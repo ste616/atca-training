@@ -7,7 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "rpfits/reader.h"
+#include "reader.h"
 
 int main(int argc, char *argv[]) {
   // The argument list should all be RPFITS files.
