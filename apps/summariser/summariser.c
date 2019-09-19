@@ -12,8 +12,8 @@
 int main(int argc, char *argv[]) {
   // The argument list should all be RPFITS files.
   int i = 0, res = 0, keep_reading = 1, read_response = 0;
-  int read_cycle = 1;
-  struct scan_data *scan_data = NULL;
+  int read_cycle = 1, nscans = 0;
+  struct scan_data *scan_data = NULL, **all_scans = NULL;
   struct cycle_data *cycle_data = NULL;
   
   for (i = 1; i < argc; i++) {
@@ -22,8 +22,13 @@ int main(int argc, char *argv[]) {
     printf("Attempt to open RPFITS file %s, %d\n", argv[i], res);
 
     while (keep_reading) {
-      // Make a new scan.
+      // Make a new scan and add it to the list.
       scan_data = prepare_new_scan_data();
+      nscans += 1;
+      all_scans = (struct scan_data**)realloc(all_scans,
+					      nscans * sizeof(struct scan_data*));
+      all_scans[nscans - 1] = scan_data;
+
       // Read in the scan header.
       read_response = read_scan_header(&(scan_data->header_data));
       printf("scan has obs date %s, time %.1f\n",
@@ -55,6 +60,7 @@ int main(int argc, char *argv[]) {
 	keep_reading = 0;
       } // Otherwise we've probably hit another header.
       printf("scan had %d cycles\n", scan_data->num_cycles);
+
     }
 
     // Close it before moving on.
@@ -62,6 +68,12 @@ int main(int argc, char *argv[]) {
     printf("Attempt to close RPFITS file, %d\n", res);
   }
 
+  // Free all the scans.
+  printf("Read in %d scans from all files.\n", nscans);
+  for (i = 0; i < nscans; i++) {
+    free_scan_data(all_scans[i]);
+  }
+  
   exit(0);
   
 }

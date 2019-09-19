@@ -87,8 +87,14 @@ struct cycle_data {
   int *ant1;
   int *ant2;
   // Flagging.
-  
-  
+  int *flag;
+  // Data.
+  float **vis;
+  float **wgt;
+  // Metadata.
+  int *bin;
+  int *if_no;
+  char **source;
 };
 
 /**
@@ -111,5 +117,8 @@ int read_scan_header(struct scan_header_data *scan_header_data);
 struct cycle_data* prepare_new_cycle_data(void);
 struct scan_data* prepare_new_scan_data(void);
 struct cycle_data* scan_add_cycle(struct scan_data *scan_data);
+void free_scan_header_data(struct scan_header_data *scan_header_data);
+void free_cycle_data(struct cycle_data *cycle_data);
+void free_scan_data(struct scan_data *scan_data);
 int read_cycle_data(struct scan_header_data *scan_header_data,
 		    struct cycle_data *cycle_data);

@@ -174,7 +174,13 @@ struct cycle_data* prepare_new_cycle_data(void) {
   cycle_data->w = NULL;
   cycle_data->ant1 = NULL;
   cycle_data->ant2 = NULL;
-
+  cycle_data->flag = NULL;
+  cycle_data->vis = NULL;
+  cycle_data->wgt = NULL;
+  cycle_data->bin = NULL;
+  cycle_data->if_no = NULL;
+  cycle_data->source = NULL;
+  
   return(cycle_data);
 }
 
@@ -205,6 +211,40 @@ struct cycle_data* scan_add_cycle(struct scan_data *scan_data) {
     prepare_new_cycle_data();
 
   return(scan_data->cycles[scan_data->num_cycles - 1]);
+}
+
+/**
+ * Free memory from a scan header.
+ */
+void free_scan_header_data(struct scan_header_data *scan_header_data) {
+  free(scan_header_data->if_centre_freq);
+  free(scan_header_data->if_bandwidth);
+  free(scan_header_data->if_num_channels);
+  free(scan_header_data->if_num_stokes);
+}
+
+/**
+ * Free memory from a cycle.
+ */
+void free_cycle_data(struct cycle_data *cycle_data) {
+  free(cycle_data->u);
+  free(cycle_data->v);
+  free(cycle_data->w);
+  free(cycle_data->ant1);
+  free(cycle_data->ant2);
+}
+
+/**
+ * Free memory from a scan.
+ */
+void free_scan_data(struct scan_data *scan_data) {
+  int i = 0;
+
+  for (i = 0; i < scan_data->num_cycles; i++) {
+    free_cycle_data(scan_data->cycles[i]);
+  }
+  free(scan_data->cycles);
+  free_scan_header_data(&(scan_data->header_data));
 }
 
 /**
@@ -275,7 +315,8 @@ int read_cycle_data(struct scan_header_data *scan_header_data,
 					  cycle_data->num_points * sizeof(int));
 	base_to_ants(baseline, &(cycle_data->ant1[cycle_data->num_points - 1]),
 		     &(cycle_data->ant2[cycle_data->num_points - 1]));
-
+	cycle_data->flag = (int *)realloc(cycle_data->flag,
+					  cycle_data->num_points * sizeof(int));
       }
     }
   }
