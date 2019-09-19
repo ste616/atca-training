@@ -2,20 +2,26 @@
  * ATCA Training Application: summariser.c
  * (C) Jamie Stevens CSIRO 2019
  *
- * This app summarises one or more RPFITS files.
+ * This app summarises plots out visibilities from an RPFITS file.
  */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 #include "reader.h"
 #include "memory.h"
+#include "cpgplot.h"
+
+#define BUFSIZE 1024
 
 int main(int argc, char *argv[]) {
   // The argument list should all be RPFITS files.
-  int i = 0, j = 0, k = 0, res = 0, keep_reading = 1, read_response = 0;
-  int read_cycle = 1, nscans = 0;
+  int i = 0, j = 0, k = 0, l = 0, m = 0, res = 0, keep_reading = 1;
+  int read_cycle = 1, nscans = 0, vis_length = 0, if_no, read_response = 0;
+  float min_vis, max_vis, *xpts = NULL;
   struct scan_data *scan_data = NULL, **all_scans = NULL;
   struct cycle_data *cycle_data = NULL;
+  char ptitle[BUFSIZE];
   
   for (i = 1; i < argc; i++) {
     // Try to open the RPFITS file.
@@ -77,6 +83,47 @@ int main(int argc, char *argv[]) {
     // Close it before moving on.
     res = close_rpfits_file();
     printf("Attempt to close RPFITS file, %d\n", res);
+
+    // Plot the data from this file.
+    printf("Plotting...\n");
+    cpgopen("/xs");
+    cpgask(1);
+    for (j = 0; j < nscans; j++) {
+      scan_data = all_scans[j];
+      for (k = 0; k < scan_data->num_cycles; k++) {
+	cycle_data = scan_data->cycles[k];
+	for (l = 0; l < cycle_data->num_points; l++) {
+	  cpgpage();
+	  // Determine the limits.
+	  if_no = cycle_data->if_no[l];
+	  vis_length = scan_data->header_data.if_num_stokes[if_no] *
+	    scan_data->header_data.if_num_channels[if_no];
+	  REALLOC(xpts, vis_length);
+	  min_vis = INFINITY;
+	  max_vis = -INFINITY;
+	  for (m = 1; m < vis_length; m++) {
+	    xpts[m] = m;
+	    if (cycle_data->vis[l][m] != cycle_data->vis[l][m]) {
+	      // This is NaN.
+	      continue;
+	    }
+	    min_vis = (cycle_data->vis[l][m] < min_vis) ?
+	      cycle_data->vis[l][m] : min_vis;
+	    max_vis = (cycle_data->vis[l][m] > max_vis) ?
+	      cycle_data->vis[l][m] : max_vis;
+	  }
+	  snprintf(ptitle, BUFSIZE, "%d-%d bin %d IF %d",
+		   cycle_data->ant1[l], cycle_data->ant2[l],
+		   cycle_data->bin[l], cycle_data->if_no[l]);
+	  printf("%s min %.5f max %.5f\n", ptitle, min_vis, max_vis);
+	  cpgswin(0, vis_length, min_vis, max_vis);
+	  cpgbox("BCNTS", 0, 0, "BCNTS", 0, 0);
+	  cpgline(vis_length, xpts, cycle_data->vis[l]);
+	  cpglab("X", "Y", ptitle);
+	}
+      }
+    }
+    cpgclos();
   }
 
   // Free all the scans.

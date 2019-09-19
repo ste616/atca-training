@@ -49,6 +49,10 @@
 #define READER_DATA_AVAILABLE 1
 #define READER_HEADER_AVAILABLE 2
 
+// Some check values.
+#define RPFITS_FLAG_BAD 1
+#define RPFITS_FLAG_GOOD 0
+
 /**
  * This structure holds all the header information data.
  */

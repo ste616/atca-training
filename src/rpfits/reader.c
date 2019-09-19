@@ -249,12 +249,14 @@ int read_cycle_data(struct scan_header_data *scan_header_data,
   int baseline, last_ut = -1, ant1, ant2;
   float *vis = NULL, *wgt = NULL, ut, u, v, w;
 
-  // Allocate some memory.
-  vis_size = size_of_vis();
-  MALLOC(vis, 2 * vis_size);
-  MALLOC(wgt, 2 * vis_size);
   
   while (read_data) {
+    // Allocate some memory.
+    vis_size = size_of_vis();
+    MALLOC(vis, 2 * vis_size);
+    MALLOC(wgt, 2 * vis_size);
+
+    // Read in the data.
     this_jstat = JSTAT_READDATA;
     rpfits_result = rpfitsin_(&this_jstat, vis, wgt, &baseline, &ut,
 			      &u, &v, &w, &flag, &bin, &if_no, &sourceno);
@@ -298,13 +300,19 @@ int read_cycle_data(struct scan_header_data *scan_header_data,
 	ARRAY_APPEND(cycle_data->ant1, cycle_data->num_points, ant1);
 	ARRAY_APPEND(cycle_data->ant2, cycle_data->num_points, ant2);
 	ARRAY_APPEND(cycle_data->flag, cycle_data->num_points, flag);
+	ARRAY_APPEND(cycle_data->bin, cycle_data->num_points, bin);
+	ARRAY_APPEND(cycle_data->if_no, cycle_data->num_points, if_no);
+	// We have to do something special for the source name.
+	REALLOC(cycle_data->source, cycle_data->num_points);
+	MALLOC(cycle_data->source[cycle_data->num_points - 1], SOURCE_LENGTH);
+	string_copy(SOURCENAME(sourceno), SOURCE_LENGTH,
+		    cycle_data->source[cycle_data->num_points - 1]);
+	// Keep a pointer to the vis and weight data.
+	ARRAY_APPEND(cycle_data->vis, cycle_data->num_points, vis);
+	ARRAY_APPEND(cycle_data->wgt, cycle_data->num_points, wgt);
       }
     }
   }
-
-  // Free our memory.
-  FREE(vis);
-  FREE(wgt);
 
   return(rv);
   
