@@ -4,6 +4,7 @@
 #include <math.h>
 #include "RPFITS.h"
 #include "reader.h"
+#include "memory.h"
 
 /**
  * ATCA Training Library: reader.c
@@ -26,7 +27,7 @@ void base_to_ants(int baseline,int *ant1,int *ant2){
   /* the baseline number is just 256*a1 + a2, where
      a1 is antenna 1, and a2 is antenna 2, and a1<=a2 */
 
-  *ant2 = baseline % 6;
+  *ant2 = baseline % 256;
   *ant1 = (baseline - *ant2) / 256;
   
 }
@@ -127,14 +128,10 @@ int read_scan_header(struct scan_header_data *scan_header_data) {
     scan_header_data->declination_degrees = DECLINATION(sourceno) * 180 / M_PI;
 
     scan_header_data->num_ifs = if_.n_if;
-    scan_header_data->if_centre_freq = (float *)malloc(scan_header_data->num_ifs *
-						 sizeof(float));
-    scan_header_data->if_bandwidth = (float *)malloc(scan_header_data->num_ifs *
-					       sizeof(float));
-    scan_header_data->if_num_channels = (int *)malloc(scan_header_data->num_ifs *
-						sizeof(int));
-    scan_header_data->if_num_stokes = (int *)malloc(scan_header_data->num_ifs *
-					      sizeof(int));
+    MALLOC(scan_header_data->if_centre_freq, scan_header_data->num_ifs);
+    MALLOC(scan_header_data->if_bandwidth, scan_header_data->num_ifs);
+    MALLOC(scan_header_data->if_num_channels, scan_header_data->num_ifs);
+    MALLOC(scan_header_data->if_num_stokes, scan_header_data->num_ifs);
     for (i = 0; i < scan_header_data->num_ifs; i++) {
       scan_header_data->if_centre_freq[i] = FREQUENCYMHZ(i);
       scan_header_data->if_bandwidth[i] = BANDWIDTHMHZ(i);
@@ -145,9 +142,6 @@ int read_scan_header(struct scan_header_data *scan_header_data) {
     // We read the data if there is data to read.
     if ((scan_header_data->if_num_stokes[0] *
 	 scan_header_data->if_num_channels[0]) > 0) {
-      // Allocate some memory for the data.
-      //vis = (float *)realloc(vis, 2 * vis_size * sizeof(float));
-      //wgt = (float *)realloc(wgt, 2 * vis_size * sizeof(float));
       keep_reading = keep_reading | READER_DATA_AVAILABLE;
     }
 
@@ -204,9 +198,7 @@ struct scan_data* prepare_new_scan_data(void) {
  */
 struct cycle_data* scan_add_cycle(struct scan_data *scan_data) {
   scan_data->num_cycles += 1;
-  scan_data->cycles =
-    (struct cycle_data**)realloc(scan_data->cycles,
-				 scan_data->num_cycles * sizeof(struct cycle_data*));
+  REALLOC(scan_data->cycles, scan_data->num_cycles);
   scan_data->cycles[scan_data->num_cycles - 1] =
     prepare_new_cycle_data();
 
@@ -217,21 +209,21 @@ struct cycle_data* scan_add_cycle(struct scan_data *scan_data) {
  * Free memory from a scan header.
  */
 void free_scan_header_data(struct scan_header_data *scan_header_data) {
-  free(scan_header_data->if_centre_freq);
-  free(scan_header_data->if_bandwidth);
-  free(scan_header_data->if_num_channels);
-  free(scan_header_data->if_num_stokes);
+  FREE(scan_header_data->if_centre_freq);
+  FREE(scan_header_data->if_bandwidth);
+  FREE(scan_header_data->if_num_channels);
+  FREE(scan_header_data->if_num_stokes);
 }
 
 /**
  * Free memory from a cycle.
  */
 void free_cycle_data(struct cycle_data *cycle_data) {
-  free(cycle_data->u);
-  free(cycle_data->v);
-  free(cycle_data->w);
-  free(cycle_data->ant1);
-  free(cycle_data->ant2);
+  FREE(cycle_data->u);
+  FREE(cycle_data->v);
+  FREE(cycle_data->w);
+  FREE(cycle_data->ant1);
+  FREE(cycle_data->ant2);
 }
 
 /**
@@ -243,7 +235,7 @@ void free_scan_data(struct scan_data *scan_data) {
   for (i = 0; i < scan_data->num_cycles; i++) {
     free_cycle_data(scan_data->cycles[i]);
   }
-  free(scan_data->cycles);
+  FREE(scan_data->cycles);
   free_scan_header_data(&(scan_data->header_data));
 }
 
@@ -254,13 +246,13 @@ int read_cycle_data(struct scan_header_data *scan_header_data,
 		    struct cycle_data *cycle_data) {
   int this_jstat = JSTAT_READDATA, read_data = 1, rpfits_result = 0;
   int flag, bin, if_no, sourceno, vis_size = 0, rv = READER_HEADER_AVAILABLE;
-  int baseline, last_ut = -1;
+  int baseline, last_ut = -1, ant1, ant2;
   float *vis = NULL, *wgt = NULL, ut, u, v, w;
 
   // Allocate some memory.
   vis_size = size_of_vis();
-  vis = (float *)malloc(2 * vis_size * sizeof(float));
-  wgt = (float *)malloc(2 * vis_size * sizeof(float));
+  MALLOC(vis, 2 * vis_size);
+  MALLOC(wgt, 2 * vis_size);
   
   while (read_data) {
     this_jstat = JSTAT_READDATA;
@@ -299,31 +291,20 @@ int read_cycle_data(struct scan_header_data *scan_header_data,
       } else {
 	// Store this data.
 	cycle_data->num_points += 1;
-	// Allocate the memory.
-	cycle_data->u = (float *)realloc(cycle_data->u,
-					 cycle_data->num_points * sizeof(float));
-	cycle_data->u[cycle_data->num_points - 1] = u;
-	cycle_data->v = (float *)realloc(cycle_data->v,
-					 cycle_data->num_points * sizeof(float));
-	cycle_data->v[cycle_data->num_points - 1] = v;
-	cycle_data->w = (float *)realloc(cycle_data->w,
-					 cycle_data->num_points * sizeof(float));
-	cycle_data->w[cycle_data->num_points - 1] = w;
-	cycle_data->ant1 = (int *)realloc(cycle_data->ant1,
-					  cycle_data->num_points * sizeof(int));
-	cycle_data->ant2 = (int *)realloc(cycle_data->ant2,
-					  cycle_data->num_points * sizeof(int));
-	base_to_ants(baseline, &(cycle_data->ant1[cycle_data->num_points - 1]),
-		     &(cycle_data->ant2[cycle_data->num_points - 1]));
-	cycle_data->flag = (int *)realloc(cycle_data->flag,
-					  cycle_data->num_points * sizeof(int));
+	base_to_ants(baseline, &ant1, &ant2);
+	ARRAY_APPEND(cycle_data->u, cycle_data->num_points, u);
+	ARRAY_APPEND(cycle_data->v, cycle_data->num_points, v);
+	ARRAY_APPEND(cycle_data->w, cycle_data->num_points, w);
+	ARRAY_APPEND(cycle_data->ant1, cycle_data->num_points, ant1);
+	ARRAY_APPEND(cycle_data->ant2, cycle_data->num_points, ant2);
+	ARRAY_APPEND(cycle_data->flag, cycle_data->num_points, flag);
       }
     }
   }
 
   // Free our memory.
-  free(vis);
-  free(wgt);
+  FREE(vis);
+  FREE(wgt);
 
   return(rv);
   

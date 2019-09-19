@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "reader.h"
+#include "memory.h"
 
 int main(int argc, char *argv[]) {
   // The argument list should all be RPFITS files.
@@ -25,9 +26,10 @@ int main(int argc, char *argv[]) {
       // Make a new scan and add it to the list.
       scan_data = prepare_new_scan_data();
       nscans += 1;
-      all_scans = (struct scan_data**)realloc(all_scans,
+      ARRAY_APPEND(all_scans, nscans, scan_data);
+      /*all_scans = (struct scan_data**)realloc(all_scans,
 					      nscans * sizeof(struct scan_data*));
-      all_scans[nscans - 1] = scan_data;
+					      all_scans[nscans - 1] = scan_data;*/
 
       // Read in the scan header.
       read_response = read_scan_header(&(scan_data->header_data));
