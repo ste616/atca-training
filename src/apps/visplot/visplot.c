@@ -95,13 +95,13 @@ int main(int argc, char *argv[]) {
 	for (l = 0; l < cycle_data->num_points; l++) {
 	  cpgpage();
 	  // Determine the limits.
-	  if_no = cycle_data->if_no[l];
+	  if_no = cycle_data->if_no[l] - 1;
 	  vis_length = scan_data->header_data.if_num_stokes[if_no] *
 	    scan_data->header_data.if_num_channels[if_no];
 	  REALLOC(xpts, vis_length);
 	  min_vis = INFINITY;
 	  max_vis = -INFINITY;
-	  for (m = 1; m < vis_length; m++) {
+	  for (m = 0; m < vis_length; m++) {
 	    xpts[m] = m;
 	    if (cycle_data->vis[l][m] != cycle_data->vis[l][m]) {
 	      // This is NaN.
