@@ -97,7 +97,7 @@ int main(int argc, char *argv[]) {
 	  // Determine the limits.
 	  if_no = cycle_data->if_no[l] - 1;
 	  vis_length = scan_data->header_data.if_num_stokes[if_no] *
-	    scan_data->header_data.if_num_channels[if_no];
+	    scan_data->header_data.if_num_channels[if_no] * 2;
 	  REALLOC(xpts, vis_length);
 	  min_vis = INFINITY;
 	  max_vis = -INFINITY;

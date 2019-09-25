@@ -3,6 +3,7 @@
 #include <string.h>
 #include <math.h>
 #include "RPFITS.h"
+#include "atrpfits.h"
 #include "reader.h"
 #include "memory.h"
 
@@ -41,10 +42,44 @@ int size_of_vis(void) {
   int i, vis_size = 0;
 
   for (i = 0; i < if_.n_if; i++){
-    vis_size += ((if_.if_nstok[i] + 1) * (if_.if_nfreq[i] + 1));
+    vis_size += (if_.if_nstok[i] * if_.if_nfreq[i]);
   }
 
   return(vis_size);
+}
+
+/**
+ * Routine to work out how big the visibility set is for
+ * a nominated IF.
+ */
+int size_of_if_vis(int if_no) {
+  int vis_size = 0, idx = -1;
+
+  // The vis size is just the number of Stokes parameters
+  // multiplied by the number of channels. Because each visibility
+  // is a complex number, we need two values per (hence the * 2).
+  // The if_no is what comes from the rpfitsin_ call, which is
+  // 1-indexed, so we subtract 1.
+  idx = if_no - 1;
+  vis_size = 2 * if_.if_nstok[idx] * if_.if_nfreq[idx];
+
+  return(vis_size);
+}
+
+/**
+ * Routine to work out the maximum size required for a vis array.
+ * We need this since we can't get the if_no until after the
+ * rpfitsin_ call, but we need the vis allocated before it.
+ */
+int max_size_of_vis(void) {
+  int i = 0, vis_size = 0, max_vis_size = 0;
+
+  for (i = 1; i <= if_.n_if; i++) {
+    vis_size = size_of_if_vis(i);
+    max_vis_size = (vis_size > max_vis_size) ? vis_size : max_vis_size;
+  }
+
+  return(max_vis_size);
 }
 
 /**
@@ -252,9 +287,9 @@ int read_cycle_data(struct scan_header_data *scan_header_data,
   
   while (read_data) {
     // Allocate some memory.
-    vis_size = size_of_vis();
-    MALLOC(vis, 2 * vis_size);
-    MALLOC(wgt, 2 * vis_size);
+    vis_size = max_size_of_vis();
+    MALLOC(vis, vis_size);
+    MALLOC(wgt, vis_size);
 
     // Read in the data.
     this_jstat = JSTAT_READDATA;
