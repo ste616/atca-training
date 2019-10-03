@@ -7,7 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "reader.h"
+#include "atrpfits.h"
 #include "memory.h"
 
 int main(int argc, char *argv[]) {
@@ -40,6 +40,17 @@ int main(int argc, char *argv[]) {
       printf("  coordinates RA = %.4f, Dec = %.4f\n",
 	     scan_data->header_data.rightascension_hours,
 	     scan_data->header_data.declination_degrees);
+      printf("  number of IFs = %d:\n", scan_data->header_data.num_ifs);
+      for (i = 0; i < scan_data->header_data.num_ifs; i++) {
+	printf("   %d: num channels = %d, num stokes = %d\n", i,
+	       scan_data->header_data.if_num_channels[i],
+	       scan_data->header_data.if_num_stokes[i]);
+	printf("      ");
+	for (j = 0; j < scan_data->header_data.if_num_stokes[i]; j++) {
+	  printf("[%s] ", scan_data->header_data.if_stokes_names[i][j]);
+	}
+	printf("\n");
+      }
       if (read_response & READER_DATA_AVAILABLE) {
 	  // Now start reading the cycle data.
 	read_cycle = 1;
@@ -48,7 +59,7 @@ int main(int argc, char *argv[]) {
 	  read_response = read_cycle_data(&(scan_data->header_data),
 					  cycle_data);
 	  //fprintf(stderr, "found read response %d\n", read_response);
-	  //printf("cycle has %d points\n", cycle_data->num_points);
+	  /*printf("cycle has %d baselines\n", cycle_data->n_baselines);*/
 	  if (!(read_response & READER_DATA_AVAILABLE)) {
 	    read_cycle = 0;
 	  }

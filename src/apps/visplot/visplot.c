@@ -8,7 +8,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
-#include "reader.h"
+#include <complex.h>
+#include "atrpfits.h"
 #include "memory.h"
 #include "cpgplot.h"
 
@@ -18,6 +19,7 @@ int main(int argc, char *argv[]) {
   // The argument list should all be RPFITS files.
   int i = 0, j = 0, k = 0, l = 0, m = 0, res = 0, keep_reading = 1;
   int read_cycle = 1, nscans = 0, vis_length = 0, if_no, read_response = 0;
+  int plotpol = POL_XX, plotif = 0;
   float min_vis, max_vis, *xpts = NULL;
   struct scan_data *scan_data = NULL, **all_scans = NULL;
   struct cycle_data *cycle_data = NULL;
@@ -92,12 +94,14 @@ int main(int argc, char *argv[]) {
       scan_data = all_scans[j];
       for (k = 0; k < scan_data->num_cycles; k++) {
 	cycle_data = scan_data->cycles[k];
+	// We will plot only XX pol of IF 1.
+	
 	for (l = 0; l < cycle_data->num_points; l++) {
 	  cpgpage();
 	  // Determine the limits.
 	  if_no = cycle_data->if_no[l] - 1;
 	  vis_length = scan_data->header_data.if_num_stokes[if_no] *
-	    scan_data->header_data.if_num_channels[if_no] * 2;
+	    scan_data->header_data.if_num_channels[if_no];
 	  REALLOC(xpts, vis_length);
 	  min_vis = INFINITY;
 	  max_vis = -INFINITY;
@@ -107,10 +111,10 @@ int main(int argc, char *argv[]) {
 	      // This is NaN.
 	      continue;
 	    }
-	    min_vis = (cycle_data->vis[l][m] < min_vis) ?
-	      cycle_data->vis[l][m] : min_vis;
-	    max_vis = (cycle_data->vis[l][m] > max_vis) ?
-	      cycle_data->vis[l][m] : max_vis;
+	    min_vis = (crealf(cycle_data->vis[l][m]) < min_vis) ?
+	      crealf(cycle_data->vis[l][m]) : min_vis;
+	    max_vis = (crealf(cycle_data->vis[l][m]) > max_vis) ?
+	      crealf(cycle_data->vis[l][m]) : max_vis;
 	  }
 	  snprintf(ptitle, BUFSIZE, "%d-%d bin %d IF %d",
 		   cycle_data->ant1[l], cycle_data->ant2[l],

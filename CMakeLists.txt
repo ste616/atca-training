@@ -2,7 +2,8 @@ cmake_minimum_required (VERSION 3.5)
 project (ATCATraining LANGUAGES C Fortran)
 set(CMAKE_BUILD_TYPE Debug)
 
-add_library(atrpfits STATIC src/rpfits/reader.c)
+add_library(atrpfits STATIC src/rpfits/reader.c src/rpfits/compute.c
+  src/rpfits/atrpfits.c)
 target_include_directories(atrpfits PUBLIC src/rpfits src/include)
 
 add_executable(summariser src/apps/summariser/summariser.c)

@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <complex.h>
 #include "RPFITS.h"
 #include "atrpfits.h"
 #include "reader.h"
@@ -20,18 +21,6 @@
  * 
  * This module handles reading an RPFITS file.
  */
-
-/**
- * Routine to convert an RPFITS baseline number into the component antennas.
- */
-void base_to_ants(int baseline,int *ant1,int *ant2){
-  /* the baseline number is just 256*a1 + a2, where
-     a1 is antenna 1, and a2 is antenna 2, and a1<=a2 */
-
-  *ant2 = baseline % 256;
-  *ant1 = (baseline - *ant2) / 256;
-  
-}
 
 /**
  * Routine to assess how large the visibility set is.
@@ -56,12 +45,11 @@ int size_of_if_vis(int if_no) {
   int vis_size = 0, idx = -1;
 
   // The vis size is just the number of Stokes parameters
-  // multiplied by the number of channels. Because each visibility
-  // is a complex number, we need two values per (hence the * 2).
+  // multiplied by the number of channels.
   // The if_no is what comes from the rpfitsin_ call, which is
   // 1-indexed, so we subtract 1.
   idx = if_no - 1;
-  vis_size = 2 * if_.if_nstok[idx] * if_.if_nfreq[idx];
+  vis_size = if_.if_nstok[idx] * if_.if_nfreq[idx];
 
   return(vis_size);
 }
@@ -134,7 +122,7 @@ int read_scan_header(struct scan_header_data *scan_header_data) {
   int keep_reading = READER_HEADER_AVAILABLE, this_jstat = 0, that_jstat = 0;
   int rpfits_result = 0;
   int vis_size = 0, flag = 0, bin = 0, if_no = 0, sourceno = 0, baseline = 0;
-  int i = 0, read_data = 0;
+  int i = 0, read_data = 0, j = 0;
   float *vis = NULL, *wgt = NULL, ut = 0, u = 0, v = 0, w = 0;
   
   this_jstat = JSTAT_READNEXTHEADER;
@@ -167,11 +155,19 @@ int read_scan_header(struct scan_header_data *scan_header_data) {
     MALLOC(scan_header_data->if_bandwidth, scan_header_data->num_ifs);
     MALLOC(scan_header_data->if_num_channels, scan_header_data->num_ifs);
     MALLOC(scan_header_data->if_num_stokes, scan_header_data->num_ifs);
+    MALLOC(scan_header_data->if_stokes_names, scan_header_data->num_ifs);
     for (i = 0; i < scan_header_data->num_ifs; i++) {
       scan_header_data->if_centre_freq[i] = FREQUENCYMHZ(i);
       scan_header_data->if_bandwidth[i] = BANDWIDTHMHZ(i);
       scan_header_data->if_num_channels[i] = NCHANNELS(i);
       scan_header_data->if_num_stokes[i] = NSTOKES(i);
+      MALLOC(scan_header_data->if_stokes_names[i], NSTOKES(i));
+      for (j = 0; j < NSTOKES(i); j++) {
+	MALLOC(scan_header_data->if_stokes_names[i][j], 3);
+	(void)strncpy(scan_header_data->if_stokes_names[i][j],
+		      CSTOKES(i, j), 2);
+	scan_header_data->if_stokes_names[i][j][2] = '\0';
+      }
     }
 
     // We read the data if there is data to read.
@@ -193,6 +189,7 @@ int read_scan_header(struct scan_header_data *scan_header_data) {
  * filled by the reader.
  */
 struct cycle_data* prepare_new_cycle_data(void) {
+  int i;
   struct cycle_data *cycle_data = NULL;
 
   cycle_data = (struct cycle_data *)malloc(sizeof(struct cycle_data));
@@ -209,6 +206,10 @@ struct cycle_data* prepare_new_cycle_data(void) {
   cycle_data->bin = NULL;
   cycle_data->if_no = NULL;
   cycle_data->source = NULL;
+
+  // Zero the all_baselines array.
+  memset(cycle_data->all_baselines, 0, sizeof(cycle_data->all_baselines));
+  cycle_data->n_baselines = 0;
   
   return(cycle_data);
 }
@@ -281,14 +282,14 @@ int read_cycle_data(struct scan_header_data *scan_header_data,
 		    struct cycle_data *cycle_data) {
   int this_jstat = JSTAT_READDATA, read_data = 1, rpfits_result = 0;
   int flag, bin, if_no, sourceno, vis_size = 0, rv = READER_HEADER_AVAILABLE;
-  int baseline, last_ut = -1, ant1, ant2;
+  int baseline, last_ut = -1, ant1, ant2, i, bidx = 1;
   float *vis = NULL, *wgt = NULL, ut, u, v, w;
-
+  float complex *cvis = NULL;
   
   while (read_data) {
     // Allocate some memory.
     vis_size = max_size_of_vis();
-    MALLOC(vis, vis_size);
+    MALLOC(vis, 2 * vis_size);
     MALLOC(wgt, vis_size);
 
     // Read in the data.
@@ -329,6 +330,10 @@ int read_cycle_data(struct scan_header_data *scan_header_data,
 	// Store this data.
 	cycle_data->num_points += 1;
 	base_to_ants(baseline, &ant1, &ant2);
+	if (cycle_data->all_baselines[baseline] == 0) {
+	  cycle_data->all_baselines[baseline] = bidx;
+	  bidx += 1;
+	}
 	ARRAY_APPEND(cycle_data->u, cycle_data->num_points, u);
 	ARRAY_APPEND(cycle_data->v, cycle_data->num_points, v);
 	ARRAY_APPEND(cycle_data->w, cycle_data->num_points, w);
@@ -342,13 +347,20 @@ int read_cycle_data(struct scan_header_data *scan_header_data,
 	MALLOC(cycle_data->source[cycle_data->num_points - 1], SOURCE_LENGTH);
 	string_copy(SOURCENAME(sourceno), SOURCE_LENGTH,
 		    cycle_data->source[cycle_data->num_points - 1]);
+	// Convert the vis array read into complex numbers.
+	MALLOC(cvis, vis_size);
+	for (i = 0; i < vis_size; i++) {
+	  cvis[i] = vis[i * 2] + vis[(i * 2) + 1] * I;
+	}
 	// Keep a pointer to the vis and weight data.
-	ARRAY_APPEND(cycle_data->vis, cycle_data->num_points, vis);
+	ARRAY_APPEND(cycle_data->vis, cycle_data->num_points, cvis);
 	ARRAY_APPEND(cycle_data->wgt, cycle_data->num_points, wgt);
       }
     }
   }
 
+  cycle_data->n_baselines = bidx - 1;
+  
   return(rv);
   
 }

@@ -41,14 +41,13 @@
 #define BANDWIDTHMHZ(f) doubles_.if_bw[f] / 1e6
 #define NCHANNELS(f) if_.if_nfreq[f]
 #define NSTOKES(f) if_.if_nstok[f]
-
+#define CSTOKES(f,s) names_.if_cstok + (s * 2 + f * 4 * 2)
 
 // Return values from the read routines.
 #define READER_EXHAUSTED 0
 #define READER_DATA_AVAILABLE 1
 #define READER_HEADER_AVAILABLE 2
 
-void base_to_ants(int baseline, int *ant1, int *ant2);
 int size_of_vis(void);
 int size_of_if_vis(int if_no);
 int max_size_of_vis(void);
