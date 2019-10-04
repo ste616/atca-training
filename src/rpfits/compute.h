@@ -41,7 +41,7 @@ struct ampphase {
   int nbaselines;
 
   // Now the arrays storing the labels for each quantity.
-  int *channel;
+  float *channel;
   float *frequency; // in GHz.
   int *baseline;
 
@@ -71,8 +71,8 @@ struct ampphase {
 };
 
 struct ampphase* prepare_ampphase(void);
-void free_ampphase(struct ampphase *ampphase);
+void free_ampphase(struct ampphase **ampphase);
 int polarisation_number(char *polstring);
 int vis_ampphase(struct scan_header_data *scan_header_data,
 		 struct cycle_data *cycle_data,
-		 struct ampphase *ampphase, int pol, int ifno, int bin);
+		 struct ampphase **ampphase, int pol, int ifno, int bin);

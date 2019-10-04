@@ -19,11 +19,15 @@ int main(int argc, char *argv[]) {
   // The argument list should all be RPFITS files.
   int i = 0, j = 0, k = 0, l = 0, m = 0, res = 0, keep_reading = 1;
   int read_cycle = 1, nscans = 0, vis_length = 0, if_no, read_response = 0;
-  int plotpol = POL_XX, plotif = 0;
+  int plotpol = POL_XX, plotif = 0, r = 0, ant1, ant2;
   float min_vis, max_vis, *xpts = NULL;
   struct scan_data *scan_data = NULL, **all_scans = NULL;
   struct cycle_data *cycle_data = NULL;
+  struct ampphase *cycle_ampphase = NULL;
   char ptitle[BUFSIZE];
+
+  cpgopen("/xs");
+  cpgask(1);
   
   for (i = 1; i < argc; i++) {
     // Try to open the RPFITS file.
@@ -61,24 +65,39 @@ int main(int argc, char *argv[]) {
 	    read_cycle = 0;
 	  }
 	}
-      } 
+      }
+      for (k = 0; k < scan_data->num_cycles; k++) {
+	cycle_data = scan_data->cycles[k];
+	// We will plot only XX pol of IF 1.
+	r = vis_ampphase(&(scan_data->header_data), cycle_data,
+			 &cycle_ampphase, plotpol, plotif, 1);
+	if (r < 0) {
+	  printf("error encountered while calculating amp and phase\n");
+	  free_ampphase(&cycle_ampphase);
+	  continue;
+	}
+	for (l = 0; l < cycle_ampphase->nbaselines; l++) {
+	  cpgpage();
+	  base_to_ants(cycle_ampphase->baseline[l], &ant1, &ant2);
+	  snprintf(ptitle, BUFSIZE, "%d-%d bin %d IF %d",
+		   ant1, ant2, 0, plotif);
+	  cpgswin(0, cycle_ampphase->nchannels,
+		  cycle_ampphase->min_amplitude[l],
+		  cycle_ampphase->max_amplitude[l]);
+	  cpgbox("BCNTS", 0, 0, "BCNTS", 0, 0);
+	  cpgline(cycle_ampphase->nchannels,
+		  cycle_ampphase->channel,
+		  cycle_ampphase->amplitude[l]);
+	  cpglab("Channel", "Amplitude", ptitle);
+	}
+	free_ampphase(&cycle_ampphase);
+      }
+    
       if (read_response == READER_EXHAUSTED) {
 	// No more data in this file.
 	keep_reading = 0;
       } // Otherwise we've probably hit another header.
       printf("scan had %d cycles\n", scan_data->num_cycles);
-      /*for (j = 0; j < scan_data->num_cycles; j++) {
-	/*printf("   %04d: number of products = %d\n", (j + 1),
-	  scan_data->cycles[j]->num_points);* /
-	printf(" %04d: unflagged baselines ", (j + 1));
-	for (k = 0; k < scan_data->cycles[j]->num_points; k++) {
-	  if (scan_data->cycles[j]->flag[k] == RPFITS_FLAG_GOOD) {
-	    printf(" %d-%d", scan_data->cycles[j]->ant1[k],
-		   scan_data->cycles[j]->ant2[k]);
-	  }
-	}
-	printf("\n");
-	}*/
 
     }
 
@@ -86,50 +105,10 @@ int main(int argc, char *argv[]) {
     res = close_rpfits_file();
     printf("Attempt to close RPFITS file, %d\n", res);
 
-    // Plot the data from this file.
-    printf("Plotting...\n");
-    cpgopen("/xs");
-    cpgask(1);
-    for (j = 0; j < nscans; j++) {
-      scan_data = all_scans[j];
-      for (k = 0; k < scan_data->num_cycles; k++) {
-	cycle_data = scan_data->cycles[k];
-	// We will plot only XX pol of IF 1.
-	
-	for (l = 0; l < cycle_data->num_points; l++) {
-	  cpgpage();
-	  // Determine the limits.
-	  if_no = cycle_data->if_no[l] - 1;
-	  vis_length = scan_data->header_data.if_num_stokes[if_no] *
-	    scan_data->header_data.if_num_channels[if_no];
-	  REALLOC(xpts, vis_length);
-	  min_vis = INFINITY;
-	  max_vis = -INFINITY;
-	  for (m = 0; m < vis_length; m++) {
-	    xpts[m] = m;
-	    if (cycle_data->vis[l][m] != cycle_data->vis[l][m]) {
-	      // This is NaN.
-	      continue;
-	    }
-	    min_vis = (crealf(cycle_data->vis[l][m]) < min_vis) ?
-	      crealf(cycle_data->vis[l][m]) : min_vis;
-	    max_vis = (crealf(cycle_data->vis[l][m]) > max_vis) ?
-	      crealf(cycle_data->vis[l][m]) : max_vis;
-	  }
-	  snprintf(ptitle, BUFSIZE, "%d-%d bin %d IF %d",
-		   cycle_data->ant1[l], cycle_data->ant2[l],
-		   cycle_data->bin[l], cycle_data->if_no[l]);
-	  printf("%s min %.5f max %.5f\n", ptitle, min_vis, max_vis);
-	  cpgswin(0, vis_length, min_vis, max_vis);
-	  cpgbox("BCNTS", 0, 0, "BCNTS", 0, 0);
-	  cpgline(vis_length, xpts, cycle_data->vis[l]);
-	  cpglab("X", "Y", ptitle);
-	}
-      }
-    }
-    cpgclos();
   }
 
+  cpgclos();
+  
   // Free all the scans.
   printf("Read in %d scans from all files.\n", nscans);
   for (i = 0; i < nscans; i++) {

@@ -49,7 +49,11 @@ struct ampphase* prepare_ampphase(void) {
   ampphase->max_amplitude = NULL;
   ampphase->min_phase = NULL;
   ampphase->max_phase = NULL;
-  
+
+  ampphase->min_amplitude_global = INFINITY;
+  ampphase->max_amplitude_global = -INFINITY;
+  ampphase->min_phase_global = INFINITY;
+  ampphase->max_phase_global = -INFINITY;
   
   return(ampphase);
 }
@@ -57,23 +61,28 @@ struct ampphase* prepare_ampphase(void) {
 /**
  * Free an ampphase structure's memory.
  */
-void free_ampphase(struct ampphase *ampphase) {
+void free_ampphase(struct ampphase **ampphase) {
   int i = 0;
 
-  for (i = 0; i < ampphase->nbaselines; i++) {
-    FREE(ampphase->weight[i]);
-    FREE(ampphase->amplitude[i]);
-    FREE(ampphase->phase[i]);
+  for (i = 0; i < (*ampphase)->nbaselines; i++) {
+    FREE((*ampphase)->weight[i]);
+    FREE((*ampphase)->amplitude[i]);
+    FREE((*ampphase)->phase[i]);
   }
-  FREE(ampphase->weight);
-  FREE(ampphase->amplitude);
-  FREE(ampphase->phase);
+  FREE((*ampphase)->weight);
+  FREE((*ampphase)->amplitude);
+  FREE((*ampphase)->phase);
 
-  FREE(ampphase->channel);
-  FREE(ampphase->frequency);
-  FREE(ampphase->baseline);
+  FREE((*ampphase)->channel);
+  FREE((*ampphase)->frequency);
+  FREE((*ampphase)->baseline);
 
-  FREE(ampphase);
+  FREE((*ampphase)->min_amplitude);
+  FREE((*ampphase)->max_amplitude);
+  FREE((*ampphase)->min_phase);
+  FREE((*ampphase)->max_phase);
+  
+  FREE(*ampphase);
 }
 
 /**
@@ -110,15 +119,15 @@ int polarisation_number(char *polstring) {
  */
 int vis_ampphase(struct scan_header_data *scan_header_data,
 		  struct cycle_data *cycle_data,
-		  struct ampphase *ampphase,
+		  struct ampphase **ampphase,
 		  int pol, int ifno, int bin) {
   int ap_created = 0, reqpol = -1, i = 0, polnum = -1, bl = -1, bidx = -1;
   int j = 0, vidx = -1;
 
   // Prepare the structure if required.
-  if (ampphase == NULL) {
+  if (*ampphase == NULL) {
     ap_created = 1;
-    ampphase = prepare_ampphase();
+    *ampphase = prepare_ampphase();
   }
 
   // Check we know about the window number we were given.
@@ -128,11 +137,11 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
     }
     return -1;
   }
-  ampphase->window = ifno;
+  (*ampphase)->window = ifno;
   
   // Get the number of channels in this window.
-  ampphase->nchannels = scan_header_data->if_num_channels[ifno];
-
+  (*ampphase)->nchannels = scan_header_data->if_num_channels[ifno];
+  
   // Determine which of the polarisations is the one requested.
   for (i = 0; i < scan_header_data->if_num_stokes[ifno]; i++) {
     polnum = polarisation_number(scan_header_data->if_stokes_names[ifno][i]);
@@ -149,26 +158,47 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
     return -1;
   }
 
-  ampphase->pol = pol;
+  (*ampphase)->pol = pol;
 
   // Allocate the necessary arrays.
-  ampphase->nbaselines = cycle_data->n_baselines;
-  MALLOC(ampphase->weight, ampphase->nbaselines);
-  MALLOC(ampphase->amplitude, ampphase->nbaselines);
-  MALLOC(ampphase->phase, ampphase->nbaselines);
-  for (i = 0; i < ampphase->nbaselines; i++) {
-    MALLOC(ampphase->weight[i], ampphase->nchannels);
-    MALLOC(ampphase->amplitude[i], ampphase->nchannels);
-    MALLOC(ampphase->phase[i], ampphase->nchannels);
+  MALLOC((*ampphase)->channel, (*ampphase)->nchannels);
+  MALLOC((*ampphase)->frequency, (*ampphase)->nchannels);
+
+  (*ampphase)->nbaselines = cycle_data->n_baselines;
+  MALLOC((*ampphase)->weight, (*ampphase)->nbaselines);
+  MALLOC((*ampphase)->amplitude, (*ampphase)->nbaselines);
+  MALLOC((*ampphase)->phase, (*ampphase)->nbaselines);
+  MALLOC((*ampphase)->baseline, (*ampphase)->nbaselines);
+  MALLOC((*ampphase)->min_amplitude, (*ampphase)->nbaselines);
+  MALLOC((*ampphase)->max_amplitude, (*ampphase)->nbaselines);
+  MALLOC((*ampphase)->min_phase, (*ampphase)->nbaselines);
+  MALLOC((*ampphase)->max_phase, (*ampphase)->nbaselines);
+  for (i = 0; i < (*ampphase)->nbaselines; i++) {
+    MALLOC((*ampphase)->weight[i], (*ampphase)->nchannels);
+    MALLOC((*ampphase)->amplitude[i], (*ampphase)->nchannels);
+    MALLOC((*ampphase)->phase[i], (*ampphase)->nchannels);
+    (*ampphase)->min_amplitude[i] = INFINITY;
+    (*ampphase)->max_amplitude[i] = -INFINITY;
+    (*ampphase)->min_phase[i] = INFINITY;
+    (*ampphase)->max_phase[i] = -INFINITY;
+    (*ampphase)->baseline[i] = 0;
   }
   
   // Fill the arrays.
-  ampphase->bin = bin;
+  for (i = 0; i < (*ampphase)->nchannels; i++) {
+    (*ampphase)->channel[i] = i;
+    
+  }
+
+  (*ampphase)->bin = bin;
+  printf("bin is %d\n", (*ampphase)->bin);
   for (i = 0; i < cycle_data->num_points; i++) {
     // Check this is the bin we are after.
     if (cycle_data->bin[i] != bin) {
       continue;
     }
+    /*printf("found the bin with point %d, baseline %d-%d!\n", i,
+      cycle_data->ant1[i], cycle_data->ant2[i]); */
     bl = ants_to_base(cycle_data->ant1[i], cycle_data->ant2[i]);
     bidx = cycle_data->all_baselines[bl] - 1;
     if (bidx < 0) {
@@ -178,11 +208,48 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
       }
       return -1;
     }
-    for (j = 0; j < ampphase->nchannels; j++) {
+    if ((*ampphase)->baseline[bidx] == 0) {
+      (*ampphase)->baseline[bidx] = bl;
+    }
+    /*printf("baseline number is %d, index is %d, confirmation %d\n",
+	   bl, bidx, (*ampphase)->baseline[bidx]);
+	   printf("this baseline has %d channels\n", (*ampphase)->nchannels);*/
+    for (j = 0; j < (*ampphase)->nchannels; j++) {
       vidx = reqpol + j * scan_header_data->if_num_stokes[ifno];
-      ampphase->weight[bidx][j] = cycle_data->weight[i][vidx];
-      ampphase->amplitude[bidx][j] = cabsf(cycle_data->vis[i][vidx]);
-      ampphase->phase[bidx][j] = cargf(cycle_data->vis[i][vidx]);
+      (*ampphase)->weight[bidx][j] = cycle_data->wgt[i][vidx];
+      (*ampphase)->amplitude[bidx][j] = cabsf(cycle_data->vis[i][vidx]);
+      (*ampphase)->phase[bidx][j] = cargf(cycle_data->vis[i][vidx]);
+      /*printf("weight is %.2f amp %.3f phase %.3f\n",
+	     (*ampphase)->weight[bidx][j], (*ampphase)->amplitude[bidx][j],
+	     (*ampphase)->phase[bidx][j]);*/
+      // Continually assess limits.
+      //if ((*ampphase)->weight[bidx][i] > 0) {
+      if ((*ampphase)->amplitude[bidx][j] == (*ampphase)->amplitude[bidx][j]) {
+	if ((*ampphase)->amplitude[bidx][j] < (*ampphase)->min_amplitude[bidx]) {
+	  (*ampphase)->min_amplitude[bidx] = (*ampphase)->amplitude[bidx][j];
+	  if ((*ampphase)->amplitude[bidx][j] < (*ampphase)->min_amplitude_global) {
+	    (*ampphase)->min_amplitude_global = (*ampphase)->amplitude[bidx][j];
+	  }
+	}
+	if ((*ampphase)->amplitude[bidx][j] > (*ampphase)->max_amplitude[bidx]) {
+	  (*ampphase)->max_amplitude[bidx] = (*ampphase)->amplitude[bidx][j];
+	  if ((*ampphase)->amplitude[bidx][j] > (*ampphase)->max_amplitude_global) {
+	    (*ampphase)->max_amplitude_global = (*ampphase)->amplitude[bidx][j];
+	  }
+	}
+	if ((*ampphase)->phase[bidx][j] < (*ampphase)->min_phase[bidx]) {
+	  (*ampphase)->min_phase[bidx] = (*ampphase)->phase[bidx][j];
+	  if ((*ampphase)->phase[bidx][j] < (*ampphase)->min_phase_global) {
+	    (*ampphase)->min_phase_global = (*ampphase)->phase[bidx][j];
+	  }
+	}
+	if ((*ampphase)->phase[bidx][j] > (*ampphase)->max_phase[bidx]) {
+	  (*ampphase)->max_phase[bidx] = (*ampphase)->phase[bidx][j];
+	  if ((*ampphase)->phase[bidx][j] > (*ampphase)->max_phase_global) {
+	    (*ampphase)->max_phase_global = (*ampphase)->phase[bidx][j];
+	  }
+	}
+      }
     }
     
   }
