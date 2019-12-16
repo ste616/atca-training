@@ -9,6 +9,7 @@
 #include <string.h>
 #include <math.h>
 #include <complex.h>
+#include <stdbool.h>
 #include "atrpfits.h"
 #include "memory.h"
 #include "cpgplot.h"
@@ -25,9 +26,13 @@ int main(int argc, char *argv[]) {
   struct cycle_data *cycle_data = NULL;
   struct ampphase *cycle_ampphase = NULL;
   char ptitle[BUFSIZE];
-
+  struct ampphase_options ampphase_options;
+  
   cpgopen("/xs");
   cpgask(1);
+
+  // Get phase in degrees.
+  ampphase_options.phase_in_degrees = true;
   
   for (i = 1; i < argc; i++) {
     // Try to open the RPFITS file.
@@ -70,7 +75,8 @@ int main(int argc, char *argv[]) {
 	cycle_data = scan_data->cycles[k];
 	// We will plot only XX pol of IF 1.
 	r = vis_ampphase(&(scan_data->header_data), cycle_data,
-			 &cycle_ampphase, plotpol, plotif, 1);
+			 &cycle_ampphase, plotpol, plotif, 1,
+			 &ampphase_options);
 	if (r < 0) {
 	  printf("error encountered while calculating amp and phase\n");
 	  free_ampphase(&cycle_ampphase);
@@ -85,10 +91,18 @@ int main(int argc, char *argv[]) {
 		  cycle_ampphase->min_amplitude[l],
 		  cycle_ampphase->max_amplitude[l]);
 	  cpgbox("BCNTS", 0, 0, "BCNTS", 0, 0);
-	  cpgline(cycle_ampphase->nchannels,
-		  cycle_ampphase->channel,
-		  cycle_ampphase->amplitude[l]);
+	  cpgline(cycle_ampphase->f_nchannels[l],
+		  cycle_ampphase->f_channel[l],
+		  cycle_ampphase->f_amplitude[l]);
 	  cpglab("Channel", "Amplitude", ptitle);
+	  cpgpage();
+	  cpgswin(0, cycle_ampphase->nchannels,
+		  -200, 200);
+	  cpgbox("BCNTS", 0, 0, "BCNTS", 0, 0);
+	  cpgline(cycle_ampphase->f_nchannels[l],
+		  cycle_ampphase->f_channel[l],
+		  cycle_ampphase->f_phase[l]);
+	  cpglab("Channel", "Phase", ptitle);
 	}
 	free_ampphase(&cycle_ampphase);
       }

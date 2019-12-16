@@ -18,6 +18,7 @@
 #include <math.h>
 #include <string.h>
 #include <complex.h>
+#include <stdbool.h>
 #include "atrpfits.h"
 #include "memory.h"
 #include "compute.h"
@@ -113,6 +114,15 @@ int polarisation_number(char *polstring) {
 }
 
 /**
+ * Set default options in an ampphase_options structure.
+ */
+struct ampphase_options ampphase_options_default(void) {
+  struct ampphase_options options;
+
+  options.phase_in_degrees = false;
+}
+
+/**
  * Routine to compute amplitude and phase from a vis array.
  * The user needs to specify which pol quantity they want,
  * and which IF and bin.
@@ -120,9 +130,12 @@ int polarisation_number(char *polstring) {
 int vis_ampphase(struct scan_header_data *scan_header_data,
 		  struct cycle_data *cycle_data,
 		  struct ampphase **ampphase,
-		  int pol, int ifno, int bin) {
+		 int pol, int ifno, int bin,
+		 struct ampphase_options *options) {
   int ap_created = 0, reqpol = -1, i = 0, polnum = -1, bl = -1, bidx = -1;
-  int j = 0, vidx = -1;
+  int j = 0, jflag = 0, vidx = -1;
+  float rcheck = 0;
+  struct ampphase_options default_options;
 
   // Prepare the structure if required.
   if (*ampphase == NULL) {
@@ -138,6 +151,12 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
     return -1;
   }
   (*ampphase)->window = ifno;
+
+  // Check for options.
+  default_options = ampphase_options_default();
+  if (options == NULL) {
+    options = &default_options;
+  }
   
   // Get the number of channels in this window.
   (*ampphase)->nchannels = scan_header_data->if_num_channels[ifno];
@@ -173,6 +192,12 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
   MALLOC((*ampphase)->max_amplitude, (*ampphase)->nbaselines);
   MALLOC((*ampphase)->min_phase, (*ampphase)->nbaselines);
   MALLOC((*ampphase)->max_phase, (*ampphase)->nbaselines);
+  MALLOC((*ampphase)->f_nchannels, (*ampphase)->nbaselines);
+  MALLOC((*ampphase)->f_channel, (*ampphase)->nbaselines);
+  MALLOC((*ampphase)->f_frequency, (*ampphase)->nbaselines);
+  MALLOC((*ampphase)->f_weight, (*ampphase)->nbaselines);
+  MALLOC((*ampphase)->f_amplitude, (*ampphase)->nbaselines);
+  MALLOC((*ampphase)->f_phase, (*ampphase)->nbaselines);
   for (i = 0; i < (*ampphase)->nbaselines; i++) {
     MALLOC((*ampphase)->weight[i], (*ampphase)->nchannels);
     MALLOC((*ampphase)->amplitude[i], (*ampphase)->nchannels);
@@ -182,6 +207,13 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
     (*ampphase)->min_phase[i] = INFINITY;
     (*ampphase)->max_phase[i] = -INFINITY;
     (*ampphase)->baseline[i] = 0;
+
+    (*ampphase)->f_nchannels[i] = (*ampphase)->nchannels;
+    MALLOC((*ampphase)->f_channel[i], (*ampphase)->nchannels);
+    MALLOC((*ampphase)->f_frequency[i], (*ampphase)->nchannels);
+    MALLOC((*ampphase)->f_weight[i], (*ampphase)->nchannels);
+    MALLOC((*ampphase)->f_amplitude[i], (*ampphase)->nchannels);
+    MALLOC((*ampphase)->f_phase[i], (*ampphase)->nchannels);
   }
   
   // Fill the arrays.
@@ -191,7 +223,7 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
   }
 
   (*ampphase)->bin = bin;
-  printf("bin is %d\n", (*ampphase)->bin);
+  /* printf("bin is %d\n", (*ampphase)->bin); */
   for (i = 0; i < cycle_data->num_points; i++) {
     // Check this is the bin we are after.
     if (cycle_data->bin[i] != bin) {
@@ -214,14 +246,30 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
     /*printf("baseline number is %d, index is %d, confirmation %d\n",
 	   bl, bidx, (*ampphase)->baseline[bidx]);
 	   printf("this baseline has %d channels\n", (*ampphase)->nchannels);*/
-    for (j = 0; j < (*ampphase)->nchannels; j++) {
+    for (j = 0, jflag = 0; j < (*ampphase)->nchannels; j++) {
       vidx = reqpol + j * scan_header_data->if_num_stokes[ifno];
       (*ampphase)->weight[bidx][j] = cycle_data->wgt[i][vidx];
       (*ampphase)->amplitude[bidx][j] = cabsf(cycle_data->vis[i][vidx]);
       (*ampphase)->phase[bidx][j] = cargf(cycle_data->vis[i][vidx]);
-      /*printf("weight is %.2f amp %.3f phase %.3f\n",
-	     (*ampphase)->weight[bidx][j], (*ampphase)->amplitude[bidx][j],
-	     (*ampphase)->phase[bidx][j]);*/
+      if (options->phase_in_degrees == true) {
+	(*ampphase)->phase[bidx][j] *= (180 / M_PI);
+      }
+      // Now assign the data to the arrays considering flagging.
+      rcheck = crealf(cycle_data->vis[i][vidx]);
+      if (rcheck != rcheck) {
+	// A bad channel.
+	(*ampphase)->f_nchannels[bidx] -= 1;
+      } else {
+	(*ampphase)->f_channel[bidx][jflag] = (*ampphase)->channel[j];
+	(*ampphase)->f_frequency[bidx][jflag] = (*ampphase)->frequency[j];
+	(*ampphase)->f_weight[bidx][jflag] = (*ampphase)->weight[bidx][j];
+	(*ampphase)->f_amplitude[bidx][jflag] = (*ampphase)->amplitude[bidx][j];
+	(*ampphase)->f_phase[bidx][jflag] = (*ampphase)->phase[bidx][j];
+	jflag++;
+      }
+      /* printf("weight is %.2f real %.3f image %.3f\n", */
+      /* 	     (*ampphase)->weight[bidx][j], crealf(cycle_data->vis[i][vidx]), */
+      /* 	     cimagf(cycle_data->vis[i][vidx])); */
       // Continually assess limits.
       //if ((*ampphase)->weight[bidx][i] > 0) {
       if ((*ampphase)->amplitude[bidx][j] == (*ampphase)->amplitude[bidx][j]) {

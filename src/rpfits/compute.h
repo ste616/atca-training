@@ -14,6 +14,7 @@
  */
 
 #pragma once
+#include <stdbool.h>
 
 /**
  * Some polarisation flags.
@@ -59,6 +60,15 @@ struct ampphase {
   // Phase.
   float **phase;
 
+  // These next arrays contain the same data as above, but
+  // do not include the flagged channels.
+  int *f_nchannels;
+  float **f_channel;
+  float **f_frequency;
+  float **f_weight;
+  float **f_amplitude;
+  float **f_phase;
+  
   // Some metadata.
   float min_amplitude_global;
   float max_amplitude_global;
@@ -70,9 +80,19 @@ struct ampphase {
   float *max_phase;
 };
 
+/**
+ * Structure to hold options to pass to the function
+ * that computes the amplitude and phase.
+ */
+struct ampphase_options {
+  // Return phase in degrees (default is radians).
+  bool phase_in_degrees;
+};
+
 struct ampphase* prepare_ampphase(void);
 void free_ampphase(struct ampphase **ampphase);
 int polarisation_number(char *polstring);
 int vis_ampphase(struct scan_header_data *scan_header_data,
 		 struct cycle_data *cycle_data,
-		 struct ampphase **ampphase, int pol, int ifno, int bin);
+		 struct ampphase **ampphase, int pol, int ifno, int bin,
+		 struct ampphase_options *options);
