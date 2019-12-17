@@ -32,6 +32,33 @@
 #define    POL_YX 6
 #define STRPOL_YX "YX"
 
+/**
+ * Magic numbers for averaging types.
+ */
+#define AVERAGETYPE_MEAN   1
+#define AVERAGETYPE_MEDIAN 2
+#define AVERAGETYPE_VECTOR 4
+#define AVERAGETYPE_SCALAR 8
+
+/**
+ * Structure to hold options to pass to the function
+ * that computes the amplitude and phase.
+ */
+struct ampphase_options {
+  // Return phase in degrees (default is radians).
+  bool phase_in_degrees;
+
+  // The delay averaging factor (default is 1).
+  int delay_averaging;
+
+  // The range of channels to use to calculate the amplitude,
+  // phase and delay quantities (default is min 513, max 1537).
+  int min_tvchannel;
+  int max_tvchannel;
+
+  // The method to do the averaging (default is mean).
+  int averaging_method;
+};
 
 /**
  * Structure to hold amplitude and phase quantities.
@@ -59,6 +86,8 @@ struct ampphase {
   float **amplitude;
   // Phase.
   float **phase;
+  // The raw data.
+  float complex **raw;
 
   // These next arrays contain the same data as above, but
   // do not include the flagged channels.
@@ -68,6 +97,7 @@ struct ampphase {
   float **f_weight;
   float **f_amplitude;
   float **f_phase;
+  float complex **f_raw;
   
   // Some metadata.
   float min_amplitude_global;
@@ -78,21 +108,50 @@ struct ampphase {
   float *max_amplitude;
   float *min_phase;
   float *max_phase;
+  struct ampphase_options *options;
 };
 
 /**
- * Structure to hold options to pass to the function
- * that computes the amplitude and phase.
+ * Structure to hold average amplitude, phase and delay
+ * quantities.
  */
-struct ampphase_options {
-  // Return phase in degrees (default is radians).
-  bool phase_in_degrees;
+struct vis_quantities {
+  // The options that were used.
+  struct ampphase_options *options;
+
+  // Number of quantities in the array.
+  int nbaselines;
+
+  // Labels.
+  int pol;
+  int window;
+  int bin;
+  
+  // The arrays.
+  float *amplitude;
+  float *phase;
+  float *delay;
+
+  // Metadata.
+  float min_amplitude;
+  float max_amplitude;
+  float min_phase;
+  float max_phase;
+  float min_delay;
+  float max_delay;
 };
 
 struct ampphase* prepare_ampphase(void);
+struct vis_quantities* prepare_vis_quantities(void);
 void free_ampphase(struct ampphase **ampphase);
+void free_vis_quantities(struct vis_quantities **vis_quantities);
 int polarisation_number(char *polstring);
 int vis_ampphase(struct scan_header_data *scan_header_data,
 		 struct cycle_data *cycle_data,
 		 struct ampphase **ampphase, int pol, int ifno, int bin,
 		 struct ampphase_options *options);
+int cmpfunc_real(const void *a, const void *b);
+int cmpfunc_complex(const void *a, const void *b);
+int ampphase_average(struct ampphase *ampphase,
+		     struct vis_quantities **vis_quantities,
+		     struct ampphase_options *options);
