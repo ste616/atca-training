@@ -10,11 +10,56 @@
 #include <math.h>
 #include <complex.h>
 #include <stdbool.h>
+#include <argp.h>
 #include "atrpfits.h"
 #include "memory.h"
 #include "cpgplot.h"
 
 #define BUFSIZE 1024
+
+const char *argp_program_version = "visplot 1.0";
+const char *argp_program_bug_address = "<Jamie.Stevens@csiro.au>";
+
+// Program documentation.
+static char doc[] = "visplot plotter for RPFITS files";
+
+// Argument description.
+static char args_doc[] = "[options] RPFITS_FILES...";
+
+// Our options.
+static struct argp_option options[] = {
+  { "device", 'd', "PGPLOT_DEVICE", 0, "Direct plots to this PGGPLOT device" },
+  { 0 }
+};
+
+// Argp stuff.
+struct arguments {
+  char pgplot_device[BUFSIZE];
+  char **rpfits_files;
+  int n_rpfits_files;
+};
+
+static error_t parse_opt(int key, char *arg, struct argp_state *state) {
+  struct arguments *arguments = state->input;
+
+  switch (key) {
+  case 'd':
+    strncpy(arguments->pgplot_device, arg, BUFSIZE);
+    break;
+
+  case ARGP_KEY_ARG:
+    arguments->n_rpfits_files += 1;
+    REALLOC(arguments->rpfits_files, arguments->n_rpfits_files);
+    arguments->rpfits_files[arguments->n_rpfits_files - 1] = arg;
+    break;
+    
+  default:
+    return ARGP_ERR_UNKNOWN;
+  }
+  return 0;
+}
+
+static struct argp argp = { options, parse_opt, args_doc, doc };
 
 // This structure holds pre-calculated panel positions for a PGPLOT
 // device with nx x ny panels.
@@ -91,8 +136,15 @@ int main(int argc, char *argv[]) {
   char ptitle[BUFSIZE];
   struct ampphase_options ampphase_options;
   struct panelspec panelspec;
+  struct arguments arguments;
+
+  // Set some defaults and parse our command line options.
+  arguments.pgplot_device[0] = '\0';
+  arguments.n_rpfits_files = 0;
+  arguments.rpfits_files = NULL;
+  argp_parse(&argp, argc, argv, 0, 0, &arguments);
   
-  cpgopen("/xs");
+  cpgopen(arguments.pgplot_device);
   cpgask(1);
 
   // Get phase in degrees.
@@ -116,9 +168,9 @@ int main(int argc, char *argv[]) {
   // plus the 6 autocorrelation amplitude plots.
   splitpanels(6, 6, &panelspec);
   
-  for (i = 1; i < argc; i++) {
+  for (i = 0; i < arguments.n_rpfits_files; i++) {
     // Try to open the RPFITS file.
-    res = open_rpfits_file(argv[i]);
+    res = open_rpfits_file(arguments.rpfits_files[i]);
     printf("Attempt to open RPFITS file %s, %d\n", argv[i], res);
 
     while (keep_reading) {
