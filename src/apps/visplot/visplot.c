@@ -16,6 +16,25 @@
 #include "cpgplot.h"
 
 #define BUFSIZE 1024
+#define MAXANTS 6
+#define MAXIFS 34
+#define YES 1
+#define NO 0
+
+// Some option flags.
+#define PLOT_AMPLITUDE            1<<0
+#define PLOT_PHASE                1<<1
+#define PLOT_CHANNEL              1<<2
+#define PLOT_FREQUENCY            1<<3
+#define PLOT_AUTOCORRELATIONS     1<<4
+#define PLOT_CROSSCORRELATIONS    1<<5
+#define PLOT_POL_XX               1<<6
+#define PLOT_POL_YY               1<<7
+#define PLOT_POL_XY               1<<8
+#define PLOT_POL_YX               1<<9
+#define PLOT_AMPLITUDE_LINEAR     1<<10
+#define PLOT_AMPLITUDE_LOG        1<<11
+#define PLOT_CONSISTENT_YRANGE    1<<12
 
 const char *argp_program_version = "visplot 1.0";
 const char *argp_program_bug_address = "<Jamie.Stevens@csiro.au>";
@@ -76,9 +95,49 @@ struct panelspec {
   float orig_y2;
 };
 
+// This structure holds all the details about user plot control.
+struct plotcontrols {
+  // General plot options.
+  long int plot_options;
+  // Has the user specified a channel range to look at.
+  int channel_range_limit;
+  int channel_range_min;
+  int channel_range_max;
+  // Has the user specified a y-axis range.
+  int yaxis_range_limit;
+  float yaxis_range_min;
+  float yaxis_range_max;
+  // The IF numbers to plot.
+  long int if_num_spec;
+  // The antennas to plot.
+  int array_spec;
+};
+
+void init_plotcontrols(struct plotcontrols *plotcontrols) {
+  int i;
+
+  // Initialise the plotcontrols structure.
+  plotcontrols->plot_options =
+    PLOT_AMPLITUDE | PLOT_CHANNEL | PLOT_AUTOCORRELATIONS |
+    PLOT_CROSSCORRELATIONS | PLOT_POL_XX | PLOT_POL_YY |
+    PLOT_AMPLITUDE_LINEAR;
+  plotcontrols->channel_range_limit = NO;
+  plotcontrols->yaxis_range_limit = NO;
+  plotcontrols->if_num_spec = 0;
+  for (i = 0; i <= MAXIFS; i++) {
+    plotcontrols->if_num_spec |= 1<<i;
+  }
+  plotcontrols->array_spec = 0;
+  for (i = 0; i <= MAXANTS; i++) {
+    plotcontrols->array_spec |= 1<<i;
+  }
+}
+
 void splitpanels(int nx, int ny, struct panelspec *panelspec) {
   int i, j;
-  float panel_width, panel_height;
+  float panel_width, panel_height, margin_reduction = 5;
+  float padding_fraction = 2, padding_x, padding_y;
+  float orig_charheight, charheight;
 
   // Allocate some memory.
   panelspec->nx = nx;
@@ -97,17 +156,36 @@ void splitpanels(int nx, int ny, struct panelspec *panelspec) {
   // Get the original settings.
   cpgqvp(0, &(panelspec->orig_x1), &(panelspec->orig_x2),
 	 &(panelspec->orig_y1), &(panelspec->orig_y2));
-  panel_width = (panelspec->orig_x2 - panelspec->orig_x1) / (float)nx;
-  panel_height = (panelspec->orig_y2 - panelspec->orig_y1) / (float)ny;
+  // Reduce the margins.
+  panelspec->orig_x1 /= margin_reduction;
+  panelspec->orig_x2 = 1 - panelspec->orig_x1;
+  panelspec->orig_y1 /= margin_reduction;
+  panelspec->orig_y2 = 1 - panelspec->orig_y1;
+  printf("viewport is x = %.2f -> %.2f, y = %.2f -> %.2f\n",
+	 panelspec->orig_x1, panelspec->orig_x2,
+	 panelspec->orig_y1, panelspec->orig_y2);
+  // Space between the panels should be some fraction of the margin.
+  padding_x = panelspec->orig_x1 * padding_fraction;
+  padding_y = panelspec->orig_y1 * padding_fraction;
+  
+  panel_width = (panelspec->orig_x2 - panelspec->orig_x1 -
+		 (float)(nx - 1) * padding_x) / (float)nx;
+  panel_height = (panelspec->orig_y2 - panelspec->orig_y1 -
+		  (float)(ny - 1) * padding_y) / (float)ny;
 
   for (i = 0; i < nx; i++) {
     for (j = 0; j < ny; j++) {
-      panelspec->x1[i][j] = panelspec->orig_x1 + i * panel_width;
-      panelspec->x2[i][j] = panelspec->orig_x1 + (i + 1) * panel_width;
-      panelspec->y1[i][j] = panelspec->orig_y2 - (j + 1) * panel_height;
-      panelspec->y2[i][j] = panelspec->orig_y2 - j * panel_height;
+      panelspec->x1[i][j] = panelspec->orig_x1 + i * (panel_width + padding_x);
+      panelspec->x2[i][j] = panelspec->x1[i][j] + panel_width;
+      panelspec->y2[i][j] = panelspec->orig_y2 - j * (panel_height + padding_y);
+      panelspec->y1[i][j] = panelspec->y2[i][j] - panel_height;
     }
   }
+
+  // Change the character height.
+  cpgqch(&orig_charheight);
+  charheight = orig_charheight / 2;
+  cpgsch(charheight);
 }
 
 void changepanel(int x, int y, struct panelspec *panelspec) {
@@ -122,13 +200,195 @@ void changepanel(int x, int y, struct panelspec *panelspec) {
   }
 }
 
+void plotnum_to_xy(struct panelspec *panelspec, int plotnum,
+		   int *px, int *py) {
+  *px = plotnum % panelspec->nx;
+  *py = (int)((plotnum - *px) / panelspec->nx);
+}
+
+#define MINASSIGN(a, b) a = (b < a) ? b : a
+#define MAXASSIGN(a, b) a = (b > a) ? b : a
+
+void plotpanel_minmax(struct ampphase **plot_ampphase,
+		      struct plotcontrols *plot_controls,
+		      int plot_baseline_idx,
+		      float *plotmin_x, float *plotmax_x,
+		      float *plotmin_y, float *plotmax_y) {
+  // This routine does the computation required to work out what the
+  // axis ranges of a single plot with plotoptions will be. It takes into
+  // account whether it's an auto or cross correlation, and the polarisations
+  // that are being plotted.
+  int i = 0, j = 0, npols = 0, *polidx = NULL, bltype, ant1, ant2;
+
+  // Get the x-axis range first.
+  if (plot_controls->plot_options & PLOT_CHANNEL) {
+    *plotmin_x = 0;
+    *plotmin_y = plot_ampphase[0]->nchannels;
+    if (plot_controls->channel_range_limit == YES) {
+      if ((plot_controls->channel_range_min >= 0) &&
+	  (plot_controls->channel_range_min < plot_ampphase[0]->nchannels)) {
+	*plotmin_x = plot_controls->channel_range_min;
+      }
+      if ((plot_controls->channel_range_max > 0) &&
+	  (plot_controls->channel_range_max <= plot_ampphase[0]->channels) &&
+	  (plot_controls->channel_range_max > *plotmin_x)) {
+	*plotmax_x = plot_controls->channel_range_max;
+      }
+    } else if (plot_controls->plot_options & PLOT_FREQUENCY) {
+      // TODO: frequency conversions.
+    }
+
+    // Now the y-axis. If we've been given a range by the user,
+    // we can set that and return immediately.
+    if (plot_controls->yaxis_range_limit == YES) {
+      *plotmin_y = plot_controls->yaxis_range_min;
+      *plotmax_y = plot_controls->yaxis_range_max;
+      return;
+    }
+    
+    // Which polarisations are we plotting?
+    if (plot_controls->plot_options & PLOT_POL_XX) {
+      REALLOC(polidx, ++npols);
+      polidx[npols - 1] = 0;
+    }
+    if (plot_controls->plot_options & PLOT_POL_YY) {
+      REALLOC(polidx, ++npols);
+      polidx[npols - 1] = 1;
+    }
+    if (plot_controls->plot_options & PLOT_POL_XY) {
+      REALLOC(polidx, ++npols);
+      polidx[npols - 1] = 2;
+    }
+    if (plot_controls->plot_options & PLOT_POL_YX) {
+      REALLOC(polidx, ++npols);
+      polidx[npols - 1] = 3;
+    }
+
+    // If we have no pols to plot, we're done.
+    if (npols == 0) {
+      *plotmin_y = 0;
+      *plotmax_y = 1;
+      return;
+    }
+    
+    // Get the initial value for min and max.
+    if (plot_controls->plot_options & PLOT_AMPLITUDE) {
+      *plotmin_y = plot_ampphase[polidx[0]]->min_amplitude[plot_baseline_idx];
+      *plotmax_y = plot_ampphase[polidx[0]]->max_amplitude[plot_baseline_idx];
+    } else if (plot_controls->plot_options & PLOT_PHASE) {
+      *plotmin_y = plot_ampphase[polidx[0]]->min_phase[plot_baseline_idx];
+      *plotmax_y = plot_ampphase[polidx[0]]->max_phase[plot_baseline_idx];
+    } 
+
+    // Account for all the other polarisations.
+    for (i = 1; i < npols; i++) {
+      if (plot_controls->plot_options & PLOT_AMPLITUDE) {
+	MINASSIGN(*plotmin_y,
+		  plot_ampphase[polidx[i]]->min_amplitude[plot_baseline_idx]);
+	MAXASSIGN(*plotmax_y,
+		  plot_ampphase[polidx[i]]->max_amplitude[plot_baseline_idx]);
+      } else if (plot_controls->plot_options & PLOT_PHASE) {
+	MINASSIGN(*plotmin_y,
+	  plot_ampphase[polidx[i]]->min_phase[plot_baseline_idx]);
+	MAXASSIGN(*plotmax_y,
+	  plot_ampphase[polidx[i]]->max_phase[plot_baseline_idx]);
+      }
+      }
+	
+    
+    // Refine the min/max values.
+    if (plot_controls->plot_options & PLOT_CONSISTENT_YRANGE) {
+      // The user wants us to keep a consistent Y axis range for
+      // all the plots. But we also need a different Y axis range for
+      // auto and cross correlations. So we need to know what type of
+      // correlation the specified baseline is first.
+      base_to_ants(plot_ampphase->baseline[plot_baseline_idx], &ant1, &ant2);
+      if (ant1 == ant2) {
+	// Autocorrelation.
+	bltype = 0;
+      } else {
+	bltype = 1;
+      }
+      for (i = 0; i < plot_ampphase[0]->nbaselines; i++) {
+
+      }
+    }
+  }
+}
+
+void make_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspec,
+	       struct plotcontrols *plotcontrols) {
+  int x = 0, y = 0, i, j, ant1, ants, nants = 0, px, py, iauto = 0, icross = 0;
+  float xaxis_min, xaxis_max, yaxis_min, yaxis_max;
+  char ptitle[BUFSIZE], ptype[BUFSIZE];
+  struct ampphase **ampphase_if = NULL;
+
+  // Work out how many antennas we will show.
+  for (i = 1, nants = 0; i <= MAXANTS; i++) {
+    if ((1 << i) & plotcontrols->array_spec) {
+      nants++;
+    }
+  }
+  if (nants == 0) {
+    // Nothing to plot!
+    return;
+  }
+  
+  changepanel(-1, -1, panelspec);
+  cpgpage();
+  ampphase_if = cycle_ampphase[if_num];
+
+  for (i = 0; i < ampphase_if[0]->nbaselines; i++) {
+    // Work out the antennas in this baseline.
+    base_to_ants(ampphase_if[0]->baseline[i], &ant1, &ant2);
+    // Check if we are plotting both of these antenna.
+    if (((1 << ant1) & array_spec) &&
+	((1 << ant2) & array_spec)) {
+      // Work out which panel to use.
+      if ((ant1 == ant2) &&
+	  (plot_controls->plot_options & PLOT_AUTOCORRELATIONS)) {
+	px = iauto % panelspec->nx;
+	py = (int)((iauto - px) / panelspec->nx);
+	iauto++;
+      } else if ((ant1 != ant2) &&
+		 (plot_controls->plot_options & PLOT_CROSSCORRELATIONS)) {
+	if (plot_controls->plot_options & PLOT_AUTOCORRELATIONS) {
+	  px = (nants + icross) % panelspec->nx;
+	  py = (int)((nants + icross - px) / panelspec->nx);
+	} else {
+	  px = icross % panelspec->nx;
+	  py = (int)((icross - px) / panelspec->nx);
+	}
+	icross++;
+      }
+      // Check if we've exceeded the space for this plot.
+      if (py >= panelspec->ny) {
+	continue;
+      }
+      // Set the panel.
+      changepanel(px, py, &panelspec);
+      // Set the title for the plot.
+      if (plot_controls->plot_options & PLOT_AMPLITUDE) {
+	snprintf(ptype, BUFSIZE, "AMPL.");
+      } else if (plot_controls->plot_options & PLOT_PHASE) {
+	snprintf(ptype, BUFSIZE, "PHASE");
+      }
+      snprintf(ptitle, BUFSIZE, "%s: FQ:%d BSL%d%d",
+	       ptype, (if_num + 1), ant1, ant2);
+      plotpanel_minmax(ampphase_if, plot_controls, i,
+		       &xaxis_min, &xaxis_max, &yaxis_min, &yaxis_max);
+    }
+  }
+  
+}
+
 int main(int argc, char *argv[]) {
   // The argument list should all be RPFITS files.
   int i = 0, j = 0, k = 0, l = 0, m = 0, res = 0, keep_reading = 1;
   int read_cycle = 1, nscans = 0, vis_length = 0, if_no, read_response = 0;
   int plotpol = POL_XX, plotif = 0, r = 0, ant1, ant2, num_ifs = 2, num_pols = 2;
   int p = 0, q = 0, sp = 0, rp, ri, rx, ry;
-  float min_vis, max_vis, *xpts = NULL;
+  float min_vis, max_vis, *xpts = NULL, theight = 0.4;
   struct scan_data *scan_data = NULL, **all_scans = NULL;
   struct cycle_data *cycle_data = NULL;
   struct ampphase ***cycle_ampphase = NULL;
@@ -137,7 +397,8 @@ int main(int argc, char *argv[]) {
   struct ampphase_options ampphase_options;
   struct panelspec panelspec;
   struct arguments arguments;
-
+  struct plotcontrols plotcontrols;
+  
   // Set some defaults and parse our command line options.
   arguments.pgplot_device[0] = '\0';
   arguments.n_rpfits_files = 0;
@@ -163,10 +424,9 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  // Our view panel is split into 36 subplots.
-  // That is 15 baselines, two plots per baseline (one amp, one phase),
-  // plus the 6 autocorrelation amplitude plots.
-  splitpanels(6, 6, &panelspec);
+  // Initialise the plotting space and options.
+  splitpanels(5, 5, &panelspec);
+  init_plotcontrols(&plotcontrols);
   
   for (i = 0; i < arguments.n_rpfits_files; i++) {
     // Try to open the RPFITS file.
@@ -250,17 +510,17 @@ int main(int argc, char *argv[]) {
 	      ry = 1 + (int)floorf(((float)rp - (float)rx) / (float)panelspec.nx);
 	      changepanel(rx, ry, &panelspec);
 	    }
-	    snprintf(ptitle, BUFSIZE, "%d-%d bin %d IF %d",
-		     ant1, ant2, 0, q);
+	    snprintf(ptitle, BUFSIZE, "AMPL. FQ:%d BSL:%d%d",
+		     (q + 1), ant1, ant2);
 	    cpgswin(0, cycle_ampphase[q][0]->nchannels,
 		    cycle_ampphase[q][0]->min_amplitude[l],
 		    cycle_ampphase[q][0]->max_amplitude[l]);
 	    cpgsci(1);
-	    cpgbox("BCTS", 0, 0, "BCTS", 0, 0);
+	    cpgbox("BCNTS", 0, 0, "BCNTS", 0, 0);
 	    cpgline(cycle_ampphase[q][0]->f_nchannels[l],
 		    cycle_ampphase[q][0]->f_channel[l],
 		    cycle_ampphase[q][0]->f_amplitude[l]);
-	    /* cpglab("Channel", "Amplitude", ptitle); */
+	    cpgmtxt("T", theight, 0.5, 0.5, ptitle);
 	    cpgsci(2);
 	    cpgline(cycle_ampphase[q][1]->f_nchannels[l],
 		    cycle_ampphase[q][1]->f_channel[l],
@@ -270,14 +530,16 @@ int main(int argc, char *argv[]) {
 	      rp += 1;
 	      rx = rp % panelspec.nx;
 	      ry = 1 + (int)floorf(((float)rp - (float)rx) / (float)panelspec.nx);
+	      snprintf(ptitle, BUFSIZE, "PHASE FQ:%d BSL:%d%d",
+		       (q + 1), ant1, ant2);
 	      changepanel(rx, ry, &panelspec);
 	      cpgswin(0, cycle_ampphase[q][0]->nchannels,
 		      -200, 200);
-	      cpgbox("BCTS", 0, 0, "BCTS", 0, 0);
+	      cpgbox("BCNTS", 0, 0, "BCNTS", 0, 0);
 	      cpgline(cycle_ampphase[q][0]->f_nchannels[l],
 		      cycle_ampphase[q][0]->f_channel[l],
 		      cycle_ampphase[q][0]->f_phase[l]);
-	      /* cpglab("Channel", "Phase", ptitle); */
+	      cpgmtxt("T", theight, 0.5, 0.5, ptitle);
 	      cpgsci(2);
 	      cpgline(cycle_ampphase[q][1]->f_nchannels[l],
 		      cycle_ampphase[q][1]->f_channel[l],
