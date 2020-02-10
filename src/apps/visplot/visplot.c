@@ -211,26 +211,26 @@ void plotnum_to_xy(struct panelspec *panelspec, int plotnum,
 
 void plotpanel_minmax(struct ampphase **plot_ampphase,
 		      struct plotcontrols *plot_controls,
-		      int plot_baseline_idx,
+		      int plot_baseline_idx, int npols, int *polidx,
 		      float *plotmin_x, float *plotmax_x,
 		      float *plotmin_y, float *plotmax_y) {
   // This routine does the computation required to work out what the
   // axis ranges of a single plot with plotoptions will be. It takes into
   // account whether it's an auto or cross correlation, and the polarisations
   // that are being plotted.
-  int i = 0, j = 0, npols = 0, *polidx = NULL, bltype, ant1, ant2;
+  int i = 0, j = 0, bltype, ant1, ant2;
 
   // Get the x-axis range first.
   if (plot_controls->plot_options & PLOT_CHANNEL) {
     *plotmin_x = 0;
-    *plotmin_y = plot_ampphase[0]->nchannels;
+    *plotmax_x = plot_ampphase[0]->nchannels;
     if (plot_controls->channel_range_limit == YES) {
       if ((plot_controls->channel_range_min >= 0) &&
 	  (plot_controls->channel_range_min < plot_ampphase[0]->nchannels)) {
 	*plotmin_x = plot_controls->channel_range_min;
       }
       if ((plot_controls->channel_range_max > 0) &&
-	  (plot_controls->channel_range_max <= plot_ampphase[0]->channels) &&
+	  (plot_controls->channel_range_max <= plot_ampphase[0]->nchannels) &&
 	  (plot_controls->channel_range_max > *plotmin_x)) {
 	*plotmax_x = plot_controls->channel_range_max;
       }
@@ -246,23 +246,6 @@ void plotpanel_minmax(struct ampphase **plot_ampphase,
       return;
     }
     
-    // Which polarisations are we plotting?
-    if (plot_controls->plot_options & PLOT_POL_XX) {
-      REALLOC(polidx, ++npols);
-      polidx[npols - 1] = 0;
-    }
-    if (plot_controls->plot_options & PLOT_POL_YY) {
-      REALLOC(polidx, ++npols);
-      polidx[npols - 1] = 1;
-    }
-    if (plot_controls->plot_options & PLOT_POL_XY) {
-      REALLOC(polidx, ++npols);
-      polidx[npols - 1] = 2;
-    }
-    if (plot_controls->plot_options & PLOT_POL_YX) {
-      REALLOC(polidx, ++npols);
-      polidx[npols - 1] = 3;
-    }
 
     // If we have no pols to plot, we're done.
     if (npols == 0) {
@@ -293,7 +276,7 @@ void plotpanel_minmax(struct ampphase **plot_ampphase,
 	MAXASSIGN(*plotmax_y,
 	  plot_ampphase[polidx[i]]->max_phase[plot_baseline_idx]);
       }
-      }
+    }
 	
     
     // Refine the min/max values.
@@ -302,7 +285,7 @@ void plotpanel_minmax(struct ampphase **plot_ampphase,
       // all the plots. But we also need a different Y axis range for
       // auto and cross correlations. So we need to know what type of
       // correlation the specified baseline is first.
-      base_to_ants(plot_ampphase->baseline[plot_baseline_idx], &ant1, &ant2);
+      base_to_ants(plot_ampphase[0]->baseline[plot_baseline_idx], &ant1, &ant2);
       if (ant1 == ant2) {
 	// Autocorrelation.
 	bltype = 0;
@@ -310,28 +293,64 @@ void plotpanel_minmax(struct ampphase **plot_ampphase,
 	bltype = 1;
       }
       for (i = 0; i < plot_ampphase[0]->nbaselines; i++) {
-
+	base_to_ants(plot_ampphase[0]->baseline[i], &ant1, &ant2);
+	// TODO: check the antennas are in the array spec.
+	if (((ant1 == ant2) && (bltype == 0)) ||
+	    ((ant1 != ant2) && (bltype == 1))) {
+	  for (j = 0; j < npols; j++) {
+	    if (plot_controls->plot_options & PLOT_AMPLITUDE) {
+	      MINASSIGN(*plotmin_y,
+			plot_ampphase[polidx[j]]->min_amplitude[i]);
+	      MAXASSIGN(*plotmax_y,
+			plot_ampphase[polidx[j]]->max_amplitude[i]);
+	    } else if (plot_controls->plot_options & PLOT_PHASE) {
+	      MINASSIGN(*plotmin_y,
+			plot_ampphase[polidx[j]]->min_phase[i]);
+	      MAXASSIGN(*plotmax_y,
+			plot_ampphase[polidx[j]]->max_phase[i]);
+	    }
+	  }
+	}
       }
     }
   }
 }
 
 void make_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspec,
-	       struct plotcontrols *plotcontrols) {
-  int x = 0, y = 0, i, j, ant1, ants, nants = 0, px, py, iauto = 0, icross = 0;
-  float xaxis_min, xaxis_max, yaxis_min, yaxis_max;
+	       struct plotcontrols *plot_controls) {
+  int x = 0, y = 0, i, j, ant1, ant2, nants = 0, px, py, iauto = 0, icross = 0;
+  int npols = 0, *polidx = NULL, if_num = 0;
+  float xaxis_min, xaxis_max, yaxis_min, yaxis_max, theight = 0.4;
   char ptitle[BUFSIZE], ptype[BUFSIZE];
   struct ampphase **ampphase_if = NULL;
 
   // Work out how many antennas we will show.
   for (i = 1, nants = 0; i <= MAXANTS; i++) {
-    if ((1 << i) & plotcontrols->array_spec) {
+    if ((1 << i) & plot_controls->array_spec) {
       nants++;
     }
   }
   if (nants == 0) {
     // Nothing to plot!
     return;
+  }
+
+  // Which polarisations are we plotting?
+  if (plot_controls->plot_options & PLOT_POL_XX) {
+	REALLOC(polidx, ++npols);
+	polidx[npols - 1] = 0;
+  }
+  if (plot_controls->plot_options & PLOT_POL_YY) {
+	REALLOC(polidx, ++npols);
+	polidx[npols - 1] = 1;
+  }
+  if (plot_controls->plot_options & PLOT_POL_XY) {
+	REALLOC(polidx, ++npols);
+	polidx[npols - 1] = 2;
+  }
+  if (plot_controls->plot_options & PLOT_POL_YX) {
+	REALLOC(polidx, ++npols);
+	polidx[npols - 1] = 3;
   }
   
   changepanel(-1, -1, panelspec);
@@ -342,8 +361,8 @@ void make_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspec,
     // Work out the antennas in this baseline.
     base_to_ants(ampphase_if[0]->baseline[i], &ant1, &ant2);
     // Check if we are plotting both of these antenna.
-    if (((1 << ant1) & array_spec) &&
-	((1 << ant2) & array_spec)) {
+    if (((1 << ant1) & plot_controls->array_spec) &&
+	((1 << ant2) & plot_controls->array_spec)) {
       // Work out which panel to use.
       if ((ant1 == ant2) &&
 	  (plot_controls->plot_options & PLOT_AUTOCORRELATIONS)) {
@@ -366,7 +385,7 @@ void make_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspec,
 	continue;
       }
       // Set the panel.
-      changepanel(px, py, &panelspec);
+      changepanel(px, py, panelspec);
       // Set the title for the plot.
       if (plot_controls->plot_options & PLOT_AMPLITUDE) {
 	snprintf(ptype, BUFSIZE, "AMPL.");
@@ -375,8 +394,22 @@ void make_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspec,
       }
       snprintf(ptitle, BUFSIZE, "%s: FQ:%d BSL%d%d",
 	       ptype, (if_num + 1), ant1, ant2);
-      plotpanel_minmax(ampphase_if, plot_controls, i,
+      plotpanel_minmax(ampphase_if, plot_controls, i, npols, polidx,
 		       &xaxis_min, &xaxis_max, &yaxis_min, &yaxis_max);
+      cpgsci(1);
+      cpgswin(xaxis_min, xaxis_max, yaxis_min, yaxis_max);
+      cpgbox("BCNTS", 0, 0, "BCNTS", 0, 0);
+      cpgmtxt("T", theight, 0.5, 0.5, ptitle);
+      for (j = 0; j < npols; j++) {
+	cpgsci(polidx[j] + 1);
+	if (plot_controls->plot_options & PLOT_AMPLITUDE) {
+	  if (plot_controls->plot_options & PLOT_CHANNEL) {
+	    cpgline(ampphase_if[polidx[j]]->f_nchannels[i],
+		    ampphase_if[polidx[j]]->f_channel[i],
+		    ampphase_if[polidx[j]]->f_amplitude[i]);
+	  }
+	}
+      }
     }
   }
   
@@ -490,63 +523,8 @@ int main(int argc, char *argv[]) {
 	  }
 	  /* r = ampphase_average(cycle_ampphase[q][p], &cycle_vis_quantities, */
 	  /* 			 &ampphase_options); */
-	  changepanel(-1, -1, &panelspec);
-	  cpgpage();
-	  for (l = 0; l < cycle_ampphase[q][0]->nbaselines; l++) {
-	    base_to_ants(cycle_ampphase[q][0]->baseline[l], &ant1, &ant2);
-	    /* printf("%d-%d tvchan amp = %.4f  phase = %.4f\n", */
-	    /* 	   ant1, ant2, cycle_vis_quantities->amplitude[l], */
-	    /* 	   cycle_vis_quantities->phase[l]); */
-	    if (ant1 == ant2) {
-	      changepanel(ant1 - 1, 0, &panelspec);
-	    } else {
-	      rp = 0;
-	      for (ri = 1; ri < ant1; ri++) {
-		rp += 6 - ri;
-	      }
-	      rp += ant2 - ant1 - 1;
-	      rp *= 2;
-	      rx = rp % panelspec.nx;
-	      ry = 1 + (int)floorf(((float)rp - (float)rx) / (float)panelspec.nx);
-	      changepanel(rx, ry, &panelspec);
-	    }
-	    snprintf(ptitle, BUFSIZE, "AMPL. FQ:%d BSL:%d%d",
-		     (q + 1), ant1, ant2);
-	    cpgswin(0, cycle_ampphase[q][0]->nchannels,
-		    cycle_ampphase[q][0]->min_amplitude[l],
-		    cycle_ampphase[q][0]->max_amplitude[l]);
-	    cpgsci(1);
-	    cpgbox("BCNTS", 0, 0, "BCNTS", 0, 0);
-	    cpgline(cycle_ampphase[q][0]->f_nchannels[l],
-		    cycle_ampphase[q][0]->f_channel[l],
-		    cycle_ampphase[q][0]->f_amplitude[l]);
-	    cpgmtxt("T", theight, 0.5, 0.5, ptitle);
-	    cpgsci(2);
-	    cpgline(cycle_ampphase[q][1]->f_nchannels[l],
-		    cycle_ampphase[q][1]->f_channel[l],
-		    cycle_ampphase[q][1]->f_amplitude[l]);
-	    if (ant1 != ant2) {
-	      cpgsci(1);
-	      rp += 1;
-	      rx = rp % panelspec.nx;
-	      ry = 1 + (int)floorf(((float)rp - (float)rx) / (float)panelspec.nx);
-	      snprintf(ptitle, BUFSIZE, "PHASE FQ:%d BSL:%d%d",
-		       (q + 1), ant1, ant2);
-	      changepanel(rx, ry, &panelspec);
-	      cpgswin(0, cycle_ampphase[q][0]->nchannels,
-		      -200, 200);
-	      cpgbox("BCNTS", 0, 0, "BCNTS", 0, 0);
-	      cpgline(cycle_ampphase[q][0]->f_nchannels[l],
-		      cycle_ampphase[q][0]->f_channel[l],
-		      cycle_ampphase[q][0]->f_phase[l]);
-	      cpgmtxt("T", theight, 0.5, 0.5, ptitle);
-	      cpgsci(2);
-	      cpgline(cycle_ampphase[q][1]->f_nchannels[l],
-		      cycle_ampphase[q][1]->f_channel[l],
-		      cycle_ampphase[q][1]->f_phase[l]);
-	    }
-	  }
 	}
+	make_plot(cycle_ampphase, &panelspec, &plotcontrols);
 	for (q = 0; q < num_ifs; q++) {
 	  for (p = 0; p < num_pols; p++) {
 	    free_ampphase(&(cycle_ampphase[q][p]));
