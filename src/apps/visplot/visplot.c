@@ -11,6 +11,7 @@
 #include <complex.h>
 #include <stdbool.h>
 #include <argp.h>
+#include <ctype.h>
 #include "atrpfits.h"
 #include "memory.h"
 #include "cpgplot.h"
@@ -29,6 +30,8 @@ static char args_doc[] = "[options] RPFITS_FILES...";
 static struct argp_option options[] = {
   { "device", 'd', "PGPLOT_DEVICE", 0, "Direct plots to this PGGPLOT device" },
   { "phase", 'p', 0, 0, "Plots phase on y-axis" },
+  { "pols", 'P', "POLS", 0,
+    "Which polarisations to plot, as a comma-separated list" },
   { 0 }
 };
 
@@ -39,10 +42,14 @@ struct arguments {
   int n_rpfits_files;
   int plot_phase;
   int plot_pols;
+  int npols;
 };
 
 static error_t parse_opt(int key, char *arg, struct argp_state *state) {
   struct arguments *arguments = state->input;
+  int i;
+  char *token;
+  const char s[2] = ",";
 
   switch (key) {
   case 'd':
@@ -50,6 +57,33 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state) {
     break;
   case 'p':
     arguments->plot_phase = YES;
+    break;
+  case 'P':
+    // Reset the polarisations.
+    arguments->plot_pols = 0;
+    arguments->npols = 0;
+    // Convert to lower case.
+    for (i = 0; arg[i]; i++) {
+      arg[i] = tolower(arg[i]);
+    }
+    // Tokenise.
+    token = strtok(arg, s);
+    while (token != NULL) {
+      if (strcmp(token, "xx") == 0) {
+	arguments->plot_pols |= PLOT_POL_XX;
+	arguments->npols++;
+      } else if (strcmp(token, "yy") == 0) {
+	arguments->plot_pols |= PLOT_POL_YY;
+	arguments->npols++;
+      } else if (strcmp(token, "xy") == 0) {
+	arguments->plot_pols |= PLOT_POL_XY;
+	arguments->npols++;
+      } else if (strcmp(token, "yx") == 0) {
+	arguments->plot_pols |= PLOT_POL_YX;
+	arguments->npols++;
+      }
+      token = strtok(NULL, s);
+    }
     break;
     
   case ARGP_KEY_ARG:
@@ -70,8 +104,8 @@ int main(int argc, char *argv[]) {
   // The argument list should all be RPFITS files.
   int i = 0, j = 0, k = 0, l = 0, m = 0, res = 0, keep_reading = 1;
   int read_cycle = 1, nscans = 0, vis_length = 0, if_no, read_response = 0;
-  int plotif = 0, r = 0, ant1, ant2, num_ifs = 2, num_pols = 2;
-  int p = 0, q = 0, sp = 0, rp, ri, rx, ry, yaxis_type;
+  int plotif = 0, r = 0, ant1, ant2, num_ifs = 2;
+  int p = 0, pp = 0, q = 0, sp = 0, rp, ri, rx, ry, yaxis_type;
   float min_vis, max_vis, *xpts = NULL, theight = 0.4;
   struct scan_data *scan_data = NULL, **all_scans = NULL;
   struct cycle_data *cycle_data = NULL;
@@ -89,6 +123,7 @@ int main(int argc, char *argv[]) {
   arguments.rpfits_files = NULL;
   arguments.plot_phase = NO;
   arguments.plot_pols = PLOT_POL_XX | PLOT_POL_YY;
+  arguments.npols = 2;
   argp_parse(&argp, argc, argv, 0, 0, &arguments);
   
   cpgopen(arguments.pgplot_device);
@@ -104,8 +139,8 @@ int main(int argc, char *argv[]) {
   // We will get data for all IFs and pols.
   MALLOC(cycle_ampphase, num_ifs);
   for (i = 0; i < num_ifs; i++) {
-    MALLOC(cycle_ampphase[i], num_pols);
-    for (j = 0; j < num_pols; j++) {
+    MALLOC(cycle_ampphase[i], arguments.npols);
+    for (j = 0; j < arguments.npols; j++) {
       cycle_ampphase[i][j] = NULL;
     }
   }
@@ -161,16 +196,35 @@ int main(int argc, char *argv[]) {
       for (k = 0; k < scan_data->num_cycles; k++) {
 	cycle_data = scan_data->cycles[k];
 	for (q = 0; q < num_ifs; q++) {
-	  for (p = 0; p < num_pols; p++) {
-	    switch(p) {
-	    case 0:
-	      sp = POL_XX;
-	      break;
-	    case 1:
-	      sp = POL_YY;
-	      break;
-	    default:
-	      sp = POL_XX;
+	  for (p = 0; p < arguments.npols; p++) {
+	    pp = p;
+	    if (pp == 0) {
+	      if (arguments.plot_pols & PLOT_POL_XX) {
+		sp = POL_XX;
+	      } else {
+		pp++;
+	      }
+	    }
+	    if (pp == 1) {
+	      if (arguments.plot_pols & PLOT_POL_YY) {
+		sp = POL_YY;
+	      } else {
+		pp++;
+	      }
+	    }
+	    if (pp == 2) {
+	      if (arguments.plot_pols & PLOT_POL_XY) {
+		sp = POL_XY;
+	      } else {
+		pp++;
+	      }
+	    }
+	    if (pp == 3) {
+	      if (arguments.plot_pols & PLOT_POL_YX) {
+		sp = POL_YX;
+	      } else {
+		sp = POL_XX; // Safety.
+	      }
 	    }
 	    r = vis_ampphase(&(scan_data->header_data), cycle_data,
 			     &(cycle_ampphase[q][p]), sp, q, 1,
@@ -184,7 +238,7 @@ int main(int argc, char *argv[]) {
 	}
 	make_plot(cycle_ampphase, &panelspec, &plotcontrols);
 	for (q = 0; q < num_ifs; q++) {
-	  for (p = 0; p < num_pols; p++) {
+	  for (p = 0; p < arguments.npols; p++) {
 	    free_ampphase(&(cycle_ampphase[q][p]));
 	  }
 	}

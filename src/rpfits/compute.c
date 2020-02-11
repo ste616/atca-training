@@ -198,8 +198,8 @@ struct ampphase_options ampphase_options_default(void) {
  * and which IF and bin.
  */
 int vis_ampphase(struct scan_header_data *scan_header_data,
-		  struct cycle_data *cycle_data,
-		  struct ampphase **ampphase,
+		 struct cycle_data *cycle_data,
+		 struct ampphase **ampphase,
 		 int pol, int ifno, int bin,
 		 struct ampphase_options *options) {
   int ap_created = 0, reqpol = -1, i = 0, polnum = -1, bl = -1, bidx = -1;

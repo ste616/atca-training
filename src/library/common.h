@@ -70,6 +70,8 @@ struct plotcontrols {
   long int if_num_spec;
   // The antennas to plot.
   int array_spec;
+  // The numer of polarisations to plot.
+  int npols;
 };
 
 // Our routine definitions.
@@ -84,6 +86,7 @@ void plotpanel_minmax(struct ampphase **plot_ampphase,
 		      int plot_baseline_idx, int npols, int *polidx,
 		      float *plotmin_x, float *plotmax_x,
 		      float *plotmin_y, float *plotmax_y);
+int find_pol(struct ampphase ***cycle_ampphase, int npols, int ifnum, int poltype);
 void make_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspec,
 	       struct plotcontrols *plot_controls);
 

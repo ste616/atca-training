@@ -29,6 +29,22 @@ void init_plotcontrols(struct plotcontrols *plotcontrols,
     corr_type = PLOT_AUTOCORRELATIONS | PLOT_CROSSCORRELATIONS;
   }
   plotcontrols->plot_options = xaxis_type | yaxis_type | pols | corr_type;
+
+  // Work out the number of pols.
+  plotcontrols->npols = 0;
+  if (pols & PLOT_POL_XX) {
+    plotcontrols->npols++;
+  }
+  if (pols & PLOT_POL_YY) {
+    plotcontrols->npols++;
+  }
+  if (pols & PLOT_POL_XY) {
+    plotcontrols->npols++;
+  }
+  if (pols & PLOT_POL_YX) {
+    plotcontrols->npols++;
+  }
+  
   plotcontrols->channel_range_limit = NO;
   plotcontrols->yaxis_range_limit = NO;
   plotcontrols->if_num_spec = 0;
@@ -221,10 +237,20 @@ void plotpanel_minmax(struct ampphase **plot_ampphase,
   }
 }
 
+int find_pol(struct ampphase ***cycle_ampphase, int npols, int ifnum, int poltype) {
+  int i;
+  for (i = 0; i < npols; i++) {
+    if (cycle_ampphase[ifnum][i]->pol == poltype) {
+      return i;
+    }
+  }
+  return -1;
+}
+
 void make_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspec,
 	       struct plotcontrols *plot_controls) {
   int x = 0, y = 0, i, j, ant1, ant2, nants = 0, px, py, iauto = 0, icross = 0;
-  int npols = 0, *polidx = NULL, if_num = 0;
+  int npols = 0, *polidx = NULL, if_num = 0, poli;
   float xaxis_min, xaxis_max, yaxis_min, yaxis_max, theight = 0.4;
   char ptitle[BUFSIZE], ptype[BUFSIZE];
   struct ampphase **ampphase_if = NULL;
@@ -242,20 +268,32 @@ void make_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspec,
 
   // Which polarisations are we plotting?
   if (plot_controls->plot_options & PLOT_POL_XX) {
-	REALLOC(polidx, ++npols);
-	polidx[npols - 1] = 0;
+    poli = find_pol(cycle_ampphase, plot_controls->npols, if_num, POL_XX);
+    if (poli >= 0) {
+      REALLOC(polidx, ++npols);
+      polidx[npols - 1] = poli;
+    }
   }
   if (plot_controls->plot_options & PLOT_POL_YY) {
-	REALLOC(polidx, ++npols);
-	polidx[npols - 1] = 1;
+    poli = find_pol(cycle_ampphase, plot_controls->npols, if_num, POL_YY);
+    if (poli >= 0) {
+      REALLOC(polidx, ++npols);
+      polidx[npols - 1] = poli;
+    }
   }
   if (plot_controls->plot_options & PLOT_POL_XY) {
-	REALLOC(polidx, ++npols);
-	polidx[npols - 1] = 2;
+    poli = find_pol(cycle_ampphase, plot_controls->npols, if_num, POL_XY);
+    if (poli >= 0) {
+      REALLOC(polidx, ++npols);
+      polidx[npols - 1] = poli;
+    }
   }
   if (plot_controls->plot_options & PLOT_POL_YX) {
-	REALLOC(polidx, ++npols);
-	polidx[npols - 1] = 3;
+    poli = find_pol(cycle_ampphase, plot_controls->npols, if_num, POL_YX);
+    if (poli >= 0) {
+      REALLOC(polidx, ++npols);
+      polidx[npols - 1] = poli;
+    }
   }
   
   changepanel(-1, -1, panelspec);
