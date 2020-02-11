@@ -28,6 +28,8 @@ static char args_doc[] = "[options] RPFITS_FILES...";
 
 // Our options.
 static struct argp_option options[] = {
+  { "array", 'a', "ARRAY", 0,
+    "Which antennas to plot, as a comma-separated list" },
   { "device", 'd', "PGPLOT_DEVICE", 0, "Direct plots to this PGGPLOT device" },
   { "phase", 'p', 0, 0, "Plots phase on y-axis" },
   { "pols", 'P', "POLS", 0,
@@ -39,6 +41,7 @@ static struct argp_option options[] = {
 struct arguments {
   char pgplot_device[BUFSIZE];
   char **rpfits_files;
+  char array_spec[BUFSIZE];
   int n_rpfits_files;
   int plot_phase;
   int plot_pols;
@@ -52,6 +55,9 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state) {
   const char s[2] = ",";
 
   switch (key) {
+  case 'a':
+    strncpy(arguments->array_spec, arg, BUFSIZE);
+    break;
   case 'd':
     strncpy(arguments->pgplot_device, arg, BUFSIZE);
     break;
@@ -121,6 +127,7 @@ int main(int argc, char *argv[]) {
   arguments.pgplot_device[0] = '\0';
   arguments.n_rpfits_files = 0;
   arguments.rpfits_files = NULL;
+  strcpy(arguments.array_spec, "1,2,3,4,5,6");
   arguments.plot_phase = NO;
   arguments.plot_pols = PLOT_POL_XX | PLOT_POL_YY;
   arguments.npols = 2;
@@ -155,7 +162,7 @@ int main(int argc, char *argv[]) {
   
   init_plotcontrols(&plotcontrols, DEFAULT, yaxis_type,
 		    arguments.plot_pols, DEFAULT);
-  
+  plotcontrols.array_spec = interpret_array_string(arguments.array_spec);
   for (i = 0; i < arguments.n_rpfits_files; i++) {
     // Try to open the RPFITS file.
     res = open_rpfits_file(arguments.rpfits_files[i]);

@@ -5,9 +5,28 @@
  * This library contains functions that are useful for many of the
  * applications.
  */
+#include <string.h>
 #include "common.h"
 #include "cpgplot.h"
 #include "memory.h"
+
+int interpret_array_string(char *array_string) {
+  // The array string should be a comma-separated list of antenna.
+  int a = 0, r = 0;
+  char *token;
+  const char s[2] = ",";
+  
+  token = strtok(array_string, s);
+  while (token != NULL) {
+    a = atoi(token);
+    if ((a >= 1) && (a <= MAXANTS)) {
+      r |= 1<<a;
+    }
+    token = strtok(NULL, s);
+  }
+
+  return r;
+}
 
 void init_plotcontrols(struct plotcontrols *plotcontrols,
 		       int xaxis_type, int yaxis_type, int pols,

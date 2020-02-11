@@ -75,6 +75,7 @@ struct plotcontrols {
 };
 
 // Our routine definitions.
+int interpret_array_string(char *array_string);
 void init_plotcontrols(struct plotcontrols *plotcontrols,
 		       int xaxis_type, int yaxis_type, int pols,
 		       int corr_type);
