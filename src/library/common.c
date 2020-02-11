@@ -277,7 +277,8 @@ int find_pol(struct ampphase ***cycle_ampphase, int npols, int ifnum, int poltyp
 void make_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspec,
 	       struct plotcontrols *plot_controls) {
   int x = 0, y = 0, i, j, ant1, ant2, nants = 0, px, py, iauto = 0, icross = 0;
-  int npols = 0, *polidx = NULL, if_num = 0, poli;
+  int npols = 0, *polidx = NULL, if_num = 0, poli, num_ifs = 0, panels_per_if = 0;
+  long int idxif;
   float xaxis_min, xaxis_max, yaxis_min, yaxis_max, theight = 0.4;
   char ptitle[BUFSIZE], ptype[BUFSIZE];
   struct ampphase **ampphase_if = NULL;
@@ -293,6 +294,14 @@ void make_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspec,
     return;
   }
 
+  // How many panels per IF?
+  if (plot_controls->plot_options & PLOT_AUTOCORRELATIONS) {
+    panels_per_if += nants;
+  }
+  if (plot_controls->plot_options & PLOT_CROSSCORRELATIONS) {
+    panels_per_if += (nants * (nants - 1)) / 2;
+  }
+  
   // Which polarisations are we plotting?
   if (plot_controls->plot_options & PLOT_POL_XX) {
     poli = find_pol(cycle_ampphase, plot_controls->npols, if_num, POL_XX);
@@ -325,67 +334,74 @@ void make_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspec,
   
   changepanel(-1, -1, panelspec);
   cpgpage();
-  ampphase_if = cycle_ampphase[if_num];
+  for (idxif = 0; idxif < MAXIFS; idxif++) {
+    if (plot_controls->plot_options & 1<<idxif) {
+      if_num = (int)idxif;
+      ampphase_if = cycle_ampphase[if_num];
 
-  for (i = 0; i < ampphase_if[0]->nbaselines; i++) {
-    // Work out the antennas in this baseline.
-    base_to_ants(ampphase_if[0]->baseline[i], &ant1, &ant2);
-    // Check if we are plotting both of these antenna.
-    if (((1 << ant1) & plot_controls->array_spec) &&
-	((1 << ant2) & plot_controls->array_spec)) {
-      // Work out which panel to use.
-      if ((ant1 == ant2) &&
-	  (plot_controls->plot_options & PLOT_AUTOCORRELATIONS)) {
-	px = iauto % panelspec->nx;
-	py = (int)((iauto - px) / panelspec->nx);
-	iauto++;
-      } else if ((ant1 != ant2) &&
-		 (plot_controls->plot_options & PLOT_CROSSCORRELATIONS)) {
-	if (plot_controls->plot_options & PLOT_AUTOCORRELATIONS) {
-	  px = (nants + icross) % panelspec->nx;
-	  py = (int)((nants + icross - px) / panelspec->nx);
-	} else {
-	  px = icross % panelspec->nx;
-	  py = (int)((icross - px) / panelspec->nx);
-	}
-	icross++;
-      }
-      // Check if we've exceeded the space for this plot.
-      if (py >= panelspec->ny) {
-	continue;
-      }
-      // Set the panel.
-      changepanel(px, py, panelspec);
-      // Set the title for the plot.
-      if (plot_controls->plot_options & PLOT_AMPLITUDE) {
-	snprintf(ptype, BUFSIZE, "AMPL.");
-      } else if (plot_controls->plot_options & PLOT_PHASE) {
-	snprintf(ptype, BUFSIZE, "PHASE");
-      }
-      snprintf(ptitle, BUFSIZE, "%s: FQ:%d BSL%d%d",
-	       ptype, (if_num + 1), ant1, ant2);
-      plotpanel_minmax(ampphase_if, plot_controls, i, npols, polidx,
-		       &xaxis_min, &xaxis_max, &yaxis_min, &yaxis_max);
-      cpgsci(1);
-      cpgswin(xaxis_min, xaxis_max, yaxis_min, yaxis_max);
-      cpgbox("BCNTS", 0, 0, "BCNTS", 0, 0);
-      cpgmtxt("T", theight, 0.5, 0.5, ptitle);
-      for (j = 0; j < npols; j++) {
-	cpgsci(polidx[j] + 1);
-	if (plot_controls->plot_options & PLOT_AMPLITUDE) {
-	  if (plot_controls->plot_options & PLOT_CHANNEL) {
-	    cpgline(ampphase_if[polidx[j]]->f_nchannels[i],
-		    ampphase_if[polidx[j]]->f_channel[i],
-		    ampphase_if[polidx[j]]->f_amplitude[i]);
+      for (i = 0; i < ampphase_if[0]->nbaselines; i++) {
+	// Work out the antennas in this baseline.
+	base_to_ants(ampphase_if[0]->baseline[i], &ant1, &ant2);
+	// Check if we are plotting both of these antenna.
+	if (((1 << ant1) & plot_controls->array_spec) &&
+	    ((1 << ant2) & plot_controls->array_spec)) {
+	  // Work out which panel to use.
+	  if ((ant1 == ant2) &&
+	      (plot_controls->plot_options & PLOT_AUTOCORRELATIONS)) {
+	    px = (num_ifs * panels_per_if + iauto) % panelspec->nx;
+	    py = (int)((num_ifs * panels_per_if + iauto - px) / panelspec->nx);
+	    iauto++;
+	  } else if ((ant1 != ant2) &&
+		     (plot_controls->plot_options & PLOT_CROSSCORRELATIONS)) {
+	    if (plot_controls->plot_options & PLOT_AUTOCORRELATIONS) {
+	      px = (num_ifs * panels_per_if + nants + icross) % panelspec->nx;
+	      py = (int)((num_ifs * panels_per_if + nants + icross - px) /
+			 panelspec->nx);
+	    } else {
+	      px = (num_ifs * panels_per_if + icross) % panelspec->nx;
+	      py = (int)((num_ifs * panels_per_if + icross - px) / panelspec->nx);
+	    }
+	    icross++;
 	  }
-	} else if (plot_controls->plot_options & PLOT_PHASE) {
-	  if (plot_controls->plot_options & PLOT_CHANNEL) {
-	    cpgline(ampphase_if[polidx[j]]->f_nchannels[i],
-		    ampphase_if[polidx[j]]->f_channel[i],
-		    ampphase_if[polidx[j]]->f_phase[i]);
+	  // Check if we've exceeded the space for this plot.
+	  if (py >= panelspec->ny) {
+	    continue;
+	  }
+	  // Set the panel.
+	  changepanel(px, py, panelspec);
+	  // Set the title for the plot.
+	  if (plot_controls->plot_options & PLOT_AMPLITUDE) {
+	    snprintf(ptype, BUFSIZE, "AMPL.");
+	  } else if (plot_controls->plot_options & PLOT_PHASE) {
+	    snprintf(ptype, BUFSIZE, "PHASE");
+	  }
+	  snprintf(ptitle, BUFSIZE, "%s: FQ:%d BSL%d%d",
+		   ptype, (if_num + 1), ant1, ant2);
+	  plotpanel_minmax(ampphase_if, plot_controls, i, npols, polidx,
+			   &xaxis_min, &xaxis_max, &yaxis_min, &yaxis_max);
+	  cpgsci(1);
+	  cpgswin(xaxis_min, xaxis_max, yaxis_min, yaxis_max);
+	  cpgbox("BCNTS", 0, 0, "BCNTS", 0, 0);
+	  cpgmtxt("T", theight, 0.5, 0.5, ptitle);
+	  for (j = 0; j < npols; j++) {
+	    cpgsci(polidx[j] + 1);
+	    if (plot_controls->plot_options & PLOT_AMPLITUDE) {
+	      if (plot_controls->plot_options & PLOT_CHANNEL) {
+		cpgline(ampphase_if[polidx[j]]->f_nchannels[i],
+			ampphase_if[polidx[j]]->f_channel[i],
+			ampphase_if[polidx[j]]->f_amplitude[i]);
+	      }
+	    } else if (plot_controls->plot_options & PLOT_PHASE) {
+	      if (plot_controls->plot_options & PLOT_CHANNEL) {
+		cpgline(ampphase_if[polidx[j]]->f_nchannels[i],
+			ampphase_if[polidx[j]]->f_channel[i],
+			ampphase_if[polidx[j]]->f_phase[i]);
+	      }
+	    }
 	  }
 	}
       }
+      num_ifs++;
     }
   }
   
