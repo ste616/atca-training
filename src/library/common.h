@@ -67,7 +67,7 @@ struct plotcontrols {
   float yaxis_range_min;
   float yaxis_range_max;
   // The IF numbers to plot.
-  long int if_num_spec;
+  int if_num_spec[MAXIFS];
   // The antennas to plot.
   int array_spec;
   // The numer of polarisations to plot.

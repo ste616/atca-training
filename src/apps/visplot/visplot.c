@@ -34,6 +34,8 @@ static struct argp_option options[] = {
   { "phase", 'p', 0, 0, "Plots phase on y-axis" },
   { "pols", 'P', "POLS", 0,
     "Which polarisations to plot, as a comma-separated list" },
+  { "ifs", 'I', "IFS", 0,
+    "Which IFs to plot, as a comma-separated list" },
   { 0 }
 };
 
@@ -46,6 +48,8 @@ struct arguments {
   int plot_phase;
   int plot_pols;
   int npols;
+  int plot_ifs[MAXIFS];
+  int nifs;
 };
 
 static error_t parse_opt(int key, char *arg, struct argp_state *state) {
@@ -91,7 +95,20 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state) {
       token = strtok(NULL, s);
     }
     break;
-    
+  case 'I':
+    // Reset the IFs.
+    memset(arguments->plot_ifs, 0, sizeof(arguments->plot_ifs));
+    arguments->nifs = 0;
+    token = strtok(arg, s);
+    while (token != NULL) {
+      i = atoi(token);
+      if ((i >= 1) && (i <= MAXIFS) && (arguments->nifs < MAXIFS)) {
+	arguments->plot_ifs[arguments->nifs] = i - 1;
+	arguments->nifs++;
+      }
+      token = strtok(NULL, s);
+    }
+    break;
   case ARGP_KEY_ARG:
     arguments->n_rpfits_files += 1;
     REALLOC(arguments->rpfits_files, arguments->n_rpfits_files);
@@ -109,9 +126,10 @@ static struct argp argp = { options, parse_opt, args_doc, doc };
 int main(int argc, char *argv[]) {
   // The argument list should all be RPFITS files.
   int i = 0, j = 0, k = 0, l = 0, m = 0, res = 0, keep_reading = 1;
-  int read_cycle = 1, nscans = 0, vis_length = 0, if_no, read_response = 0;
+  int read_cycle = 1, nscans = 0, vis_length = 0, if_no = 0, read_response = 0;
   int plotif = 0, r = 0, ant1, ant2, num_ifs = 2;
   int p = 0, pp = 0, q = 0, sp = 0, rp, ri, rx, ry, yaxis_type;
+  int old_num_ifs = 0, old_npols = 0;
   float min_vis, max_vis, *xpts = NULL, theight = 0.4;
   struct scan_data *scan_data = NULL, **all_scans = NULL;
   struct cycle_data *cycle_data = NULL;
@@ -131,6 +149,11 @@ int main(int argc, char *argv[]) {
   arguments.plot_phase = NO;
   arguments.plot_pols = PLOT_POL_XX | PLOT_POL_YY;
   arguments.npols = 2;
+  memset(arguments.plot_ifs, 0, sizeof(arguments.plot_ifs));
+  for (i = 0; i < MAXIFS; i++) {
+    arguments.plot_ifs[i] = i;
+  }
+  arguments.nifs = MAXIFS;
   argp_parse(&argp, argc, argv, 0, 0, &arguments);
   
   cpgopen(arguments.pgplot_device);
@@ -142,15 +165,6 @@ int main(int argc, char *argv[]) {
   ampphase_options.min_tvchannel = 513;
   ampphase_options.max_tvchannel = 1537;
   ampphase_options.averaging_method = AVERAGETYPE_MEAN | AVERAGETYPE_SCALAR;
-
-  // We will get data for all IFs and pols.
-  MALLOC(cycle_ampphase, num_ifs);
-  for (i = 0; i < num_ifs; i++) {
-    MALLOC(cycle_ampphase[i], arguments.npols);
-    for (j = 0; j < arguments.npols; j++) {
-      cycle_ampphase[i][j] = NULL;
-    }
-  }
 
   // Initialise the plotting space and options.
   splitpanels(5, 5, &panelspec);
@@ -176,6 +190,9 @@ int main(int argc, char *argv[]) {
 
       // Read in the scan header.
       read_response = read_scan_header(&(scan_data->header_data));
+      // Adjust the number of IFs.
+      num_ifs = (scan_data->header_data.num_ifs < arguments.nifs) ?
+	scan_data->header_data.num_ifs : arguments.nifs;
       printf("scan has obs date %s, time %.1f\n",
 	     scan_data->header_data.obsdate,
 	     scan_data->header_data.ut_seconds);
@@ -186,6 +203,7 @@ int main(int argc, char *argv[]) {
       printf("  coordinates RA = %.4f, Dec = %.4f\n",
 	     scan_data->header_data.rightascension_hours,
 	     scan_data->header_data.declination_degrees);
+      printf("  number of IFs = %d\n", scan_data->header_data.num_ifs);
       if (read_response & READER_DATA_AVAILABLE) {
 	  // Now start reading the cycle data.
 	read_cycle = 1;
@@ -200,9 +218,33 @@ int main(int argc, char *argv[]) {
 	  }
 	}
       }
+      // We allocate memory if we need to.
+      if (num_ifs != old_num_ifs) {
+	printf("Reallocating cycle memory...\n");
+	for (j = 0; j < old_num_ifs; j++) {
+	  for (k = 0; k < arguments.npols; k++) {
+	    FREE(cycle_ampphase[j][k]);
+	  }
+	  FREE(cycle_ampphase[j]);
+	}
+	FREE(cycle_ampphase);
+	MALLOC(cycle_ampphase, num_ifs);
+	for (j = 0; j < num_ifs; j++) {
+	  MALLOC(cycle_ampphase[j], arguments.npols);
+	  for (k = 0; k < arguments.npols; k++) {
+	    cycle_ampphase[j][k] = NULL;
+	  }
+	}
+	old_num_ifs = num_ifs;
+	// Change the plot control as well.
+	memset(plotcontrols.if_num_spec, 0, sizeof(plotcontrols.if_num_spec));
+      }
+
       for (k = 0; k < scan_data->num_cycles; k++) {
 	cycle_data = scan_data->cycles[k];
 	for (q = 0; q < num_ifs; q++) {
+	  if_no = arguments.plot_ifs[q];
+	  plotcontrols.if_num_spec[if_no] = 1;
 	  for (p = 0; p < arguments.npols; p++) {
 	    pp = p;
 	    if (pp == 0) {
@@ -234,7 +276,7 @@ int main(int argc, char *argv[]) {
 	      }
 	    }
 	    r = vis_ampphase(&(scan_data->header_data), cycle_data,
-			     &(cycle_ampphase[q][p]), sp, q, 1,
+			     &(cycle_ampphase[q][p]), sp, if_no, 1,
 			     &ampphase_options);
 	    if (r < 0) {
 	      printf("error encountered while calculating amp and phase\n");

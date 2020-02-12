@@ -66,12 +66,11 @@ void init_plotcontrols(struct plotcontrols *plotcontrols,
   
   plotcontrols->channel_range_limit = NO;
   plotcontrols->yaxis_range_limit = NO;
-  plotcontrols->if_num_spec = 0;
-  for (i = 0; i <= MAXIFS; i++) {
-    plotcontrols->if_num_spec |= 1<<i;
+  for (i = 0; i < MAXIFS; i++) {
+    plotcontrols->if_num_spec[i] = 1;
   }
   plotcontrols->array_spec = 0;
-  for (i = 0; i <= MAXANTS; i++) {
+  for (i = 1; i <= MAXANTS; i++) {
     plotcontrols->array_spec |= 1<<i;
   }
 }
@@ -277,8 +276,8 @@ int find_pol(struct ampphase ***cycle_ampphase, int npols, int ifnum, int poltyp
 void make_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspec,
 	       struct plotcontrols *plot_controls) {
   int x = 0, y = 0, i, j, ant1, ant2, nants = 0, px, py, iauto = 0, icross = 0;
-  int npols = 0, *polidx = NULL, if_num = 0, poli, num_ifs = 0, panels_per_if = 0;
-  long int idxif;
+  int npols = 0, *polidx = NULL, poli, num_ifs = 0, panels_per_if = 0;
+  int idxif, ni;
   float xaxis_min, xaxis_max, yaxis_min, yaxis_max, theight = 0.4;
   char ptitle[BUFSIZE], ptype[BUFSIZE];
   struct ampphase **ampphase_if = NULL;
@@ -302,43 +301,47 @@ void make_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspec,
     panels_per_if += (nants * (nants - 1)) / 2;
   }
   
-  // Which polarisations are we plotting?
-  if (plot_controls->plot_options & PLOT_POL_XX) {
-    poli = find_pol(cycle_ampphase, plot_controls->npols, if_num, POL_XX);
-    if (poli >= 0) {
-      REALLOC(polidx, ++npols);
-      polidx[npols - 1] = poli;
-    }
-  }
-  if (plot_controls->plot_options & PLOT_POL_YY) {
-    poli = find_pol(cycle_ampphase, plot_controls->npols, if_num, POL_YY);
-    if (poli >= 0) {
-      REALLOC(polidx, ++npols);
-      polidx[npols - 1] = poli;
-    }
-  }
-  if (plot_controls->plot_options & PLOT_POL_XY) {
-    poli = find_pol(cycle_ampphase, plot_controls->npols, if_num, POL_XY);
-    if (poli >= 0) {
-      REALLOC(polidx, ++npols);
-      polidx[npols - 1] = poli;
-    }
-  }
-  if (plot_controls->plot_options & PLOT_POL_YX) {
-    poli = find_pol(cycle_ampphase, plot_controls->npols, if_num, POL_YX);
-    if (poli >= 0) {
-      REALLOC(polidx, ++npols);
-      polidx[npols - 1] = poli;
-    }
-  }
-  
   changepanel(-1, -1, panelspec);
   cpgpage();
-  for (idxif = 0; idxif < MAXIFS; idxif++) {
-    if (plot_controls->plot_options & 1<<idxif) {
-      if_num = (int)idxif;
-      ampphase_if = cycle_ampphase[if_num];
-
+  for (idxif = 0, ni = 0; idxif < MAXIFS; idxif++) {
+    iauto = 0;
+    icross = 0;
+    if (plot_controls->if_num_spec[idxif]) {
+      ampphase_if = cycle_ampphase[ni];
+      if (ampphase_if == NULL) {
+	continue;
+      }
+      
+      // Which polarisations are we plotting?
+      if (plot_controls->plot_options & PLOT_POL_XX) {
+	poli = find_pol(cycle_ampphase, plot_controls->npols, ni, POL_XX);
+	if (poli >= 0) {
+	  REALLOC(polidx, ++npols);
+	  polidx[npols - 1] = poli;
+	}
+      }
+      if (plot_controls->plot_options & PLOT_POL_YY) {
+	poli = find_pol(cycle_ampphase, plot_controls->npols, ni, POL_YY);
+	if (poli >= 0) {
+	  REALLOC(polidx, ++npols);
+	  polidx[npols - 1] = poli;
+	}
+      }
+      if (plot_controls->plot_options & PLOT_POL_XY) {
+	poli = find_pol(cycle_ampphase, plot_controls->npols, ni, POL_XY);
+	if (poli >= 0) {
+	  REALLOC(polidx, ++npols);
+	  polidx[npols - 1] = poli;
+	}
+      }
+      if (plot_controls->plot_options & PLOT_POL_YX) {
+	poli = find_pol(cycle_ampphase, plot_controls->npols, ni, POL_YX);
+	if (poli >= 0) {
+	  REALLOC(polidx, ++npols);
+	  polidx[npols - 1] = poli;
+	}
+      }
+      
       for (i = 0; i < ampphase_if[0]->nbaselines; i++) {
 	// Work out the antennas in this baseline.
 	base_to_ants(ampphase_if[0]->baseline[i], &ant1, &ant2);
@@ -376,7 +379,7 @@ void make_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspec,
 	    snprintf(ptype, BUFSIZE, "PHASE");
 	  }
 	  snprintf(ptitle, BUFSIZE, "%s: FQ:%d BSL%d%d",
-		   ptype, (if_num + 1), ant1, ant2);
+		   ptype, (idxif + 1), ant1, ant2);
 	  plotpanel_minmax(ampphase_if, plot_controls, i, npols, polidx,
 			   &xaxis_min, &xaxis_max, &yaxis_min, &yaxis_max);
 	  cpgsci(1);
@@ -402,6 +405,7 @@ void make_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspec,
 	}
       }
       num_ifs++;
+      ni++;
     }
   }
   
