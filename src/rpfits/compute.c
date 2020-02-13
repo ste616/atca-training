@@ -304,9 +304,16 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
     if (cycle_data->bin[i] != bin) {
       continue;
     }
+    // Check this is the IF we are after.
+    if (cycle_data->if_no[i] != (ifno + 1)) {
+      continue;
+    }
     /*printf("found the bin with point %d, baseline %d-%d!\n", i,
       cycle_data->ant1[i], cycle_data->ant2[i]); */
     bl = ants_to_base(cycle_data->ant1[i], cycle_data->ant2[i]);
+    if (bl < 0) {
+      continue;
+    }
     bidx = cycle_data->all_baselines[bl] - 1;
     if (bidx < 0) {
       // This is wrong.

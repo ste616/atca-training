@@ -282,8 +282,8 @@ int read_cycle_data(struct scan_header_data *scan_header_data,
 		    struct cycle_data *cycle_data) {
   int this_jstat = JSTAT_READDATA, read_data = 1, rpfits_result = 0;
   int flag, bin, if_no, sourceno, vis_size = 0, rv = READER_HEADER_AVAILABLE;
-  int baseline, last_ut = -1, ant1, ant2, i, bidx = 1;
-  float *vis = NULL, *wgt = NULL, ut, u, v, w;
+  int baseline, ant1, ant2, i, bidx = 1;
+  float *vis = NULL, *wgt = NULL, ut, last_ut = -1, u, v, w;
   float complex *cvis = NULL;
   
   while (read_data) {
@@ -317,13 +317,14 @@ int read_cycle_data(struct scan_header_data *scan_header_data,
 	rv = READER_HEADER_AVAILABLE;
       }
     } else {
-      /*fprintf(stderr, "jstat = %d ut = %.1f baseline = %d\n", this_jstat,
-	      ut, baseline);
-      fprintf(stderr, "if_no = %d sourceno = %d flag = %d bin = %d\n",
-      if_no, sourceno, flag, bin);*/
+      /* fprintf(stderr, "jstat = %d ut = %.1f last = %.1f baseline = %d\n", this_jstat, */
+      /* 	      ut, last_ut, baseline); */
+      /* fprintf(stderr, "if_no = %d sourceno = %d flag = %d bin = %d\n", */
+      /* 	      if_no, sourceno, flag, bin); */
       // Check for a time change.
       if ((baseline == -1) && (ut > last_ut)) {
 	// We've gone to a new cycle.
+	//printf("stopping because new cycle!\n");
 	rv = READER_HEADER_AVAILABLE | READER_DATA_AVAILABLE;
 	read_data = 0;
       } else {

@@ -205,9 +205,10 @@ int main(int argc, char *argv[]) {
 	     scan_data->header_data.declination_degrees);
       printf("  number of IFs = %d\n", scan_data->header_data.num_ifs);
       if (read_response & READER_DATA_AVAILABLE) {
-	  // Now start reading the cycle data.
+	// Now start reading the cycle data.
 	read_cycle = 1;
 	while (read_cycle) {
+	  //printf("reading cycle\n");
 	  cycle_data = scan_add_cycle(scan_data);
 	  read_response = read_cycle_data(&(scan_data->header_data),
 					  cycle_data);
@@ -215,6 +216,9 @@ int main(int argc, char *argv[]) {
 	  //printf("cycle has %d points\n", cycle_data->num_points);
 	  if (!(read_response & READER_DATA_AVAILABLE)) {
 	    read_cycle = 0;
+	    //keep_reading = 0;
+	    printf("something went wrong while reading cycle: %d\n",
+		   read_response);
 	  }
 	}
       }
