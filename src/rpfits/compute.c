@@ -204,7 +204,7 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
 		 struct ampphase_options *options) {
   int ap_created = 0, reqpol = -1, i = 0, polnum = -1, bl = -1, bidx = -1;
   int j = 0, jflag = 0, vidx = -1;
-  float rcheck = 0;
+  float rcheck = 0, chanwidth, firstfreq, nhalfchan;
   struct ampphase_options default_options;
 
   // Prepare the structure if required.
@@ -292,9 +292,22 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
   }
   
   // Fill the arrays.
+  // Work out the channel width (GHz).
+  nhalfchan = (scan_header_data->if_num_channels[ifno] % 2 == 1) ?
+    (float)((scan_header_data->if_num_channels[ifno] - 1) / 2) :
+    (float)(scan_header_data->if_num_channels[ifno] / 2);
+  chanwidth = scan_header_data->if_sideband[ifno] *
+    scan_header_data->if_bandwidth[ifno] / (nhalfchan * 2);
+  // And the first channel's frequency.
+  firstfreq = scan_header_data->if_centre_freq[ifno] -
+     nhalfchan * chanwidth;
+  printf("with nchan = %d, chanwidth = %.6f, first = %.6f\n",
+	  scan_header_data->if_num_channels[ifno], chanwidth,
+	  firstfreq);
   for (i = 0; i < (*ampphase)->nchannels; i++) {
     (*ampphase)->channel[i] = i;
-    
+    // Compute the channel frequency.
+    (*ampphase)->frequency[i] = firstfreq + (float)i * chanwidth;
   }
 
   (*ampphase)->bin = bin;

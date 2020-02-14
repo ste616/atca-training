@@ -41,6 +41,7 @@
 #define BANDWIDTHMHZ(f) doubles_.if_bw[f] / 1e6
 #define NCHANNELS(f) if_.if_nfreq[f]
 #define NSTOKES(f) if_.if_nstok[f]
+#define SIDEBAND(f) if_.if_invert[f]
 #define CSTOKES(f,s) names_.if_cstok + (s * 2 + f * 4 * 2)
 
 // Return values from the read routines.

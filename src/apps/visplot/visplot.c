@@ -31,11 +31,12 @@ static struct argp_option options[] = {
   { "array", 'a', "ARRAY", 0,
     "Which antennas to plot, as a comma-separated list" },
   { "device", 'd', "PGPLOT_DEVICE", 0, "Direct plots to this PGGPLOT device" },
+  { "frequency", 'f', 0, 0, "Plots frequency on x-axis" },
+  { "ifs", 'I', "IFS", 0,
+    "Which IFs to plot, as a comma-separated list" },
   { "phase", 'p', 0, 0, "Plots phase on y-axis" },
   { "pols", 'P', "POLS", 0,
     "Which polarisations to plot, as a comma-separated list" },
-  { "ifs", 'I', "IFS", 0,
-    "Which IFs to plot, as a comma-separated list" },
   { 0 }
 };
 
@@ -46,6 +47,7 @@ struct arguments {
   char array_spec[BUFSIZE];
   int n_rpfits_files;
   int plot_phase;
+  int plot_frequency;
   int plot_pols;
   int npols;
   int plot_ifs[MAXIFS];
@@ -64,6 +66,22 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state) {
     break;
   case 'd':
     strncpy(arguments->pgplot_device, arg, BUFSIZE);
+    break;
+  case 'f':
+    arguments->plot_frequency = YES;
+  case 'I':
+    // Reset the IFs.
+    memset(arguments->plot_ifs, 0, sizeof(arguments->plot_ifs));
+    arguments->nifs = 0;
+    token = strtok(arg, s);
+    while (token != NULL) {
+      i = atoi(token);
+      if ((i >= 1) && (i <= MAXIFS) && (arguments->nifs < MAXIFS)) {
+	arguments->plot_ifs[arguments->nifs] = i - 1;
+	arguments->nifs++;
+      }
+      token = strtok(NULL, s);
+    }
     break;
   case 'p':
     arguments->plot_phase = YES;
@@ -95,20 +113,6 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state) {
       token = strtok(NULL, s);
     }
     break;
-  case 'I':
-    // Reset the IFs.
-    memset(arguments->plot_ifs, 0, sizeof(arguments->plot_ifs));
-    arguments->nifs = 0;
-    token = strtok(arg, s);
-    while (token != NULL) {
-      i = atoi(token);
-      if ((i >= 1) && (i <= MAXIFS) && (arguments->nifs < MAXIFS)) {
-	arguments->plot_ifs[arguments->nifs] = i - 1;
-	arguments->nifs++;
-      }
-      token = strtok(NULL, s);
-    }
-    break;
   case ARGP_KEY_ARG:
     arguments->n_rpfits_files += 1;
     REALLOC(arguments->rpfits_files, arguments->n_rpfits_files);
@@ -128,7 +132,7 @@ int main(int argc, char *argv[]) {
   int i = 0, j = 0, k = 0, l = 0, m = 0, res = 0, keep_reading = 1;
   int read_cycle = 1, nscans = 0, vis_length = 0, if_no = 0, read_response = 0;
   int plotif = 0, r = 0, ant1, ant2, num_ifs = 2;
-  int p = 0, pp = 0, q = 0, sp = 0, rp, ri, rx, ry, yaxis_type;
+  int p = 0, pp = 0, q = 0, sp = 0, rp, ri, rx, ry, yaxis_type, xaxis_type;
   int old_num_ifs = 0, old_npols = 0;
   float min_vis, max_vis, *xpts = NULL, theight = 0.4;
   struct scan_data *scan_data = NULL, **all_scans = NULL;
@@ -147,6 +151,7 @@ int main(int argc, char *argv[]) {
   arguments.rpfits_files = NULL;
   strcpy(arguments.array_spec, "1,2,3,4,5,6");
   arguments.plot_phase = NO;
+  arguments.plot_frequency = NO;
   arguments.plot_pols = PLOT_POL_XX | PLOT_POL_YY;
   arguments.npols = 2;
   memset(arguments.plot_ifs, 0, sizeof(arguments.plot_ifs));
@@ -173,8 +178,13 @@ int main(int argc, char *argv[]) {
   } else {
     yaxis_type = PLOT_PHASE;
   }
+  if (arguments.plot_frequency == NO) {
+    xaxis_type = PLOT_CHANNEL;
+  } else {
+    xaxis_type = PLOT_FREQUENCY;
+  }
   
-  init_plotcontrols(&plotcontrols, DEFAULT, yaxis_type,
+  init_plotcontrols(&plotcontrols, xaxis_type, yaxis_type,
 		    arguments.plot_pols, DEFAULT);
   plotcontrols.array_spec = interpret_array_string(arguments.array_spec);
   for (i = 0; i < arguments.n_rpfits_files; i++) {
@@ -286,6 +296,11 @@ int main(int argc, char *argv[]) {
 	      printf("error encountered while calculating amp and phase\n");
 	      free_ampphase(&(cycle_ampphase[q][p]));
 	      exit(0);
+	    } else {
+	      printf("frequency determined to be %.6f - %.6f\n",
+		     cycle_ampphase[q][p]->frequency[0],
+		     cycle_ampphase[q][p]->frequency
+		     [cycle_ampphase[q][p]->nchannels - 1]);
 	    }
 	  }
 	}

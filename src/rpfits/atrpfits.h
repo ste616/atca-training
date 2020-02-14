@@ -52,6 +52,7 @@ struct scan_header_data {
   float *if_bandwidth;
   int *if_num_channels;
   int *if_num_stokes;
+  int *if_sideband;
   char ***if_stokes_names;
 };
 
