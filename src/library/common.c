@@ -365,6 +365,14 @@ void make_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspec,
 	}
       }
 
+      if (plot_controls->plot_options & PLOT_FREQUENCY) {
+	MALLOC(freq_amp, npols);
+	MALLOC(freq_phase, npols);
+	for (rp = 0; rp < npols; rp++) {
+	  freq_amp[rp] = NULL;
+	  freq_phase[rp] = NULL;
+	}
+      }
       
       for (i = 0; i < ampphase_if[0]->nbaselines; i++) {
 	// Work out the antennas in this baseline.
@@ -407,13 +415,11 @@ void make_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspec,
 
 	  // Check if we need to make an inverted frequency array.
 	  if (plot_controls->plot_options & PLOT_FREQUENCY) {
-	    MALLOC(freq_amp, npols);
-	    MALLOC(freq_phase, npols);
 	    if (ampphase_if[0]->f_frequency[i][0] >
 		ampphase_if[0]->f_frequency[i]
 		[ampphase_if[0]->f_nchannels[i] - 1]) {
 	      // Inverted band.
-	      if (freq_malloced) {
+	      if (freq_malloced == 1) {
 		FREE(freq_ordered);
 		for (rp = 0; rp < npols; rp++) {
 		  if (plot_controls->plot_options & PLOT_AMPLITUDE) {
@@ -433,11 +439,11 @@ void make_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspec,
 	      }
 	      freq_malloced = 1;
 	      for (rp = 0; rp < npols; rp++) {
-		for (ri = 0, ri = ampphase_if[0]->f_nchannels[i] - 1;
+		for (ri = 0, rj = ampphase_if[0]->f_nchannels[i] - 1;
 		     ri < ampphase_if[0]->f_nchannels[i]; ri++, rj--) {
 		  // Swap the frequencies.
 		  if (rp == 0) {
-		    freq_ordered[ri] = ampphase_if[0]->f_frequency[i][rj];
+		    freq_ordered[ri] = ampphase_if[polidx[rp]]->f_frequency[i][rj];
 		  }
 		  if (plot_controls->plot_options & PLOT_AMPLITUDE) {
 		    freq_amp[rp][ri] = ampphase_if[polidx[rp]]->f_amplitude[i][rj];
@@ -454,7 +460,7 @@ void make_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspec,
 		  FREE(freq_phase[rp]);
 		}
 	      }
-	      freq_ordered = ampphase_if[0]->f_frequency[i];
+	      freq_ordered = ampphase_if[polidx[rp]]->f_frequency[i];
 	      for (rp = 0; rp < npols; rp++) {
 		freq_amp[rp] = ampphase_if[polidx[rp]]->f_amplitude[i];
 		freq_phase[rp] = ampphase_if[polidx[rp]]->f_phase[i];
