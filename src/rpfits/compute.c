@@ -301,9 +301,9 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
   // And the first channel's frequency.
   firstfreq = scan_header_data->if_centre_freq[ifno] -
      nhalfchan * chanwidth;
-  printf("with nchan = %d, chanwidth = %.6f, first = %.6f\n",
-	  scan_header_data->if_num_channels[ifno], chanwidth,
-	  firstfreq);
+  /* printf("with nchan = %d, chanwidth = %.6f, first = %.6f\n", */
+  /* 	  scan_header_data->if_num_channels[ifno], chanwidth, */
+  /* 	  firstfreq); */
   for (i = 0; i < (*ampphase)->nchannels; i++) {
     (*ampphase)->channel[i] = i;
     // Compute the channel frequency.

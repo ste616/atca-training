@@ -158,6 +158,7 @@ void plotpanel_minmax(struct ampphase **plot_ampphase,
   // account whether it's an auto or cross correlation, and the polarisations
   // that are being plotted.
   int i = 0, j = 0, bltype, ant1, ant2;
+  float swapf;
 
   // Get the x-axis range first.
   if (plot_controls->plot_options & PLOT_CHANNEL) {
@@ -169,12 +170,33 @@ void plotpanel_minmax(struct ampphase **plot_ampphase,
 	*plotmin_x = plot_controls->channel_range_min;
       }
       if ((plot_controls->channel_range_max > 0) &&
-	  (plot_controls->channel_range_max <= plot_ampphase[0]->nchannels) &&
+	  (plot_controls->channel_range_max < plot_ampphase[0]->nchannels) &&
 	  (plot_controls->channel_range_max > *plotmin_x)) {
 	*plotmax_x = plot_controls->channel_range_max;
       }
-    } else if (plot_controls->plot_options & PLOT_FREQUENCY) {
-      // TODO: frequency conversions.
+    }
+  } else if (plot_controls->plot_options & PLOT_FREQUENCY) {
+    *plotmin_x = plot_ampphase[0]->frequency[0];
+    *plotmax_x = plot_ampphase[0]->frequency
+      [plot_ampphase[0]->nchannels - 1];
+    if (plot_controls->channel_range_limit == YES) {
+      if ((plot_controls->channel_range_min >= 0) &&
+	  (plot_controls->channel_range_min < plot_ampphase[0]->nchannels)) {
+	*plotmin_x = plot_ampphase[0]->frequency
+	  [plot_controls->channel_range_min];
+      }
+      if ((plot_controls->channel_range_max > 0) &&
+	  (plot_controls->channel_range_max < plot_ampphase[0]->nchannels) &&
+	  (plot_controls->channel_range_max > plot_controls->channel_range_min)) {
+	*plotmax_x = plot_ampphase[0]->frequency
+	  [plot_controls->channel_range_max];
+      }
+    }
+    // Check for frequency inversion.
+    if (*plotmin_x > *plotmax_x) {
+      swapf = *plotmin_x;
+      *plotmin_x = *plotmax_x;
+      *plotmax_x = swapf;
     }
   }
     
@@ -277,8 +299,9 @@ void make_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspec,
 	       struct plotcontrols *plot_controls) {
   int x = 0, y = 0, i, j, ant1, ant2, nants = 0, px, py, iauto = 0, icross = 0;
   int npols = 0, *polidx = NULL, poli, num_ifs = 0, panels_per_if = 0;
-  int idxif, ni;
+  int idxif, ni, ri, rj, rp, freq_malloced = 0;
   float xaxis_min, xaxis_max, yaxis_min, yaxis_max, theight = 0.4;
+  float **freq_amp = NULL, **freq_phase = NULL, *freq_ordered = NULL;
   char ptitle[BUFSIZE], ptype[BUFSIZE];
   struct ampphase **ampphase_if = NULL;
 
@@ -341,6 +364,7 @@ void make_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspec,
 	  polidx[npols - 1] = poli;
 	}
       }
+
       
       for (i = 0; i < ampphase_if[0]->nbaselines; i++) {
 	// Work out the antennas in this baseline.
@@ -380,12 +404,75 @@ void make_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspec,
 	  }
 	  snprintf(ptitle, BUFSIZE, "%s: FQ:%d BSL%d%d",
 		   ptype, (idxif + 1), ant1, ant2);
+
+	  // Check if we need to make an inverted frequency array.
+	  if (plot_controls->plot_options & PLOT_FREQUENCY) {
+	    MALLOC(freq_amp, npols);
+	    MALLOC(freq_phase, npols);
+	    if (ampphase_if[0]->f_frequency[i][0] >
+		ampphase_if[0]->f_frequency[i]
+		[ampphase_if[0]->f_nchannels[i] - 1]) {
+	      // Inverted band.
+	      if (freq_malloced) {
+		FREE(freq_ordered);
+		for (rp = 0; rp < npols; rp++) {
+		  if (plot_controls->plot_options & PLOT_AMPLITUDE) {
+		    FREE(freq_amp[rp]);
+		  } else {
+		    FREE(freq_phase[rp]);
+		  }
+		}
+	      }
+	      MALLOC(freq_ordered, ampphase_if[0]->f_nchannels[i]);
+	      for (rp = 0; rp < npols; rp++) {
+		if (plot_controls->plot_options & PLOT_AMPLITUDE) {
+		  MALLOC(freq_amp[rp], ampphase_if[polidx[rp]]->f_nchannels[i]);
+		} else {
+		  MALLOC(freq_phase[rp], ampphase_if[polidx[rp]]->f_nchannels[i]);
+		}
+	      }
+	      freq_malloced = 1;
+	      for (rp = 0; rp < npols; rp++) {
+		for (ri = 0, ri = ampphase_if[0]->f_nchannels[i] - 1;
+		     ri < ampphase_if[0]->f_nchannels[i]; ri++, rj--) {
+		  // Swap the frequencies.
+		  if (rp == 0) {
+		    freq_ordered[ri] = ampphase_if[0]->f_frequency[i][rj];
+		  }
+		  if (plot_controls->plot_options & PLOT_AMPLITUDE) {
+		    freq_amp[rp][ri] = ampphase_if[polidx[rp]]->f_amplitude[i][rj];
+		  } else {
+		    freq_phase[rp][ri] = ampphase_if[polidx[rp]]->f_phase[i][rj];
+		  }
+		}
+	      }
+	    } else {
+	      if (freq_malloced) {
+		FREE(freq_ordered);
+		for (rp = 0; rp < npols; rp++) {
+		  FREE(freq_amp[rp]);
+		  FREE(freq_phase[rp]);
+		}
+	      }
+	      freq_ordered = ampphase_if[0]->f_frequency[i];
+	      for (rp = 0; rp < npols; rp++) {
+		freq_amp[rp] = ampphase_if[polidx[rp]]->f_amplitude[i];
+		freq_phase[rp] = ampphase_if[polidx[rp]]->f_phase[i];
+	      }
+	      freq_malloced = 0;
+	    }
+	  }
+
+	  
 	  plotpanel_minmax(ampphase_if, plot_controls, i, npols, polidx,
 			   &xaxis_min, &xaxis_max, &yaxis_min, &yaxis_max);
+	  /* printf("max/max x = %.6f / %.6f, y = %.6f / %.6f\n", */
+	  /* 	 xaxis_min, xaxis_max, yaxis_min, yaxis_max); */
 	  cpgsci(1);
 	  cpgswin(xaxis_min, xaxis_max, yaxis_min, yaxis_max);
 	  cpgbox("BCNTS", 0, 0, "BCNTS", 0, 0);
 	  cpgmtxt("T", theight, 0.5, 0.5, ptitle);
+	  
 	  for (j = 0; j < npols; j++) {
 	    cpgsci(polidx[j] + 1);
 	    if (plot_controls->plot_options & PLOT_AMPLITUDE) {
@@ -393,12 +480,18 @@ void make_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspec,
 		cpgline(ampphase_if[polidx[j]]->f_nchannels[i],
 			ampphase_if[polidx[j]]->f_channel[i],
 			ampphase_if[polidx[j]]->f_amplitude[i]);
+	      } else if (plot_controls->plot_options & PLOT_FREQUENCY) {
+		cpgline(ampphase_if[polidx[j]]->f_nchannels[i],
+			freq_ordered, freq_amp[j]);
 	      }
 	    } else if (plot_controls->plot_options & PLOT_PHASE) {
 	      if (plot_controls->plot_options & PLOT_CHANNEL) {
 		cpgline(ampphase_if[polidx[j]]->f_nchannels[i],
 			ampphase_if[polidx[j]]->f_channel[i],
 			ampphase_if[polidx[j]]->f_phase[i]);
+	      } else if (plot_controls->plot_options & PLOT_FREQUENCY) {
+		cpgline(ampphase_if[polidx[j]]->f_nchannels[i],
+			freq_ordered, freq_phase[j]);
 	      }
 	    }
 	  }
@@ -406,6 +499,19 @@ void make_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspec,
       }
       num_ifs++;
       ni++;
+      if (freq_malloced == 1) {
+	FREE(freq_ordered);
+	for (rp = 0; rp < npols; rp++) {
+	  if (plot_controls->plot_options & PLOT_AMPLITUDE) {
+	    FREE(freq_amp[rp]);
+	  } else if (plot_controls->plot_options & PLOT_PHASE) {
+	    FREE(freq_phase[rp]);
+	  }
+	}
+	FREE(freq_amp);
+	FREE(freq_phase);
+	freq_malloced = 0;
+      }
     }
   }
   

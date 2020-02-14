@@ -69,6 +69,7 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state) {
     break;
   case 'f':
     arguments->plot_frequency = YES;
+    break;
   case 'I':
     // Reset the IFs.
     memset(arguments->plot_ifs, 0, sizeof(arguments->plot_ifs));
@@ -160,6 +161,12 @@ int main(int argc, char *argv[]) {
   }
   arguments.nifs = MAXIFS;
   argp_parse(&argp, argc, argv, 0, 0, &arguments);
+
+  // Check for nonsense arguments.
+  if (arguments.nifs == 0) {
+    printf("Must specify at least 1 IF to plot!\n");
+    exit(-1);
+  }
   
   cpgopen(arguments.pgplot_device);
   cpgask(1);
@@ -296,11 +303,12 @@ int main(int argc, char *argv[]) {
 	      printf("error encountered while calculating amp and phase\n");
 	      free_ampphase(&(cycle_ampphase[q][p]));
 	      exit(0);
-	    } else {
-	      printf("frequency determined to be %.6f - %.6f\n",
-		     cycle_ampphase[q][p]->frequency[0],
-		     cycle_ampphase[q][p]->frequency
-		     [cycle_ampphase[q][p]->nchannels - 1]);
+	    /* } else { */
+	    /*   printf("frequency determined to be %.6f - %.6f\n", */
+	    /* 	     cycle_ampphase[q][p]->frequency[0], */
+	    /* 	     cycle_ampphase[q][p]->frequency */
+	    /* 	     [cycle_ampphase[q][p]->nchannels - 1]); */
+	    /*   fflush(stdout); */
 	    }
 	  }
 	}
