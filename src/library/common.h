@@ -17,6 +17,9 @@
 #define MAXIFS 34
 #define YES 1
 #define NO 0
+#define MAXCHAN 18000
+#define MAXPOL  4
+#define MAXBIN  32
 
 /**
  * Some option flags.

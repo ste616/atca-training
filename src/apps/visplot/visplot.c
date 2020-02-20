@@ -297,7 +297,7 @@ int main(int argc, char *argv[]) {
 	      }
 	    }
 	    r = vis_ampphase(&(scan_data->header_data), cycle_data,
-			     &(cycle_ampphase[q][p]), sp, if_no, 1,
+			     &(cycle_ampphase[q][p]), sp, if_no,
 			     &ampphase_options);
 	    if (r < 0) {
 	      printf("error encountered while calculating amp and phase\n");

@@ -40,7 +40,8 @@ struct ampphase* prepare_ampphase(void) {
 
   ampphase->pol = -1;
   ampphase->window = -1;
-  ampphase->bin = -1;
+
+  ampphase->nbins = NULL;
   
   ampphase->weight = NULL;
   ampphase->amplitude = NULL;
@@ -82,7 +83,7 @@ struct vis_quantities* prepare_vis_quantities(void) {
 
   vis_quantities->pol = -1;
   vis_quantities->window = -1;
-  vis_quantities->bin = -1;
+  vis_quantities->nbins = NULL;
   
   vis_quantities->amplitude = NULL;
   vis_quantities->phase = NULL;
@@ -102,9 +103,21 @@ struct vis_quantities* prepare_vis_quantities(void) {
  * Free an ampphase structure's memory.
  */
 void free_ampphase(struct ampphase **ampphase) {
-  int i = 0;
+  int i = 0, j = 0;
 
   for (i = 0; i < (*ampphase)->nbaselines; i++) {
+    for (j = 0; j < (*ampphase)->nbins[i]; j++) {
+      FREE((*ampphase)->weight[i][j]);
+      FREE((*ampphase)->amplitude[i][j]);
+      FREE((*ampphase)->phase[i][j]);
+      FREE((*ampphase)->raw[i][j]);
+      FREE((*ampphase)->f_channel[i][j]);
+      FREE((*ampphase)->f_frequency[i][j]);
+      FREE((*ampphase)->f_weight[i][j]);
+      FREE((*ampphase)->f_amplitude[i][j]);
+      FREE((*ampphase)->f_phase[i][j]);
+      FREE((*ampphase)->f_raw[i][j]);
+    }
     FREE((*ampphase)->weight[i]);
     FREE((*ampphase)->amplitude[i]);
     FREE((*ampphase)->phase[i]);
@@ -121,6 +134,7 @@ void free_ampphase(struct ampphase **ampphase) {
   FREE((*ampphase)->phase);
   FREE((*ampphase)->raw);
   FREE((*ampphase)->f_nchannels);
+  FREE((*ampphase)->nbins);
 
   FREE((*ampphase)->channel);
   FREE((*ampphase)->frequency);
@@ -145,10 +159,16 @@ void free_ampphase(struct ampphase **ampphase) {
  * Free a vis_quantities structure's memory.
  */
 void free_vis_quantities(struct vis_quantities **vis_quantities) {
+  int i;
+  for (i = 0; i < (*vis_quantities)->nbaselines; i++) {
+    FREE((*vis_quantities)->amplitude[i]);
+    FREE((*vis_quantities)->phase[i]);
+    FREE((*vis_quantities)->delay[i]);
+  }
   FREE((*vis_quantities)->amplitude);
   FREE((*vis_quantities)->phase);
   FREE((*vis_quantities)->delay);
-
+  FREE((*vis_quantities)->nbins);
   FREE(*vis_quantities);
 }
 
@@ -200,10 +220,10 @@ struct ampphase_options ampphase_options_default(void) {
 int vis_ampphase(struct scan_header_data *scan_header_data,
 		 struct cycle_data *cycle_data,
 		 struct ampphase **ampphase,
-		 int pol, int ifno, int bin,
+		 int pol, int ifno,
 		 struct ampphase_options *options) {
   int ap_created = 0, reqpol = -1, i = 0, polnum = -1, bl = -1, bidx = -1;
-  int j = 0, jflag = 0, vidx = -1;
+  int j = 0, jflag = 0, vidx = -1, cidx = -1;
   float rcheck = 0, chanwidth, firstfreq, nhalfchan;
   struct ampphase_options default_options;
 
@@ -271,25 +291,41 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
   MALLOC((*ampphase)->f_amplitude, (*ampphase)->nbaselines);
   MALLOC((*ampphase)->f_phase, (*ampphase)->nbaselines);
   MALLOC((*ampphase)->f_raw, (*ampphase)->nbaselines);
+
+  CALLOC((*ampphase)->nbins, (*ampphase)->nbaselines);
   for (i = 0; i < (*ampphase)->nbaselines; i++) {
-    MALLOC((*ampphase)->weight[i], (*ampphase)->nchannels);
-    MALLOC((*ampphase)->amplitude[i], (*ampphase)->nchannels);
-    MALLOC((*ampphase)->phase[i], (*ampphase)->nchannels);
-    MALLOC((*ampphase)->raw[i], (*ampphase)->nchannels);
+    (*ampphase)->weight[i] = NULL;
+    (*ampphase)->amplitude[i] = NULL;
+    (*ampphase)->phase[i] = NULL;
+    (*ampphase)->raw[i] = NULL;
     (*ampphase)->min_amplitude[i] = INFINITY;
     (*ampphase)->max_amplitude[i] = -INFINITY;
     (*ampphase)->min_phase[i] = INFINITY;
     (*ampphase)->max_phase[i] = -INFINITY;
     (*ampphase)->baseline[i] = 0;
-
-    (*ampphase)->f_nchannels[i] = (*ampphase)->nchannels;
-    MALLOC((*ampphase)->f_channel[i], (*ampphase)->nchannels);
-    MALLOC((*ampphase)->f_frequency[i], (*ampphase)->nchannels);
-    MALLOC((*ampphase)->f_weight[i], (*ampphase)->nchannels);
-    MALLOC((*ampphase)->f_amplitude[i], (*ampphase)->nchannels);
-    MALLOC((*ampphase)->f_phase[i], (*ampphase)->nchannels);
-    MALLOC((*ampphase)->f_raw[i], (*ampphase)->nchannels);
+    (*ampphase)->f_nchannels[i] = NULL;
+    (*ampphase)->f_channel[i] = NULL;
+    (*ampphase)->f_frequency[i] = NULL;
+    (*ampphase)->f_weight[i] = NULL;
+    (*ampphase)->f_amplitude[i] = NULL;
+    (*ampphase)->f_phase[i] = NULL;
+    (*ampphase)->f_raw[i] = NULL;
   }
+  
+  /* for (i = 0; i < (*ampphase)->nbaselines; i++) { */
+  /*   MALLOC((*ampphase)->weight[i], (*ampphase)->nchannels); */
+  /*   MALLOC((*ampphase)->amplitude[i], (*ampphase)->nchannels); */
+  /*   MALLOC((*ampphase)->phase[i], (*ampphase)->nchannels); */
+  /*   MALLOC((*ampphase)->raw[i], (*ampphase)->nchannels); */
+  /*   (*ampphase)->f_nchannels[i] = (*ampphase)->nchannels; */
+
+  /*   MALLOC((*ampphase)->f_channel[i], (*ampphase)->nchannels); */
+  /*   MALLOC((*ampphase)->f_frequency[i], (*ampphase)->nchannels); */
+  /*   MALLOC((*ampphase)->f_weight[i], (*ampphase)->nchannels); */
+  /*   MALLOC((*ampphase)->f_amplitude[i], (*ampphase)->nchannels); */
+  /*   MALLOC((*ampphase)->f_phase[i], (*ampphase)->nchannels); */
+  /*   MALLOC((*ampphase)->f_raw[i], (*ampphase)->nchannels); */
+  /* } */
   
   // Fill the arrays.
   // Work out the channel width (GHz).
@@ -310,13 +346,7 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
     (*ampphase)->frequency[i] = firstfreq + (float)i * chanwidth;
   }
 
-  (*ampphase)->bin = bin;
-  /* printf("bin is %d\n", (*ampphase)->bin); */
   for (i = 0; i < cycle_data->num_points; i++) {
-    // Check this is the bin we are after.
-    if (cycle_data->bin[i] != bin) {
-      continue;
-    }
     // Check this is the IF we are after.
     if (cycle_data->if_no[i] != (ifno + 1)) {
       continue;
@@ -338,30 +368,63 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
     if ((*ampphase)->baseline[bidx] == 0) {
       (*ampphase)->baseline[bidx] = bl;
     }
+    if ((*ampphase)->nbins[bidx] < cycle_data->bin[i]) {
+      // Found another bin, add it to the list.
+      REALLOC((*ampphase)->weight[bidx], cycle_data->bin[i]);
+      REALLOC((*ampphase)->amplitude[bidx], cycle_data->bin[i]);
+      REALLOC((*ampphase)->phase[bidx], cycle_data->bin[i]);
+      REALLOC((*ampphase)->raw[bidx], cycle_data->bin[i]);
+      REALLOC((*ampphase)->f_nchannels[bidx], cycle_data->bin[i]);
+      REALLOC((*ampphase)->f_channel[bidx], cycle_data->bin[i]);
+      REALLOC((*ampphase)->f_frequency[bidx], cycle_data->bin[i]);
+      REALLOC((*ampphase)->f_weight[bidx], cycle_data->bin[i]);
+      REALLOC((*ampphase)->f_amplitude[bidx], cycle_data->bin[i]);
+      REALLOC((*ampphase)->f_phase[bidx], cycle_data->bin[i]);
+      REALLOC((*ampphase)->f_raw[bidx], cycle_data->bin[i]);
+      for (j = (*ampphase)->nbins[bidx]; j < cycle_data->bin[i]; j++) {
+	MALLOC((*ampphase)->weight[bidx][j], (*ampphase)->nchannels);
+	MALLOC((*ampphase)->amplitude[bidx][j], (*ampphase)->nchannels);
+	MALLOC((*ampphase)->phase[bidx][j], (*ampphase)->nchannels);
+	MALLOC((*ampphase)->raw[bidx][j], (*ampphase)->nchannels);
+	(*ampphase)->f_nchannels[bidx][j] = (*ampphase)->nchannels;
+	MALLOC((*ampphase)->f_channel[bidx][j], (*ampphase)->nchannels);
+	MALLOC((*ampphase)->f_frequency[bidx][j], (*ampphase)->nchannels);
+	MALLOC((*ampphase)->f_weight[bidx][j], (*ampphase)->nchannels);
+	MALLOC((*ampphase)->f_amplitude[bidx][j], (*ampphase)->nchannels);
+	MALLOC((*ampphase)->f_phase[bidx][j], (*ampphase)->nchannels);
+	MALLOC((*ampphase)->f_raw[bidx][j], (*ampphase)->nchannels);
+      }
+      (*ampphase)->nbins[bidx] = cycle_data->bin[i];
+    }
     /*printf("baseline number is %d, index is %d, confirmation %d\n",
 	   bl, bidx, (*ampphase)->baseline[bidx]);
 	   printf("this baseline has %d channels\n", (*ampphase)->nchannels);*/
+    cidx = cycle_data->bin[i] - 1;
     for (j = 0, jflag = 0; j < (*ampphase)->nchannels; j++) {
       vidx = reqpol + j * scan_header_data->if_num_stokes[ifno];
-      (*ampphase)->weight[bidx][j] = cycle_data->wgt[i][vidx];
-      (*ampphase)->amplitude[bidx][j] = cabsf(cycle_data->vis[i][vidx]);
-      (*ampphase)->phase[bidx][j] = cargf(cycle_data->vis[i][vidx]);
-      (*ampphase)->raw[bidx][j] = cycle_data->vis[i][vidx];
+      (*ampphase)->weight[bidx][cidx][j] = cycle_data->wgt[i][vidx];
+      (*ampphase)->amplitude[bidx][cidx][j] = cabsf(cycle_data->vis[i][vidx]);
+      (*ampphase)->phase[bidx][cidx][j] = cargf(cycle_data->vis[i][vidx]);
+      (*ampphase)->raw[bidx][cidx][j] = cycle_data->vis[i][vidx];
       if (options->phase_in_degrees == true) {
-	(*ampphase)->phase[bidx][j] *= (180 / M_PI);
+	(*ampphase)->phase[bidx][cidx][j] *= (180 / M_PI);
       }
       // Now assign the data to the arrays considering flagging.
       rcheck = crealf(cycle_data->vis[i][vidx]);
       if (rcheck != rcheck) {
 	// A bad channel.
-	(*ampphase)->f_nchannels[bidx] -= 1;
+	(*ampphase)->f_nchannels[bidx][cidx] -= 1;
       } else {
-	(*ampphase)->f_channel[bidx][jflag] = (*ampphase)->channel[j];
-	(*ampphase)->f_frequency[bidx][jflag] = (*ampphase)->frequency[j];
-	(*ampphase)->f_weight[bidx][jflag] = (*ampphase)->weight[bidx][j];
-	(*ampphase)->f_amplitude[bidx][jflag] = (*ampphase)->amplitude[bidx][j];
-	(*ampphase)->f_phase[bidx][jflag] = (*ampphase)->phase[bidx][j];
-	(*ampphase)->f_raw[bidx][jflag] = (*ampphase)->raw[bidx][j];
+	(*ampphase)->f_channel[bidx][cidx][jflag] = (*ampphase)->channel[j];
+	(*ampphase)->f_frequency[bidx][cidx][jflag] = (*ampphase)->frequency[j];
+	(*ampphase)->f_weight[bidx][cidx][jflag] =
+	  (*ampphase)->weight[bidx][cidx][j];
+	(*ampphase)->f_amplitude[bidx][cidx][jflag] =
+	  (*ampphase)->amplitude[bidx][cidx][j];
+	(*ampphase)->f_phase[bidx][cidx][jflag] =
+	  (*ampphase)->phase[bidx][cidx][j];
+	(*ampphase)->f_raw[bidx][cidx][jflag] =
+	  (*ampphase)->raw[bidx][cidx][j];
 	jflag++;
       }
       /* printf("weight is %.2f real %.3f image %.3f\n", */
@@ -369,29 +432,39 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
       /* 	     cimagf(cycle_data->vis[i][vidx])); */
       // Continually assess limits.
       //if ((*ampphase)->weight[bidx][i] > 0) {
-      if ((*ampphase)->amplitude[bidx][j] == (*ampphase)->amplitude[bidx][j]) {
-	if ((*ampphase)->amplitude[bidx][j] < (*ampphase)->min_amplitude[bidx]) {
-	  (*ampphase)->min_amplitude[bidx] = (*ampphase)->amplitude[bidx][j];
-	  if ((*ampphase)->amplitude[bidx][j] < (*ampphase)->min_amplitude_global) {
-	    (*ampphase)->min_amplitude_global = (*ampphase)->amplitude[bidx][j];
+      if ((*ampphase)->amplitude[bidx][cidx][j] ==
+	  (*ampphase)->amplitude[bidx][cidx][j]) {
+	if ((*ampphase)->amplitude[bidx][cidx][j] <
+	    (*ampphase)->min_amplitude[bidx]) {
+	  (*ampphase)->min_amplitude[bidx] =
+	    (*ampphase)->amplitude[bidx][cidx][j];
+	  if ((*ampphase)->amplitude[bidx][cidx][j] <
+	      (*ampphase)->min_amplitude_global) {
+	    (*ampphase)->min_amplitude_global =
+	      (*ampphase)->amplitude[bidx][cidx][j];
 	  }
 	}
-	if ((*ampphase)->amplitude[bidx][j] > (*ampphase)->max_amplitude[bidx]) {
-	  (*ampphase)->max_amplitude[bidx] = (*ampphase)->amplitude[bidx][j];
-	  if ((*ampphase)->amplitude[bidx][j] > (*ampphase)->max_amplitude_global) {
-	    (*ampphase)->max_amplitude_global = (*ampphase)->amplitude[bidx][j];
+	if ((*ampphase)->amplitude[bidx][cidx][j] >
+	    (*ampphase)->max_amplitude[bidx]) {
+	  (*ampphase)->max_amplitude[bidx] =
+	    (*ampphase)->amplitude[bidx][cidx][j];
+	  if ((*ampphase)->amplitude[bidx][cidx][j] >
+	      (*ampphase)->max_amplitude_global) {
+	    (*ampphase)->max_amplitude_global =
+	      (*ampphase)->amplitude[bidx][cidx][j];
 	  }
 	}
-	if ((*ampphase)->phase[bidx][j] < (*ampphase)->min_phase[bidx]) {
-	  (*ampphase)->min_phase[bidx] = (*ampphase)->phase[bidx][j];
-	  if ((*ampphase)->phase[bidx][j] < (*ampphase)->min_phase_global) {
-	    (*ampphase)->min_phase_global = (*ampphase)->phase[bidx][j];
+	if ((*ampphase)->phase[bidx][cidx][j] <
+	    (*ampphase)->min_phase[bidx]) {
+	  (*ampphase)->min_phase[bidx] = (*ampphase)->phase[bidx][cidx][j];
+	  if ((*ampphase)->phase[bidx][cidx][j] < (*ampphase)->min_phase_global) {
+	    (*ampphase)->min_phase_global = (*ampphase)->phase[bidx][cidx][j];
 	  }
 	}
-	if ((*ampphase)->phase[bidx][j] > (*ampphase)->max_phase[bidx]) {
-	  (*ampphase)->max_phase[bidx] = (*ampphase)->phase[bidx][j];
-	  if ((*ampphase)->phase[bidx][j] > (*ampphase)->max_phase_global) {
-	    (*ampphase)->max_phase_global = (*ampphase)->phase[bidx][j];
+	if ((*ampphase)->phase[bidx][cidx][j] > (*ampphase)->max_phase[bidx]) {
+	  (*ampphase)->max_phase[bidx] = (*ampphase)->phase[bidx][cidx][j];
+	  if ((*ampphase)->phase[bidx][cidx][j] > (*ampphase)->max_phase_global) {
+	    (*ampphase)->max_phase_global = (*ampphase)->phase[bidx][cidx][j];
 	  }
 	}
       }
@@ -421,7 +494,7 @@ int cmpfunc_complex(const void *a, const void *b) {
 int ampphase_average(struct ampphase *ampphase,
 		     struct vis_quantities **vis_quantities,
 		     struct ampphase_options *options) {
-  int vq_created = 0, n_points = 0, i, j, n_expected = 0;
+  int vq_created = 0, n_points = 0, i, j, k, n_expected = 0;
   float total_amplitude = 0, total_phase = 0;
   float *median_array_amplitude = NULL, *median_array_phase = NULL;
   float complex total_complex, *median_complex = NULL, average_complex;
@@ -436,7 +509,6 @@ int ampphase_average(struct ampphase *ampphase,
   (*vis_quantities)->nbaselines = ampphase->nbaselines;
   (*vis_quantities)->pol = ampphase->pol;
   (*vis_quantities)->window = ampphase->window;
-  (*vis_quantities)->bin = ampphase->bin;
 
   // Check for options.
   if (options == NULL) {
@@ -449,6 +521,14 @@ int ampphase_average(struct ampphase *ampphase,
   MALLOC((*vis_quantities)->amplitude, (*vis_quantities)->nbaselines);
   MALLOC((*vis_quantities)->phase, (*vis_quantities)->nbaselines);
   MALLOC((*vis_quantities)->delay, (*vis_quantities)->nbaselines);
+  MALLOC((*vis_quantities)->nbins, (*vis_quantities)->nbaselines);
+  for (i = 0; i < (*vis_quantities)->nbaselines; i++) {
+    (*vis_quantities)->nbins[i] = ampphase->nbins[i];
+    MALLOC((*vis_quantities)->amplitude[i], (*vis_quantities)->nbins[i]);
+    MALLOC((*vis_quantities)->phase[i], (*vis_quantities)->nbins[i]);
+    MALLOC((*vis_quantities)->delay[i], (*vis_quantities)->nbins[i]);
+  }
+
   n_expected = (options->max_tvchannel - options->min_tvchannel) + 1;
   MALLOC(median_array_amplitude, n_expected);
   MALLOC(median_array_phase, n_expected);
@@ -456,62 +536,64 @@ int ampphase_average(struct ampphase *ampphase,
 
   // Do the averaging loop.
   for (i = 0; i < (*vis_quantities)->nbaselines; i++) {
-    // Reset our averaging counters.
-    total_amplitude = 0;
-    total_phase = 0;
-    total_complex = 0 + 0 * I;
-    n_points = 0;
-    for (j = 0; j < ampphase->f_nchannels[i]; j++) {
-      // Check for in range.
-      if ((ampphase->f_channel[i][j] >= options->min_tvchannel) &&
-	  (ampphase->f_channel[i][j] < options->max_tvchannel)) {
-	total_amplitude += ampphase->f_amplitude[i][j];
-	total_phase += ampphase->f_phase[i][j];
-	total_complex += ampphase->f_raw[i][j];
-	median_array_amplitude[n_points] = ampphase->f_amplitude[i][j];
-	median_array_phase[n_points] = ampphase->f_phase[i][j];
-	median_complex[n_points] = ampphase->f_raw[i][j];
-	n_points++;
-      }
-    }
-    if (n_points > 0) {
-      if (options->averaging_method & AVERAGETYPE_MEAN) {
-	if (options->averaging_method & AVERAGETYPE_SCALAR) {
-	  (*vis_quantities)->amplitude[i] = total_amplitude / (float)n_points;
-	  (*vis_quantities)->phase[i] = total_phase / (float)n_points;
-	} else if (options->averaging_method & AVERAGETYPE_VECTOR) {
-	  average_complex = total_complex / (float)n_points;
-	  (*vis_quantities)->amplitude[i] = cabsf(average_complex);
-	  (*vis_quantities)->phase[i] = cargf(average_complex);
+    for (k = 0; k < (*vis_quantities)->nbins[i]; k++) {
+      // Reset our averaging counters.
+      total_amplitude = 0;
+      total_phase = 0;
+      total_complex = 0 + 0 * I;
+      n_points = 0;
+      for (j = 0; j < ampphase->f_nchannels[i][k]; j++) {
+	// Check for in range.
+	if ((ampphase->f_channel[i][k][j] >= options->min_tvchannel) &&
+	    (ampphase->f_channel[i][k][j] < options->max_tvchannel)) {
+	  total_amplitude += ampphase->f_amplitude[i][k][j];
+	  total_phase += ampphase->f_phase[i][k][j];
+	  total_complex += ampphase->f_raw[i][k][j];
+	  median_array_amplitude[n_points] = ampphase->f_amplitude[i][k][j];
+	  median_array_phase[n_points] = ampphase->f_phase[i][k][j];
+	  median_complex[n_points] = ampphase->f_raw[i][k][j];
+	  n_points++;
 	}
-      } else if (options->averaging_method & AVERAGETYPE_MEDIAN) {
-	if (options->averaging_method & AVERAGETYPE_SCALAR) {
-	  qsort(median_array_amplitude, n_points, sizeof(float), cmpfunc_real);
-	  qsort(median_array_phase, n_points, sizeof(float), cmpfunc_real);
-	  if (n_points % 2) {
-	    // Odd number of points.
-	    (*vis_quantities)->amplitude[i] =
-	      median_array_amplitude[(n_points + 1) / 2];
-	    (*vis_quantities)->phase[i] =
-	      median_array_phase[(n_points + 1) / 2];
-	  } else {
-	    (*vis_quantities)->amplitude[i] =
-	      (median_array_amplitude[n_points / 2] +
-	       median_array_amplitude[n_points / 2 + 1]) / 2;
-	    (*vis_quantities)->phase[i] =
-	      (median_array_amplitude[n_points / 2] +
-	       median_array_amplitude[n_points / 2 + 1]) / 2;
+      }
+      if (n_points > 0) {
+	if (options->averaging_method & AVERAGETYPE_MEAN) {
+	  if (options->averaging_method & AVERAGETYPE_SCALAR) {
+	    (*vis_quantities)->amplitude[i][k] = total_amplitude / (float)n_points;
+	    (*vis_quantities)->phase[i][k] = total_phase / (float)n_points;
+	  } else if (options->averaging_method & AVERAGETYPE_VECTOR) {
+	    average_complex = total_complex / (float)n_points;
+	    (*vis_quantities)->amplitude[i][k] = cabsf(average_complex);
+	    (*vis_quantities)->phase[i][k] = cargf(average_complex);
 	  }
-	} else if (options->averaging_method & AVERAGETYPE_VECTOR) {
-	  qsort(median_complex, n_points, sizeof(float complex), cmpfunc_complex);
-	  if (n_points % 2) {
-	    average_complex = median_complex[(n_points + 1) / 2];
-	  } else {
-	    average_complex =
-	      (median_complex[n_points / 2] + median_complex[n_points / 2 + 1]) / 2;
+	} else if (options->averaging_method & AVERAGETYPE_MEDIAN) {
+	  if (options->averaging_method & AVERAGETYPE_SCALAR) {
+	    qsort(median_array_amplitude, n_points, sizeof(float), cmpfunc_real);
+	    qsort(median_array_phase, n_points, sizeof(float), cmpfunc_real);
+	    if (n_points % 2) {
+	      // Odd number of points.
+	      (*vis_quantities)->amplitude[i][k] =
+		median_array_amplitude[(n_points + 1) / 2];
+	      (*vis_quantities)->phase[i][k] =
+		median_array_phase[(n_points + 1) / 2];
+	    } else {
+	      (*vis_quantities)->amplitude[i][k] =
+		(median_array_amplitude[n_points / 2] +
+		 median_array_amplitude[n_points / 2 + 1]) / 2;
+	      (*vis_quantities)->phase[i][k] =
+		(median_array_amplitude[n_points / 2] +
+		 median_array_amplitude[n_points / 2 + 1]) / 2;
+	    }
+	  } else if (options->averaging_method & AVERAGETYPE_VECTOR) {
+	    qsort(median_complex, n_points, sizeof(float complex), cmpfunc_complex);
+	    if (n_points % 2) {
+	      average_complex = median_complex[(n_points + 1) / 2];
+	    } else {
+	      average_complex =
+		(median_complex[n_points / 2] + median_complex[n_points / 2 + 1]) / 2;
+	    }
+	    (*vis_quantities)->amplitude[i][k] = cabsf(average_complex);
+	    (*vis_quantities)->phase[i][k] = cargf(average_complex);
 	  }
-	  (*vis_quantities)->amplitude[i] = cabsf(average_complex);
-	  (*vis_quantities)->phase[i] = cargf(average_complex);
 	}
       }
     }

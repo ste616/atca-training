@@ -76,28 +76,30 @@ struct ampphase {
   // The static quantities.
   int pol;
   int window;
-  int bin;
+
+  // The bin arrays have one element per baseline.
+  int *nbins;
   
   // The arrays here have the following indexing.
-  // array[baseline][channel]
+  // array[baseline][bin][channel]
   // Weighting.
-  float **weight;
+  float ***weight;
   // Amplitude.
-  float **amplitude;
+  float ***amplitude;
   // Phase.
-  float **phase;
+  float ***phase;
   // The raw data.
-  float complex **raw;
+  float complex ***raw;
 
   // These next arrays contain the same data as above, but
   // do not include the flagged channels.
-  int *f_nchannels;
-  float **f_channel;
-  float **f_frequency;
-  float **f_weight;
-  float **f_amplitude;
-  float **f_phase;
-  float complex **f_raw;
+  int **f_nchannels;
+  float ***f_channel;
+  float ***f_frequency;
+  float ***f_weight;
+  float ***f_amplitude;
+  float ***f_phase;
+  float complex ***f_raw;
   
   // Some metadata.
   float min_amplitude_global;
@@ -125,12 +127,12 @@ struct vis_quantities {
   // Labels.
   int pol;
   int window;
-  int bin;
+  int *nbins;
   
   // The arrays.
-  float *amplitude;
-  float *phase;
-  float *delay;
+  float **amplitude;
+  float **phase;
+  float **delay;
 
   // Metadata.
   float min_amplitude;
@@ -148,7 +150,7 @@ void free_vis_quantities(struct vis_quantities **vis_quantities);
 int polarisation_number(char *polstring);
 int vis_ampphase(struct scan_header_data *scan_header_data,
 		 struct cycle_data *cycle_data,
-		 struct ampphase **ampphase, int pol, int ifno, int bin,
+		 struct ampphase **ampphase, int pol, int ifno,
 		 struct ampphase_options *options);
 int cmpfunc_real(const void *a, const void *b);
 int cmpfunc_complex(const void *a, const void *b);
