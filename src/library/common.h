@@ -73,8 +73,10 @@ struct plotcontrols {
   int if_num_spec[MAXIFS];
   // The antennas to plot.
   int array_spec;
-  // The numer of polarisations to plot.
+  // The number of polarisations to plot.
   int npols;
+  // Whether to wait for user input when changing plots.
+  int interactive;
 };
 
 // Our routine definitions.
@@ -82,6 +84,7 @@ int interpret_array_string(char *array_string);
 void init_plotcontrols(struct plotcontrols *plotcontrols,
 		       int xaxis_type, int yaxis_type, int pols,
 		       int corr_type);
+void free_panelspec(struct panelspec *panelspec);
 void splitpanels(int nx, int ny, struct panelspec *panelspec);
 void changepanel(int x, int y, struct panelspec *panelspec);
 void plotnum_to_xy(struct panelspec *panelspec, int plotnum, int *px, int *py);

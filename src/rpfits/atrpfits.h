@@ -74,6 +74,7 @@ struct cycle_data {
   // Flagging.
   int *flag;
   // Data.
+  int *vis_size;
   float complex **vis;
   float **wgt;
   // Metadata.

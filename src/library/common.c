@@ -73,6 +73,22 @@ void init_plotcontrols(struct plotcontrols *plotcontrols,
   for (i = 1; i <= MAXANTS; i++) {
     plotcontrols->array_spec |= 1<<i;
   }
+
+  plotcontrols->interactive = YES;
+}
+
+void free_panelspec(struct panelspec *panelspec) {
+  int i;
+  for (i = 0; i < panelspec->nx; i++) {
+    FREE(panelspec->x1[i]);
+    FREE(panelspec->x2[i]);
+    FREE(panelspec->y1[i]);
+    FREE(panelspec->y2[i]);
+  }
+  FREE(panelspec->x1);
+  FREE(panelspec->x2);
+  FREE(panelspec->y1);
+  FREE(panelspec->y2);
 }
 
 void splitpanels(int nx, int ny, struct panelspec *panelspec) {
@@ -103,9 +119,9 @@ void splitpanels(int nx, int ny, struct panelspec *panelspec) {
   panelspec->orig_x2 = 1 - panelspec->orig_x1;
   panelspec->orig_y1 /= margin_reduction;
   panelspec->orig_y2 = 1 - panelspec->orig_y1;
-  printf("viewport is x = %.2f -> %.2f, y = %.2f -> %.2f\n",
-	 panelspec->orig_x1, panelspec->orig_x2,
-	 panelspec->orig_y1, panelspec->orig_y2);
+  /* printf("viewport is x = %.2f -> %.2f, y = %.2f -> %.2f\n", */
+  /* 	 panelspec->orig_x1, panelspec->orig_x2, */
+  /* 	 panelspec->orig_y1, panelspec->orig_y2); */
   // Space between the panels should be some fraction of the margin.
   padding_x = panelspec->orig_x1 * padding_fraction;
   padding_y = panelspec->orig_y1 * padding_fraction;
@@ -325,7 +341,9 @@ void make_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspec,
   }
   
   changepanel(-1, -1, panelspec);
-  cpgpage();
+  if (plot_controls->interactive == YES) {
+    cpgpage();
+  }
   for (idxif = 0, ni = 0; idxif < MAXIFS; idxif++) {
     iauto = 0;
     icross = 0;

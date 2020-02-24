@@ -194,7 +194,7 @@ struct cycle_data* prepare_new_cycle_data(void) {
   int i;
   struct cycle_data *cycle_data = NULL;
 
-  cycle_data = (struct cycle_data *)malloc(sizeof(struct cycle_data));
+  MALLOC(cycle_data, 1);
   cycle_data->ut_seconds = 0;
   cycle_data->num_points = 0;
   cycle_data->u = NULL;
@@ -203,6 +203,7 @@ struct cycle_data* prepare_new_cycle_data(void) {
   cycle_data->ant1 = NULL;
   cycle_data->ant2 = NULL;
   cycle_data->flag = NULL;
+  cycle_data->vis_size = NULL;
   cycle_data->vis = NULL;
   cycle_data->wgt = NULL;
   cycle_data->bin = NULL;
@@ -223,7 +224,7 @@ struct cycle_data* prepare_new_cycle_data(void) {
 struct scan_data* prepare_new_scan_data(void) {
   struct scan_data *scan_data = NULL;
 
-  scan_data = (struct scan_data*)malloc(sizeof(struct scan_data));
+  MALLOC(scan_data, 1);
   
   scan_data->num_cycles = 0;
   scan_data->cycles = NULL;
@@ -247,22 +248,43 @@ struct cycle_data* scan_add_cycle(struct scan_data *scan_data) {
  * Free memory from a scan header.
  */
 void free_scan_header_data(struct scan_header_data *scan_header_data) {
+  int i, j;
+  for (i = 0; i < scan_header_data->num_ifs; i++) {
+    for (j = 0; j < scan_header_data->if_num_stokes[i]; j++) {
+      FREE(scan_header_data->if_stokes_names[i][j]);
+    }
+    FREE(scan_header_data->if_stokes_names[i]);
+  }
   FREE(scan_header_data->if_centre_freq);
   FREE(scan_header_data->if_bandwidth);
   FREE(scan_header_data->if_num_channels);
   FREE(scan_header_data->if_num_stokes);
   FREE(scan_header_data->if_sideband);
+  FREE(scan_header_data->if_stokes_names);
 }
 
 /**
  * Free memory from a cycle.
  */
 void free_cycle_data(struct cycle_data *cycle_data) {
+  int i;
   FREE(cycle_data->u);
   FREE(cycle_data->v);
   FREE(cycle_data->w);
   FREE(cycle_data->ant1);
   FREE(cycle_data->ant2);
+  FREE(cycle_data->flag);
+  FREE(cycle_data->bin);
+  FREE(cycle_data->if_no);
+  for (i = 0; i < cycle_data->num_points; i++) {
+    FREE(cycle_data->source[i]);
+    FREE(cycle_data->vis[i]);
+    FREE(cycle_data->wgt[i]);
+  }
+  FREE(cycle_data->source);
+  FREE(cycle_data->vis_size);
+  FREE(cycle_data->vis);
+  FREE(cycle_data->wgt);
 }
 
 /**
@@ -273,9 +295,11 @@ void free_scan_data(struct scan_data *scan_data) {
 
   for (i = 0; i < scan_data->num_cycles; i++) {
     free_cycle_data(scan_data->cycles[i]);
+    FREE(scan_data->cycles[i]);
   }
   FREE(scan_data->cycles);
   free_scan_header_data(&(scan_data->header_data));
+  FREE(scan_data);
 }
 
 /**
@@ -308,6 +332,8 @@ int read_cycle_data(struct scan_header_data *scan_header_data,
     // Check for success.
     if (this_jstat != JSTAT_SUCCESSFUL) {
       // Ignore illegal data.
+      FREE(vis);
+      FREE(wgt);
       if (this_jstat == JSTAT_ILLEGALDATA) {
 	continue;
       }
@@ -330,6 +356,7 @@ int read_cycle_data(struct scan_header_data *scan_header_data,
 	//printf("stopping because new cycle!\n");
 	rv = READER_HEADER_AVAILABLE | READER_DATA_AVAILABLE;
 	read_data = 0;
+	FREE(wgt);
       } else {
 	// Store this data.
 	cycle_data->num_points += 1;
@@ -346,6 +373,7 @@ int read_cycle_data(struct scan_header_data *scan_header_data,
 	ARRAY_APPEND(cycle_data->flag, cycle_data->num_points, flag);
 	ARRAY_APPEND(cycle_data->bin, cycle_data->num_points, bin);
 	ARRAY_APPEND(cycle_data->if_no, cycle_data->num_points, if_no);
+	ARRAY_APPEND(cycle_data->vis_size, cycle_data->num_points, vis_size);
 	// We have to do something special for the source name.
 	REALLOC(cycle_data->source, cycle_data->num_points);
 	MALLOC(cycle_data->source[cycle_data->num_points - 1], SOURCE_LENGTH);
@@ -360,6 +388,7 @@ int read_cycle_data(struct scan_header_data *scan_header_data,
 	ARRAY_APPEND(cycle_data->vis, cycle_data->num_points, cvis);
 	ARRAY_APPEND(cycle_data->wgt, cycle_data->num_points, wgt);
       }
+      FREE(vis);
     }
   }
 

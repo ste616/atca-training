@@ -34,6 +34,7 @@ static struct argp_option options[] = {
   { "frequency", 'f', 0, 0, "Plots frequency on x-axis" },
   { "ifs", 'I', "IFS", 0,
     "Which IFs to plot, as a comma-separated list" },
+  { "non-interactive", 'N', 0, 0, "Do not run in interactive mode" },
   { "phase", 'p', 0, 0, "Plots phase on y-axis" },
   { "pols", 'P', "POLS", 0,
     "Which polarisations to plot, as a comma-separated list" },
@@ -52,6 +53,7 @@ struct arguments {
   int npols;
   int plot_ifs[MAXIFS];
   int nifs;
+  int interactive;
 };
 
 static error_t parse_opt(int key, char *arg, struct argp_state *state) {
@@ -83,6 +85,10 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state) {
       }
       token = strtok(NULL, s);
     }
+    break;
+  case 'N':
+    // Not interactive.
+    arguments->interactive = NO;
     break;
   case 'p':
     arguments->plot_phase = YES;
@@ -155,6 +161,7 @@ int main(int argc, char *argv[]) {
   arguments.plot_frequency = NO;
   arguments.plot_pols = PLOT_POL_XX | PLOT_POL_YY;
   arguments.npols = 2;
+  arguments.interactive = YES;
   memset(arguments.plot_ifs, 0, sizeof(arguments.plot_ifs));
   for (i = 0; i < MAXIFS; i++) {
     arguments.plot_ifs[i] = i;
@@ -194,10 +201,11 @@ int main(int argc, char *argv[]) {
   init_plotcontrols(&plotcontrols, xaxis_type, yaxis_type,
 		    arguments.plot_pols, DEFAULT);
   plotcontrols.array_spec = interpret_array_string(arguments.array_spec);
+  plotcontrols.interactive = arguments.interactive;
   for (i = 0; i < arguments.n_rpfits_files; i++) {
     // Try to open the RPFITS file.
     res = open_rpfits_file(arguments.rpfits_files[i]);
-    printf("Attempt to open RPFITS file %s, %d\n", argv[i], res);
+    printf("Attempt to open RPFITS file %s, %d\n", arguments.rpfits_files[i], res);
 
     while (keep_reading) {
       // Make a new scan and add it to the list.
@@ -234,14 +242,14 @@ int main(int argc, char *argv[]) {
 	  if (!(read_response & READER_DATA_AVAILABLE)) {
 	    read_cycle = 0;
 	    //keep_reading = 0;
-	    printf("something went wrong while reading cycle: %d\n",
-		   read_response);
+	    /* printf("something went wrong while reading cycle: %d\n", */
+	    /* 	   read_response); */
 	  }
 	}
       }
       // We allocate memory if we need to.
       if (num_ifs != old_num_ifs) {
-	printf("Reallocating cycle memory...\n");
+	/* printf("Reallocating cycle memory...\n"); */
 	for (j = 0; j < old_num_ifs; j++) {
 	  for (k = 0; k < arguments.npols; k++) {
 	    FREE(cycle_ampphase[j][k]);
@@ -318,7 +326,6 @@ int main(int argc, char *argv[]) {
 	    free_ampphase(&(cycle_ampphase[q][p]));
 	  }
 	}
-	/* free_vis_quantities(&cycle_vis_quantities); */
       }
     
       if (read_response == READER_EXHAUSTED) {
@@ -328,13 +335,21 @@ int main(int argc, char *argv[]) {
       printf("scan had %d cycles\n", scan_data->num_cycles);
 
     }
+    for (j = 0; j < old_num_ifs; j++) {
+      for (k = 0; k < arguments.npols; k++) {
+	FREE(cycle_ampphase[j][k]);
+      }
+      FREE(cycle_ampphase[j]);
+    }
+    FREE(cycle_ampphase);
+    old_num_ifs = 0;
 
     // Close it before moving on.
     res = close_rpfits_file();
     printf("Attempt to close RPFITS file, %d\n", res);
 
   }
-
+  free_panelspec(&panelspec);
   cpgclos();
   
   // Free all the scans.
@@ -342,6 +357,9 @@ int main(int argc, char *argv[]) {
   for (i = 0; i < nscans; i++) {
     free_scan_data(all_scans[i]);
   }
+  FREE(all_scans);
+  // And the last little bit of memory.
+  FREE(arguments.rpfits_files);
   
   exit(0);
   

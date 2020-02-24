@@ -122,6 +122,7 @@ void free_ampphase(struct ampphase **ampphase) {
     FREE((*ampphase)->amplitude[i]);
     FREE((*ampphase)->phase[i]);
     FREE((*ampphase)->raw[i]);
+    FREE((*ampphase)->f_nchannels[i]);
     FREE((*ampphase)->f_channel[i]);
     FREE((*ampphase)->f_frequency[i]);
     FREE((*ampphase)->f_weight[i]);
