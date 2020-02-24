@@ -339,7 +339,9 @@ void make_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspec,
   if (plot_controls->plot_options & PLOT_CROSSCORRELATIONS) {
     panels_per_if += (nants * (nants - 1)) / 2;
   }
-  
+
+  printf("time of cycle = %s %.6f\n", cycle_ampphase[0][0]->obsdate,
+	 cycle_ampphase[0][0]->ut_seconds);
   changepanel(-1, -1, panelspec);
   if (plot_controls->interactive == YES) {
     cpgpage();

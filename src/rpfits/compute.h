@@ -15,6 +15,7 @@
 
 #pragma once
 #include <stdbool.h>
+#include "atrpfits.h"
 
 /**
  * Some polarisation flags.
@@ -76,7 +77,9 @@ struct ampphase {
   // The static quantities.
   int pol;
   int window;
-
+  char obsdate[OBSDATE_LENGTH];
+  float ut_seconds;
+  
   // The bin arrays have one element per baseline.
   int *nbins;
   

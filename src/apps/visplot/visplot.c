@@ -237,8 +237,8 @@ int main(int argc, char *argv[]) {
 	  cycle_data = scan_add_cycle(scan_data);
 	  read_response = read_cycle_data(&(scan_data->header_data),
 					  cycle_data);
-	  //fprintf(stderr, "found read response %d\n", read_response);
-	  //printf("cycle has %d points\n", cycle_data->num_points);
+	  /* fprintf(stderr, "found read response %d\n", read_response); */
+	  /* printf("cycle has %d points\n", cycle_data->num_points); */
 	  if (!(read_response & READER_DATA_AVAILABLE)) {
 	    read_cycle = 0;
 	    //keep_reading = 0;
@@ -269,8 +269,10 @@ int main(int argc, char *argv[]) {
 	memset(plotcontrols.if_num_spec, 0, sizeof(plotcontrols.if_num_spec));
       }
 
+      printf("working with %d cycles\n", scan_data->num_cycles);
       for (k = 0; k < scan_data->num_cycles; k++) {
 	cycle_data = scan_data->cycles[k];
+	printf("cycle %d, number of IFs = %d\n", k, num_ifs);
 	for (q = 0; q < num_ifs; q++) {
 	  if_no = arguments.plot_ifs[q];
 	  plotcontrols.if_num_spec[if_no] = 1;

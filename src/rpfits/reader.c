@@ -312,7 +312,8 @@ int read_cycle_data(struct scan_header_data *scan_header_data,
   int baseline, ant1, ant2, i, bidx = 1;
   float *vis = NULL, *wgt = NULL, ut, last_ut = -1, u, v, w;
   float complex *cvis = NULL;
-  
+
+  /* printf("reading data\n"); */
   while (read_data) {
     // Allocate some memory.
     vis_size = max_size_of_vis();
@@ -323,6 +324,7 @@ int read_cycle_data(struct scan_header_data *scan_header_data,
     this_jstat = JSTAT_READDATA;
     rpfits_result = rpfitsin_(&this_jstat, vis, wgt, &baseline, &ut,
 			      &u, &v, &w, &flag, &bin, &if_no, &sourceno);
+    /* printf("got read result %d for ut = %.6f\n", rpfits_result, ut); */
     if (last_ut == -1) {
       // Set it here.
       last_ut = ut;
@@ -331,18 +333,22 @@ int read_cycle_data(struct scan_header_data *scan_header_data,
     
     // Check for success.
     if (this_jstat != JSTAT_SUCCESSFUL) {
+      /* printf("this isn't right...\n"); */
       // Ignore illegal data.
       FREE(vis);
       FREE(wgt);
       if (this_jstat == JSTAT_ILLEGALDATA) {
+	/* printf("got illegal data\n"); */
 	continue;
       }
       // Stop reading.
       read_data = 0;
       if (this_jstat == JSTAT_ENDOFFILE) {
+	/* printf("reached end of file\n"); */
 	rv = READER_EXHAUSTED;
       } else if (this_jstat == JSTAT_FGTABLE) {
 	// We've hit the end of this data.
+	/* printf("reached a new header\n"); */
 	rv = READER_HEADER_AVAILABLE;
       }
     } else {
@@ -350,10 +356,11 @@ int read_cycle_data(struct scan_header_data *scan_header_data,
       /* 	      ut, last_ut, baseline); */
       /* fprintf(stderr, "if_no = %d sourceno = %d flag = %d bin = %d\n", */
       /* 	      if_no, sourceno, flag, bin); */
-      // Check for a time change.
-      if ((baseline == -1) && (ut > last_ut)) {
+      // Check for a time change. The time has to change by at least 0.5
+      // otherwise it's not really a cycle change.
+      if ((baseline == -1) && (ut > (last_ut + 0.5))) {
 	// We've gone to a new cycle.
-	//printf("stopping because new cycle!\n");
+	/* printf("stopping because new cycle!\n"); */
 	rv = READER_HEADER_AVAILABLE | READER_DATA_AVAILABLE;
 	read_data = 0;
 	FREE(wgt);

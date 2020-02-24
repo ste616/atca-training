@@ -270,7 +270,9 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
   }
 
   (*ampphase)->pol = pol;
-
+  strncpy((*ampphase)->obsdate, scan_header_data->obsdate, OBSDATE_LENGTH);
+  (*ampphase)->ut_seconds = cycle_data->ut_seconds;
+  
   // Allocate the necessary arrays.
   MALLOC((*ampphase)->channel, (*ampphase)->nchannels);
   MALLOC((*ampphase)->frequency, (*ampphase)->nchannels);
