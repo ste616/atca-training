@@ -340,12 +340,14 @@ void make_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspec,
     panels_per_if += (nants * (nants - 1)) / 2;
   }
 
-  printf("time of cycle = %s %.6f\n", cycle_ampphase[0][0]->obsdate,
-	 cycle_ampphase[0][0]->ut_seconds);
+  /* printf("time of cycle = %s %.6f\n", cycle_ampphase[0][0]->obsdate, */
+  /* 	 cycle_ampphase[0][0]->ut_seconds); */
   changepanel(-1, -1, panelspec);
-  if (plot_controls->interactive == YES) {
-    cpgpage();
+  if (plot_controls->interactive == NO) {
+    cpgask(0);
   }
+  cpgpage();
+
   for (idxif = 0, ni = 0; idxif < MAXIFS; idxif++) {
     iauto = 0;
     icross = 0;

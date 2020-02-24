@@ -206,7 +206,7 @@ int main(int argc, char *argv[]) {
     // Try to open the RPFITS file.
     res = open_rpfits_file(arguments.rpfits_files[i]);
     printf("Attempt to open RPFITS file %s, %d\n", arguments.rpfits_files[i], res);
-
+    keep_reading = 1;
     while (keep_reading) {
       // Make a new scan and add it to the list.
       scan_data = prepare_new_scan_data();
@@ -269,10 +269,10 @@ int main(int argc, char *argv[]) {
 	memset(plotcontrols.if_num_spec, 0, sizeof(plotcontrols.if_num_spec));
       }
 
-      printf("working with %d cycles\n", scan_data->num_cycles);
+      /* printf("working with %d cycles\n", scan_data->num_cycles); */
       for (k = 0; k < scan_data->num_cycles; k++) {
 	cycle_data = scan_data->cycles[k];
-	printf("cycle %d, number of IFs = %d\n", k, num_ifs);
+	/* printf("cycle %d, number of IFs = %d\n", k, num_ifs); */
 	for (q = 0; q < num_ifs; q++) {
 	  if_no = arguments.plot_ifs[q];
 	  plotcontrols.if_num_spec[if_no] = 1;
