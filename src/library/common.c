@@ -28,9 +28,9 @@ int interpret_array_string(char *array_string) {
   return r;
 }
 
-void init_plotcontrols(struct plotcontrols *plotcontrols,
-		       int xaxis_type, int yaxis_type, int pols,
-		       int corr_type) {
+void init_spd_plotcontrols(struct spd_plotcontrols *plotcontrols,
+			   int xaxis_type, int yaxis_type, int pols,
+			   int corr_type, int pgplot_device) {
   int i;
 
   // Initialise the plotcontrols structure.
@@ -75,6 +75,45 @@ void init_plotcontrols(struct plotcontrols *plotcontrols,
   }
 
   plotcontrols->interactive = YES;
+
+  // Keep the PGPLOT device.
+  plotcontrols->pgplot_device = pgplot_device;
+}
+
+#define NAVAILABLE_PANELS 3
+
+void init_vis_plotcontrols(struct vis_plotcontrols *plotcontrols,
+			   int xaxis_type, int paneltypes,
+			   int pgplot_device,
+			   struct panelspec *panelspec) {
+  int npanels = 0, i;
+  int available_panels[NAVAILABLE_PANELS] = { PLOT_AMPLITUDE,
+					      PLOT_PHASE,
+					      PLOT_DELAY };
+  
+  // Initialise the plotcontrols structure and form the panelspec
+  // structure using the same information.
+  if (xaxis_type == DEFAULT) {
+    xaxis_type = PLOT_TIME;
+  }
+  // Count the number of panels we need.
+  for (i = 0; i < NAVAILABLE_PANELS; i++) {
+    if (paneltypes & available_panels[i]) {
+      npanels++;
+    }
+  }
+  plotcontrols->num_panels = npanels;
+  plotcontrols->plot_options = xaxis_type | paneltypes;
+
+  // Keep the PGPLOT device.
+  plotcontrols->pgplot_device = pgplot_device;
+  
+  // Set up the panelspec structure for this.
+  splitpanels(1, npanels, pgplot_device, panelspec);
+
+  // Initialise the products to display.
+  plotcontrols->nproducts = 0;
+  plotcontrols->products = NULL;
 }
 
 void free_panelspec(struct panelspec *panelspec) {
@@ -91,7 +130,8 @@ void free_panelspec(struct panelspec *panelspec) {
   FREE(panelspec->y2);
 }
 
-void splitpanels(int nx, int ny, struct panelspec *panelspec) {
+void splitpanels(int nx, int ny, int pgplot_device,
+		 struct panelspec *panelspec) {
   int i, j;
   float panel_width, panel_height, margin_reduction = 5;
   float padding_fraction = 2, padding_x, padding_y;
@@ -112,6 +152,7 @@ void splitpanels(int nx, int ny, struct panelspec *panelspec) {
   }
 
   // Get the original settings.
+  cpgslct(pgplot_device);
   cpgqvp(0, &(panelspec->orig_x1), &(panelspec->orig_x2),
 	 &(panelspec->orig_y1), &(panelspec->orig_y2));
   // Reduce the margins.
@@ -165,7 +206,7 @@ void plotnum_to_xy(struct panelspec *panelspec, int plotnum,
 }
 
 void plotpanel_minmax(struct ampphase **plot_ampphase,
-		      struct plotcontrols *plot_controls,
+		      struct spd_plotcontrols *plot_controls,
 		      int plot_baseline_idx, int npols, int *polidx,
 		      float *plotmin_x, float *plotmax_x,
 		      float *plotmin_y, float *plotmax_y) {
@@ -311,8 +352,128 @@ int find_pol(struct ampphase ***cycle_ampphase, int npols, int ifnum, int poltyp
   return -1;
 }
 
-void make_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspec,
-	       struct plotcontrols *plot_controls) {
+void pol_to_vis_name(int pol, int if_num, char *vis_name) {
+  if (pol & PLOT_POL_XX) {
+    if (if_num == 1) {
+      strcpy(vis_name, "AA");
+    } else if (if_num == 2) {
+      strcpy(vis_name, "CC");
+    }
+  } else if (pol & PLOT_POL_YY) {
+    if (if_num == 1) {
+      strcpy(vis_name, "BB");
+    } else if (if_num == 2) {
+      strcpy(vis_name, "DD");
+    }
+  } else if (pol & PLOT_POL_XY) {
+    if (if_num == 1) {
+      strcpy(vis_name, "AB");
+    } else if (if_num == 2) {
+      strcpy(vis_name, "CD");
+    }
+  } else if (pol & PLOT_POL_YX) {
+    if (if_num == 1) {
+      strcpy(vis_name, "BA");
+    } else if (if_num == 2) {
+      strcpy(vis_name, "DC");
+    }
+  }
+}
+
+void add_vis_line(struct vis_line ***vis_lines, int *n_vis_lines,
+		  int ant1, int ant2, int if_number, int pol) {
+  struct vis_line *new_line = NULL;
+  char polname[BUFSIZE];
+  // Add a potential vis line.
+  *n_vis_lines += 1;
+  REALLOC(*vis_lines, *n_vis_lines);
+  MALLOC(new_line, 1);
+  new_line->ant1 = ant1;
+  new_line->ant2 = ant2;
+  new_line->if_number = if_number;
+  new_line->pol = pol;
+  pol_to_vis_name(new_line->pol, new_line->if_number, polname);
+  snprintf(new_line->label, BUFSIZE, "%d%d%s",
+	   new_line->ant1, new_line->ant2, polname);
+  (*vis_lines)[*n_vis_lines - 1] = new_line;
+}
+
+long int vis_interpret_pol(char *pol) {
+  long int res = 0;
+  if ((strcmp(p1, "xx") == 0) ||
+      (strcmp(p1, "XX") == 0)) {
+    res = PLOT_POL_XX;
+  } else if ((strcmp(p1, "yy") == 0) ||
+	     (strcmp(p1, "YY") == 0)) {
+    res = PLOT_POL_YY;
+  } else if ((strcmp(p1, "xy") == 0) ||
+	     (strcmp(p1, 
+	      
+}
+
+long int vis_interpret_product(char *product) {
+  int ant1, ant2, nmatch = 0;
+  long int res;
+  char p1[3];
+  
+  nmatch = sscanf(product, "%1d%1d%2s", &ant1, &ant2, p1);
+  if (nmatch == 4) {
+    // Everything was specified.
+    res = 1<<(ant1 - 1) | 1<<(ant2 - 1);
+  }
+}
+
+void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
+		   int ncycles, int *cycle_numifs, int npols,
+		   struct panelspec *panelspec,
+		   struct vis_plotcontrols *plot_controls) {
+  int nants = 0, i = 0, n_vis_lines = 0, j = 0;
+  float ****plot_lines = NULL;
+  struct vis_line **vis_lines = NULL;
+
+  // Work out how many antennas we will show.
+  for (i = 1, nants = 0; i <= MAXANTS; i++) {
+    if ((1 << i) & plot_controls->array_spec) {
+      nants++;
+    }
+  }
+  if (nants == 0) {
+    // Nothing to plot!
+    return;
+  }
+
+  // Select the PGPLOT device.
+  cpgslct(plot_controls->pgplot_device);
+
+  // We make up to 16 lines per panel.
+  // The first dimension will be the panel number.
+  MALLOC(plot_lines, plot_controls->num_panels);
+  // The second dimension will be the line number.
+  // We need to work out how to allocate up to 16 lines.
+  for (i = 1, n_vis_lines = 0; i <= MAXANTS; i++) {
+    if ((1 << i) & plot_controls->array_spec) {
+      for (j = i; j <= MAXANTS; j++) {
+	if ((1 << j) & plot_controls->array_spec) {
+	  if (i != j) {
+	    // Cross-correlations allow XX and YY.
+	    if (plot_controls->plot_options & PLOT_POL_XX) {
+	      add_vis_line(&vis_lines, &n_vis_lines, i, j,
+			   
+	    }
+	  } else {
+	    // Auto-correlations allow XY and YX.
+	  }
+	}
+      }
+    }
+  }
+  for (i = 0; i < plot_controls->num_panels; i++) {
+    
+  }
+}
+
+void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspec,
+		   struct spd_plotcontrols *plot_controls) {
   int x = 0, y = 0, i, j, ant1, ant2, nants = 0, px, py, iauto = 0, icross = 0;
   int npols = 0, *polidx = NULL, poli, num_ifs = 0, panels_per_if = 0;
   int idxif, ni, ri, rj, rp, bi, bn, pc, inverted = NO;
@@ -340,6 +501,9 @@ void make_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspec,
     panels_per_if += (nants * (nants - 1)) / 2;
   }
 
+  // Select the PGPLOT device.
+  cpgslct(plot_controls->pgplot_device);
+  
   /* printf("time of cycle = %s %.6f\n", cycle_ampphase[0][0]->obsdate, */
   /* 	 cycle_ampphase[0][0]->ut_seconds); */
   changepanel(-1, -1, panelspec);

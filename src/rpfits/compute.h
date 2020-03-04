@@ -127,6 +127,10 @@ struct vis_quantities {
   // Number of quantities in the array.
   int nbaselines;
 
+  // The time.
+  char obsdate[OBSDATE_LENGTH];
+  float ut_seconds;
+  
   // Labels.
   int pol;
   int window;

@@ -156,6 +156,8 @@ int read_scan_header(struct scan_header_data *scan_header_data) {
     MALLOC(scan_header_data->if_num_channels, scan_header_data->num_ifs);
     MALLOC(scan_header_data->if_num_stokes, scan_header_data->num_ifs);
     MALLOC(scan_header_data->if_sideband, scan_header_data->num_ifs);
+    MALLOC(scan_header_data->if_chain, scan_header_data->num_ifs);
+    MALLOC(scan_header_data->if_label, scan_header_data->num_ifs);
     MALLOC(scan_header_data->if_stokes_names, scan_header_data->num_ifs);
     for (i = 0; i < scan_header_data->num_ifs; i++) {
       scan_header_data->if_centre_freq[i] = FREQUENCYMHZ(i);
@@ -163,6 +165,8 @@ int read_scan_header(struct scan_header_data *scan_header_data) {
       scan_header_data->if_num_channels[i] = NCHANNELS(i);
       scan_header_data->if_num_stokes[i] = NSTOKES(i);
       scan_header_data->if_sideband[i] = SIDEBAND(i);
+      scan_header_data->if_chain[i] = CHAIN(i);
+      scan_header_data->if_label[i] = LABEL(i);
       MALLOC(scan_header_data->if_stokes_names[i], NSTOKES(i));
       for (j = 0; j < NSTOKES(i); j++) {
 	MALLOC(scan_header_data->if_stokes_names[i][j], 3);
@@ -170,6 +174,21 @@ int read_scan_header(struct scan_header_data *scan_header_data) {
 		      CSTOKES(i, j), 2);
 	scan_header_data->if_stokes_names[i][j][2] = '\0';
       }
+    }
+    scan_header_data->num_ants = anten_.nant;
+    MALLOC(scan_header_data->ant_label, scan_header_data->num_ants);
+    MALLOC(scan_header_data->ant_name, scan_header_data->num_ants);
+    MALLOC(scan_header_data->ant_cartesian, scan_header_data->num_ants);
+    for (i = 0; i < scan_header_data->num_ants; i++) {
+      scan_header_data->ant_label[i] = ANTNUM(i);
+      MALLOC(scan_header_data->ant_name[i], 9);
+      scan_header_data->ant_name[i][8] = '\0';
+      (void)strncpy(scan_header_data->ant_name[i],
+		    ANTSTATION(i), 8);
+      MALLOC(scan_header_data->ant_cartesian[i], 3);
+      scan_header_data->ant_cartesian[i][0] = ANTX(i);
+      scan_header_data->ant_cartesian[i][1] = ANTY(i);
+      scan_header_data->ant_cartesian[i][2] = ANTZ(i);
     }
 
     // We read the data if there is data to read.
@@ -260,7 +279,16 @@ void free_scan_header_data(struct scan_header_data *scan_header_data) {
   FREE(scan_header_data->if_num_channels);
   FREE(scan_header_data->if_num_stokes);
   FREE(scan_header_data->if_sideband);
+  FREE(scan_header_data->if_chain);
+  FREE(scan_header_data->if_label);
   FREE(scan_header_data->if_stokes_names);
+  for (i = 0; i < scan_header_data->num_ants; i++) {
+    FREE(scan_header_data->ant_name[i]);
+    FREE(scan_header_data->ant_cartesian[i]);
+  }
+  FREE(scan_header_data->ant_label);
+  FREE(scan_header_data->ant_name);
+  FREE(scan_header_data->ant_cartesian);
 }
 
 /**
@@ -402,5 +430,19 @@ int read_cycle_data(struct scan_header_data *scan_header_data,
   cycle_data->n_baselines = bidx - 1;
   
   return(rv);
+  
+}
+
+int generate_rpfits_index(struct rpfits_index *rpfits_index) {
+  // Make an index of the currently opened RPFITS file.
+  long int entrypos;
+
+  // Keep a record of where the file was up to when we entered.
+  //entrypos = ftell();
+
+  // Go back to the start.
+  //rewind();
+
+  // We're finished, go back to the entry point.
   
 }

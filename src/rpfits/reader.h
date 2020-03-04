@@ -42,7 +42,14 @@
 #define NCHANNELS(f) if_.if_nfreq[f]
 #define NSTOKES(f) if_.if_nstok[f]
 #define SIDEBAND(f) if_.if_invert[f]
+#define CHAIN(f) if_.if_chain[f]
+#define LABEL(f) if_.if_num[f]
 #define CSTOKES(f,s) names_.if_cstok + (s * 2 + f * 4 * 2)
+#define ANTNUM(a) anten_.ant_num[a]
+#define ANTSTATION(a) names_.sta + (a * 8)
+#define ANTX(a) doubles_.x[a]
+#define ANTY(a) doubles_.y[a]
+#define ANTZ(a) doubles_.z[a]
 
 // Return values from the read routines.
 #define READER_EXHAUSTED 0
@@ -64,3 +71,4 @@ void free_cycle_data(struct cycle_data *cycle_data);
 void free_scan_data(struct scan_data *scan_data);
 int read_cycle_data(struct scan_header_data *scan_header_data,
 		    struct cycle_data *cycle_data);
+int generate_rpfits_index(struct rpfits_index *rpfits_index);

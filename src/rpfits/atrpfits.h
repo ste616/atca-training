@@ -30,6 +30,8 @@
 // This is for up to 100 antennas.
 #define MAX_BASELINENUM 25700
 
+#define FILENAME_LENGTH 2048
+
 /**
  * This structure holds all the header information data.
  */
@@ -53,7 +55,13 @@ struct scan_header_data {
   int *if_num_channels;
   int *if_num_stokes;
   int *if_sideband;
+  int *if_chain;
+  int *if_label;
   char ***if_stokes_names;
+  int num_ants;
+  int *ant_label;
+  char **ant_name;
+  double **ant_cartesian;
 };
 
 /**
@@ -92,6 +100,18 @@ struct scan_data {
   // And any number of cycles.
   int num_cycles;
   struct cycle_data **cycles;
+};
+
+/**
+ * A structure which describes how to quickly access data
+ * in an RFPITS file.
+ */
+struct rpfits_index {
+  char filename[FILENAME_LENGTH];
+  int num_headers;
+  long int *header_pos;
+  int *num_cycles;
+  long int **cycle_pos;
 };
 
 void base_to_ants(int baseline, int *ant1, int *ant2);

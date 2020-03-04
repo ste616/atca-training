@@ -17,11 +17,11 @@ int main(int argc, char *argv[]) {
   struct scan_data *scan_data = NULL, **all_scans = NULL;
   struct cycle_data *cycle_data = NULL;
   
-  for (i = 1; i < argc; i++) {
+  for (k = 1; k < argc; k++) {
     // Try to open the RPFITS file.
-    res = open_rpfits_file(argv[i]);
-    printf("Attempt to open RPFITS file %s, %d\n", argv[i], res);
-
+    res = open_rpfits_file(argv[k]);
+    printf("Attempt to open RPFITS file %s, %d\n", argv[k], res);
+    keep_reading = 1;
     while (keep_reading) {
       // Make a new scan and add it to the list.
       scan_data = prepare_new_scan_data();
@@ -42,14 +42,25 @@ int main(int argc, char *argv[]) {
 	     scan_data->header_data.declination_degrees);
       printf("  number of IFs = %d:\n", scan_data->header_data.num_ifs);
       for (i = 0; i < scan_data->header_data.num_ifs; i++) {
-	printf("   %d: num channels = %d, num stokes = %d\n", i,
+	printf("   %d: num channels = %d, num stokes = %d, chain = %d\n",
+	       scan_data->header_data.if_label[i],
 	       scan_data->header_data.if_num_channels[i],
-	       scan_data->header_data.if_num_stokes[i]);
+	       scan_data->header_data.if_num_stokes[i],
+	       scan_data->header_data.if_chain[i]);
 	printf("      ");
 	for (j = 0; j < scan_data->header_data.if_num_stokes[i]; j++) {
 	  printf("[%s] ", scan_data->header_data.if_stokes_names[i][j]);
 	}
 	printf("\n");
+      }
+      printf("  number of antennas = %d:\n", scan_data->header_data.num_ants);
+      for (i = 0; i < scan_data->header_data.num_ants; i++) {
+	printf("   ant %d: station = %8s, [ X, Y, Z ] = [ %.2f, %.2f, %.2f ]\n",
+	       scan_data->header_data.ant_label[i],
+	       scan_data->header_data.ant_name[i],
+	       scan_data->header_data.ant_cartesian[i][0],
+	       scan_data->header_data.ant_cartesian[i][1],
+	       scan_data->header_data.ant_cartesian[i][2]);
       }
       if (read_response & READER_DATA_AVAILABLE) {
 	  // Now start reading the cycle data.
@@ -95,6 +106,7 @@ int main(int argc, char *argv[]) {
   for (i = 0; i < nscans; i++) {
     free_scan_data(all_scans[i]);
   }
+  FREE(all_scans);
   
   exit(0);
   

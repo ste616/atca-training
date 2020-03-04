@@ -38,9 +38,13 @@
 #define PLOT_AMPLITUDE_LINEAR     1<<10
 #define PLOT_AMPLITUDE_LOG        1<<11
 #define PLOT_CONSISTENT_YRANGE    1<<12
+#define PLOT_DELAY                1<<13
+#define PLOT_TIME                 1<<14
 
 #define MINASSIGN(a, b) a = (b < a) ? b : a
 #define MAXASSIGN(a, b) a = (b > a) ? b : a
+
+
 
 // This structure holds pre-calculated panel positions for a PGPLOT
 // device with nx x ny panels.
@@ -57,8 +61,9 @@ struct panelspec {
   float orig_y2;
 };
 
-// This structure holds all the details about user plot control.
-struct plotcontrols {
+// This structure holds all the details about user plot control
+// for an SPD-type plot.
+struct spd_plotcontrols {
   // General plot options.
   long int plot_options;
   // Has the user specified a channel range to look at.
@@ -77,23 +82,73 @@ struct plotcontrols {
   int npols;
   // Whether to wait for user input when changing plots.
   int interactive;
+  // The PGPLOT device number used.
+  int pgplot_device;
+};
+
+// This structure holds all the details about use plot control
+// for a VIS-type plot.
+struct vis_plotcontrols {
+  // General plot options.
+  long int plot_options;
+  // The products to show.
+  long int *products;
+  int nproducts;
+  // The array specification.
+  int array_spec;
+  // The number of panels needed.
+  int num_panels;
+  // The maximum history to plot (minutes).
+  float history_length;
+  // The PGPLOT device number used.
+  int pgplot_device;
+};
+
+// This structure holds details about the lines we are asked to
+// plot in the VIS-type plots.
+struct vis_line {
+  // The antennas.
+  int ant1;
+  int ant2;
+  // The IF.
+  int if_number;
+  // Polarisation.
+  int pol;
+  // Label.
+  char label[BUFSIZE];
+  // The colour.
+  int pgplot_colour;
+  // To come: baseline length for sorting.
+  float baseline_length;
 };
 
 // Our routine definitions.
 int interpret_array_string(char *array_string);
-void init_plotcontrols(struct plotcontrols *plotcontrols,
-		       int xaxis_type, int yaxis_type, int pols,
-		       int corr_type);
+void init_spd_plotcontrols(struct spd_plotcontrols *plotcontrols,
+			   int xaxis_type, int yaxis_type, int pols,
+			   int corr_type, int pgplot_device);
+void init_vis_plotcontrols(struct vis_plotcontrols *plotcontrols,
+			   int xaxis_type, int paneltypes,
+			   int pgplot_device,
+			   struct panelspec *panelspec);
 void free_panelspec(struct panelspec *panelspec);
-void splitpanels(int nx, int ny, struct panelspec *panelspec);
+void splitpanels(int nx, int ny, int pgplot_device,
+		 struct panelspec *panelspec);
 void changepanel(int x, int y, struct panelspec *panelspec);
 void plotnum_to_xy(struct panelspec *panelspec, int plotnum, int *px, int *py);
 void plotpanel_minmax(struct ampphase **plot_ampphase,
-		      struct plotcontrols *plot_controls,
+		      struct spd_plotcontrols *plot_controls,
 		      int plot_baseline_idx, int npols, int *polidx,
 		      float *plotmin_x, float *plotmax_x,
 		      float *plotmin_y, float *plotmax_y);
 int find_pol(struct ampphase ***cycle_ampphase, int npols, int ifnum, int poltype);
-void make_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspec,
-	       struct plotcontrols *plot_controls);
+void add_vis_line(struct vis_line ***vis_lines, int *n_vis_lines,
+		  int ant1, int ant2, int if_number, int pol);
+long int vis_interpret_product(char *product);
+void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
+		   int ncycles, int *cycle_numifs, int npols,
+		   struct panelspec *panelspec,
+		   struct vis_plotcontrols *plot_controls);
+void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspec,
+		   struct spd_plotcontrols *plot_controls);
 

@@ -315,20 +315,6 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
     (*ampphase)->f_raw[i] = NULL;
   }
   
-  /* for (i = 0; i < (*ampphase)->nbaselines; i++) { */
-  /*   MALLOC((*ampphase)->weight[i], (*ampphase)->nchannels); */
-  /*   MALLOC((*ampphase)->amplitude[i], (*ampphase)->nchannels); */
-  /*   MALLOC((*ampphase)->phase[i], (*ampphase)->nchannels); */
-  /*   MALLOC((*ampphase)->raw[i], (*ampphase)->nchannels); */
-  /*   (*ampphase)->f_nchannels[i] = (*ampphase)->nchannels; */
-
-  /*   MALLOC((*ampphase)->f_channel[i], (*ampphase)->nchannels); */
-  /*   MALLOC((*ampphase)->f_frequency[i], (*ampphase)->nchannels); */
-  /*   MALLOC((*ampphase)->f_weight[i], (*ampphase)->nchannels); */
-  /*   MALLOC((*ampphase)->f_amplitude[i], (*ampphase)->nchannels); */
-  /*   MALLOC((*ampphase)->f_phase[i], (*ampphase)->nchannels); */
-  /*   MALLOC((*ampphase)->f_raw[i], (*ampphase)->nchannels); */
-  /* } */
   
   // Fill the arrays.
   // Work out the channel width (GHz).
@@ -512,6 +498,8 @@ int ampphase_average(struct ampphase *ampphase,
   (*vis_quantities)->nbaselines = ampphase->nbaselines;
   (*vis_quantities)->pol = ampphase->pol;
   (*vis_quantities)->window = ampphase->window;
+  strncpy((*vis_quantities)->obsdate, ampphase->obsdate, OBSDATE_LENGTH);
+  (*vis_quantities)->ut_seconds = ampphase->ut_seconds;
 
   // Check for options.
   if (options == NULL) {
