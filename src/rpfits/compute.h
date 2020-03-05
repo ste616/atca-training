@@ -77,6 +77,7 @@ struct ampphase {
   // The static quantities.
   int pol;
   int window;
+  char window_name[8];
   char obsdate[OBSDATE_LENGTH];
   float ut_seconds;
   

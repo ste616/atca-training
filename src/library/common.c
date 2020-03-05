@@ -492,7 +492,7 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
   int idxif, ni, ri, rj, rp, bi, bn, pc, inverted = NO;
   float xaxis_min, xaxis_max, yaxis_min, yaxis_max, theight = 0.4;
   float *freq_ordered = NULL, *freq_amp = NULL, *freq_phase = NULL;
-  char ptitle[BUFSIZE], ptype[BUFSIZE];
+  char ptitle[BUFSIZE], ptype[BUFSIZE], ftype[BUFSIZE];
   struct ampphase **ampphase_if = NULL;
 
   // Work out how many antennas we will show.
@@ -604,8 +604,13 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
 	  } else if (plot_controls->plot_options & PLOT_PHASE) {
 	    snprintf(ptype, BUFSIZE, "PHASE");
 	  }
-	  snprintf(ptitle, BUFSIZE, "%s: FQ:%d BSL%d%d",
-		   ptype, idxif, ant1, ant2);
+	  if (ampphase_if[0]->window_name[0] == 'f') {
+	    snprintf(ftype, BUFSIZE, "FQ:%s", ampphase_if[0]->window_name + 1);
+	  } else if (ampphase_if[0]->window_name[0] == 'z') {
+	    snprintf(ftype, BUFSIZE, "ZM:%s", ampphase_if[0]->window_name + 1);
+	  }
+	  snprintf(ptitle, BUFSIZE, "%s: %s BSL%d%d",
+		   ptype, ftype, ant1, ant2);
 
 	  plotpanel_minmax(ampphase_if, plot_controls, i, npols, polidx,
 			   &xaxis_min, &xaxis_max, &yaxis_min, &yaxis_max);

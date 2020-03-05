@@ -256,6 +256,7 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
     return -1;
   }
   (*ampphase)->window = ifno;
+  (void)strncpy((*ampphase)->window_name, scan_header_data->if_name[ifno][1], 8);
 
   // Check for options.
   default_options = ampphase_options_default();
