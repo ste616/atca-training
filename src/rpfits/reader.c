@@ -122,7 +122,7 @@ int read_scan_header(struct scan_header_data *scan_header_data) {
   int keep_reading = READER_HEADER_AVAILABLE, this_jstat = 0, that_jstat = 0;
   int rpfits_result = 0;
   int vis_size = 0, flag = 0, bin = 0, if_no = 0, sourceno = 0, baseline = 0;
-  int i = 0, read_data = 0, j = 0;
+  int i = 0, read_data = 0, j = 0, *nfound_chain = NULL, nfound_if = 0, zn = 0;
   float *vis = NULL, *wgt = NULL, ut = 0, u = 0, v = 0, w = 0;
   
   this_jstat = JSTAT_READNEXTHEADER;
@@ -158,6 +158,7 @@ int read_scan_header(struct scan_header_data *scan_header_data) {
     MALLOC(scan_header_data->if_sideband, scan_header_data->num_ifs);
     MALLOC(scan_header_data->if_chain, scan_header_data->num_ifs);
     MALLOC(scan_header_data->if_label, scan_header_data->num_ifs);
+    MALLOC(scan_header_data->if_name, scan_header_data->num_ifs);
     MALLOC(scan_header_data->if_stokes_names, scan_header_data->num_ifs);
     for (i = 0; i < scan_header_data->num_ifs; i++) {
       scan_header_data->if_centre_freq[i] = FREQUENCYMHZ(i);
@@ -167,6 +168,40 @@ int read_scan_header(struct scan_header_data *scan_header_data) {
       scan_header_data->if_sideband[i] = SIDEBAND(i);
       scan_header_data->if_chain[i] = CHAIN(i);
       scan_header_data->if_label[i] = LABEL(i);
+      MALLOC(scan_header_data->if_name[i], 3);
+      // The first name is the simple indicator like f1 or f3.
+      MALLOC(scan_header_data->if_name[i][0], 8);
+      (void)snprintf(scan_header_data->if_name[i][0], 8,
+		     "f%d", scan_header_data->if_label[i]);
+      // The second name classifies the band into f and z.
+      MALLOC(scan_header_data->if_name[i][1], 8);
+      // The third name is the complicated one to work out which
+      // IF each zoom corresponds to.
+      MALLOC(scan_header_data->if_name[i][2], 8);
+      if (scan_header_data->if_chain[i] > nfound_if) {
+	REALLOC(nfound_chain, scan_header_data->if_chain[i]);
+	for (j = nfound_if; j < scan_header_data->if_chain[i]; j++) {
+	  nfound_chain[j] = 0;
+	}
+	nfound_if = scan_header_data->if_chain[i];
+      }
+      if (nfound_chain[scan_header_data->if_chain[i] - 1] == 0) {
+	// This is the first one in this chain, it is the wideband.
+	(void)snprintf(scan_header_data->if_name[i][1], 8,
+		       "f%d", scan_header_data->if_chain[i]);
+	(void)strncpy(scan_header_data->if_name[i][2],
+		      scan_header_data->if_name[i][1], 8);
+      } else {
+	// This must be a zoom.
+	zn++;
+	(void)snprintf(scan_header_data->if_name[i][1], 8,
+		       "z%d", zn);
+	(void)snprintf(scan_header_data->if_name[i][2], 8,
+		       "z%d-%d", scan_header_data->if_chain[i],
+		       nfound_chain[scan_header_data->if_chain[i] - 1]);
+      }
+      nfound_chain[scan_header_data->if_chain[i] - 1] += 1;
+		       		       
       MALLOC(scan_header_data->if_stokes_names[i], NSTOKES(i));
       for (j = 0; j < NSTOKES(i); j++) {
 	MALLOC(scan_header_data->if_stokes_names[i][j], 3);
@@ -202,6 +237,8 @@ int read_scan_header(struct scan_header_data *scan_header_data) {
     keep_reading = READER_EXHAUSTED;
   }
 
+  FREE(nfound_chain);
+  
   return(keep_reading);
 }
 
@@ -273,6 +310,10 @@ void free_scan_header_data(struct scan_header_data *scan_header_data) {
       FREE(scan_header_data->if_stokes_names[i][j]);
     }
     FREE(scan_header_data->if_stokes_names[i]);
+    for (j = 0; j < 3; j++) {
+      FREE(scan_header_data->if_name[i][j]);
+    }
+    FREE(scan_header_data->if_name[i]);
   }
   FREE(scan_header_data->if_centre_freq);
   FREE(scan_header_data->if_bandwidth);
@@ -281,6 +322,7 @@ void free_scan_header_data(struct scan_header_data *scan_header_data) {
   FREE(scan_header_data->if_sideband);
   FREE(scan_header_data->if_chain);
   FREE(scan_header_data->if_label);
+  FREE(scan_header_data->if_name);
   FREE(scan_header_data->if_stokes_names);
   for (i = 0; i < scan_header_data->num_ants; i++) {
     FREE(scan_header_data->ant_name[i]);

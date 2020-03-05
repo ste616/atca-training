@@ -42,11 +42,14 @@ int main(int argc, char *argv[]) {
 	     scan_data->header_data.declination_degrees);
       printf("  number of IFs = %d:\n", scan_data->header_data.num_ifs);
       for (i = 0; i < scan_data->header_data.num_ifs; i++) {
-	printf("   %d: num channels = %d, num stokes = %d, chain = %d\n",
+	printf("   %d: num channels = %d, num stokes = %d, chain = %d (%s %s %s)\n",
 	       scan_data->header_data.if_label[i],
 	       scan_data->header_data.if_num_channels[i],
 	       scan_data->header_data.if_num_stokes[i],
-	       scan_data->header_data.if_chain[i]);
+	       scan_data->header_data.if_chain[i],
+	       scan_data->header_data.if_name[i][0],
+	       scan_data->header_data.if_name[i][1],
+	       scan_data->header_data.if_name[i][2]);
 	printf("      ");
 	for (j = 0; j < scan_data->header_data.if_num_stokes[i]; j++) {
 	  printf("[%s] ", scan_data->header_data.if_stokes_names[i][j]);

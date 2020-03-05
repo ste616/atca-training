@@ -221,10 +221,10 @@ struct ampphase_options ampphase_options_default(void) {
 int vis_ampphase(struct scan_header_data *scan_header_data,
 		 struct cycle_data *cycle_data,
 		 struct ampphase **ampphase,
-		 int pol, int ifno,
+		 int pol, int ifnum,
 		 struct ampphase_options *options) {
   int ap_created = 0, reqpol = -1, i = 0, polnum = -1, bl = -1, bidx = -1;
-  int j = 0, jflag = 0, vidx = -1, cidx = -1;
+  int j = 0, jflag = 0, vidx = -1, cidx = -1, ifno;
   float rcheck = 0, chanwidth, firstfreq, nhalfchan;
   struct ampphase_options default_options;
 
@@ -235,7 +235,21 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
   }
 
   // Check we know about the window number we were given.
-  if ((ifno < 0) || (ifno >= scan_header_data->num_ifs)) {
+  if ((ifnum < 1) || (ifnum > scan_header_data->num_ifs)) {
+    if (ap_created) {
+      free_ampphase(ampphase);
+    }
+    return -1;
+  }
+  // Search for the index of the requested IF.
+  for (i = 0, ifno = -1; i < scan_header_data->num_ifs; i++) {
+    if (ifnum == scan_header_data->if_label[i]) {
+      ifno = i;
+      break;
+    }
+  }
+  if (ifno < 0) {
+    // Didn't find the IF number.
     if (ap_created) {
       free_ampphase(ampphase);
     }

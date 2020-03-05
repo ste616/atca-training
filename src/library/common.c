@@ -400,14 +400,6 @@ void add_vis_line(struct vis_line ***vis_lines, int *n_vis_lines,
 
 long int vis_interpret_pol(char *pol) {
   long int res = 0;
-  if ((strcmp(p1, "xx") == 0) ||
-      (strcmp(p1, "XX") == 0)) {
-    res = PLOT_POL_XX;
-  } else if ((strcmp(p1, "yy") == 0) ||
-	     (strcmp(p1, "YY") == 0)) {
-    res = PLOT_POL_YY;
-  } else if ((strcmp(p1, "xy") == 0) ||
-	     (strcmp(p1, 
 	      
 }
 
@@ -421,6 +413,28 @@ long int vis_interpret_product(char *product) {
     // Everything was specified.
     res = 1<<(ant1 - 1) | 1<<(ant2 - 1);
   }
+}
+
+int find_if_name(struct scan_header_data *scan_header_data,
+		 char *name) {
+  int res = -1, i, j;
+  for (i = 0; i < scan_header_data->num_ifs; i++) {
+    for (j = 0; j < 3; j++) {
+      if (strcmp(scan_header_data->if_name[i][j], name) == 0) {
+	res = scan_header_data->if_label[i];
+	break;
+      }
+    }
+    if (res >= 0) {
+      break;
+    }
+  }
+
+  if (res < 0) {
+    res = 1; // For safety.
+  }
+  
+  return res;
 }
 
 void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
@@ -457,7 +471,6 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
 	  if (i != j) {
 	    // Cross-correlations allow XX and YY.
 	    if (plot_controls->plot_options & PLOT_POL_XX) {
-	      add_vis_line(&vis_lines, &n_vis_lines, i, j,
 			   
 	    }
 	  } else {
@@ -592,7 +605,7 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
 	    snprintf(ptype, BUFSIZE, "PHASE");
 	  }
 	  snprintf(ptitle, BUFSIZE, "%s: FQ:%d BSL%d%d",
-		   ptype, (idxif + 1), ant1, ant2);
+		   ptype, idxif, ant1, ant2);
 
 	  plotpanel_minmax(ampphase_if, plot_controls, i, npols, polidx,
 			   &xaxis_min, &xaxis_max, &yaxis_min, &yaxis_max);

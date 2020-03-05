@@ -55,7 +55,7 @@ struct arguments {
   int plot_frequency;
   int plot_pols;
   int npols;
-  int plot_ifs[MAXIFS];
+  char plot_ifs[MAXIFS][BUFSIZE];
   int nifs;
   int interactive;
   int nselect;
@@ -65,7 +65,8 @@ struct arguments {
 static error_t parse_opt(int key, char *arg, struct argp_state *state) {
   struct arguments *arguments = state->input;
   int i;
-  char *token;
+  long int ifnum;
+  char *token, *eptr = NULL;
   const char s[2] = ",", sp[2] = " ";
 
   switch (key) {
@@ -84,10 +85,20 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state) {
     arguments->nifs = 0;
     token = strtok(arg, s);
     while (token != NULL) {
-      i = atoi(token);
-      if ((i >= 1) && (i <= MAXIFS) && (arguments->nifs < MAXIFS)) {
-	arguments->plot_ifs[arguments->nifs] = i - 1;
+      // Check if the string can be straight converted to a number.
+      ifnum = strtol(token, &eptr, 10);
+      if (*eptr != 0) {
+	// This is a string, just copy it.
+	(void)strncpy(arguments->plot_ifs[arguments->nifs], token, BUFSIZE);
 	arguments->nifs++;
+      } else {
+	// It's a number.
+	i = (int)ifnum;
+	if ((i >= 1) && (i <= MAXIFS) && (arguments->nifs < MAXIFS)) {
+	  (void)snprintf(arguments->plot_ifs[arguments->nifs], BUFSIZE,
+			 "f%d", i);
+	  arguments->nifs++;
+	}
       }
       token = strtok(NULL, s);
     }
@@ -193,7 +204,7 @@ int main(int argc, char *argv[]) {
   arguments.interactive = YES;
   memset(arguments.plot_ifs, 0, sizeof(arguments.plot_ifs));
   for (i = 0; i < MAXIFS; i++) {
-    arguments.plot_ifs[i] = i;
+    (void)snprintf(arguments.plot_ifs[i], BUFSIZE, "f%d", i);
   }
   arguments.nifs = MAXIFS;
   arguments.nselect = 1;
@@ -322,7 +333,8 @@ int main(int argc, char *argv[]) {
 	vis_cycle_num_ifs[nviscycle] = num_ifs;
 	MALLOC(cycle_vis_quantities[nviscycle], num_ifs);
 	for (q = 0; q < num_ifs; q++) {
-	  if_no = arguments.plot_ifs[q];
+	  if_no = find_if_name(&(scan_data->header_data),
+			       arguments.plot_ifs[q]);
 	  spd_plotcontrols.if_num_spec[if_no] = 1;
 	  MALLOC(cycle_vis_quantities[nviscycle][q], arguments.npols);
 	  for (p = 0; p < arguments.npols; p++) {

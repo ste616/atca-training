@@ -145,6 +145,7 @@ int find_pol(struct ampphase ***cycle_ampphase, int npols, int ifnum, int poltyp
 void add_vis_line(struct vis_line ***vis_lines, int *n_vis_lines,
 		  int ant1, int ant2, int if_number, int pol);
 long int vis_interpret_product(char *product);
+int find_if_name(struct scan_header_data *scan_header_data, char *name);
 void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
 		   int ncycles, int *cycle_numifs, int npols,
 		   struct panelspec *panelspec,

@@ -57,6 +57,7 @@ struct scan_header_data {
   int *if_sideband;
   int *if_chain;
   int *if_label;
+  char ***if_name;
   char ***if_stokes_names;
   int num_ants;
   int *ant_label;
