@@ -30,6 +30,8 @@ static char args_doc[] = "[options] RPFITS_FILES...";
 static struct argp_option options[] = {
   { "array", 'a', "ARRAY", 0,
     "Which antennas to plot, as a comma-separated list" },
+  { "visband", 'c', "VISBAND", 0,
+    "Two comma-separated numbers representing the visband setting" },
   { "device", 'd', "PGPLOT_DEVICE", 0, "Direct SPD plots to this PGGPLOT device" },
   { "frequency", 'f', 0, 0, "Plots frequency on x-axis" },
   { "ifs", 'I', "IFS", 0,
@@ -60,6 +62,7 @@ struct arguments {
   int interactive;
   int nselect;
   char **vis_select;
+  int visband[2];
 };
 
 static error_t parse_opt(int key, char *arg, struct argp_state *state) {
@@ -72,6 +75,17 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state) {
   switch (key) {
   case 'a':
     strncpy(arguments->array_spec, arg, BUFSIZE);
+    break;
+  case 'c':
+    token = strtok(arg, s);
+    i = 0;
+    while (token != NULL) {
+      ifnum = atoi(token);
+      if ((ifnum >= 0) && (ifnum <= MAXIFS) && (i < 2)) {
+	arguments->visband[i] = ifnum;
+      }
+      token = strtok(NULL, s);
+    }
     break;
   case 'd':
     strncpy(arguments->spd_device, arg, BUFSIZE);
@@ -178,7 +192,7 @@ int main(int argc, char *argv[]) {
   int plotif = 0, r = 0, ant1, ant2, num_ifs = 2;
   int p = 0, pp = 0, q = 0, sp = 0, rp, ri, rx, ry, yaxis_type, xaxis_type;
   int old_num_ifs = 0, old_npols = 0, vis_num_cycles = 0, nviscycle = 0;
-  int *vis_cycle_num_ifs = NULL, spd_pgplot = -1, vis_pgplot = -1;
+  int *vis_cycle_num_ifs = NULL, spd_pgplot = -1, vis_pgplot = -1, nvisproducts = 0;
   float min_vis, max_vis, *xpts = NULL, theight = 0.4;
   struct scan_data *scan_data = NULL, **all_scans = NULL;
   struct cycle_data *cycle_data = NULL;
@@ -204,19 +218,36 @@ int main(int argc, char *argv[]) {
   arguments.interactive = YES;
   memset(arguments.plot_ifs, 0, sizeof(arguments.plot_ifs));
   for (i = 0; i < MAXIFS; i++) {
-    (void)snprintf(arguments.plot_ifs[i], BUFSIZE, "f%d", i);
+    (void)snprintf(arguments.plot_ifs[i], BUFSIZE, "f%d", (i + 1));
   }
   arguments.nifs = MAXIFS;
   arguments.nselect = 1;
   MALLOC(arguments.vis_select, arguments.nselect);
   strcpy(defselect, "aa");
   arguments.vis_select[0] = defselect;
+  arguments.visband[0] = 0;
+  arguments.visband[1] = 0;
   argp_parse(&argp, argc, argv, 0, 0, &arguments);
 
   // Check for nonsense arguments.
   if (arguments.nifs == 0) {
     printf("Must specify at least 1 IF to plot!\n");
     exit(-1);
+  }
+  // Resolve the visbands.
+  if (arguments.visband[0] == 0) {
+    arguments.visband[0] = 1;
+  } else if (arguments.visband[0] > arguments.nifs) {
+    arguments.visband[0] = arguments.nifs;
+  }
+  if (arguments.visband[1] == 0) {
+    if (arguments.nifs > 1) {
+      arguments.visband[1] = 2;
+    } else {
+      arguments.visband[1] = 1;
+    }
+  } else if (arguments.visband[1] > arguments.nifs) {
+    arguments.visband[1] = arguments.nifs;
   }
   
   spd_pgplot = cpgopen(arguments.spd_device);
@@ -246,11 +277,16 @@ int main(int argc, char *argv[]) {
   init_spd_plotcontrols(&spd_plotcontrols, xaxis_type, yaxis_type,
 			arguments.plot_pols, DEFAULT, spd_pgplot);
   init_vis_plotcontrols(&vis_plotcontrols, PLOT_TIME,
-			PLOT_AMPLITUDE | PLOT_PHASE, vis_pgplot,
-			&vis_panelspec);
+			PLOT_AMPLITUDE | PLOT_PHASE, arguments.visband,
+			vis_pgplot, &vis_panelspec);
   spd_plotcontrols.array_spec = interpret_array_string(arguments.array_spec);
   vis_plotcontrols.array_spec = interpret_array_string(arguments.array_spec);
   spd_plotcontrols.interactive = arguments.interactive;
+  MALLOC(vis_plotcontrols.vis_products, arguments.nselect);
+  vis_plotcontrols.nproducts = arguments.nselect;
+  for (i = 0; i < vis_plotcontrols.nproducts; i++) {
+    vis_interpret_product(arguments.vis_select[i], &(vis_plotcontrols.vis_products[i]));
+  }
   nviscycle = 0;
   for (i = 0; i < arguments.n_rpfits_files; i++) {
     // Try to open the RPFITS file.

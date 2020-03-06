@@ -6,6 +6,7 @@
  * applications.
  */
 #include <string.h>
+#include <math.h>
 #include "common.h"
 #include "cpgplot.h"
 #include "memory.h"
@@ -13,10 +14,12 @@
 int interpret_array_string(char *array_string) {
   // The array string should be a comma-separated list of antenna.
   int a = 0, r = 0;
-  char *token;
+  char *token, copy[BUFSIZE];
   const char s[2] = ",";
-  
-  token = strtok(array_string, s);
+
+  // We make a copy of the string since strtok is destructive.
+  (void)strncpy(copy, array_string, BUFSIZE);
+  token = strtok(copy, s);
   while (token != NULL) {
     a = atoi(token);
     if ((a >= 1) && (a <= MAXANTS)) {
@@ -83,10 +86,10 @@ void init_spd_plotcontrols(struct spd_plotcontrols *plotcontrols,
 #define NAVAILABLE_PANELS 3
 
 void init_vis_plotcontrols(struct vis_plotcontrols *plotcontrols,
-			   int xaxis_type, int paneltypes,
+			   int xaxis_type, int paneltypes, int *visbands,
 			   int pgplot_device,
 			   struct panelspec *panelspec) {
-  int npanels = 0, i;
+  int npanels = 0, i, j;
   int available_panels[NAVAILABLE_PANELS] = { PLOT_AMPLITUDE,
 					      PLOT_PHASE,
 					      PLOT_DELAY };
@@ -103,6 +106,14 @@ void init_vis_plotcontrols(struct vis_plotcontrols *plotcontrols,
     }
   }
   plotcontrols->num_panels = npanels;
+  // Order the panels.
+  MALLOC(plotcontrols->panel_type, plotcontrols->num_panels);
+  for (i = 0, j = 0; i < NAVAILABLE_PANELS; i++) {
+    if (paneltypes & available_panels[i]) {
+      plotcontrols->panel_type[j] = available_panels[i];
+      j++;
+    }
+  }
   plotcontrols->plot_options = xaxis_type | paneltypes;
 
   // Keep the PGPLOT device.
@@ -113,7 +124,11 @@ void init_vis_plotcontrols(struct vis_plotcontrols *plotcontrols,
 
   // Initialise the products to display.
   plotcontrols->nproducts = 0;
-  plotcontrols->products = NULL;
+  plotcontrols->vis_products = NULL;
+
+  for (i = 0; i < 2; i++) {
+    plotcontrols->visbands[i] = visbands[i];
+  }
 }
 
 void free_panelspec(struct panelspec *panelspec) {
@@ -398,20 +413,100 @@ void add_vis_line(struct vis_line ***vis_lines, int *n_vis_lines,
   (*vis_lines)[*n_vis_lines - 1] = new_line;
 }
 
-long int vis_interpret_pol(char *pol) {
-  long int res = 0;
-	      
+void vis_interpret_pol(char *pol, struct vis_product *vis_product) {
+  if (strcmp(pol, "aa") == 0) {
+    vis_product->if_spec = VIS_PLOT_IF1;
+    vis_product->pol_spec = PLOT_POL_XX;
+  } else if (strcmp(pol, "bb") == 0) {
+    vis_product->if_spec = VIS_PLOT_IF1;
+    vis_product->pol_spec = PLOT_POL_YY;
+  } else if (strcmp(pol, "ab") == 0) {
+    vis_product->if_spec = VIS_PLOT_IF1;
+    vis_product->pol_spec = PLOT_POL_XY;
+  } else if (strcmp(pol, "a") == 0) {
+    vis_product->if_spec = VIS_PLOT_IF1;
+    vis_product->pol_spec = PLOT_POL_XX | PLOT_POL_XY;
+  } else if (strcmp(pol, "b") == 0) {
+    vis_product->if_spec = VIS_PLOT_IF1;
+    vis_product->pol_spec = PLOT_POL_YY | PLOT_POL_XY;
+  } else if (strcmp(pol, "cc") == 0) {
+    vis_product->if_spec = VIS_PLOT_IF2;
+    vis_product->pol_spec = PLOT_POL_XX;
+  } else if (strcmp(pol, "dd") == 0) {
+    vis_product->if_spec = VIS_PLOT_IF2;
+    vis_product->pol_spec = PLOT_POL_YY;
+  } else if (strcmp(pol, "cd") == 0) {
+    vis_product->if_spec = VIS_PLOT_IF2;
+    vis_product->pol_spec = PLOT_POL_XY;
+  } else if (strcmp(pol, "c") == 0) {
+    vis_product->if_spec = VIS_PLOT_IF2;
+    vis_product->pol_spec = PLOT_POL_XX | PLOT_POL_XY;
+  } else if (strcmp(pol, "d") == 0) {
+    vis_product->if_spec = VIS_PLOT_IF2;
+    vis_product->pol_spec = PLOT_POL_YY | PLOT_POL_XY;
+  }
 }
 
-long int vis_interpret_product(char *product) {
-  int ant1, ant2, nmatch = 0;
-  long int res;
+void vis_interpret_product(char *product, struct vis_product **vis_product) {
+  int ant1, ant2, nmatch = 0, i;
   char p1[3];
+
+  // Work out if we need to make a vis_product.
+  if (*vis_product == NULL) {
+    MALLOC(*vis_product, 1);
+  }
   
   nmatch = sscanf(product, "%1d%1d%2s", &ant1, &ant2, p1);
-  if (nmatch == 4) {
+  if (nmatch == 3) {
     // Everything was specified.
-    res = 1<<(ant1 - 1) | 1<<(ant2 - 1);
+    (*vis_product)->antenna_spec = 1<<ant1 | 1<<ant2;
+    vis_interpret_pol(p1, *vis_product);
+  } else if (nmatch == 2) {
+    // The character wasn't matched.
+    (*vis_product)->antenna_spec = 1<<ant1 | 1<<ant2;
+    nmatch = sscanf(product, "%1d%1d%1s", &ant1, &ant2, p1);
+    if (nmatch == 3) {
+      // We were just given a single pol indicator.
+      vis_interpret_pol(p1, *vis_product);
+    } else {
+      // We were only given baselines.
+      (*vis_product)->if_spec = VIS_PLOT_IF1 | VIS_PLOT_IF2;
+      (*vis_product)->pol_spec = PLOT_POL_XX | PLOT_POL_YY | PLOT_POL_XY;
+    }
+  } else if (nmatch == 1) {
+    // We were given the first antenna number.
+    (*vis_product)->antenna_spec = 1<<ant1;
+    nmatch = sscanf(product, "%1d%2s", &ant1, p1);
+    if (nmatch == 2) {
+      vis_interpret_pol(p1, *vis_product);
+    } else {
+      nmatch = sscanf(product, "%1d%1s", &ant1, p1);
+      if (nmatch == 2) {
+	vis_interpret_pol(p1, *vis_product);
+      } else {
+	// Only given the first antenna number.
+	(*vis_product)->if_spec = VIS_PLOT_IF1 | VIS_PLOT_IF2;
+	(*vis_product)->pol_spec = PLOT_POL_XX | PLOT_POL_YY | PLOT_POL_XY;
+      }
+    }
+  } else {
+    // We weren't given any antenna specifications.
+    (*vis_product)->antenna_spec = 0;
+    for (i = 1; i <= MAXANTS; i++) {
+      (*vis_product)->antenna_spec |= 1<<i;
+    }
+    nmatch = sscanf(product, "%2s", p1);
+    if (nmatch == 1) {
+      vis_interpret_pol(p1, *vis_product);
+    } else {
+      nmatch = sscanf(product, "%1s", p1);
+      if (nmatch == 1) {
+	vis_interpret_pol(p1, *vis_product);
+      } else {
+	(*vis_product)->if_spec = VIS_PLOT_IF1 | VIS_PLOT_IF2;
+	(*vis_product)->pol_spec = PLOT_POL_XX | PLOT_POL_YY | PLOT_POL_XY;
+      }
+    }
   }
 }
 
@@ -441,8 +536,10 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
 		   int ncycles, int *cycle_numifs, int npols,
 		   struct panelspec *panelspec,
 		   struct vis_plotcontrols *plot_controls) {
-  int nants = 0, i = 0, n_vis_lines = 0, j = 0;
-  float ****plot_lines = NULL;
+  int nants = 0, i = 0, n_vis_lines = 0, j = 0, k = 0, p = 0;
+  int singleant = 0, l = 0, m = 0, n = 0;
+  int **n_plot_lines = NULL;
+  float ****plot_lines = NULL, min_x, max_x, min_y, max_y;
   struct vis_line **vis_lines = NULL;
 
   // Work out how many antennas we will show.
@@ -462,26 +559,154 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
   // We make up to 16 lines per panel.
   // The first dimension will be the panel number.
   MALLOC(plot_lines, plot_controls->num_panels);
+  MALLOC(n_plot_lines, plot_controls->num_panels);
   // The second dimension will be the line number.
   // We need to work out how to allocate up to 16 lines.
-  for (i = 1, n_vis_lines = 0; i <= MAXANTS; i++) {
-    if ((1 << i) & plot_controls->array_spec) {
-      for (j = i; j <= MAXANTS; j++) {
-	if ((1 << j) & plot_controls->array_spec) {
-	  if (i != j) {
-	    // Cross-correlations allow XX and YY.
-	    if (plot_controls->plot_options & PLOT_POL_XX) {
-			   
+  for (p = 0; p < plot_controls->nproducts; p++) {
+    // Check if only a single antenna is requested.
+    for (i = 1; i <= MAXANTS; i++) {
+      if ((plot_controls->vis_products[p]->antenna_spec == (1<<i)) &&
+	  (plot_controls->array_spec & (1<<i))) {
+	singleant = i;
+	break;
+      }
+    }
+    for (i = 1, n_vis_lines = 0; i <= MAXANTS; i++) {
+      if (((1 << i) & plot_controls->array_spec) &&
+	  (((1 << i) & plot_controls->vis_products[p]->antenna_spec) ||
+	   (singleant > i))) {
+	for (j = i; j <= MAXANTS; j++) {
+	  if (((1 << j) & plot_controls->array_spec) &&
+	      ((1 << j) & plot_controls->vis_products[p]->antenna_spec)) {
+	    if (i != j) {
+	      // Cross-correlations allow XX and YY.
+	      if (plot_controls->vis_products[p]->pol_spec & PLOT_POL_XX) {
+		if (plot_controls->vis_products[p]->if_spec & VIS_PLOT_IF1) {
+		  add_vis_line(&vis_lines, &n_vis_lines,
+			       i, j, plot_controls->visbands[0], PLOT_POL_XX);
+		}
+		if (plot_controls->vis_products[p]->if_spec & VIS_PLOT_IF2) {
+		  add_vis_line(&vis_lines, &n_vis_lines,
+			       i, j, plot_controls->visbands[1], PLOT_POL_XX);
+		}
+	      }
+	      if (plot_controls->vis_products[p]->pol_spec & PLOT_POL_YY) {
+		if (plot_controls->vis_products[p]->if_spec & VIS_PLOT_IF1) {
+		  add_vis_line(&vis_lines, &n_vis_lines,
+			       i, j, plot_controls->visbands[0], PLOT_POL_YY);
+		}
+		if (plot_controls->vis_products[p]->if_spec & VIS_PLOT_IF2) {
+		  add_vis_line(&vis_lines, &n_vis_lines,
+			       i, j, plot_controls->visbands[1], PLOT_POL_YY);
+		}
+	      }
+	    } else {
+	      // Auto-correlations allow XY and YX.
+	      if (plot_controls->vis_products[p]->pol_spec & PLOT_POL_XY) {
+		if (plot_controls->vis_products[p]->if_spec & VIS_PLOT_IF1) {
+		  add_vis_line(&vis_lines, &n_vis_lines,
+			       i, j, plot_controls->visbands[0], PLOT_POL_XY);
+		}
+		if (plot_controls->vis_products[p]->if_spec & VIS_PLOT_IF2) {
+		  add_vis_line(&vis_lines, &n_vis_lines,
+			       i, j, plot_controls->visbands[1], PLOT_POL_XY);
+		}
+	      }
 	    }
-	  } else {
-	    // Auto-correlations allow XY and YX.
 	  }
 	}
       }
     }
   }
+  printf("generating %d vis lines\n", n_vis_lines);
+  if (n_vis_lines == 0) {
+    // Nothing to plot!
+    return;
+  }
+
+  // Sort the lines; TODO, for now just take the first 16.
+  if (n_vis_lines > 16) {
+    n_vis_lines = 16;
+  }
+  for (i = 0; i < n_vis_lines; i++) {
+    vis_lines[i]->pgplot_colour = (i + 1);
+  }
+  
   for (i = 0; i < plot_controls->num_panels; i++) {
+    // Make the lines.
+    MALLOC(plot_lines[i], n_vis_lines);
+    MALLOC(n_plot_lines[i], n_vis_lines);
+
+    // Keep track of the min and max values to plot.
+    min_x = INFINITY;
+    max_x = -INFINITY;
+    min_y = INFINITY;
+    max_y = -INFINITY;
     
+    // The third dimension of the plot lines will be the X and Y
+    // coordinates.
+    for (j = 0; j < n_vis_lines; j++) {
+      n_plot_lines[i][j] = 0;
+      MALLOC(plot_lines[i][j], 2);
+      plot_lines[i][j][0] = NULL;
+      plot_lines[i][j][1] = NULL;
+      // The fourth dimension is the points to plot in the line.
+      // We accumulate these now.
+      for (k = 0; k < ncycles; k++) {
+	for (l = 0; l < cycle_numifs[k]; l++) {
+	  for (m = 0; m < npols; m++) {
+	    if ((cycle_vis_quantities[k][l][m]->pol &
+		 vis_lines[j]->pol) &&
+		(cycle_vis_quantities[k][l][m]->window ==
+		 vis_lines[j]->if_number)) {
+	      // Find the correct baseline.
+	      for (n = 0; n < cycle_vis_quantities[k][l][m]->nbaselines; n++) {
+		if (cycle_vis_quantities[k][l][m]->baseline[n] ==
+		    ants_to_base(vis_lines[j]->ant1, vis_lines[j]->ant2)) {
+		  // Found it.
+		  n_plot_lines[i][j] += 1;
+		  REALLOC(plot_lines[i][j][0], n_plot_lines[i][j]);
+		  REALLOC(plot_lines[i][j][1], n_plot_lines[i][j]);
+		  plot_lines[i][j][0][n_plot_lines[i][j] - 1] =
+		    cycle_vis_quantities[k][l][m]->ut_seconds;
+		  if (plot_lines[i][j][0][n_plot_lines[i][j] - 1] < min_x) {
+		    min_x = plot_lines[i][j][0][n_plot_lines[i][j] - 1];
+		  }
+		  if (plot_lines[i][j][0][n_plot_lines[i][j] - 1] > max_x) {
+		    max_x = plot_lines[i][j][0][n_plot_lines[i][j] - 1];
+		  }
+		  // Need to fix for bin.
+		  if (plot_controls->panel_type[i] == PLOT_AMPLITUDE) {
+		    plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
+		      cycle_vis_quantities[k][l][m]->amplitude[n][0];
+		  } else if (plot_controls->panel_type[i] == PLOT_PHASE) {
+		    plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
+		      cycle_vis_quantities[k][l][m]->phase[n][0];
+		  }
+		  if (plot_lines[i][j][1][n_plot_lines[i][j] - 1] < min_y) {
+		    min_y = plot_lines[i][j][1][n_plot_lines[i][j] -1 ];
+		  }
+		  if (plot_lines[i][j][1][n_plot_lines[i][j] - 1] > max_y) {
+		    max_y = plot_lines[i][j][1][n_plot_lines[i][j] - 1];
+		  }
+		  break;
+		}
+	      }
+	    }
+	  }
+	}
+      }
+    }
+    // Make the panel.
+    changepanel(0, i, panelspec);
+    printf("plotting panel %d with %.2f <= x <= %.2f, %.2f <= y <= %.2f\n",
+	   i, min_x, max_x, min_y, max_y);
+    cpgswin(min_x, max_x, min_y, max_y);
+    cpgtbox("BCNTSZ", 0, 0, "BCNTS", 0, 0);
+    for (j = 0; j < n_vis_lines; j++) {
+      cpgsci(vis_lines[j]->pgplot_colour);
+      cpgline(n_plot_lines[i][j], plot_lines[i][j][0], plot_lines[i][j][1]);
+    }
   }
 }
 

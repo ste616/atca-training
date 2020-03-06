@@ -44,6 +44,8 @@
 #define MINASSIGN(a, b) a = (b < a) ? b : a
 #define MAXASSIGN(a, b) a = (b > a) ? b : a
 
+#define VIS_PLOT_IF1     1<<0
+#define VIS_PLOT_IF2     1<<1
 
 
 // This structure holds pre-calculated panel positions for a PGPLOT
@@ -86,22 +88,36 @@ struct spd_plotcontrols {
   int pgplot_device;
 };
 
+// This structure informs vis what to plot.
+struct vis_product {
+  // The antennas to plot.
+  int antenna_spec;
+  // The IFs to plot.
+  int if_spec;
+  // The pols to plot.
+  int pol_spec;
+};
+
 // This structure holds all the details about use plot control
 // for a VIS-type plot.
 struct vis_plotcontrols {
   // General plot options.
   long int plot_options;
   // The products to show.
-  long int *products;
+  struct vis_product **vis_products;
   int nproducts;
   // The array specification.
   int array_spec;
   // The number of panels needed.
   int num_panels;
+  // And their type.
+  int *panel_type;
   // The maximum history to plot (minutes).
   float history_length;
   // The PGPLOT device number used.
   int pgplot_device;
+  // The bands to assign as IFs 1 and 2.
+  int visbands[2];
 };
 
 // This structure holds details about the lines we are asked to
@@ -128,7 +144,7 @@ void init_spd_plotcontrols(struct spd_plotcontrols *plotcontrols,
 			   int xaxis_type, int yaxis_type, int pols,
 			   int corr_type, int pgplot_device);
 void init_vis_plotcontrols(struct vis_plotcontrols *plotcontrols,
-			   int xaxis_type, int paneltypes,
+			   int xaxis_type, int paneltypes, int *visbands,
 			   int pgplot_device,
 			   struct panelspec *panelspec);
 void free_panelspec(struct panelspec *panelspec);
@@ -144,7 +160,8 @@ void plotpanel_minmax(struct ampphase **plot_ampphase,
 int find_pol(struct ampphase ***cycle_ampphase, int npols, int ifnum, int poltype);
 void add_vis_line(struct vis_line ***vis_lines, int *n_vis_lines,
 		  int ant1, int ant2, int if_number, int pol);
-long int vis_interpret_product(char *product);
+void vis_interpret_pol(char *pol, struct vis_product *vis_product);
+void vis_interpret_product(char *product, struct vis_product **vis_product);
 int find_if_name(struct scan_header_data *scan_header_data, char *name);
 void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
 		   int ncycles, int *cycle_numifs, int npols,

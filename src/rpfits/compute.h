@@ -136,6 +136,7 @@ struct vis_quantities {
   int pol;
   int window;
   int *nbins;
+  int *baseline;
   
   // The arrays.
   float **amplitude;

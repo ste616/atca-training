@@ -528,8 +528,10 @@ int ampphase_average(struct ampphase *ampphase,
   MALLOC((*vis_quantities)->phase, (*vis_quantities)->nbaselines);
   MALLOC((*vis_quantities)->delay, (*vis_quantities)->nbaselines);
   MALLOC((*vis_quantities)->nbins, (*vis_quantities)->nbaselines);
+  MALLOC((*vis_quantities)->baseline, (*vis_quantities)->nbaselines);
   for (i = 0; i < (*vis_quantities)->nbaselines; i++) {
     (*vis_quantities)->nbins[i] = ampphase->nbins[i];
+    (*vis_quantities)->baseline[i] = ampphase->baseline[i];
     MALLOC((*vis_quantities)->amplitude[i], (*vis_quantities)->nbins[i]);
     MALLOC((*vis_quantities)->phase[i], (*vis_quantities)->nbins[i]);
     MALLOC((*vis_quantities)->delay[i], (*vis_quantities)->nbins[i]);
