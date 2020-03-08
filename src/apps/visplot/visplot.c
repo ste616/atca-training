@@ -257,8 +257,8 @@ int main(int argc, char *argv[]) {
   // Get phase in degrees.
   ampphase_options.phase_in_degrees = true;
   ampphase_options.delay_averaging = 1;
-  ampphase_options.min_tvchannel = 513;
-  ampphase_options.max_tvchannel = 1537;
+  ampphase_options.min_tvchannel = 9;
+  ampphase_options.max_tvchannel = 25;
   ampphase_options.averaging_method = AVERAGETYPE_MEAN | AVERAGETYPE_SCALAR;
 
   // Initialise the plotting space and options.

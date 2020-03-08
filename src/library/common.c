@@ -583,21 +583,21 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
 	      if (plot_controls->vis_products[p]->pol_spec & PLOT_POL_XX) {
 		if (plot_controls->vis_products[p]->if_spec & VIS_PLOT_IF1) {
 		  add_vis_line(&vis_lines, &n_vis_lines,
-			       i, j, plot_controls->visbands[0], PLOT_POL_XX);
+			       i, j, plot_controls->visbands[0], POL_XX);
 		}
 		if (plot_controls->vis_products[p]->if_spec & VIS_PLOT_IF2) {
 		  add_vis_line(&vis_lines, &n_vis_lines,
-			       i, j, plot_controls->visbands[1], PLOT_POL_XX);
+			       i, j, plot_controls->visbands[1], POL_XX);
 		}
 	      }
 	      if (plot_controls->vis_products[p]->pol_spec & PLOT_POL_YY) {
 		if (plot_controls->vis_products[p]->if_spec & VIS_PLOT_IF1) {
 		  add_vis_line(&vis_lines, &n_vis_lines,
-			       i, j, plot_controls->visbands[0], PLOT_POL_YY);
+			       i, j, plot_controls->visbands[0], POL_YY);
 		}
 		if (plot_controls->vis_products[p]->if_spec & VIS_PLOT_IF2) {
 		  add_vis_line(&vis_lines, &n_vis_lines,
-			       i, j, plot_controls->visbands[1], PLOT_POL_YY);
+			       i, j, plot_controls->visbands[1], POL_YY);
 		}
 	      }
 	    } else {
@@ -605,11 +605,11 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
 	      if (plot_controls->vis_products[p]->pol_spec & PLOT_POL_XY) {
 		if (plot_controls->vis_products[p]->if_spec & VIS_PLOT_IF1) {
 		  add_vis_line(&vis_lines, &n_vis_lines,
-			       i, j, plot_controls->visbands[0], PLOT_POL_XY);
+			       i, j, plot_controls->visbands[0], POL_XY);
 		}
 		if (plot_controls->vis_products[p]->if_spec & VIS_PLOT_IF2) {
 		  add_vis_line(&vis_lines, &n_vis_lines,
-			       i, j, plot_controls->visbands[1], PLOT_POL_XY);
+			       i, j, plot_controls->visbands[1], POL_XY);
 		}
 	      }
 	    }
@@ -653,12 +653,17 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
       // The fourth dimension is the points to plot in the line.
       // We accumulate these now.
       for (k = 0; k < ncycles; k++) {
+	//printf(" cycle %d has %d IFs\n", k, cycle_numifs[k]);
 	for (l = 0; l < cycle_numifs[k]; l++) {
 	  for (m = 0; m < npols; m++) {
+	    /* printf("comparing pols %d to %d, window %d to %d\n", */
+	    /* 	   cycle_vis_quantities[k][l][m]->pol, vis_lines[j]->pol, */
+	    /* 	   cycle_vis_quantities[k][l][m]->window, vis_lines[j]->if_number); */
 	    if ((cycle_vis_quantities[k][l][m]->pol &
 		 vis_lines[j]->pol) &&
 		(cycle_vis_quantities[k][l][m]->window ==
 		 vis_lines[j]->if_number)) {
+	      //printf("   found appropriate vis quantity!\n");
 	      // Find the correct baseline.
 	      for (n = 0; n < cycle_vis_quantities[k][l][m]->nbaselines; n++) {
 		if (cycle_vis_quantities[k][l][m]->baseline[n] ==
