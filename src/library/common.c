@@ -585,19 +585,9 @@ float fracwidth(struct panelspec *panelspec,
   float dx, xc[4], yc[4], dlx;
   int i;
 
-  printf(" string to size is %s\n", label);
-  //dx = fabsf(panelspec->px_x2[x][y] - panelspec->px_x1[x][y]);
   dx = fabsf(axis_max_x - axis_min_x);
-  printf("  edge length = %.4f\n", dx);
-  /* cpgqtxt(panelspec->x1[x][y], panelspec->y1[x][y], 0, 0, */
-  /* 	  label, xc, yc); */
   cpgqtxt(axis_min_x, 0, 0, 0, label, xc, yc);
-  printf("  string bounding is:\n");
-  for (i = 0; i < 4; i++) {
-    printf("   [ %.4f , %.4f ]\n", xc[i], yc[i]);
-  }
   dlx = fabsf(xc[2] - xc[1]);
-  printf("  width of string is %.4f\n", dlx);
   return (dlx / dx);
 }
 
