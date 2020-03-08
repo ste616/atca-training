@@ -262,7 +262,7 @@ int main(int argc, char *argv[]) {
   ampphase_options.averaging_method = AVERAGETYPE_MEAN | AVERAGETYPE_SCALAR;
 
   // Initialise the plotting space and options.
-  splitpanels(5, 5, spd_pgplot, &spd_panelspec);
+  splitpanels(5, 5, spd_pgplot, 0, 5, &spd_panelspec);
   if (arguments.plot_phase == NO) {
     yaxis_type = PLOT_AMPLITUDE | PLOT_AMPLITUDE_LINEAR;
   } else {

@@ -57,10 +57,18 @@ struct panelspec {
   float **x2;
   float **y1;
   float **y2;
+  float **px_x1;
+  float **px_x2;
+  float **px_y1;
+  float **px_y2;
   float orig_x1;
   float orig_x2;
   float orig_y1;
   float orig_y2;
+  float orig_px_x1;
+  float orig_px_x2;
+  float orig_px_y1;
+  float orig_px_y2;
 };
 
 // This structure holds all the details about user plot control
@@ -148,7 +156,8 @@ void init_vis_plotcontrols(struct vis_plotcontrols *plotcontrols,
 			   int pgplot_device,
 			   struct panelspec *panelspec);
 void free_panelspec(struct panelspec *panelspec);
-void splitpanels(int nx, int ny, int pgplot_device,
+void splitpanels(int nx, int ny, int pgplot_device, int abut,
+		 float margin_reduction,
 		 struct panelspec *panelspec);
 void changepanel(int x, int y, struct panelspec *panelspec);
 void plotnum_to_xy(struct panelspec *panelspec, int plotnum, int *px, int *py);
@@ -163,6 +172,9 @@ void add_vis_line(struct vis_line ***vis_lines, int *n_vis_lines,
 void vis_interpret_pol(char *pol, struct vis_product *vis_product);
 void vis_interpret_product(char *product, struct vis_product **vis_product);
 int find_if_name(struct scan_header_data *scan_header_data, char *name);
+float fracwidth(struct panelspec *panelspec,
+		float axis_min_x, float axis_max_x,
+		int x, int y, char *label);
 void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
 		   int ncycles, int *cycle_numifs, int npols,
 		   struct panelspec *panelspec,

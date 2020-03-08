@@ -120,7 +120,7 @@ void init_vis_plotcontrols(struct vis_plotcontrols *plotcontrols,
   plotcontrols->pgplot_device = pgplot_device;
   
   // Set up the panelspec structure for this.
-  splitpanels(1, npanels, pgplot_device, panelspec);
+  splitpanels(1, npanels, pgplot_device, 1, 1, panelspec);
 
   // Initialise the products to display.
   plotcontrols->nproducts = 0;
@@ -138,18 +138,28 @@ void free_panelspec(struct panelspec *panelspec) {
     FREE(panelspec->x2[i]);
     FREE(panelspec->y1[i]);
     FREE(panelspec->y2[i]);
+    FREE(panelspec->px_x1[i]);
+    FREE(panelspec->px_x2[i]);
+    FREE(panelspec->px_y1[i]);
+    FREE(panelspec->px_y2[i]);
   }
   FREE(panelspec->x1);
   FREE(panelspec->x2);
   FREE(panelspec->y1);
   FREE(panelspec->y2);
+  FREE(panelspec->px_x1);
+  FREE(panelspec->px_x2);
+  FREE(panelspec->px_y1);
+  FREE(panelspec->px_y2);
 }
 
-void splitpanels(int nx, int ny, int pgplot_device,
+void splitpanels(int nx, int ny, int pgplot_device, int abut,
+		 float margin_reduction,
 		 struct panelspec *panelspec) {
   int i, j;
-  float panel_width, panel_height, margin_reduction = 5;
+  float panel_width, panel_height, panel_px_width, panel_px_height;
   float padding_fraction = 2, padding_x, padding_y;
+  float padding_px_x, padding_px_y, dpx_x, dpx_y;
   float orig_charheight, charheight;
 
   // Allocate some memory.
@@ -159,33 +169,63 @@ void splitpanels(int nx, int ny, int pgplot_device,
   MALLOC(panelspec->x2, nx);
   MALLOC(panelspec->y1, nx);
   MALLOC(panelspec->y2, nx);
+  MALLOC(panelspec->px_x1, nx);
+  MALLOC(panelspec->px_x2, nx);
+  MALLOC(panelspec->px_y1, nx);
+  MALLOC(panelspec->px_y2, nx);
   for (i = 0; i < nx; i++) {
     MALLOC(panelspec->x1[i], ny);
     MALLOC(panelspec->x2[i], ny);
     MALLOC(panelspec->y1[i], ny);
     MALLOC(panelspec->y2[i], ny);
+    MALLOC(panelspec->px_x1[i], ny);
+    MALLOC(panelspec->px_x2[i], ny);
+    MALLOC(panelspec->px_y1[i], ny);
+    MALLOC(panelspec->px_y2[i], ny);
   }
 
   // Get the original settings.
   cpgslct(pgplot_device);
+  cpgqvp(3, &(panelspec->orig_px_x1), &(panelspec->orig_px_x2),
+	 &(panelspec->orig_px_y1), &(panelspec->orig_px_y2));
   cpgqvp(0, &(panelspec->orig_x1), &(panelspec->orig_x2),
 	 &(panelspec->orig_y1), &(panelspec->orig_y2));
   // Reduce the margins.
   panelspec->orig_x1 /= margin_reduction;
+  dpx_x = panelspec->orig_px_x1 - (panelspec->orig_px_x1 / margin_reduction);
+  dpx_y = panelspec->orig_px_y1 - (panelspec->orig_px_y1 / margin_reduction);
+  panelspec->orig_px_x1 /= margin_reduction;
   panelspec->orig_x2 = 1 - panelspec->orig_x1;
+  panelspec->orig_px_x2 += dpx_x;
   panelspec->orig_y1 /= margin_reduction;
+  panelspec->orig_px_y1 /= margin_reduction;
   panelspec->orig_y2 = 1 - panelspec->orig_y1;
+  panelspec->orig_px_y2 += dpx_y;
   /* printf("viewport is x = %.2f -> %.2f, y = %.2f -> %.2f\n", */
   /* 	 panelspec->orig_x1, panelspec->orig_x2, */
   /* 	 panelspec->orig_y1, panelspec->orig_y2); */
-  // Space between the panels should be some fraction of the margin.
-  padding_x = panelspec->orig_x1 * padding_fraction;
-  padding_y = panelspec->orig_y1 * padding_fraction;
+  if (abut == 0) {
+    // Space between the panels should be some fraction of the margin.
+    padding_x = panelspec->orig_x1 * padding_fraction;
+    padding_y = panelspec->orig_y1 * padding_fraction;
+    padding_px_x = panelspec->orig_px_x1 * padding_fraction;
+    padding_px_y = panelspec->orig_px_y1 * padding_fraction;
+  } else {
+    // No space between the panels.
+    padding_x = 0;
+    padding_y = 0;
+    padding_px_x = 0;
+    padding_px_y = 0;
+  }
   
   panel_width = (panelspec->orig_x2 - panelspec->orig_x1 -
 		 (float)(nx - 1) * padding_x) / (float)nx;
+  panel_px_width = (panelspec->orig_px_x2 - panelspec->orig_px_x1 -
+		 (float)(nx - 1) * padding_px_x) / (float)nx;
   panel_height = (panelspec->orig_y2 - panelspec->orig_y1 -
 		  (float)(ny - 1) * padding_y) / (float)ny;
+  panel_px_height = (panelspec->orig_px_y2 - panelspec->orig_px_y1 -
+		  (float)(ny - 1) * padding_px_y) / (float)ny;
 
   for (i = 0; i < nx; i++) {
     for (j = 0; j < ny; j++) {
@@ -193,6 +233,12 @@ void splitpanels(int nx, int ny, int pgplot_device,
       panelspec->x2[i][j] = panelspec->x1[i][j] + panel_width;
       panelspec->y2[i][j] = panelspec->orig_y2 - j * (panel_height + padding_y);
       panelspec->y1[i][j] = panelspec->y2[i][j] - panel_height;
+      panelspec->px_x1[i][j] = panelspec->orig_px_x1 +
+	i * (panel_px_width + padding_px_x);
+      panelspec->px_x2[i][j] = panelspec->px_x1[i][j] + panel_px_width;
+      panelspec->px_y2[i][j] = panelspec->orig_px_y2 -
+	j * (panel_px_height + padding_px_y);
+      panelspec->px_y1[i][j] = panelspec->px_y2[i][j] - panel_px_height;
     }
   }
 
@@ -532,6 +578,29 @@ int find_if_name(struct scan_header_data *scan_header_data,
   return res;
 }
 
+float fracwidth(struct panelspec *panelspec,
+		float axis_min_x, float axis_max_x, int x, int y, char *label) {
+  // This routine works out the fractional width of the string in label,
+  // compared to the entire width of the box.
+  float dx, xc[4], yc[4], dlx;
+  int i;
+
+  printf(" string to size is %s\n", label);
+  //dx = fabsf(panelspec->px_x2[x][y] - panelspec->px_x1[x][y]);
+  dx = fabsf(axis_max_x - axis_min_x);
+  printf("  edge length = %.4f\n", dx);
+  /* cpgqtxt(panelspec->x1[x][y], panelspec->y1[x][y], 0, 0, */
+  /* 	  label, xc, yc); */
+  cpgqtxt(axis_min_x, 0, 0, 0, label, xc, yc);
+  printf("  string bounding is:\n");
+  for (i = 0; i < 4; i++) {
+    printf("   [ %.4f , %.4f ]\n", xc[i], yc[i]);
+  }
+  dlx = fabsf(xc[2] - xc[1]);
+  printf("  width of string is %.4f\n", dlx);
+  return (dlx / dx);
+}
+
 void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
 		   int ncycles, int *cycle_numifs, int npols,
 		   struct panelspec *panelspec,
@@ -540,6 +609,9 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
   int singleant = 0, l = 0, m = 0, n = 0;
   int **n_plot_lines = NULL;
   float ****plot_lines = NULL, min_x, max_x, min_y, max_y;
+  float cxpos, dxpos;
+  char xopts[BUFSIZE], yopts[BUFSIZE], panellabel[BUFSIZE], panelunits[BUFSIZE];
+  char antstring[BUFSIZE];
   struct vis_line **vis_lines = NULL;
 
   // Work out how many antennas we will show.
@@ -707,7 +779,49 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
     printf("plotting panel %d with %.2f <= x <= %.2f, %.2f <= y <= %.2f\n",
 	   i, min_x, max_x, min_y, max_y);
     cpgswin(min_x, max_x, min_y, max_y);
-    cpgtbox("BCNTSZ", 0, 0, "BCNTS", 0, 0);
+    cpgsci(3);
+    cpgsch(1.1);
+    if (i % 2 == 0) {
+      (void)strcpy(yopts, "BCNTS");
+    } else {
+      (void)strcpy(yopts, "BCMTS");
+    }
+    if (i == (plot_controls->num_panels - 1)) {
+      (void)strcpy(xopts, "BCNTSZH");
+    } else {
+      (void)strcpy(xopts, "BCTSZ");
+    }
+    cpgtbox(xopts, 0, 0, yopts, 0, 0);
+    if (plot_controls->panel_type[i] == PLOT_AMPLITUDE) {
+      (void)strcpy(panellabel, "Amplitude");
+      (void)strcpy(panelunits, "(Pseudo-Jy)");
+    } else if (plot_controls->panel_type[i] == PLOT_PHASE) {
+      (void)strcpy(panellabel, "Phase");
+      (void)strcpy(panelunits, "(degrees)");
+    }
+    cpgmtxt("L", 2.2, 0.5, 0.5, panellabel);
+    cpgmtxt("R", 2.2, 0.5, 0.5, panelunits);
+    if (i == (plot_controls->num_panels - 1)) {
+      cpgmtxt("B", 3, 0.5, 0.5, "UT");
+    } else if (i == 0) {
+      dxpos = fracwidth(panelspec, min_x, max_x, 0, i, "Ants:");
+      cxpos = 0;
+      cpgsci(3);
+      cpgmtxt("T", 0.5, cxpos, 0, "Ants:");
+      cxpos = dxpos;
+      for (j = 1; j <= MAXANTS; j++) {
+	if ((1 << j) & plot_controls->array_spec) {
+	  (void)sprintf(antstring, "%d", j);
+	} else {
+	  (void)strcpy(antstring, "-");
+	}
+	cpgsci(j + 3);
+	dxpos = fracwidth(panelspec, min_x, max_x, 0, i, antstring);
+	cpgmtxt("T", 0.5, cxpos, 0, antstring);
+	cxpos += dxpos;
+      }
+    }
+    cpgsci(1);
     for (j = 0; j < n_vis_lines; j++) {
       cpgsci(vis_lines[j]->pgplot_colour);
       cpgline(n_plot_lines[i][j], plot_lines[i][j][0], plot_lines[i][j][1]);
