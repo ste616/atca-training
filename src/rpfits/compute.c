@@ -499,9 +499,11 @@ int cmpfunc_complex(const void *a, const void *b) {
 int ampphase_average(struct ampphase *ampphase,
 		     struct vis_quantities **vis_quantities,
 		     struct ampphase_options *options) {
-  int vq_created = 0, n_points = 0, i, j, k, n_expected = 0;
+  int vq_created = 0, n_points = 0, i, j, k, n_expected = 0, n_delavg_expected = 0;
+  int *delavg_n = NULL, delavg_idx = 0;
   float total_amplitude = 0, total_phase = 0;
   float *median_array_amplitude = NULL, *median_array_phase = NULL;
+  float *array_frequency = NULL, *delavg_frequency = NULL, *delavg_phase = NULL;
   float complex total_complex, *median_complex = NULL, average_complex;
 
   // Prepare the structure if required.
@@ -542,7 +544,13 @@ int ampphase_average(struct ampphase *ampphase,
   MALLOC(median_array_amplitude, n_expected);
   MALLOC(median_array_phase, n_expected);
   MALLOC(median_complex, n_expected);
-
+  MALLOC(array_frequency, n_expected);
+  // Make some arrays for the delay-averaged phases and frequencies.
+  n_delavg_expected = (int)ceilf(n_expected / options->delay_averaging);
+  CALLOC(delavg_frequency, n_delavg_expected);
+  CALLOC(delavg_phase, n_delavg_expected);
+  CALLOC(delavg_n, n_delavg_expected);
+  
   // Do the averaging loop.
   for (i = 0; i < (*vis_quantities)->nbaselines; i++) {
     for (k = 0; k < (*vis_quantities)->nbins[i]; k++) {
@@ -561,10 +569,20 @@ int ampphase_average(struct ampphase *ampphase,
 	  median_array_amplitude[n_points] = ampphase->f_amplitude[i][k][j];
 	  median_array_phase[n_points] = ampphase->f_phase[i][k][j];
 	  median_complex[n_points] = ampphase->f_raw[i][k][j];
+	  array_frequency[n_points] = ampphase->f_frequency[i][k][j];
 	  n_points++;
+	  delavg_idx =
+	    (int)(floorf(ampphase->f_channel[i][k][j] - options->min_tvchannel) /
+		  options->delay_averaging);
+	  delavg_frequency[delavg_idx] += ampphase->f_frequency[i][k][j];
+	  delavg_phase[delavg_idx] += ampphase->f_phase[i][k][j];
+	  delavg_n[delavg_idx] += 1;
 	}
       }
       if (n_points > 0) {
+	// Begin by calculating the delay before the arrays get sorted.
+	
+	
 	if (options->averaging_method & AVERAGETYPE_MEAN) {
 	  if (options->averaging_method & AVERAGETYPE_SCALAR) {
 	    (*vis_quantities)->amplitude[i][k] = total_amplitude / (float)n_points;
@@ -611,6 +629,10 @@ int ampphase_average(struct ampphase *ampphase,
   FREE(median_array_amplitude);
   FREE(median_array_phase);
   FREE(median_complex);
+  FREE(array_frequency);
+  FREE(delavg_phase);
+  FREE(delavg_n);
+  FREE(delavg_frequency);
   
   return 0;
 }
