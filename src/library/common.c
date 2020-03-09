@@ -633,7 +633,7 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
   MALLOC(n_plot_lines, plot_controls->num_panels);
   // The second dimension will be the line number.
   // We need to work out how to allocate up to 16 lines.
-  for (p = 0; p < plot_controls->nproducts; p++) {
+  for (p = 0, n_vis_lines = 0; p < plot_controls->nproducts; p++) {
     // Check if only a single antenna is requested.
     for (i = 1; i <= MAXANTS; i++) {
       if ((plot_controls->vis_products[p]->antenna_spec == (1<<i)) &&
@@ -642,7 +642,7 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
 	break;
       }
     }
-    for (i = 1, n_vis_lines = 0; i <= MAXANTS; i++) {
+    for (i = 1; i <= MAXANTS; i++) {
       if (((1 << i) & plot_controls->array_spec) &&
 	  (((1 << i) & plot_controls->vis_products[p]->antenna_spec) ||
 	   (singleant > i))) {
