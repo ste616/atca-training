@@ -170,6 +170,7 @@ void free_vis_quantities(struct vis_quantities **vis_quantities) {
   FREE((*vis_quantities)->phase);
   FREE((*vis_quantities)->delay);
   FREE((*vis_quantities)->nbins);
+  FREE((*vis_quantities)->baseline);
   FREE(*vis_quantities);
 }
 

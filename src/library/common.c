@@ -131,6 +131,15 @@ void init_vis_plotcontrols(struct vis_plotcontrols *plotcontrols,
   }
 }
 
+void free_vis_plotcontrols(struct vis_plotcontrols *plotcontrols) {
+  int i;
+  for (i = 0; i < plotcontrols->nproducts; i++) {
+    FREE(plotcontrols->vis_products[i]);
+  }
+  FREE(plotcontrols->vis_products);
+  FREE(plotcontrols->panel_type);
+}
+
 void free_panelspec(struct panelspec *panelspec) {
   int i;
   for (i = 0; i < panelspec->nx; i++) {
@@ -414,25 +423,25 @@ int find_pol(struct ampphase ***cycle_ampphase, int npols, int ifnum, int poltyp
 }
 
 void pol_to_vis_name(int pol, int if_num, char *vis_name) {
-  if (pol & PLOT_POL_XX) {
+  if (pol == POL_XX) {
     if (if_num == 1) {
       strcpy(vis_name, "AA");
     } else if (if_num == 2) {
       strcpy(vis_name, "CC");
     }
-  } else if (pol & PLOT_POL_YY) {
+  } else if (pol == POL_YY) {
     if (if_num == 1) {
       strcpy(vis_name, "BB");
     } else if (if_num == 2) {
       strcpy(vis_name, "DD");
     }
-  } else if (pol & PLOT_POL_XY) {
+  } else if (pol == POL_XY) {
     if (if_num == 1) {
       strcpy(vis_name, "AB");
     } else if (if_num == 2) {
       strcpy(vis_name, "CD");
     }
-  } else if (pol & PLOT_POL_YX) {
+  } else if (pol == POL_YX) {
     if (if_num == 1) {
       strcpy(vis_name, "BA");
     } else if (if_num == 2) {
@@ -680,7 +689,7 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
       }
     }
   }
-  printf("generating %d vis lines\n", n_vis_lines);
+  //printf("generating %d vis lines\n", n_vis_lines);
   if (n_vis_lines == 0) {
     // Nothing to plot!
     return;
@@ -766,8 +775,8 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
     }
     // Make the panel.
     changepanel(0, i, panelspec);
-    printf("plotting panel %d with %.2f <= x <= %.2f, %.2f <= y <= %.2f\n",
-	   i, min_x, max_x, min_y, max_y);
+    /* printf("plotting panel %d with %.2f <= x <= %.2f, %.2f <= y <= %.2f\n", */
+    /* 	   i, min_x, max_x, min_y, max_y); */
     cpgswin(min_x, max_x, min_y, max_y);
     cpgsci(3);
     cpgsch(1.1);
@@ -793,7 +802,18 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
     cpgmtxt("R", 2.2, 0.5, 0.5, panelunits);
     if (i == (plot_controls->num_panels - 1)) {
       cpgmtxt("B", 3, 0.5, 0.5, "UT");
+      // Print the baselines on the bottom.
+      cxpos = 0;
+      for (j = 0; j < n_vis_lines; j++) {
+	cpgsci(vis_lines[j]->pgplot_colour);
+	dxpos = fracwidth(panelspec, min_x, max_x, 0, i,
+			  vis_lines[j]->label);
+	cpgmtxt("B", 4, cxpos, 0, vis_lines[j]->label);
+	//printf("printing label %s\n", vis_lines[j]->label);
+	cxpos += dxpos;
+      }
     } else if (i == 0) {
+      // Print the array antennas at the top left.
       dxpos = fracwidth(panelspec, min_x, max_x, 0, i, "Ants:");
       cxpos = 0;
       cpgsci(3);
@@ -817,6 +837,24 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
       cpgline(n_plot_lines[i][j], plot_lines[i][j][0], plot_lines[i][j][1]);
     }
   }
+
+  // Free our memory.
+  for (i = 0; i < n_vis_lines; i++) {
+    FREE(vis_lines[i]);
+  }
+  FREE(vis_lines);
+  for (i = 0; i < plot_controls->num_panels; i++) {
+    for (j = 0; j < n_vis_lines; j++) {
+      for (k = 0; k < 2; k++) {
+	FREE(plot_lines[i][j][k]);
+      }
+      FREE(plot_lines[i][j]);
+    }
+    FREE(n_plot_lines[i]);
+    FREE(plot_lines[i]);
+  }
+  FREE(n_plot_lines);
+  FREE(plot_lines);
 }
 
 void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspec,

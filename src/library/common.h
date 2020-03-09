@@ -155,6 +155,7 @@ void init_vis_plotcontrols(struct vis_plotcontrols *plotcontrols,
 			   int xaxis_type, int paneltypes, int *visbands,
 			   int pgplot_device,
 			   struct panelspec *panelspec);
+void free_vis_plotcontrols(struct vis_plotcontrols *plotcontrols);
 void free_panelspec(struct panelspec *panelspec);
 void splitpanels(int nx, int ny, int pgplot_device, int abut,
 		 float margin_reduction,

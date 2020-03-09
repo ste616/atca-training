@@ -153,6 +153,9 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state) {
     break;
   case 's':
     // Split any select string into space-separated components.
+    if (arguments->nselect > 0) {
+      FREE(arguments->vis_select);
+    }
     arguments->nselect = 0;
     arguments->vis_select = NULL;
     // Convert to lower case.
@@ -459,11 +462,29 @@ int main(int argc, char *argv[]) {
   make_vis_plot(cycle_vis_quantities, vis_num_cycles,
 		vis_cycle_num_ifs, arguments.npols,
 		&vis_panelspec, &vis_plotcontrols);
-  
+
+  // Close all the PGPLOT devices.
+  cpgend();
+
+
+  // Free all the memory we allocated.
+  // The vis data.
+  for (i = 0; i < vis_num_cycles; i++) {
+    for (j = 0; j < vis_cycle_num_ifs[i]; j++) {
+      for (k = 0; k < arguments.npols; k++) {
+	free_vis_quantities(&cycle_vis_quantities[i][j][k]);
+      }
+      FREE(cycle_vis_quantities[i][j]);
+    }
+    FREE(cycle_vis_quantities[i]);
+  }
+  FREE(vis_cycle_num_ifs);
+  FREE(cycle_vis_quantities);
+
+  // The plot specifications.
   free_panelspec(&spd_panelspec);
   free_panelspec(&vis_panelspec);
-  
-  cpgend();
+  free_vis_plotcontrols(&vis_plotcontrols);
   
   // Free all the scans.
   printf("Read in %d scans from all files.\n", nscans);
@@ -473,6 +494,10 @@ int main(int argc, char *argv[]) {
   FREE(all_scans);
   // And the last little bit of memory.
   FREE(arguments.rpfits_files);
+  /* for (i = 0; i < arguments.nselect; i++) { */
+  /*   FREE(arguments.vis_select[i]); */
+  /* } */
+  FREE(arguments.vis_select);
   
   exit(0);
   
