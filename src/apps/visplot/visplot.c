@@ -36,6 +36,8 @@ static struct argp_option options[] = {
   { "frequency", 'f', 0, 0, "Plots frequency on x-axis" },
   { "ifs", 'I', "IFS", 0,
     "Which IFs to plot, as a comma-separated list" },
+  { "median", 'm', 0, 0,
+    "Use median averaging instead of mean" },
   { "non-interactive", 'N', 0, 0, "Do not run in interactive mode" },
   { "phase", 'p', 0, 0, "Plots phase on y-axis" },
   { "pols", 'P', "POLS", 0,
@@ -66,6 +68,7 @@ struct arguments {
   char **vis_select;
   int visband[2];
   int tvchannels[2];
+  int median_averaging;
 };
 
 static error_t parse_opt(int key, char *arg, struct argp_state *state) {
@@ -119,6 +122,10 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state) {
       }
       token = strtok(NULL, s);
     }
+    break;
+  case 'm':
+    // Use median averaging.
+    arguments->median_averaging = YES;
     break;
   case 'N':
     // Not interactive.
@@ -244,6 +251,7 @@ int main(int argc, char *argv[]) {
   arguments.visband[1] = 0;
   arguments.tvchannels[0] = 513;
   arguments.tvchannels[1] = 1537;
+  arguments.median_averaging = NO;
   argp_parse(&argp, argc, argv, 0, 0, &arguments);
 
   // Check for nonsense arguments.
@@ -280,7 +288,12 @@ int main(int argc, char *argv[]) {
   ampphase_options.max_tvchannel =
     (arguments.tvchannels[0] > arguments.tvchannels[1]) ?
     arguments.tvchannels[0] : arguments.tvchannels[1];
-  ampphase_options.averaging_method = AVERAGETYPE_MEAN | AVERAGETYPE_SCALAR;
+  if (arguments.median_averaging == NO) {
+    ampphase_options.averaging_method = AVERAGETYPE_MEAN;
+  } else {
+    ampphase_options.averaging_method = AVERAGETYPE_MEDIAN;
+  }
+  ampphase_options.averaging_method |= AVERAGETYPE_SCALAR;
 
   // Initialise the plotting space and options.
   splitpanels(5, 5, spd_pgplot, 0, 5, &spd_panelspec);
