@@ -349,7 +349,7 @@ void plotpanel_minmax(struct ampphase **plot_ampphase,
   } else if (plot_controls->plot_options & PLOT_PHASE) {
     *plotmin_y = plot_ampphase[polidx[0]]->min_phase[plot_baseline_idx];
     *plotmax_y = plot_ampphase[polidx[0]]->max_phase[plot_baseline_idx];
-  } 
+  }
 
   // Account for all the other polarisations.
   for (i = 1; i < npols; i++) {
@@ -758,6 +758,9 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
 		  } else if (plot_controls->panel_type[i] == PLOT_PHASE) {
 		    plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
 		      cycle_vis_quantities[k][l][m]->phase[n][0];
+		  } else if (plot_controls->panel_type[i] == PLOT_DELAY) {
+		    plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
+		      cycle_vis_quantities[k][l][m]->delay[n][0];
 		  }
 		  if (plot_lines[i][j][1][n_plot_lines[i][j] - 1] < min_y) {
 		    min_y = plot_lines[i][j][1][n_plot_lines[i][j] -1 ];
@@ -797,6 +800,9 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
     } else if (plot_controls->panel_type[i] == PLOT_PHASE) {
       (void)strcpy(panellabel, "Phase");
       (void)strcpy(panelunits, "(degrees)");
+    } else if (plot_controls->panel_type[i] == PLOT_DELAY) {
+      (void)strcpy(panellabel, "Delay");
+      (void)strcpy(panelunits, "(ns)");
     }
     cpgmtxt("L", 2.2, 0.5, 0.5, panellabel);
     cpgmtxt("R", 2.2, 0.5, 0.5, panelunits);

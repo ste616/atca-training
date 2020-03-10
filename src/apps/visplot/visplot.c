@@ -260,8 +260,8 @@ int main(int argc, char *argv[]) {
   // Get phase in degrees.
   ampphase_options.phase_in_degrees = true;
   ampphase_options.delay_averaging = 1;
-  ampphase_options.min_tvchannel = 9;
-  ampphase_options.max_tvchannel = 25;
+  ampphase_options.min_tvchannel = 513;
+  ampphase_options.max_tvchannel = 1537;
   ampphase_options.averaging_method = AVERAGETYPE_MEAN | AVERAGETYPE_SCALAR;
 
   // Initialise the plotting space and options.
@@ -280,7 +280,8 @@ int main(int argc, char *argv[]) {
   init_spd_plotcontrols(&spd_plotcontrols, xaxis_type, yaxis_type,
 			arguments.plot_pols, DEFAULT, spd_pgplot);
   init_vis_plotcontrols(&vis_plotcontrols, PLOT_TIME,
-			PLOT_AMPLITUDE | PLOT_PHASE, arguments.visband,
+			PLOT_AMPLITUDE | PLOT_PHASE | PLOT_DELAY,
+			arguments.visband,
 			vis_pgplot, &vis_panelspec);
   spd_plotcontrols.array_spec = interpret_array_string(arguments.array_spec);
   vis_plotcontrols.array_spec = interpret_array_string(arguments.array_spec);
