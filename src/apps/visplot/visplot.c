@@ -33,6 +33,8 @@ static struct argp_option options[] = {
   { "visband", 'c', "VISBAND", 0,
     "Two comma-separated numbers representing the visband setting" },
   { "device", 'd', "PGPLOT_DEVICE", 0, "Direct SPD plots to this PGGPLOT device" },
+  { "delavg", 'D', "DELAVG", 0,
+    "Number of channels to average together while calculating delay" },
   { "frequency", 'f', 0, 0, "Plots frequency on x-axis" },
   { "ifs", 'I', "IFS", 0,
     "Which IFs to plot, as a comma-separated list" },
@@ -69,6 +71,7 @@ struct arguments {
   int visband[2];
   int tvchannels[2];
   int median_averaging;
+  int delavg;
 };
 
 static error_t parse_opt(int key, char *arg, struct argp_state *state) {
@@ -95,6 +98,10 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state) {
     break;
   case 'd':
     strncpy(arguments->spd_device, arg, BUFSIZE);
+    break;
+  case 'D':
+    // Delavg.
+    arguments->delavg = atoi(arg);
     break;
   case 'f':
     arguments->plot_frequency = YES;
@@ -252,6 +259,7 @@ int main(int argc, char *argv[]) {
   arguments.tvchannels[0] = 513;
   arguments.tvchannels[1] = 1537;
   arguments.median_averaging = NO;
+  arguments.delavg = 1;
   argp_parse(&argp, argc, argv, 0, 0, &arguments);
 
   // Check for nonsense arguments.
@@ -281,7 +289,7 @@ int main(int argc, char *argv[]) {
   
   // Get phase in degrees.
   ampphase_options.phase_in_degrees = true;
-  ampphase_options.delay_averaging = 1;
+  ampphase_options.delay_averaging = arguments.delavg;
   ampphase_options.min_tvchannel =
     (arguments.tvchannels[0] < arguments.tvchannels[1]) ?
     arguments.tvchannels[0] : arguments.tvchannels[1];
