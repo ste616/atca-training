@@ -42,6 +42,8 @@ static struct argp_option options[] = {
     "Which polarisations to plot, as a comma-separated list" },
   { "select", 's', "VIS_SELECT", 0,
     "A string of products to plot on ths VIS plot" },
+  { "tvchannel", 't', "TVCHANNEL", 0,
+    "A comma separated list of tvchannels to use for all IFs (2 max)" },
   { "visdevice", 'V', "PGPLOT_DEVICE", 0, "Direct VIS plots to this PGPLOT device" },
   { 0 }
 };
@@ -63,6 +65,7 @@ struct arguments {
   int nselect;
   char **vis_select;
   int visband[2];
+  int tvchannels[2];
 };
 
 static error_t parse_opt(int key, char *arg, struct argp_state *state) {
@@ -171,6 +174,15 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state) {
       token = strtok(NULL, sp);
     }
     break;
+  case 't':
+    // Split the string into comma-separated components.
+    token = strtok(arg, s);
+    i = 0;
+    while ((token != NULL) && (i < 2)) {
+      arguments->tvchannels[i++] = atoi(token);
+      token = strtok(NULL, s);
+    }
+    break;
   case 'V':
     strncpy(arguments->vis_device, arg, BUFSIZE);
     break;
@@ -230,6 +242,8 @@ int main(int argc, char *argv[]) {
   arguments.vis_select[0] = defselect;
   arguments.visband[0] = 0;
   arguments.visband[1] = 0;
+  arguments.tvchannels[0] = 513;
+  arguments.tvchannels[1] = 1537;
   argp_parse(&argp, argc, argv, 0, 0, &arguments);
 
   // Check for nonsense arguments.
@@ -260,8 +274,12 @@ int main(int argc, char *argv[]) {
   // Get phase in degrees.
   ampphase_options.phase_in_degrees = true;
   ampphase_options.delay_averaging = 1;
-  ampphase_options.min_tvchannel = 513;
-  ampphase_options.max_tvchannel = 1537;
+  ampphase_options.min_tvchannel =
+    (arguments.tvchannels[0] < arguments.tvchannels[1]) ?
+    arguments.tvchannels[0] : arguments.tvchannels[1];
+  ampphase_options.max_tvchannel =
+    (arguments.tvchannels[0] > arguments.tvchannels[1]) ?
+    arguments.tvchannels[0] : arguments.tvchannels[1];
   ampphase_options.averaging_method = AVERAGETYPE_MEAN | AVERAGETYPE_SCALAR;
 
   // Initialise the plotting space and options.
