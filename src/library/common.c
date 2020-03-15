@@ -120,7 +120,7 @@ void init_vis_plotcontrols(struct vis_plotcontrols *plotcontrols,
   plotcontrols->pgplot_device = pgplot_device;
   
   // Set up the panelspec structure for this.
-  splitpanels(1, npanels, pgplot_device, 1, 1, panelspec);
+  splitpanels(1, npanels, pgplot_device, 1, 0.9, panelspec);
 
   // Initialise the products to display.
   plotcontrols->nproducts = 0;
@@ -608,7 +608,7 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
   int singleant = 0, l = 0, m = 0, n = 0;
   int **n_plot_lines = NULL;
   float ****plot_lines = NULL, min_x, max_x, min_y, max_y;
-  float cxpos, dxpos;
+  float cxpos, dxpos, labtotalwidth, labspacing;
   char xopts[BUFSIZE], yopts[BUFSIZE], panellabel[BUFSIZE], panelunits[BUFSIZE];
   char antstring[BUFSIZE];
   struct vis_line **vis_lines = NULL;
@@ -809,6 +809,15 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
     if (i == (plot_controls->num_panels - 1)) {
       cpgmtxt("B", 3, 0.5, 0.5, "UT");
       // Print the baselines on the bottom.
+      labtotalwidth = 0;
+      for (j = 0; j < n_vis_lines; j++) {
+	labtotalwidth += fracwidth(panelspec, min_x, max_x, 0, 1,
+				   vis_lines[j]->label);
+      }
+      // Work out the extra spacing to make the labels go all
+      // the way across the bottom.
+      labspacing = (1 - labtotalwidth) /
+	(float)(n_vis_lines - 1);
       cxpos = 0;
       for (j = 0; j < n_vis_lines; j++) {
 	cpgsci(vis_lines[j]->pgplot_colour);
@@ -816,7 +825,7 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
 			  vis_lines[j]->label);
 	cpgmtxt("B", 4, cxpos, 0, vis_lines[j]->label);
 	//printf("printing label %s\n", vis_lines[j]->label);
-	cxpos += dxpos;
+	cxpos += dxpos + labspacing;
       }
     } else if (i == 0) {
       // Print the array antennas at the top left.
@@ -867,7 +876,7 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
 		   struct spd_plotcontrols *plot_controls) {
   int x = 0, y = 0, i, j, ant1, ant2, nants = 0, px, py, iauto = 0, icross = 0;
   int npols = 0, *polidx = NULL, poli, num_ifs = 0, panels_per_if = 0;
-  int idxif, ni, ri, rj, rp, bi, bn, pc, inverted = NO;
+  int idxif, ni, ri, rj, rp, bi, bn, pc, inverted = NO, plot_started = NO;
   float xaxis_min, xaxis_max, yaxis_min, yaxis_max, theight = 0.4;
   float *freq_ordered = NULL, *freq_amp = NULL, *freq_phase = NULL;
   char ptitle[BUFSIZE], ptype[BUFSIZE], ftype[BUFSIZE];
@@ -897,11 +906,7 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
   
   /* printf("time of cycle = %s %.6f\n", cycle_ampphase[0][0]->obsdate, */
   /* 	 cycle_ampphase[0][0]->ut_seconds); */
-  changepanel(-1, -1, panelspec);
-  if (plot_controls->interactive == NO) {
-    cpgask(0);
-  }
-  cpgpage();
+  //changepanel(-1, -1, panelspec);
 
   for (idxif = 0, ni = 0; idxif < MAXIFS; idxif++) {
     iauto = 0;
@@ -975,6 +980,13 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
 	    continue;
 	  }
 	  // Set the panel.
+	  if (plot_started == NO) {
+	    if (plot_controls->interactive == NO) {
+	      cpgask(0);
+	    }
+	    cpgpage();
+	    plot_started = YES;
+	  }
 	  changepanel(px, py, panelspec);
 	  // Set the title for the plot.
 	  if (plot_controls->plot_options & PLOT_AMPLITUDE) {
