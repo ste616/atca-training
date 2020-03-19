@@ -59,6 +59,9 @@ struct ampphase_options {
 
   // The method to do the averaging (default is mean).
   int averaging_method;
+
+  // Whether to include flagged data in vis outputs.
+  int include_flagged_data;
 };
 
 /**
@@ -83,6 +86,10 @@ struct ampphase {
   
   // The bin arrays have one element per baseline.
   int *nbins;
+
+  // The flag array has the indexing:
+  // array[baseline][bin]
+  int **flagged_bad;
   
   // The arrays here have the following indexing.
   // array[baseline][bin][channel]
@@ -137,6 +144,7 @@ struct vis_quantities {
   int window;
   int *nbins;
   int *baseline;
+  int *flagged_bad;
   
   // The arrays.
   float **amplitude;

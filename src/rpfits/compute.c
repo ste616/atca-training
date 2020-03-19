@@ -43,6 +43,8 @@ struct ampphase* prepare_ampphase(void) {
 
   ampphase->nbins = NULL;
   
+  ampphase->flagged_bad = NULL;
+  
   ampphase->weight = NULL;
   ampphase->amplitude = NULL;
   ampphase->phase = NULL;
@@ -118,6 +120,7 @@ void free_ampphase(struct ampphase **ampphase) {
       FREE((*ampphase)->f_phase[i][j]);
       FREE((*ampphase)->f_raw[i][j]);
     }
+    FREE((*ampphase)->flagged_bad[i]);
     FREE((*ampphase)->weight[i]);
     FREE((*ampphase)->amplitude[i]);
     FREE((*ampphase)->phase[i]);
@@ -130,6 +133,7 @@ void free_ampphase(struct ampphase **ampphase) {
     FREE((*ampphase)->f_phase[i]);
     FREE((*ampphase)->f_raw[i]);
   }
+  FREE((*ampphase)->flagged_bad);
   FREE((*ampphase)->weight);
   FREE((*ampphase)->amplitude);
   FREE((*ampphase)->phase);
@@ -212,6 +216,7 @@ struct ampphase_options ampphase_options_default(void) {
   options.min_tvchannel = 513;
   options.max_tvchannel = 1537;
   options.averaging_method = AVERAGETYPE_MEAN | AVERAGETYPE_VECTOR;
+  options.include_flagged_data = 0;
 }
 
 /**
@@ -229,17 +234,9 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
   float rcheck = 0, chanwidth, firstfreq, nhalfchan;
   struct ampphase_options default_options;
 
-  // Prepare the structure if required.
-  if (*ampphase == NULL) {
-    ap_created = 1;
-    *ampphase = prepare_ampphase();
-  }
 
   // Check we know about the window number we were given.
   if ((ifnum < 1) || (ifnum > scan_header_data->num_ifs)) {
-    if (ap_created) {
-      free_ampphase(ampphase);
-    }
     return -1;
   }
   // Search for the index of the requested IF.
@@ -250,24 +247,14 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
     }
   }
   if (ifno < 0) {
-    // Didn't find the IF number.
-    if (ap_created) {
-      free_ampphase(ampphase);
-    }
     return -1;
   }
-  (*ampphase)->window = ifno;
-  (void)strncpy((*ampphase)->window_name, scan_header_data->if_name[ifno][1], 8);
 
   // Check for options.
   default_options = ampphase_options_default();
   if (options == NULL) {
     options = &default_options;
   }
-  (*ampphase)->options = options;
-  
-  // Get the number of channels in this window.
-  (*ampphase)->nchannels = scan_header_data->if_num_channels[ifno];
   
   // Determine which of the polarisations is the one requested.
   for (i = 0; i < scan_header_data->if_num_stokes[ifno]; i++) {
@@ -279,12 +266,20 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
   }
   if (reqpol == -1) {
     // Didn't find the requested polarisation.
-    if (ap_created) {
-      free_ampphase(ampphase);
-    }
     return -1;
   }
 
+  // Prepare the structure if required.
+  if (*ampphase == NULL) {
+    ap_created = 1;
+    *ampphase = prepare_ampphase();
+  }
+  (*ampphase)->window = ifno;
+  (void)strncpy((*ampphase)->window_name, scan_header_data->if_name[ifno][1], 8);
+  (*ampphase)->options = options;
+  // Get the number of channels in this window.
+  (*ampphase)->nchannels = scan_header_data->if_num_channels[ifno];
+  
   (*ampphase)->pol = pol;
   strncpy((*ampphase)->obsdate, scan_header_data->obsdate, OBSDATE_LENGTH);
   (*ampphase)->ut_seconds = cycle_data->ut_seconds;
@@ -294,6 +289,7 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
   MALLOC((*ampphase)->frequency, (*ampphase)->nchannels);
 
   (*ampphase)->nbaselines = cycle_data->n_baselines;
+  MALLOC((*ampphase)->flagged_bad, (*ampphase)->nbaselines);
   MALLOC((*ampphase)->weight, (*ampphase)->nbaselines);
   MALLOC((*ampphase)->amplitude, (*ampphase)->nbaselines);
   MALLOC((*ampphase)->phase, (*ampphase)->nbaselines);
@@ -313,6 +309,7 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
 
   CALLOC((*ampphase)->nbins, (*ampphase)->nbaselines);
   for (i = 0; i < (*ampphase)->nbaselines; i++) {
+    (*ampphase)->flagged_bad[i] = NULL;
     (*ampphase)->weight[i] = NULL;
     (*ampphase)->amplitude[i] = NULL;
     (*ampphase)->phase[i] = NULL;
@@ -375,6 +372,7 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
     }
     if ((*ampphase)->nbins[bidx] < cycle_data->bin[i]) {
       // Found another bin, add it to the list.
+      REALLOC((*ampphase)->flagged_bad[bidx], cycle_data->bin[i]);
       REALLOC((*ampphase)->weight[bidx], cycle_data->bin[i]);
       REALLOC((*ampphase)->amplitude[bidx], cycle_data->bin[i]);
       REALLOC((*ampphase)->phase[bidx], cycle_data->bin[i]);
@@ -387,6 +385,7 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
       REALLOC((*ampphase)->f_phase[bidx], cycle_data->bin[i]);
       REALLOC((*ampphase)->f_raw[bidx], cycle_data->bin[i]);
       for (j = (*ampphase)->nbins[bidx]; j < cycle_data->bin[i]; j++) {
+	(*ampphase)->flagged_bad[bidx][j] = cycle_data->flag[i];
 	MALLOC((*ampphase)->weight[bidx][j], (*ampphase)->nchannels);
 	MALLOC((*ampphase)->amplitude[bidx][j], (*ampphase)->nchannels);
 	MALLOC((*ampphase)->phase[bidx][j], (*ampphase)->nchannels);
@@ -536,9 +535,11 @@ int ampphase_average(struct ampphase *ampphase,
   MALLOC((*vis_quantities)->delay, (*vis_quantities)->nbaselines);
   MALLOC((*vis_quantities)->nbins, (*vis_quantities)->nbaselines);
   MALLOC((*vis_quantities)->baseline, (*vis_quantities)->nbaselines);
+  MALLOC((*vis_quantities)->flagged_bad, (*vis_quantities)->nbaselines);
   for (i = 0; i < (*vis_quantities)->nbaselines; i++) {
     (*vis_quantities)->nbins[i] = ampphase->nbins[i];
     (*vis_quantities)->baseline[i] = ampphase->baseline[i];
+    (*vis_quantities)->flagged_bad[i] = 0;
     MALLOC((*vis_quantities)->amplitude[i], (*vis_quantities)->nbins[i]);
     MALLOC((*vis_quantities)->phase[i], (*vis_quantities)->nbins[i]);
     MALLOC((*vis_quantities)->delay[i], (*vis_quantities)->nbins[i]);
@@ -559,6 +560,11 @@ int ampphase_average(struct ampphase *ampphase,
   // Do the averaging loop.
   for (i = 0; i < (*vis_quantities)->nbaselines; i++) {
     for (k = 0; k < (*vis_quantities)->nbins[i]; k++) {
+      // Check if this quantity is flagged.
+      if ((options->include_flagged_data == 0) &&
+	  (ampphase->flagged_bad[i][k] == 1)) {
+	(*vis_quantities)->flagged_bad[i] += 1;
+      }
       // Reset our averaging counters.
       total_amplitude = 0;
       total_phase = 0;

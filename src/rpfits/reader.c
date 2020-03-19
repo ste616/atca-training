@@ -124,6 +124,7 @@ int read_scan_header(struct scan_header_data *scan_header_data) {
   int vis_size = 0, flag = 0, bin = 0, if_no = 0, sourceno = 0, baseline = 0;
   int i = 0, read_data = 0, j = 0, *nfound_chain = NULL, nfound_if = 0, zn = 0;
   float *vis = NULL, *wgt = NULL, ut = 0, u = 0, v = 0, w = 0;
+  char *ptr = NULL;
   
   this_jstat = JSTAT_READNEXTHEADER;
   rpfits_result = rpfitsin_(&this_jstat, NULL, NULL, NULL, NULL, NULL,
@@ -141,7 +142,11 @@ int read_scan_header(struct scan_header_data *scan_header_data) {
 
     // Put all the data into the structure.
     scan_header_data->ut_seconds = ut;
-    string_copy(names_.obstype, OBSTYPE_LENGTH, scan_header_data->obstype);
+    ptr = names_.card;
+    do {
+      ptr += printf("%s\n", ptr);
+    } while (*ptr);
+    string_copy(names_.rpfitsversion, OBSTYPE_LENGTH, scan_header_data->obstype);
     string_copy(CALCODE(sourceno), CALCODE_LENGTH, scan_header_data->calcode);
     scan_header_data->cycle_time = param_.intime;
 
@@ -160,6 +165,7 @@ int read_scan_header(struct scan_header_data *scan_header_data) {
     MALLOC(scan_header_data->if_label, scan_header_data->num_ifs);
     MALLOC(scan_header_data->if_name, scan_header_data->num_ifs);
     MALLOC(scan_header_data->if_stokes_names, scan_header_data->num_ifs);
+    
     for (i = 0; i < scan_header_data->num_ifs; i++) {
       scan_header_data->if_centre_freq[i] = FREQUENCYMHZ(i);
       scan_header_data->if_bandwidth[i] = BANDWIDTHMHZ(i);
@@ -235,6 +241,10 @@ int read_scan_header(struct scan_header_data *scan_header_data) {
     
   } else if (this_jstat == JSTAT_ENDOFFILE) {
     keep_reading = READER_EXHAUSTED;
+  } else if (this_jstat == JSTAT_FGTABLE) {
+    // We've found the flagging table.
+    printf("READER: found %d flag groups\n", fg_.n_fg);
+    
   }
 
   FREE(nfound_chain);
@@ -388,7 +398,7 @@ int read_cycle_data(struct scan_header_data *scan_header_data,
     // Allocate some memory.
     vis_size = max_size_of_vis();
     MALLOC(vis, 2 * vis_size);
-    MALLOC(wgt, vis_size);
+    CALLOC(wgt, vis_size);
 
     // Read in the data.
     this_jstat = JSTAT_READDATA;
@@ -403,12 +413,12 @@ int read_cycle_data(struct scan_header_data *scan_header_data,
     
     // Check for success.
     if (this_jstat != JSTAT_SUCCESSFUL) {
-      /* printf("this isn't right...\n"); */
+      /* printf("this isn't right... %d\n", this_jstat); */
       // Ignore illegal data.
       FREE(vis);
       FREE(wgt);
       if (this_jstat == JSTAT_ILLEGALDATA) {
-	/* printf("got illegal data\n"); */
+	/* printf("got illegal data, %d\n", fg_.n_fg); */
 	continue;
       }
       // Stop reading.
@@ -419,13 +429,21 @@ int read_cycle_data(struct scan_header_data *scan_header_data,
       } else if (this_jstat == JSTAT_FGTABLE) {
 	// We've hit the end of this data.
 	/* printf("reached a new header\n"); */
+	/* printf("READER: while reading data, hit a FG table with %d entries\n", */
+	/*        fg_.n_fg); */
 	rv = READER_HEADER_AVAILABLE;
+      } else if (this_jstat == JSTAT_HEADERNOTDATA) {
+	/* printf("READER: while reading data, hit a header with %d entries\n", */
+	/*        fg_.n_fg); */
+	
       }
     } else {
-      /* fprintf(stderr, "jstat = %d ut = %.1f last = %.1f baseline = %d\n", this_jstat, */
-      /* 	      ut, last_ut, baseline); */
-      /* fprintf(stderr, "if_no = %d sourceno = %d flag = %d bin = %d\n", */
-      /* 	      if_no, sourceno, flag, bin); */
+      /* seconds_to_hourlabel(ut, utstring); */
+      /* seconds_to_hourlabel(last_ut, lastutstring); */
+      /* printf("jstat = %d ut = %s last = %s baseline = %d\n", this_jstat, */
+      /* 	     utstring, lastutstring, baseline); */
+      /* printf("if_no = %d sourceno = %d flag = %d bin = %d\n", */
+      /* 	     if_no, sourceno, flag, bin); */
       // Check for a time change. The time has to change by at least 0.5
       // otherwise it's not really a cycle change.
       if ((baseline == -1) && (ut > (last_ut + 0.5))) {
@@ -463,6 +481,7 @@ int read_cycle_data(struct scan_header_data *scan_header_data,
 	}
 	// Keep a pointer to the vis and weight data.
 	ARRAY_APPEND(cycle_data->vis, cycle_data->num_points, cvis);
+	// Weight is not used for CABB RPFITS, but we keep this here.
 	ARRAY_APPEND(cycle_data->wgt, cycle_data->num_points, wgt);
       }
       FREE(vis);

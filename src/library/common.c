@@ -605,7 +605,7 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
 		   struct panelspec *panelspec,
 		   struct vis_plotcontrols *plot_controls) {
   int nants = 0, i = 0, n_vis_lines = 0, j = 0, k = 0, p = 0;
-  int singleant = 0, l = 0, m = 0, n = 0;
+  int singleant = 0, l = 0, m = 0, n = 0, n_connected_points = 0, connidx = 0;
   int **n_plot_lines = NULL;
   float ****plot_lines = NULL, min_x, max_x, min_y, max_y;
   float cxpos, dxpos, labtotalwidth, labspacing;
@@ -739,6 +739,9 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
 	      for (n = 0; n < cycle_vis_quantities[k][l][m]->nbaselines; n++) {
 		if (cycle_vis_quantities[k][l][m]->baseline[n] ==
 		    ants_to_base(vis_lines[j]->ant1, vis_lines[j]->ant2)) {
+		  if (cycle_vis_quantities[k][l][m]->flagged_bad[n] > 0) {
+		    continue;
+		  }
 		  // Found it.
 		  n_plot_lines[i][j] += 1;
 		  REALLOC(plot_lines[i][j][0], n_plot_lines[i][j]);
@@ -849,7 +852,18 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
     cpgsci(1);
     for (j = 0; j < n_vis_lines; j++) {
       cpgsci(vis_lines[j]->pgplot_colour);
-      cpgline(n_plot_lines[i][j], plot_lines[i][j][0], plot_lines[i][j][1]);
+      // Plot the line in segments connected in time.
+      for (k = 0, connidx = 0; k < n_plot_lines[i][j]; k++) {
+	if ((plot_lines[i][j][0][k + 1] >
+	     (plot_lines[i][j][0][k] + 10))) {
+	  // Disconnect.
+	  cpgline((k - connidx), plot_lines[i][j][0] + connidx,
+		  plot_lines[i][j][1] + connidx);
+	  connidx = (k + 1);
+	}
+      }
+      cpgline((n_plot_lines[i][j] - connidx),
+	      plot_lines[i][j][0] + connidx, plot_lines[i][j][1] + connidx);
     }
   }
 
@@ -1095,4 +1109,27 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
   }
   FREE(polidx);
   
+}
+
+void seconds_to_hourlabel(float seconds, char *hourlabel) {
+  // Take the number of seconds and give it back as
+  // HH:MM:SS (assuming there are 86400 seconds in a day).
+  // If greater than 86400, add "xd" at the start.
+  int d, h, m, s;
+  float dayseconds;
+  
+  dayseconds = (int)seconds % 86400;
+  d = (int)((seconds - dayseconds) / 86400);
+
+  h = (int)floorf(dayseconds / 3600);
+  seconds -= h * 3600;
+  m = (int)floorf(seconds / 60);
+  seconds -= m * 60;
+  s = (int)seconds;
+
+  if (d > 0) {
+    (void)sprintf(hourlabel, "%dd %02d:%02d:%02d", d, h, m, s);
+  } else {
+    (void)sprintf(hourlabel, "%02d:%02d:%02d", h, m, s);
+  }
 }
