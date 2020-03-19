@@ -126,6 +126,8 @@ struct vis_plotcontrols {
   int pgplot_device;
   // The bands to assign as IFs 1 and 2.
   int visbands[2];
+  // The cycle time.
+  int cycletime;
 };
 
 // This structure holds details about the lines we are asked to

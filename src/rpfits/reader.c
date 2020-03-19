@@ -149,7 +149,7 @@ int read_scan_header(struct scan_header_data *scan_header_data) {
     string_copy(names_.rpfitsversion, OBSTYPE_LENGTH, scan_header_data->obstype);
     string_copy(CALCODE(sourceno), CALCODE_LENGTH, scan_header_data->calcode);
     scan_header_data->cycle_time = param_.intime;
-
+    
     string_copy(SOURCENAME(sourceno), SOURCE_LENGTH, scan_header_data->source_name);
     scan_header_data->rightascension_hours = RIGHTASCENSION(sourceno) * 180 /
       (15 * M_PI);

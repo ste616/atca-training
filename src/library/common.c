@@ -129,6 +129,9 @@ void init_vis_plotcontrols(struct vis_plotcontrols *plotcontrols,
   for (i = 0; i < 2; i++) {
     plotcontrols->visbands[i] = visbands[i];
   }
+
+  // Some default cycle time, but this should always be set (seconds).
+  plotcontrols->cycletime = 120;
 }
 
 void free_vis_plotcontrols(struct vis_plotcontrols *plotcontrols) {
@@ -855,7 +858,7 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
       // Plot the line in segments connected in time.
       for (k = 0, connidx = 0; k < n_plot_lines[i][j]; k++) {
 	if ((plot_lines[i][j][0][k + 1] >
-	     (plot_lines[i][j][0][k] + 10))) {
+	     (plot_lines[i][j][0][k] + plot_controls->cycletime))) {
 	  // Disconnect.
 	  cpgline((k - connidx), plot_lines[i][j][0] + connidx,
 		  plot_lines[i][j][1] + connidx);

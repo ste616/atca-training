@@ -222,6 +222,7 @@ int main(int argc, char *argv[]) {
   int p = 0, pp = 0, q = 0, sp = 0, rp, ri, rx, ry, yaxis_type, xaxis_type;
   int old_num_ifs = 0, old_npols = 0, vis_num_cycles = 0, nviscycle = 0;
   int *vis_cycle_num_ifs = NULL, spd_pgplot = -1, vis_pgplot = -1, nvisproducts = 0;
+  int global_max_cycletime = 0;
   float min_vis, max_vis, *xpts = NULL, theight = 0.4;
   struct scan_data *scan_data = NULL, **all_scans = NULL;
   struct cycle_data *cycle_data = NULL;
@@ -357,7 +358,11 @@ int main(int argc, char *argv[]) {
       printf("  coordinates RA = %.4f, Dec = %.4f\n",
 	     scan_data->header_data.rightascension_hours,
 	     scan_data->header_data.declination_degrees);
-      printf("  number of IFs = %d\n", scan_data->header_data.num_ifs);
+      printf("  number of IFs = %d, cycle time = %d\n",
+	     scan_data->header_data.num_ifs, scan_data->header_data.cycle_time);
+      if (scan_data->header_data.cycle_time > global_max_cycletime) {
+	global_max_cycletime = scan_data->header_data.cycle_time;
+      }
       if (read_response & READER_DATA_AVAILABLE) {
 	// Now start reading the cycle data.
 	read_cycle = 1;
@@ -499,6 +504,7 @@ int main(int argc, char *argv[]) {
   }
 
   // Make the vis plot now.
+  vis_plotcontrols.cycletime = global_max_cycletime;
   make_vis_plot(cycle_vis_quantities, vis_num_cycles,
 		vis_cycle_num_ifs, arguments.npols,
 		&vis_panelspec, &vis_plotcontrols);
