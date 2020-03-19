@@ -118,10 +118,11 @@ void get_card_value(char *header_name, char *value, int value_maxlength) {
   char *firstptr = NULL;
   
   for (i = 0; i < param_.ncard; i++) {
-    if (strncmp(names_.card + i * 80, header_name, strlen(header_name)) == 0) {
+    firstptr = names_.card + i * 80;
+    if (strncmp(firstptr, header_name, strlen(header_name)) == 0) {
       // Found the thing.
       // Find the first valid character.
-      firstptr = names_.card + i * 80 + strlen(header_name);
+      firstptr += strlen(header_name);
       while ((*firstptr == ' ') || (*firstptr == '=')) firstptr++;
       strncpy(value, firstptr, value_maxlength);
       value[value_maxlength - 1] = 0;
