@@ -113,6 +113,32 @@ void string_copy(char *start, int length, char *dest) {
   dest[length - 1] = '\0';
 };
 
+void get_card_value(char *header_name, char *value, int value_maxlength) {
+  int i, j;
+  char *firstptr = NULL;
+  
+  for (i = 0; i < param_.ncard; i++) {
+    if (strncmp(names_.card + i * 80, header_name, strlen(header_name)) == 0) {
+      // Found the thing.
+      // Find the first valid character.
+      firstptr = names_.card + i * 80 + strlen(header_name);
+      while ((*firstptr == ' ') || (*firstptr == '=')) firstptr++;
+      strncpy(value, firstptr, value_maxlength);
+      value[value_maxlength - 1] = 0;
+
+      // Remove trailing unnecessary characters.
+      for (j = (value_maxlength - 2); j >= 0; j--) {
+	if (value[j] == ' ') {
+	  value[j] = 0;
+	} else {
+	  break;
+	}
+      }
+      break;
+    }
+  }
+}
+
 /**
  * Routine to read a single cycle from the open file and return some
  * parameters.
@@ -127,6 +153,8 @@ int read_scan_header(struct scan_header_data *scan_header_data) {
   char *ptr = NULL;
   
   this_jstat = JSTAT_READNEXTHEADER;
+  // Get the cards so we can search for the scan type.
+  param_.ncard = -1;
   rpfits_result = rpfitsin_(&this_jstat, NULL, NULL, NULL, NULL, NULL,
 			    NULL, NULL, NULL, NULL, NULL, NULL);
   if (this_jstat == JSTAT_SUCCESSFUL) {
@@ -142,11 +170,8 @@ int read_scan_header(struct scan_header_data *scan_header_data) {
 
     // Put all the data into the structure.
     scan_header_data->ut_seconds = ut;
-    ptr = names_.card;
-    do {
-      ptr += printf("%s\n", ptr);
-    } while (*ptr);
-    string_copy(names_.rpfitsversion, OBSTYPE_LENGTH, scan_header_data->obstype);
+    get_card_value("SCANTYPE", scan_header_data->obstype, OBSTYPE_LENGTH);
+    /* string_copy(names_.object, OBSTYPE_LENGTH, scan_header_data->obstype); */
     string_copy(CALCODE(sourceno), CALCODE_LENGTH, scan_header_data->calcode);
     scan_header_data->cycle_time = param_.intime;
     

@@ -62,6 +62,7 @@ int max_size_of_vis(void);
 int open_rpfits_file(char *filename);
 int close_rpfits_file(void);
 void string_copy(char *start, int length, char *dest);
+void get_card_value(char *header_name, char *value, int value_maxlength);
 int read_scan_header(struct scan_header_data *scan_header_data);
 struct cycle_data* prepare_new_cycle_data(void);
 struct scan_data* prepare_new_scan_data(void);
