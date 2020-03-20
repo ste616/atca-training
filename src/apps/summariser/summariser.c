@@ -84,18 +84,6 @@ int main(int argc, char *argv[]) {
 	keep_reading = 0;
       } // Otherwise we've probably hit another header.
       printf("scan had %d cycles\n", scan_data->num_cycles);
-      /*for (j = 0; j < scan_data->num_cycles; j++) {
-	/*printf("   %04d: number of products = %d\n", (j + 1),
-	  scan_data->cycles[j]->num_points);* /
-	printf(" %04d: unflagged baselines ", (j + 1));
-	for (k = 0; k < scan_data->cycles[j]->num_points; k++) {
-	  if (scan_data->cycles[j]->flag[k] == RPFITS_FLAG_GOOD) {
-	    printf(" %d-%d", scan_data->cycles[j]->ant1[k],
-		   scan_data->cycles[j]->ant2[k]);
-	  }
-	}
-	printf("\n");
-	}*/
 
     }
 

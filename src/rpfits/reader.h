@@ -72,4 +72,4 @@ void free_cycle_data(struct cycle_data *cycle_data);
 void free_scan_data(struct scan_data *scan_data);
 int read_cycle_data(struct scan_header_data *scan_header_data,
 		    struct cycle_data *cycle_data);
-int generate_rpfits_index(struct rpfits_index *rpfits_index);
+//int generate_rpfits_index(struct rpfits_index *rpfits_index);

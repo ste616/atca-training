@@ -74,7 +74,7 @@ int max_size_of_vis(void) {
  * This routine attempts to open an RPFITS file.
  */
 int open_rpfits_file(char *filename) {
-  int this_jstat = JSTAT_UNSUCCESSFUL, rpfits_result = 0;
+  int this_jstat = JSTAT_UNSUCCESSFUL, rpfits_result;
   size_t flen = 0;
   
   // We load in the name of the file to read.
@@ -85,7 +85,7 @@ int open_rpfits_file(char *filename) {
     rpfits_result = rpfitsin_(&this_jstat, NULL, NULL, NULL, NULL, NULL,
 			      NULL, NULL, NULL, NULL, NULL, NULL);
   }
-  if (this_jstat == JSTAT_UNSUCCESSFUL) {
+  if ((this_jstat == JSTAT_UNSUCCESSFUL) || (rpfits_result != 0)) {
     fprintf(stderr, "Cannot open RPFITS file %s\n", filename);
   }
 
@@ -100,7 +100,10 @@ int close_rpfits_file(void) {
 
   rpfits_result = rpfitsin_(&this_jstat, NULL, NULL, NULL, NULL, NULL,
 			    NULL, NULL, NULL, NULL, NULL, NULL);
-
+  if (rpfits_result != 0) {
+    fprintf(stderr, "Problem when closing RPFITS file\n");
+  }
+  
   return(this_jstat);
 }
 
@@ -148,10 +151,10 @@ void get_card_value(char *header_name, char *value, int value_maxlength) {
 int read_scan_header(struct scan_header_data *scan_header_data) {
   int keep_reading = READER_HEADER_AVAILABLE, this_jstat = 0, that_jstat = 0;
   int rpfits_result = 0;
-  int vis_size = 0, flag = 0, bin = 0, if_no = 0, sourceno = 0, baseline = 0;
-  int i = 0, read_data = 0, j = 0, *nfound_chain = NULL, nfound_if = 0, zn = 0;
-  float *vis = NULL, *wgt = NULL, ut = 0, u = 0, v = 0, w = 0;
-  char *ptr = NULL;
+  int flag = 0, bin = 0, if_no = 0, sourceno = 0, baseline = 0;
+  int i = 0, j = 0, *nfound_chain = NULL, nfound_if = 0, zn = 0;
+  float ut = 0, u = 0, v = 0, w = 0;
+  //char *ptr = NULL;
   
   this_jstat = JSTAT_READNEXTHEADER;
   // Get the cards so we can search for the scan type.
@@ -172,7 +175,6 @@ int read_scan_header(struct scan_header_data *scan_header_data) {
     // Put all the data into the structure.
     scan_header_data->ut_seconds = ut;
     get_card_value("SCANTYPE", scan_header_data->obstype, OBSTYPE_LENGTH);
-    /* string_copy(names_.object, OBSTYPE_LENGTH, scan_header_data->obstype); */
     string_copy(CALCODE(sourceno), CALCODE_LENGTH, scan_header_data->calcode);
     scan_header_data->cycle_time = param_.intime;
     
@@ -271,6 +273,8 @@ int read_scan_header(struct scan_header_data *scan_header_data) {
     // We've found the flagging table.
     printf("READER: found %d flag groups\n", fg_.n_fg);
     
+  } else if (rpfits_result != 0) {
+    fprintf(stderr, "While reading header, rpfitsin encountered an error\n");
   }
 
   FREE(nfound_chain);
@@ -283,7 +287,6 @@ int read_scan_header(struct scan_header_data *scan_header_data) {
  * filled by the reader.
  */
 struct cycle_data* prepare_new_cycle_data(void) {
-  int i;
   struct cycle_data *cycle_data = NULL;
 
   MALLOC(cycle_data, 1);
@@ -419,6 +422,11 @@ int read_cycle_data(struct scan_header_data *scan_header_data,
   float *vis = NULL, *wgt = NULL, ut, last_ut = -1, u, v, w;
   float complex *cvis = NULL;
 
+  // This is only here to prevent a compiler warning.
+  if (scan_header_data == NULL) {
+    return(-1);
+  }
+  
   /* printf("reading data\n"); */
   while (read_data) {
     // Allocate some memory.
@@ -463,6 +471,8 @@ int read_cycle_data(struct scan_header_data *scan_header_data,
 	/*        fg_.n_fg); */
 	
       }
+    } else if (rpfits_result != 0) {
+      fprintf(stderr, "While reading data, rpfitsin encountered an error\n");
     } else {
       /* seconds_to_hourlabel(ut, utstring); */
       /* seconds_to_hourlabel(last_ut, lastutstring); */
@@ -520,16 +530,16 @@ int read_cycle_data(struct scan_header_data *scan_header_data,
   
 }
 
-int generate_rpfits_index(struct rpfits_index *rpfits_index) {
-  // Make an index of the currently opened RPFITS file.
-  long int entrypos;
+/* int generate_rpfits_index(struct rpfits_index *rpfits_index) { */
+/*   // Make an index of the currently opened RPFITS file. */
+/*   long int entrypos; */
 
-  // Keep a record of where the file was up to when we entered.
-  //entrypos = ftell();
+/*   // Keep a record of where the file was up to when we entered. */
+/*   //entrypos = ftell(); */
 
-  // Go back to the start.
-  //rewind();
+/*   // Go back to the start. */
+/*   //rewind(); */
 
-  // We're finished, go back to the entry point.
+/*   // We're finished, go back to the entry point. */
   
-}
+/* } */

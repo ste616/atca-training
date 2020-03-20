@@ -217,6 +217,8 @@ struct ampphase_options ampphase_options_default(void) {
   options.max_tvchannel = 1537;
   options.averaging_method = AVERAGETYPE_MEAN | AVERAGETYPE_VECTOR;
   options.include_flagged_data = 0;
+
+  return options;
 }
 
 /**
@@ -283,6 +285,7 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
   (*ampphase)->pol = pol;
   strncpy((*ampphase)->obsdate, scan_header_data->obsdate, OBSDATE_LENGTH);
   (*ampphase)->ut_seconds = cycle_data->ut_seconds;
+  strncpy((*ampphase)->scantype, scan_header_data->obstype, OBSTYPE_LENGTH);
   
   // Allocate the necessary arrays.
   MALLOC((*ampphase)->channel, (*ampphase)->nchannels);
@@ -327,7 +330,6 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
     (*ampphase)->f_phase[i] = NULL;
     (*ampphase)->f_raw[i] = NULL;
   }
-  
   
   // Fill the arrays.
   // Work out the channel width (GHz).
@@ -431,9 +433,7 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
 	  (*ampphase)->raw[bidx][cidx][j];
 	jflag++;
       }
-      /* printf("weight is %.2f real %.3f image %.3f\n", */
-      /* 	     (*ampphase)->weight[bidx][j], crealf(cycle_data->vis[i][vidx]), */
-      /* 	     cimagf(cycle_data->vis[i][vidx])); */
+
       // Continually assess limits.
       //if ((*ampphase)->weight[bidx][i] > 0) {
       if ((*ampphase)->amplitude[bidx][cidx][j] ==
@@ -498,7 +498,7 @@ int cmpfunc_complex(const void *a, const void *b) {
 int ampphase_average(struct ampphase *ampphase,
 		     struct vis_quantities **vis_quantities,
 		     struct ampphase_options *options) {
-  int vq_created = 0, n_points = 0, i, j, k, n_expected = 0, n_delavg_expected = 0;
+  int n_points = 0, i, j, k, n_expected = 0, n_delavg_expected = 0;
   int *delavg_n = NULL, delavg_idx = 0, n_delay_points = 0;
   float total_amplitude = 0, total_phase = 0, total_delay = 0;
   float delta_phase, delta_frequency;
@@ -511,7 +511,6 @@ int ampphase_average(struct ampphase *ampphase,
 
   // Prepare the structure if required.
   if (*vis_quantities == NULL) {
-    vq_created = 1;
     *vis_quantities = prepare_vis_quantities();
   }
 
@@ -521,6 +520,7 @@ int ampphase_average(struct ampphase *ampphase,
   (*vis_quantities)->window = ampphase->window;
   strncpy((*vis_quantities)->obsdate, ampphase->obsdate, OBSDATE_LENGTH);
   (*vis_quantities)->ut_seconds = ampphase->ut_seconds;
+  strncpy((*vis_quantities)->scantype, ampphase->scantype, OBSTYPE_LENGTH);
 
   // Check for options.
   if (options == NULL) {

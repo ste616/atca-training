@@ -595,10 +595,14 @@ float fracwidth(struct panelspec *panelspec,
   // This routine works out the fractional width of the string in label,
   // compared to the entire width of the box.
   float dx, xc[4], yc[4], dlx;
-  int i;
 
+  // We don't currently need panelspec, but I want to keep it here.
+  if (panelspec == NULL) {
+    dx = 0;
+  }
+  x = y = 0;
   dx = fabsf(axis_max_x - axis_min_x);
-  cpgqtxt(axis_min_x, 0, 0, 0, label, xc, yc);
+  cpgqtxt(axis_min_x, 0, x, y, label, xc, yc);
   dlx = fabsf(xc[2] - xc[1]);
   return (dlx / dx);
 }
@@ -608,7 +612,7 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
 		   struct panelspec *panelspec,
 		   struct vis_plotcontrols *plot_controls) {
   int nants = 0, i = 0, n_vis_lines = 0, j = 0, k = 0, p = 0;
-  int singleant = 0, l = 0, m = 0, n = 0, n_connected_points = 0, connidx = 0;
+  int singleant = 0, l = 0, m = 0, n = 0, connidx = 0;
   int **n_plot_lines = NULL;
   float ****plot_lines = NULL, min_x, max_x, min_y, max_y;
   float cxpos, dxpos, labtotalwidth, labspacing;
@@ -727,7 +731,8 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
       // The fourth dimension is the points to plot in the line.
       // We accumulate these now.
       for (k = 0; k < ncycles; k++) {
-	//printf(" cycle %d has %d IFs\n", k, cycle_numifs[k]);
+	printf(" cycle %d has %d IFs, type %s\n", k, cycle_numifs[k],
+	       cycle_vis_quantities[k][0][0]->scantype);
 	for (l = 0; l < cycle_numifs[k]; l++) {
 	  for (m = 0; m < npols; m++) {
 	    /* printf("comparing pols %d to %d, window %d to %d\n", */
@@ -742,6 +747,8 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
 	      for (n = 0; n < cycle_vis_quantities[k][l][m]->nbaselines; n++) {
 		if (cycle_vis_quantities[k][l][m]->baseline[n] ==
 		    ants_to_base(vis_lines[j]->ant1, vis_lines[j]->ant2)) {
+		  printf("  IF %d, pol %d, baseline %d, flagged = %d\n",
+			 l, m, n, cycle_vis_quantities[k][l][m]->flagged_bad[n]);
 		  if (cycle_vis_quantities[k][l][m]->flagged_bad[n] > 0) {
 		    continue;
 		  }
@@ -751,6 +758,9 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
 		  REALLOC(plot_lines[i][j][1], n_plot_lines[i][j]);
 		  plot_lines[i][j][0][n_plot_lines[i][j] - 1] =
 		    cycle_vis_quantities[k][l][m]->ut_seconds;
+		  printf("  number of points is now %d, time %.3f\n",
+			 n_plot_lines[i][j],
+			 plot_lines[i][j][0][n_plot_lines[i][j] - 1]);
 		  if (plot_lines[i][j][0][n_plot_lines[i][j] - 1] < min_x) {
 		    min_x = plot_lines[i][j][0][n_plot_lines[i][j] - 1];
 		  }
@@ -858,7 +868,7 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
       // Plot the line in segments connected in time.
       for (k = 0, connidx = 0; k < n_plot_lines[i][j]; k++) {
 	if ((plot_lines[i][j][0][k + 1] >
-	     (plot_lines[i][j][0][k] + plot_controls->cycletime))) {
+	     (plot_lines[i][j][0][k] + (1.5 * plot_controls->cycletime)))) {
 	  // Disconnect.
 	  cpgline((k - connidx), plot_lines[i][j][0] + connidx,
 		  plot_lines[i][j][1] + connidx);
@@ -891,7 +901,7 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
 
 void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspec,
 		   struct spd_plotcontrols *plot_controls) {
-  int x = 0, y = 0, i, j, ant1, ant2, nants = 0, px, py, iauto = 0, icross = 0;
+  int i, ant1, ant2, nants = 0, px, py, iauto = 0, icross = 0;
   int npols = 0, *polidx = NULL, poli, num_ifs = 0, panels_per_if = 0;
   int idxif, ni, ri, rj, rp, bi, bn, pc, inverted = NO, plot_started = NO;
   float xaxis_min, xaxis_max, yaxis_min, yaxis_max, theight = 0.4;

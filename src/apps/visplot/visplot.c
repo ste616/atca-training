@@ -216,19 +216,18 @@ static struct argp argp = { options, parse_opt, args_doc, doc };
 
 int main(int argc, char *argv[]) {
   // The argument list should all be RPFITS files.
-  int i = 0, j = 0, k = 0, l = 0, m = 0, res = 0, keep_reading = 1;
-  int read_cycle = 1, nscans = 0, vis_length = 0, if_no = 0, read_response = 0;
-  int plotif = 0, r = 0, ant1, ant2, num_ifs = 2;
-  int p = 0, pp = 0, q = 0, sp = 0, rp, ri, rx, ry, yaxis_type, xaxis_type;
-  int old_num_ifs = 0, old_npols = 0, vis_num_cycles = 0, nviscycle = 0;
-  int *vis_cycle_num_ifs = NULL, spd_pgplot = -1, vis_pgplot = -1, nvisproducts = 0;
+  int i = 0, j = 0, k = 0, res = 0, keep_reading = 1;
+  int read_cycle = 1, nscans = 0, if_no = 0, read_response = 0;
+  int r = 0, num_ifs = 2;
+  int p = 0, pp = 0, q = 0, sp = 0, yaxis_type, xaxis_type;
+  int old_num_ifs = 0, vis_num_cycles = 0, nviscycle = 0;
+  int *vis_cycle_num_ifs = NULL, spd_pgplot = -1, vis_pgplot = -1;
   int global_max_cycletime = 0;
-  float min_vis, max_vis, *xpts = NULL, theight = 0.4;
   struct scan_data *scan_data = NULL, **all_scans = NULL;
   struct cycle_data *cycle_data = NULL;
   struct ampphase ***cycle_ampphase = NULL;
   struct vis_quantities ****cycle_vis_quantities = NULL;
-  char ptitle[BUFSIZE], defselect[BUFSIZE];
+  char defselect[BUFSIZE];
   struct ampphase_options ampphase_options;
   struct panelspec spd_panelspec, vis_panelspec;
   struct arguments arguments;

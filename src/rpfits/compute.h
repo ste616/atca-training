@@ -83,6 +83,7 @@ struct ampphase {
   char window_name[8];
   char obsdate[OBSDATE_LENGTH];
   float ut_seconds;
+  char scantype[OBSTYPE_LENGTH];
   
   // The bin arrays have one element per baseline.
   int *nbins;
@@ -145,6 +146,7 @@ struct vis_quantities {
   int *nbins;
   int *baseline;
   int *flagged_bad;
+  char scantype[OBSTYPE_LENGTH];
   
   // The arrays.
   float **amplitude;

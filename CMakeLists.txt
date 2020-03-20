@@ -4,16 +4,20 @@ set(CMAKE_BUILD_TYPE Debug)
 
 add_library(common STATIC src/library/common.c)
 target_include_directories(common PUBLIC src/library src/rpfits src/include)
+target_compile_options(common PRIVATE -Werror -Wall -Wextra)
 
 add_library(atrpfits STATIC src/rpfits/reader.c src/rpfits/compute.c
   src/rpfits/atrpfits.c)
 target_include_directories(atrpfits PUBLIC src/rpfits src/include)
+target_compile_options(atrpfits PRIVATE -Werror -Wall -Wextra)
 
 add_executable(summariser src/apps/summariser/summariser.c)
 set_target_properties(summariser PROPERTIES LINKER_LANGUAGE Fortran)
 target_link_libraries(summariser PUBLIC atrpfits rpfits)
+target_compile_options(summariser PRIVATE -Werror -Wall -Wextra -Wno-missing-field-initializers)
 
 add_executable(visplot src/apps/visplot/visplot.c)
 set_target_properties(visplot PROPERTIES LINKER_LANGUAGE Fortran)
 target_link_libraries(visplot PUBLIC atrpfits rpfits common cpgplot pgplot png z m X11)
+target_compile_options(visplot PRIVATE -Werror -Wall -Wextra -Wno-missing-field-initializers)
 
