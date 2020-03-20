@@ -731,8 +731,8 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
       // The fourth dimension is the points to plot in the line.
       // We accumulate these now.
       for (k = 0; k < ncycles; k++) {
-	printf(" cycle %d has %d IFs, type %s\n", k, cycle_numifs[k],
-	       cycle_vis_quantities[k][0][0]->scantype);
+	/* printf(" cycle %d has %d IFs, type %s\n", k, cycle_numifs[k], */
+	/*        cycle_vis_quantities[k][0][0]->scantype); */
 	for (l = 0; l < cycle_numifs[k]; l++) {
 	  for (m = 0; m < npols; m++) {
 	    /* printf("comparing pols %d to %d, window %d to %d\n", */
@@ -747,8 +747,8 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
 	      for (n = 0; n < cycle_vis_quantities[k][l][m]->nbaselines; n++) {
 		if (cycle_vis_quantities[k][l][m]->baseline[n] ==
 		    ants_to_base(vis_lines[j]->ant1, vis_lines[j]->ant2)) {
-		  printf("  IF %d, pol %d, baseline %d, flagged = %d\n",
-			 l, m, n, cycle_vis_quantities[k][l][m]->flagged_bad[n]);
+		  /* printf("  IF %d, pol %d, baseline %d, flagged = %d\n", */
+		  /* 	 l, m, n, cycle_vis_quantities[k][l][m]->flagged_bad[n]); */
 		  if (cycle_vis_quantities[k][l][m]->flagged_bad[n] > 0) {
 		    continue;
 		  }
@@ -758,9 +758,9 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
 		  REALLOC(plot_lines[i][j][1], n_plot_lines[i][j]);
 		  plot_lines[i][j][0][n_plot_lines[i][j] - 1] =
 		    cycle_vis_quantities[k][l][m]->ut_seconds;
-		  printf("  number of points is now %d, time %.3f\n",
-			 n_plot_lines[i][j],
-			 plot_lines[i][j][0][n_plot_lines[i][j] - 1]);
+		  /* printf("  number of points is now %d, time %.3f\n", */
+		  /* 	 n_plot_lines[i][j], */
+		  /* 	 plot_lines[i][j][0][n_plot_lines[i][j] - 1]); */
 		  if (plot_lines[i][j][0][n_plot_lines[i][j] - 1] < min_x) {
 		    min_x = plot_lines[i][j][0][n_plot_lines[i][j] - 1];
 		  }

@@ -273,7 +273,7 @@ int read_scan_header(struct scan_header_data *scan_header_data) {
     // We've found the flagging table.
     printf("READER: found %d flag groups\n", fg_.n_fg);
     
-  } else if (rpfits_result != 0) {
+  } else if (rpfits_result == 0) {
     fprintf(stderr, "While reading header, rpfitsin encountered an error\n");
   }
 
@@ -471,7 +471,7 @@ int read_cycle_data(struct scan_header_data *scan_header_data,
 	/*        fg_.n_fg); */
 	
       }
-    } else if (rpfits_result != 0) {
+    } else if (rpfits_result == 0) {
       fprintf(stderr, "While reading data, rpfitsin encountered an error\n");
     } else {
       /* seconds_to_hourlabel(ut, utstring); */
