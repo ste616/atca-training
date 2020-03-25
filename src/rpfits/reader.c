@@ -345,6 +345,9 @@ struct cycle_data* scan_add_cycle(struct scan_data *scan_data) {
 void free_scan_header_data(struct scan_header_data *scan_header_data) {
   int i, j;
   for (i = 0; i < scan_header_data->num_ifs; i++) {
+    if (scan_header_data->if_num_stokes == NULL) {
+      continue;
+    }
     for (j = 0; j < scan_header_data->if_num_stokes[i]; j++) {
       FREE(scan_header_data->if_stokes_names[i][j]);
     }
@@ -363,9 +366,11 @@ void free_scan_header_data(struct scan_header_data *scan_header_data) {
   FREE(scan_header_data->if_label);
   FREE(scan_header_data->if_name);
   FREE(scan_header_data->if_stokes_names);
-  for (i = 0; i < scan_header_data->num_ants; i++) {
-    FREE(scan_header_data->ant_name[i]);
-    FREE(scan_header_data->ant_cartesian[i]);
+  if (scan_header_data->ant_name != NULL) {
+    for (i = 0; i < scan_header_data->num_ants; i++) {
+      FREE(scan_header_data->ant_name[i]);
+      FREE(scan_header_data->ant_cartesian[i]);
+    }
   }
   FREE(scan_header_data->ant_label);
   FREE(scan_header_data->ant_name);
@@ -377,6 +382,10 @@ void free_scan_header_data(struct scan_header_data *scan_header_data) {
  */
 void free_cycle_data(struct cycle_data *cycle_data) {
   int i;
+  if (cycle_data == NULL) {
+    return;
+  }
+  
   FREE(cycle_data->u);
   FREE(cycle_data->v);
   FREE(cycle_data->w);
@@ -394,6 +403,8 @@ void free_cycle_data(struct cycle_data *cycle_data) {
   FREE(cycle_data->vis_size);
   FREE(cycle_data->vis);
   FREE(cycle_data->wgt);
+
+  cycle_data = NULL;
 }
 
 /**
