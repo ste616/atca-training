@@ -158,12 +158,107 @@ double date2mjd(char *obsdate, float ut_seconds) {
   return 0;
 }
 
-int main(int argc, char *argv[]) {
-  struct arguments arguments;
-  int i, j, res, n, keep_reading, read_cycle;
-  struct rpfits_file_information **info_rpfits_files = NULL;
+// The ways in which we can read data.
+#define READ_SCAN_METADATA 1
+
+void data_reader(int read_type, int n_rpfits_files,
+		 struct rpfits_file_information **info_rpfits_files) {
+  int i, res, open_file, keep_reading, n, read_cycles, keep_cycling;
+  int cycle_free, header_free;
   struct scan_header_data *sh = NULL;
   struct cycle_data *cycle_data = NULL;
+  
+  for (i = 0; i < n_rpfits_files; i++) {
+    // HERE WILL GO ANY CHECKS TO SEE IF WE ACTUALLY WANT TO
+    // READ THIS FILE
+    open_file = 0;
+    if (read_type == READ_SCAN_METADATA) {
+      open_file = 1;
+    }
+    if (!open_file) {
+      continue;
+    }
+    res = open_rpfits_file(info_rpfits_files[i]->filename);
+    if (res) {
+      fprintf(stderr, "OPEN FAILED FOR FILE %s, CODE %d\n",
+	      info_rpfits_files[i]->filename, res);
+      continue;
+    }
+    keep_reading = 1;
+    while (keep_reading) {
+      n = info_rpfits_files[i]->n_scans;
+      if (read_type == READ_SCAN_METADATA) {
+	// We need to expand our metadata arrays as we go.
+	REALLOC(info_rpfits_files[i]->scan_headers, (n + 1));
+	REALLOC(info_rpfits_files[i]->scan_start_mjd, (n + 1));
+	REALLOC(info_rpfits_files[i]->scan_end_mjd, (n + 1));
+      }
+      // We always need to read the scan headers to move through
+      // the file, but where we direct the information changes.
+      if (read_type != READ_SCAN_METADATA) {
+	MALLOC(sh, 1);
+      } else {
+	sh = &(info_rpfits_files[i]->scan_headers[n]);
+      }
+      res = read_scan_header(sh);
+      header_free = 1;
+      if (read_type == READ_SCAN_METADATA) {
+	// Keep track of the times covered by each scan.
+	if (sh->ut_seconds > 0) {
+	  header_free = 0;
+	  info_rpfits_files[i]->scan_start_mjd[n] =
+	    info_rpfits_files[i]->scan_end_mjd[n] = date2mjd(sh->obsdate, sh->ut_seconds);
+	  info_rpfits_files[i]->n_scans += 1;
+	}
+      }
+      // HERE WILL GO THE LOGIC TO WORK OUT IF WE NEED TO READ
+      // CYCLES FROM THIS SCAN
+      read_cycles = 0;
+      if (read_type == READ_SCAN_METADATA) {
+	read_cycles = 1;
+      }
+      if (read_cycles && (res & READER_DATA_AVAILABLE)) {
+	keep_cycling = 1;
+	while (keep_cycling) {
+	  cycle_data = prepare_new_cycle_data();
+	  res = read_cycle_data(sh, cycle_data);
+	  cycle_free = 1;
+	  if (!(res & READER_DATA_AVAILABLE)) {
+	    keep_cycling = 0;
+	  }
+	  // HERE WILL GO THE LOGIC TO WORK OUT IF WE WANT TO DO
+	  // WITH THIS CYCLE
+	  if (read_type == READ_SCAN_METADATA) {
+	    info_rpfits_files[i]->scan_end_mjd[n] = date2mjd(sh->obsdate, cycle_data->ut_seconds);
+	  }
+	  // Do we need to free this memory now?
+	  if (cycle_free) {
+	    free_cycle_data(cycle_data);
+	    FREE(cycle_data);
+	  }
+	}
+      }
+      if (header_free) {
+	free_scan_header_data(sh);
+      }
+      if (res == READER_EXHAUSTED) {
+	keep_reading = 0;
+      }
+    }
+    // If we get here we must have opened the RPFITS file.
+    res = close_rpfits_file();
+    if (res) {
+      fprintf(stderr, "CLOSE FAILED FOR FILE %s, CODE %d\n",
+	      info_rpfits_files[i]->filename, res);
+      return;
+    }
+  }
+}
+
+int main(int argc, char *argv[]) {
+  struct arguments arguments;
+  int i, j;
+  struct rpfits_file_information **info_rpfits_files = NULL;
 
   // Set the defaults for the arguments.
   arguments.n_rpfits_files = 0;
@@ -180,53 +275,12 @@ int main(int argc, char *argv[]) {
 
   // Do a scan of each RPFITS file to get time information.
   MALLOC(info_rpfits_files, arguments.n_rpfits_files);
+  // Put the names of the RPFITS files into the info structure.
   for (i = 0; i < arguments.n_rpfits_files; i++) {
     info_rpfits_files[i] = new_rpfits_file();
-    res = open_rpfits_file(arguments.rpfits_files[i]);
-    if (res) {
-      fprintf(stderr, "open failed\n");
-      continue;
-    }
     strncpy(info_rpfits_files[i]->filename, arguments.rpfits_files[i], BUFSIZE);
-    keep_reading = 1;
-    while (keep_reading) {
-      n = info_rpfits_files[i]->n_scans;
-      REALLOC(info_rpfits_files[i]->scan_headers, (n + 1));
-      REALLOC(info_rpfits_files[i]->scan_start_mjd, (n + 1));
-      REALLOC(info_rpfits_files[i]->scan_end_mjd, (n + 1));
-      res = read_scan_header(&(info_rpfits_files[i]->scan_headers[info_rpfits_files[i]->n_scans]));
-      // Keep a shortcut.
-      sh = &(info_rpfits_files[i]->scan_headers[info_rpfits_files[i]->n_scans]);
-      if (sh->ut_seconds > 0) {
-	info_rpfits_files[i]->scan_start_mjd[n] =
-	  info_rpfits_files[i]->scan_end_mjd[n] = date2mjd(sh->obsdate, sh->ut_seconds);
-	info_rpfits_files[i]->n_scans += 1;
-	if (res & READER_DATA_AVAILABLE) {
-	  read_cycle = 1;
-	  while (read_cycle) {
-	    cycle_data = prepare_new_cycle_data();
-	    res = read_cycle_data(sh, cycle_data);
-	    if (!(res & READER_DATA_AVAILABLE)) {
-	      read_cycle = 0;
-	    }
-	    info_rpfits_files[i]->scan_end_mjd[n] = date2mjd(sh->obsdate, cycle_data->ut_seconds);
-	    free_cycle_data(cycle_data);
-	    FREE(cycle_data);
-	  }
-	}
-      } else {
-	free_scan_header_data(sh);
-      }
-      if (res == READER_EXHAUSTED) {
-	keep_reading = 0;
-      }
-    }
-    res = close_rpfits_file();
-    if (res) {
-      fprintf(stderr, "close failed\n");
-      break;
-    }
   }
+  data_reader(READ_SCAN_METADATA, arguments.n_rpfits_files, info_rpfits_files);
 
   // Print out the summary.
   for (i = 0; i < arguments.n_rpfits_files; i++) {
