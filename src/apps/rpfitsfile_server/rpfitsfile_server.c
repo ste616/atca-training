@@ -18,6 +18,7 @@
 #include <netdb.h>
 #include <unistd.h>
 #include <errno.h>
+#include <stdbool.h>
 #include "atrpfits.h"
 #include "memory.h"
 
@@ -159,21 +160,56 @@ double date2mjd(char *obsdate, float ut_seconds) {
 }
 
 // The ways in which we can read data.
-#define READ_SCAN_METADATA 1
+#define READ_SCAN_METADATA   1<<1
+#define COMPUTE_VIS_PRODUCTS 1<<2
+#define GRAB_SPECTRUM        1<<3
+
+// This structure wraps around all the ampphase structures and
+// will allow for easy transport.
+struct spectrum_data {
+  // The number of IFs in this spectra set.
+  int num_ifs;
+  // The number of polarisations.
+  int num_pols;
+  // The ampphase structures.
+  struct ampphase ***spectrum;
+};
 
 void data_reader(int read_type, int n_rpfits_files,
-		 struct rpfits_file_information **info_rpfits_files) {
-  int i, res, open_file, keep_reading, n, read_cycles, keep_cycling;
-  int cycle_free, header_free;
+		 double mjd_required, struct ampphase_options *ampphase_options,
+		 struct rpfits_file_information **info_rpfits_files,
+		 struct spectrum_data *spectrum_data,
+		 struct vis_quantities ****vis_quantities) {
+  int i, res, open_file, keep_reading, n, read_cycles, keep_cycling, calcres;
+  int cycle_free, header_free, curr_header, idx_if, idx_pol;
+  int pols[4] = { POL_XX, POL_YY, POL_XY, POL_YX };
+  double cycle_mjd, cycle_start, cycle_end, half_cycle;
   struct scan_header_data *sh = NULL;
   struct cycle_data *cycle_data = NULL;
+
+  if (vis_quantities == NULL) {
+    // Resist warnings.
+    fprintf(stderr, "ignore this message\n");
+  }
   
   for (i = 0; i < n_rpfits_files; i++) {
     // HERE WILL GO ANY CHECKS TO SEE IF WE ACTUALLY WANT TO
     // READ THIS FILE
-    open_file = 0;
-    if (read_type == READ_SCAN_METADATA) {
-      open_file = 1;
+    open_file = false;
+    if (read_type & READ_SCAN_METADATA) {
+      open_file = true;
+    }
+    if (read_type & GRAB_SPECTRUM) {
+      // Does this file encompass the time we want?
+      half_cycle = (double)info_rpfits_files[i]->scan_headers[0].cycle_time / (2.0 * 86400.0);
+      if ((mjd_required >= (info_rpfits_files[i]->scan_start_mjd[0] - half_cycle)) &&
+	  (mjd_required <= (info_rpfits_files[i]->scan_end_mjd[info_rpfits_files[i]->n_scans - 1]
+			    + half_cycle))) {
+	open_file = true;
+      /* } else { */
+      /* 	printf("File %s does not cover the requested MJD %.6f\n", */
+      /* 	       info_rpfits_files[i]->filename, mjd_required); */
+      }
     }
     if (!open_file) {
       continue;
@@ -184,10 +220,11 @@ void data_reader(int read_type, int n_rpfits_files,
 	      info_rpfits_files[i]->filename, res);
       continue;
     }
-    keep_reading = 1;
+    keep_reading = true;
+    curr_header = -1;
     while (keep_reading) {
       n = info_rpfits_files[i]->n_scans;
-      if (read_type == READ_SCAN_METADATA) {
+      if (read_type & READ_SCAN_METADATA) {
 	// We need to expand our metadata arrays as we go.
 	REALLOC(info_rpfits_files[i]->scan_headers, (n + 1));
 	REALLOC(info_rpfits_files[i]->scan_start_mjd, (n + 1));
@@ -195,46 +232,100 @@ void data_reader(int read_type, int n_rpfits_files,
       }
       // We always need to read the scan headers to move through
       // the file, but where we direct the information changes.
-      if (read_type != READ_SCAN_METADATA) {
+      if (!(read_type & READ_SCAN_METADATA)) {
 	MALLOC(sh, 1);
       } else {
 	sh = &(info_rpfits_files[i]->scan_headers[n]);
       }
       res = read_scan_header(sh);
-      header_free = 1;
-      if (read_type == READ_SCAN_METADATA) {
-	// Keep track of the times covered by each scan.
-	if (sh->ut_seconds > 0) {
-	  header_free = 0;
+      header_free = true;
+      if (sh->ut_seconds > 0) {
+	curr_header += 1;
+	if (read_type & READ_SCAN_METADATA) {
+	  // Keep track of the times covered by each scan.
+	  header_free = false;
 	  info_rpfits_files[i]->scan_start_mjd[n] =
 	    info_rpfits_files[i]->scan_end_mjd[n] = date2mjd(sh->obsdate, sh->ut_seconds);
 	  info_rpfits_files[i]->n_scans += 1;
 	}
-      }
-      // HERE WILL GO THE LOGIC TO WORK OUT IF WE NEED TO READ
-      // CYCLES FROM THIS SCAN
-      read_cycles = 0;
-      if (read_type == READ_SCAN_METADATA) {
-	read_cycles = 1;
-      }
-      if (read_cycles && (res & READER_DATA_AVAILABLE)) {
-	keep_cycling = 1;
-	while (keep_cycling) {
-	  cycle_data = prepare_new_cycle_data();
-	  res = read_cycle_data(sh, cycle_data);
-	  cycle_free = 1;
-	  if (!(res & READER_DATA_AVAILABLE)) {
-	    keep_cycling = 0;
+	// HERE WILL GO THE LOGIC TO WORK OUT IF WE NEED TO READ
+	// CYCLES FROM THIS SCAN
+	read_cycles = false;
+	if ((read_type & READ_SCAN_METADATA) ||
+	    (read_type & COMPUTE_VIS_PRODUCTS)) {
+	  // In both of these cases we have to look at all data.
+	  read_cycles = true;
+	}
+	if (read_type & GRAB_SPECTRUM) {
+	  // Check if this scan contains the cycle with MJD matching
+	  // the required.
+	  /* printf("assessing scan header %d: %.6f / %.6f / %.6f\n", curr_header, */
+	  /* 	 info_rpfits_files[i]->scan_start_mjd[curr_header], */
+	  /* 	 mjd_required, */
+	  /* 	 info_rpfits_files[i]->scan_end_mjd[curr_header]); */
+	  if ((mjd_required >= info_rpfits_files[i]->scan_start_mjd[curr_header]) &&
+	      (mjd_required <= info_rpfits_files[i]->scan_end_mjd[curr_header])) {
+	    /* printf("scan should contain what we're looking for\n"); */
+	    read_cycles = true;
+	  /* } else { */
+	  /*   printf("ignoring this scan\n"); */
 	  }
-	  // HERE WILL GO THE LOGIC TO WORK OUT IF WE WANT TO DO
-	  // WITH THIS CYCLE
-	  if (read_type == READ_SCAN_METADATA) {
-	    info_rpfits_files[i]->scan_end_mjd[n] = date2mjd(sh->obsdate, cycle_data->ut_seconds);
-	  }
-	  // Do we need to free this memory now?
-	  if (cycle_free) {
-	    free_cycle_data(cycle_data);
-	    FREE(cycle_data);
+	}
+	if (read_cycles && (res & READER_DATA_AVAILABLE)) {
+	  keep_cycling = true;
+	  while (keep_cycling) {
+	    cycle_data = prepare_new_cycle_data();
+	    res = read_cycle_data(sh, cycle_data);
+	    cycle_free = true;
+	    if (!(res & READER_DATA_AVAILABLE)) {
+	      keep_cycling = false;
+	    }
+	    // HERE WILL GO THE LOGIC TO WORK OUT IF WE WANT TO DO
+	    // SOMETHING WITH THIS CYCLE
+	    cycle_mjd = date2mjd(sh->obsdate, cycle_data->ut_seconds);
+	    if (read_type & READ_SCAN_METADATA) {
+	      info_rpfits_files[i]->scan_end_mjd[n] = cycle_mjd;
+	    }
+	    if (read_type & GRAB_SPECTRUM) {
+	      // We consider this the correct cycle if the requested
+	      // MJD is within half a cycle time of this cycle's time.
+	      cycle_start = cycle_mjd - ((double)sh->cycle_time / (2 * 86400.0));
+	      cycle_end = cycle_mjd + ((double)sh->cycle_time / (2 * 86400.0));
+	      /* printf("%.6f / %.6f / %.6f\n", cycle_start, mjd_required, cycle_end); */
+	      if ((mjd_required >= cycle_start) &&
+		  (mjd_required <= cycle_end)) {
+		// Convert this cycle into the spectrum that we return.
+		// Allocate all the memory we need.
+		printf("cycle found!\n");
+		spectrum_data->num_ifs = sh->num_ifs;
+		MALLOC(spectrum_data->spectrum, spectrum_data->num_ifs);
+		for (idx_if = 0; idx_if < spectrum_data->num_ifs; idx_if++) {
+		  spectrum_data->num_pols = sh->if_num_stokes[idx_if];
+		  CALLOC(spectrum_data->spectrum[idx_if], spectrum_data->num_pols);
+		  for (idx_pol = 0; idx_pol < spectrum_data->num_pols; idx_pol++) {
+		    calcres = vis_ampphase(sh, cycle_data,
+					   &(spectrum_data->spectrum[idx_if][idx_pol]),
+					   pols[idx_pol], sh->if_label[idx_if],
+					   ampphase_options);
+		    if (calcres < 0) {
+		      fprintf(stderr, "CALCULATING AMP AND PHASE FAILED FOR IF %d POL %d, CODE %d\n",
+			      sh->if_label[idx_if], pols[idx_pol], calcres);
+		    } else {
+		      printf("CONVERTED SPECTRUM FOR CYCLE IF %d POL %d AT MJD %.6f\n",
+			     sh->if_label[idx_if], pols[idx_pol], cycle_mjd);
+		    }
+		  }
+		}
+		// We don't need to search any more.
+		keep_cycling = false;
+		keep_reading = false;
+	      }
+	    }
+	    // Do we need to free this memory now?
+	    if (cycle_free) {
+	      free_cycle_data(cycle_data);
+	      FREE(cycle_data);
+	    }
 	  }
 	}
       }
@@ -242,7 +333,7 @@ void data_reader(int read_type, int n_rpfits_files,
 	free_scan_header_data(sh);
       }
       if (res == READER_EXHAUSTED) {
-	keep_reading = 0;
+	keep_reading = false;
       }
     }
     // If we get here we must have opened the RPFITS file.
@@ -259,11 +350,22 @@ int main(int argc, char *argv[]) {
   struct arguments arguments;
   int i, j;
   struct rpfits_file_information **info_rpfits_files = NULL;
-
+  struct ampphase_options ampphase_options;
+  struct spectrum_data spectrum_data;
+  struct vis_quantities ***vis_quantities = NULL;
+  
   // Set the defaults for the arguments.
   arguments.n_rpfits_files = 0;
   arguments.rpfits_files = NULL;
 
+  // And the default for the calculator options.
+  ampphase_options.phase_in_degrees = true;
+  ampphase_options.delay_averaging = 1;
+  ampphase_options.min_tvchannel = 1;
+  ampphase_options.max_tvchannel = 2048;
+  ampphase_options.averaging_method = AVERAGETYPE_MEAN | AVERAGETYPE_SCALAR;
+  ampphase_options.include_flagged_data = 1;
+  
   // Parse the arguments.
   argp_parse(&argp, argc, argv, 0, 0, &arguments);
 
@@ -280,7 +382,8 @@ int main(int argc, char *argv[]) {
     info_rpfits_files[i] = new_rpfits_file();
     strncpy(info_rpfits_files[i]->filename, arguments.rpfits_files[i], BUFSIZE);
   }
-  data_reader(READ_SCAN_METADATA, arguments.n_rpfits_files, info_rpfits_files);
+  data_reader(READ_SCAN_METADATA, arguments.n_rpfits_files, 0.0, &ampphase_options,
+	      info_rpfits_files, &spectrum_data, &vis_quantities);
 
   // Print out the summary.
   for (i = 0; i < arguments.n_rpfits_files; i++) {
@@ -295,6 +398,13 @@ int main(int argc, char *argv[]) {
     }
     printf("\n");
   }
+
+  // Let's try to load one of the spectra.
+  printf("Trying to grab a spectrum.\n");
+  data_reader(GRAB_SPECTRUM, arguments.n_rpfits_files, 58501.470312,
+	      &ampphase_options, info_rpfits_files, &spectrum_data, &vis_quantities);
+  // Save these spectra to a file after packing it.
+  
   
   // We're finished, free all our memory.
   for (i = 0; i < arguments.n_rpfits_files; i++) {
