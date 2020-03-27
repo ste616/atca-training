@@ -21,8 +21,9 @@ set_target_properties(visplot PROPERTIES LINKER_LANGUAGE Fortran)
 target_link_libraries(visplot PUBLIC atrpfits rpfits common cpgplot pgplot png z m X11)
 target_compile_options(visplot PRIVATE -Werror -Wall -Wextra -Wno-missing-field-initializers)
 
-add_executable(rpfitsfile_server src/apps/rpfitsfile_server/rpfitsfile_server.c)
+add_executable(rpfitsfile_server src/apps/rpfitsfile_server/rpfitsfile_server.c extern/cmp/cmp.c)
 set_target_properties(rpfitsfile_server PROPERTIES LINKER_LANGUAGE Fortran)
 target_link_libraries(rpfitsfile_server PUBLIC atrpfits rpfits m)
+target_include_directories(rpfitsfile_server PUBLIC src/rpfits src/include extern/cmp)
 target_compile_options(rpfitsfile_server PRIVATE -Werror -Wall -Wextra -Wno-missing-field-initializers)
 

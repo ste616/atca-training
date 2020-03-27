@@ -21,6 +21,7 @@
 #include <stdbool.h>
 #include "atrpfits.h"
 #include "memory.h"
+#include "cmp.h"
 
 #define ISVALIDSOCKET(s) ((s) >= 0)
 #define CLOSESOCKET(s) close(s)
@@ -174,6 +175,167 @@ struct spectrum_data {
   // The ampphase structures.
   struct ampphase ***spectrum;
 };
+
+// Some definitions for the packing routines.
+void error_and_exit(const char *msg) {
+  fprintf(stderr, "PACKING ERROR %s\n\n", msg);
+  exit(EXIT_FAILURE);
+}
+
+static bool read_bytes(void *data, size_t sz, FILE *fh) {
+  return fread(data, sizeof(uint8_t), sz, fh) == (sz * sizeof(uint8_t));
+}
+
+static bool file_reader(cmp_ctx_t *ctx, void *data, size_t limit) {
+  return read_bytes(data, limit, (FILE *)ctx->buf);
+}
+
+static bool file_skipper(cmp_ctx_t *ctx, size_t count) {
+  return fseek((FILE *)ctx->buf, count, SEEK_CUR);
+}
+
+static size_t file_writer(cmp_ctx_t *ctx, const void *data, size_t count) {
+  return fwrite(data, sizeof(uint8_t), count, (FILE *)ctx->buf);
+}
+
+// Boolean write.
+#define CMPW_BOOL(c, v) if (!cmp_write_bool(c, (bool)v)) error_and_exit(cmp_strerror(c))
+// Signed integer write.
+#define CMPW_SINT(c, v) if (!cmp_write_sint(c, (int)v)) error_and_exit(cmp_strerror(c))
+// Unsigned integer write.
+#define CMPW_UINT(c, v) if (!cmp_write_uint(c, (unsigned int)v)) error_and_exit(cmp_strerror(c))
+// Float write.
+#define CMPW_FLOAT(c, v) if (!cmp_write_float(c, (float)v)) error_and_exit(cmp_strerror(c))
+// String write. We write the length of the string first, then the string.
+#define CMPW_STRING(c, v, m)				       \
+  do {							       \
+    CMPW_UINT(c, (strlen(v) < m) ? strlen(v) : m);	       \
+    if (!cmp_write_str(c, v, (strlen(v) < m) ? strlen(v) : m)) \
+      error_and_exit(cmp_strerror(c));			       \
+  } while(0)
+// Array size initialiser.
+#define CMPW_ARRAYINIT(c, l) if (!cmp_write_array(c, l)) error_and_exit(cmp_strerror(c))
+// Array writers.
+#define CMPW_ARRAYFLOAT(c, l, a) \
+  do {				 \
+    int ii;			 \
+    CMPW_ARRAYINIT(c, l);	 \
+    for (ii = 0; ii < l; ii++) { \
+      CMPW_FLOAT(c, a[ii]);	 \
+    }				 \
+  } while (0)
+#define CMPW_ARRAYFLOATCOMPLEX(c, l, a) \
+  do {					\
+    int ii;				\
+    CMPW_ARRAYINIT(c, 2 * l);		\
+    for (ii = 0; ii < l; ii++) {	\
+      CMPW_FLOAT(c, creal(a[ii]));	\
+      CMPW_FLOAT(c, cimag(a[ii]));	\
+    }					\
+  } while (0)
+#define CMPW_ARRAYSINT(c, l, a)			\
+  do {						\
+    int ii;					\
+    CMPW_ARRAYINIT(c, l);			\
+    for (ii = 0; ii < l; ii++) {		\
+      CMPW_SINT(c, a[ii]);			\
+    }						\
+  } while (0)
+
+void pack_ampphase_options(cmp_ctx_t *cmp, struct ampphase_options *a) {
+  // This routine takes an ampphase_options structure and packs it for
+  // transport.
+  CMPW_BOOL(cmp, a->phase_in_degrees);
+  CMPW_SINT(cmp, a->delay_averaging);
+  CMPW_SINT(cmp, a->min_tvchannel);
+  CMPW_SINT(cmp, a->max_tvchannel);
+  CMPW_SINT(cmp, a->averaging_method);
+  CMPW_SINT(cmp, a->include_flagged_data);
+}
+
+
+void pack_ampphase(cmp_ctx_t *cmp, struct ampphase *a) {
+  // This routine takes an ampphase structure and packs it for transport.
+  int i, j;
+  // The number of quantities in each array.
+  CMPW_SINT(cmp, a->nchannels);
+  CMPW_SINT(cmp, a->nbaselines);
+
+  // Now the arrays storing the labels for each quantity.
+  CMPW_ARRAYFLOAT(cmp, a->nchannels, a->channel);
+  CMPW_ARRAYFLOAT(cmp, a->nchannels, a->frequency);
+  CMPW_ARRAYSINT(cmp, a->nbaselines, a->baseline);
+
+  // The static quantities.
+  CMPW_SINT(cmp, a->pol);
+  CMPW_SINT(cmp, a->window);
+  CMPW_STRING(cmp, a->window_name, 8);
+  CMPW_STRING(cmp, a->obsdate, OBSDATE_LENGTH);
+  CMPW_FLOAT(cmp, a->ut_seconds);
+  CMPW_STRING(cmp, a->scantype, OBSTYPE_LENGTH);
+
+  // The bin arrays have one element per baseline.
+  CMPW_ARRAYSINT(cmp, a->nbaselines, a->nbins);
+
+  // The flag array has the indexing:
+  // array[baseline][bin]
+  for (i = 0; i < a->nbaselines; i++) {
+    CMPW_ARRAYSINT(cmp, a->nbins[i], a->flagged_bad[i]);
+  }
+
+  // The arrays here have the following indexing.
+  // array[baseline][bin][channel]
+  for (i = 0; i < a->nbaselines; i++) {
+    for (j = 0; j < a->nbins[i]; j++) {
+      CMPW_ARRAYFLOAT(cmp, a->nchannels, a->weight[i][j]);
+      CMPW_ARRAYFLOAT(cmp, a->nchannels, a->amplitude[i][j]);
+      CMPW_ARRAYFLOAT(cmp, a->nchannels, a->phase[i][j]);
+      CMPW_ARRAYFLOATCOMPLEX(cmp, a->nchannels, a->raw[i][j]);
+    }
+  }
+
+  // These next arrays contain the same data as above, but
+  // do not include the flagged channels.
+  for (i = 0; i < a->nbaselines; i++) {
+    for (j = 0; j < a->nbins[i]; j++) {
+      CMPW_SINT(cmp, a->f_nchannels[i][j]);
+      CMPW_ARRAYFLOAT(cmp, a->f_nchannels[i][j], a->f_channel[i][j]);
+      CMPW_ARRAYFLOAT(cmp, a->f_nchannels[i][j], a->f_frequency[i][j]);
+      CMPW_ARRAYFLOAT(cmp, a->f_nchannels[i][j], a->f_weight[i][j]);
+      CMPW_ARRAYFLOAT(cmp, a->f_nchannels[i][j], a->f_amplitude[i][j]);
+      CMPW_ARRAYFLOAT(cmp, a->f_nchannels[i][j], a->f_phase[i][j]);
+      CMPW_ARRAYFLOATCOMPLEX(cmp, a->f_nchannels[i][j], a->f_raw[i][j]);
+    }
+  }
+
+  // Some metadata.
+  CMPW_FLOAT(cmp, a->min_amplitude_global);
+  CMPW_FLOAT(cmp, a->max_amplitude_global);
+  CMPW_FLOAT(cmp, a->min_phase_global);
+  CMPW_FLOAT(cmp, a->max_phase_global);
+  CMPW_ARRAYFLOAT(cmp, a->nbaselines, a->min_amplitude);
+  CMPW_ARRAYFLOAT(cmp, a->nbaselines, a->max_amplitude);
+  CMPW_ARRAYFLOAT(cmp, a->nbaselines, a->min_phase);
+  CMPW_ARRAYFLOAT(cmp, a->nbaselines, a->max_phase);
+
+  pack_ampphase_options(cmp, a->options);
+}
+
+void pack_spectrum_data(cmp_ctx_t *cmp, struct spectrum_data *a) {
+  int i, j;
+
+  // The number of IFs in this spectra set.
+  CMPW_SINT(cmp, a->num_ifs);
+  // The number of polarisations.
+  CMPW_SINT(cmp, a->num_pols);
+
+  // The ampphase structures.
+  for (i = 0; i < a->num_ifs; i++) {
+    for (j = 0; j < a->num_pols; j++) {
+      pack_ampphase(cmp, a->spectrum[i][j]);
+    }
+  }
+}
 
 void data_reader(int read_type, int n_rpfits_files,
 		 double mjd_required, struct ampphase_options *ampphase_options,
@@ -353,6 +515,8 @@ int main(int argc, char *argv[]) {
   struct ampphase_options ampphase_options;
   struct spectrum_data spectrum_data;
   struct vis_quantities ***vis_quantities = NULL;
+  FILE *fh = NULL;
+  cmp_ctx_t cmp;
   
   // Set the defaults for the arguments.
   arguments.n_rpfits_files = 0;
@@ -404,7 +568,13 @@ int main(int argc, char *argv[]) {
   data_reader(GRAB_SPECTRUM, arguments.n_rpfits_files, 58501.470312,
 	      &ampphase_options, info_rpfits_files, &spectrum_data, &vis_quantities);
   // Save these spectra to a file after packing it.
-  
+  fh = fopen("test.dat", "w+b");
+  if (fh == NULL) {
+    error_and_exit("Error opening output file");
+  }
+  cmp_init(&cmp, fh, file_reader, file_skipper, file_writer);
+  pack_spectrum_data(&cmp, &spectrum_data);
+  fclose(fh);
   
   // We're finished, free all our memory.
   for (i = 0; i < arguments.n_rpfits_files; i++) {
