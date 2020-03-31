@@ -2,9 +2,9 @@ cmake_minimum_required (VERSION 3.5)
 project (ATCATraining LANGUAGES C Fortran)
 set(CMAKE_BUILD_TYPE Debug)
 
-add_library(common STATIC src/library/common.c)
-target_include_directories(common PUBLIC src/library src/rpfits src/include)
-target_compile_options(common PRIVATE -Werror -Wall -Wextra)
+add_library(applib STATIC src/library/common.c src/library/packing.c extern/cmp/cmp.c)
+target_include_directories(applib PUBLIC src/library src/rpfits src/include extern/cmp)
+target_compile_options(applib PRIVATE -Werror -Wall -Wextra)
 
 add_library(atrpfits STATIC src/rpfits/reader.c src/rpfits/compute.c
   src/rpfits/atrpfits.c)
@@ -18,12 +18,12 @@ target_compile_options(summariser PRIVATE -Werror -Wall -Wextra -Wno-missing-fie
 
 add_executable(visplot src/apps/visplot/visplot.c)
 set_target_properties(visplot PROPERTIES LINKER_LANGUAGE Fortran)
-target_link_libraries(visplot PUBLIC atrpfits rpfits common cpgplot pgplot png z m X11)
+target_link_libraries(visplot PUBLIC atrpfits rpfits applib cpgplot pgplot png z m X11)
 target_compile_options(visplot PRIVATE -Werror -Wall -Wextra -Wno-missing-field-initializers)
 
-add_executable(rpfitsfile_server src/apps/rpfitsfile_server/rpfitsfile_server.c extern/cmp/cmp.c)
+add_executable(rpfitsfile_server src/apps/rpfitsfile_server/rpfitsfile_server.c)
 set_target_properties(rpfitsfile_server PROPERTIES LINKER_LANGUAGE Fortran)
-target_link_libraries(rpfitsfile_server PUBLIC atrpfits rpfits m)
-target_include_directories(rpfitsfile_server PUBLIC src/rpfits src/include extern/cmp)
+target_link_libraries(rpfitsfile_server PUBLIC applib atrpfits rpfits m)
+target_include_directories(rpfitsfile_server PUBLIC src/rpfits src/include extern/cmp src/library)
 target_compile_options(rpfitsfile_server PRIVATE -Werror -Wall -Wextra -Wno-missing-field-initializers)
 

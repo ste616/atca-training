@@ -456,7 +456,7 @@ void pol_to_vis_name(int pol, int if_num, char *vis_name) {
 void add_vis_line(struct vis_line ***vis_lines, int *n_vis_lines,
 		  int ant1, int ant2, int if_number, int pol) {
   struct vis_line *new_line = NULL;
-  char polname[BUFSIZE];
+  char polname[8];
   // Add a potential vis line.
   *n_vis_lines += 1;
   REALLOC(*vis_lines, *n_vis_lines);
@@ -906,7 +906,7 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
   int idxif, ni, ri, rj, rp, bi, bn, pc, inverted = NO, plot_started = NO;
   float xaxis_min, xaxis_max, yaxis_min, yaxis_max, theight = 0.4;
   float *freq_ordered = NULL, *freq_amp = NULL, *freq_phase = NULL;
-  char ptitle[BUFSIZE], ptype[BUFSIZE], ftype[BUFSIZE];
+  char ptitle[BIGBUFSIZE], ptype[BUFSIZE], ftype[BUFSIZE];
   struct ampphase **ampphase_if = NULL;
 
   // Work out how many antennas we will show.
@@ -1026,7 +1026,7 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
 	  } else if (ampphase_if[0]->window_name[0] == 'z') {
 	    snprintf(ftype, BUFSIZE, "ZM:%s", ampphase_if[0]->window_name + 1);
 	  }
-	  snprintf(ptitle, BUFSIZE, "%s: %s BSL%d%d",
+	  snprintf(ptitle, BIGBUFSIZE, "%s: %s BSL%d%d",
 		   ptype, ftype, ant1, ant2);
 
 	  plotpanel_minmax(ampphase_if, plot_controls, i, npols, polidx,

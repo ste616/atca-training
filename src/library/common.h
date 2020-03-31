@@ -13,6 +13,7 @@
  * Limits and magic numbers.
  */
 #define BUFSIZE 1024
+#define BIGBUFSIZE (4 * BUFSIZE)
 #define MAXANTS 6
 #define MAXIFS 34
 #define YES 1
