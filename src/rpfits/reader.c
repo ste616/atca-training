@@ -85,7 +85,7 @@ int open_rpfits_file(char *filename) {
     rpfits_result = rpfitsin_(&this_jstat, NULL, NULL, NULL, NULL, NULL,
 			      NULL, NULL, NULL, NULL, NULL, NULL);
   }
-  if ((this_jstat == JSTAT_UNSUCCESSFUL) || (rpfits_result != 0)) {
+  if ((this_jstat == JSTAT_UNSUCCESSFUL) || (rpfits_result == 0)) {
     fprintf(stderr, "Cannot open RPFITS file %s\n", filename);
   }
 
@@ -100,7 +100,7 @@ int close_rpfits_file(void) {
 
   rpfits_result = rpfitsin_(&this_jstat, NULL, NULL, NULL, NULL, NULL,
 			    NULL, NULL, NULL, NULL, NULL, NULL);
-  if (rpfits_result != 0) {
+  if (rpfits_result == 0) {
     fprintf(stderr, "Problem when closing RPFITS file\n");
   }
   

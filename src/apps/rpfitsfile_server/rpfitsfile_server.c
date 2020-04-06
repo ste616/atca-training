@@ -19,6 +19,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <stdbool.h>
+#include <time.h>
 #include "atrpfits.h"
 #include "memory.h"
 #include "cmp.h"
@@ -68,10 +69,10 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state) {
 
 static struct argp argp = { options, parse_opt, args_doc, doc };
 
-#define BUFSIZE 2048
+#define RPBUFSIZE 2048
 
 struct rpfits_file_information {
-  char filename[BUFSIZE];
+  char filename[RPBUFSIZE];
   int n_scans;
   struct scan_header_data *scan_headers;
   double *scan_start_mjd;
@@ -190,12 +191,12 @@ void data_reader(int read_type, int n_rpfits_files,
       // Does this file encompass the time we want?
       half_cycle = (double)info_rpfits_files[i]->scan_headers[0].cycle_time / (2.0 * 86400.0);
       if ((mjd_required >= (info_rpfits_files[i]->scan_start_mjd[0] - half_cycle)) &&
-	  (mjd_required <= (info_rpfits_files[i]->scan_end_mjd[info_rpfits_files[i]->n_scans - 1]
-			    + half_cycle))) {
-	open_file = true;
-      /* } else { */
-      /* 	printf("File %s does not cover the requested MJD %.6f\n", */
-      /* 	       info_rpfits_files[i]->filename, mjd_required); */
+          (mjd_required <= (info_rpfits_files[i]->scan_end_mjd[info_rpfits_files[i]->n_scans - 1]
+                            + half_cycle))) {
+        open_file = true;
+        /* } else { */
+        /* 	printf("File %s does not cover the requested MJD %.6f\n", */
+        /* 	       info_rpfits_files[i]->filename, mjd_required); */
       }
     }
     if (!open_file) {
@@ -204,7 +205,7 @@ void data_reader(int read_type, int n_rpfits_files,
     res = open_rpfits_file(info_rpfits_files[i]->filename);
     if (res) {
       fprintf(stderr, "OPEN FAILED FOR FILE %s, CODE %d\n",
-	      info_rpfits_files[i]->filename, res);
+              info_rpfits_files[i]->filename, res);
       continue;
     }
     keep_reading = true;
@@ -212,122 +213,122 @@ void data_reader(int read_type, int n_rpfits_files,
     while (keep_reading) {
       n = info_rpfits_files[i]->n_scans;
       if (read_type & READ_SCAN_METADATA) {
-	// We need to expand our metadata arrays as we go.
-	REALLOC(info_rpfits_files[i]->scan_headers, (n + 1));
-	REALLOC(info_rpfits_files[i]->scan_start_mjd, (n + 1));
-	REALLOC(info_rpfits_files[i]->scan_end_mjd, (n + 1));
+        // We need to expand our metadata arrays as we go.
+        REALLOC(info_rpfits_files[i]->scan_headers, (n + 1));
+        REALLOC(info_rpfits_files[i]->scan_start_mjd, (n + 1));
+        REALLOC(info_rpfits_files[i]->scan_end_mjd, (n + 1));
       }
       // We always need to read the scan headers to move through
       // the file, but where we direct the information changes.
       if (!(read_type & READ_SCAN_METADATA)) {
-	MALLOC(sh, 1);
+        MALLOC(sh, 1);
       } else {
-	sh = &(info_rpfits_files[i]->scan_headers[n]);
+        sh = &(info_rpfits_files[i]->scan_headers[n]);
       }
       res = read_scan_header(sh);
       header_free = true;
       if (sh->ut_seconds > 0) {
-	curr_header += 1;
-	if (read_type & READ_SCAN_METADATA) {
-	  // Keep track of the times covered by each scan.
-	  header_free = false;
-	  info_rpfits_files[i]->scan_start_mjd[n] =
-	    info_rpfits_files[i]->scan_end_mjd[n] = date2mjd(sh->obsdate, sh->ut_seconds);
-	  info_rpfits_files[i]->n_scans += 1;
-	}
-	// HERE WILL GO THE LOGIC TO WORK OUT IF WE NEED TO READ
-	// CYCLES FROM THIS SCAN
-	read_cycles = false;
-	if ((read_type & READ_SCAN_METADATA) ||
-	    (read_type & COMPUTE_VIS_PRODUCTS)) {
-	  // In both of these cases we have to look at all data.
-	  read_cycles = true;
-	}
-	if (read_type & GRAB_SPECTRUM) {
-	  // Check if this scan contains the cycle with MJD matching
-	  // the required.
-	  /* printf("assessing scan header %d: %.6f / %.6f / %.6f\n", curr_header, */
-	  /* 	 info_rpfits_files[i]->scan_start_mjd[curr_header], */
-	  /* 	 mjd_required, */
-	  /* 	 info_rpfits_files[i]->scan_end_mjd[curr_header]); */
-	  if ((mjd_required >= info_rpfits_files[i]->scan_start_mjd[curr_header]) &&
-	      (mjd_required <= info_rpfits_files[i]->scan_end_mjd[curr_header])) {
-	    /* printf("scan should contain what we're looking for\n"); */
-	    read_cycles = true;
-	  /* } else { */
-	  /*   printf("ignoring this scan\n"); */
-	  }
-	}
-	if (read_cycles && (res & READER_DATA_AVAILABLE)) {
-	  keep_cycling = true;
-	  while (keep_cycling) {
-	    cycle_data = prepare_new_cycle_data();
-	    res = read_cycle_data(sh, cycle_data);
-	    cycle_free = true;
-	    if (!(res & READER_DATA_AVAILABLE)) {
-	      keep_cycling = false;
-	    }
-	    // HERE WILL GO THE LOGIC TO WORK OUT IF WE WANT TO DO
-	    // SOMETHING WITH THIS CYCLE
-	    cycle_mjd = date2mjd(sh->obsdate, cycle_data->ut_seconds);
-	    if (read_type & READ_SCAN_METADATA) {
-	      info_rpfits_files[i]->scan_end_mjd[n] = cycle_mjd;
-	    }
-	    if (read_type & GRAB_SPECTRUM) {
-	      // We consider this the correct cycle if the requested
-	      // MJD is within half a cycle time of this cycle's time.
-	      cycle_start = cycle_mjd - ((double)sh->cycle_time / (2 * 86400.0));
-	      cycle_end = cycle_mjd + ((double)sh->cycle_time / (2 * 86400.0));
-	      /* printf("%.6f / %.6f / %.6f\n", cycle_start, mjd_required, cycle_end); */
-	      if ((mjd_required >= cycle_start) &&
-		  (mjd_required <= cycle_end)) {
-		// Convert this cycle into the spectrum that we return.
-		// Allocate all the memory we need.
-		printf("cycle found!\n");
-		spectrum_data->num_ifs = sh->num_ifs;
-		MALLOC(spectrum_data->spectrum, spectrum_data->num_ifs);
-		for (idx_if = 0; idx_if < spectrum_data->num_ifs; idx_if++) {
-		  spectrum_data->num_pols = sh->if_num_stokes[idx_if];
-		  CALLOC(spectrum_data->spectrum[idx_if], spectrum_data->num_pols);
-		  for (idx_pol = 0; idx_pol < spectrum_data->num_pols; idx_pol++) {
-		    calcres = vis_ampphase(sh, cycle_data,
-					   &(spectrum_data->spectrum[idx_if][idx_pol]),
-					   pols[idx_pol], sh->if_label[idx_if],
-					   ampphase_options);
-		    if (calcres < 0) {
-		      fprintf(stderr, "CALCULATING AMP AND PHASE FAILED FOR IF %d POL %d, CODE %d\n",
-			      sh->if_label[idx_if], pols[idx_pol], calcres);
-		    } else {
-		      printf("CONVERTED SPECTRUM FOR CYCLE IF %d POL %d AT MJD %.6f\n",
-			     sh->if_label[idx_if], pols[idx_pol], cycle_mjd);
-		    }
-		  }
-		}
-		// We don't need to search any more.
-		keep_cycling = false;
-		keep_reading = false;
-	      }
-	    }
-	    // Do we need to free this memory now?
-	    if (cycle_free) {
-	      free_cycle_data(cycle_data);
-	      FREE(cycle_data);
-	    }
-	  }
-	}
+        curr_header += 1;
+        if (read_type & READ_SCAN_METADATA) {
+          // Keep track of the times covered by each scan.
+          header_free = false;
+          info_rpfits_files[i]->scan_start_mjd[n] =
+            info_rpfits_files[i]->scan_end_mjd[n] = date2mjd(sh->obsdate, sh->ut_seconds);
+          info_rpfits_files[i]->n_scans += 1;
+        }
+        // HERE WILL GO THE LOGIC TO WORK OUT IF WE NEED TO READ
+        // CYCLES FROM THIS SCAN
+        read_cycles = false;
+        if ((read_type & READ_SCAN_METADATA) ||
+            (read_type & COMPUTE_VIS_PRODUCTS)) {
+          // In both of these cases we have to look at all data.
+          read_cycles = true;
+        }
+        if (read_type & GRAB_SPECTRUM) {
+          // Check if this scan contains the cycle with MJD matching
+          // the required.
+          /* printf("assessing scan header %d: %.6f / %.6f / %.6f\n", curr_header, */
+          /* 	 info_rpfits_files[i]->scan_start_mjd[curr_header], */
+          /* 	 mjd_required, */
+          /* 	 info_rpfits_files[i]->scan_end_mjd[curr_header]); */
+          if ((mjd_required >= info_rpfits_files[i]->scan_start_mjd[curr_header]) &&
+              (mjd_required <= info_rpfits_files[i]->scan_end_mjd[curr_header])) {
+            /* printf("scan should contain what we're looking for\n"); */
+            read_cycles = true;
+            /* } else { */
+            /*   printf("ignoring this scan\n"); */
+          }
+        }
+        if (read_cycles && (res & READER_DATA_AVAILABLE)) {
+          keep_cycling = true;
+          while (keep_cycling) {
+            cycle_data = prepare_new_cycle_data();
+            res = read_cycle_data(sh, cycle_data);
+            cycle_free = true;
+            if (!(res & READER_DATA_AVAILABLE)) {
+              keep_cycling = false;
+            }
+            // HERE WILL GO THE LOGIC TO WORK OUT IF WE WANT TO DO
+            // SOMETHING WITH THIS CYCLE
+            cycle_mjd = date2mjd(sh->obsdate, cycle_data->ut_seconds);
+            if (read_type & READ_SCAN_METADATA) {
+              info_rpfits_files[i]->scan_end_mjd[n] = cycle_mjd;
+            }
+            if (read_type & GRAB_SPECTRUM) {
+              // We consider this the correct cycle if the requested
+              // MJD is within half a cycle time of this cycle's time.
+              cycle_start = cycle_mjd - ((double)sh->cycle_time / (2 * 86400.0));
+              cycle_end = cycle_mjd + ((double)sh->cycle_time / (2 * 86400.0));
+              /* printf("%.6f / %.6f / %.6f\n", cycle_start, mjd_required, cycle_end); */
+              if ((mjd_required >= cycle_start) &&
+                  (mjd_required <= cycle_end)) {
+                // Convert this cycle into the spectrum that we return.
+                // Allocate all the memory we need.
+                printf("cycle found!\n");
+                spectrum_data->num_ifs = sh->num_ifs;
+                MALLOC(spectrum_data->spectrum, spectrum_data->num_ifs);
+                for (idx_if = 0; idx_if < spectrum_data->num_ifs; idx_if++) {
+                  spectrum_data->num_pols = sh->if_num_stokes[idx_if];
+                  CALLOC(spectrum_data->spectrum[idx_if], spectrum_data->num_pols);
+                  for (idx_pol = 0; idx_pol < spectrum_data->num_pols; idx_pol++) {
+                    calcres = vis_ampphase(sh, cycle_data,
+                                           &(spectrum_data->spectrum[idx_if][idx_pol]),
+                                           pols[idx_pol], sh->if_label[idx_if],
+                                           ampphase_options);
+                    if (calcres < 0) {
+                      fprintf(stderr, "CALCULATING AMP AND PHASE FAILED FOR IF %d POL %d, CODE %d\n",
+                              sh->if_label[idx_if], pols[idx_pol], calcres);
+                    } else {
+                      printf("CONVERTED SPECTRUM FOR CYCLE IF %d POL %d AT MJD %.6f\n",
+                             sh->if_label[idx_if], pols[idx_pol], cycle_mjd);
+                    }
+                  }
+                }
+                // We don't need to search any more.
+                keep_cycling = false;
+                keep_reading = false;
+              }
+            }
+            // Do we need to free this memory now?
+            if (cycle_free) {
+              free_cycle_data(cycle_data);
+              FREE(cycle_data);
+            }
+          }
+        }
       }
       if (header_free) {
-	free_scan_header_data(sh);
+        free_scan_header_data(sh);
       }
       if (res == READER_EXHAUSTED) {
-	keep_reading = false;
+        keep_reading = false;
       }
     }
     // If we get here we must have opened the RPFITS file.
     res = close_rpfits_file();
     if (res) {
       fprintf(stderr, "CLOSE FAILED FOR FILE %s, CODE %d\n",
-	      info_rpfits_files[i]->filename, res);
+              info_rpfits_files[i]->filename, res);
       return;
     }
   }
@@ -335,7 +336,8 @@ void data_reader(int read_type, int n_rpfits_files,
 
 int main(int argc, char *argv[]) {
   struct arguments arguments;
-  int i, j;
+  int i, j, ri, rj;
+  double mjd_grab;
   struct rpfits_file_information **info_rpfits_files = NULL;
   struct ampphase_options ampphase_options;
   struct spectrum_data spectrum_data;
@@ -369,7 +371,7 @@ int main(int argc, char *argv[]) {
   // Put the names of the RPFITS files into the info structure.
   for (i = 0; i < arguments.n_rpfits_files; i++) {
     info_rpfits_files[i] = new_rpfits_file();
-    strncpy(info_rpfits_files[i]->filename, arguments.rpfits_files[i], BUFSIZE);
+    strncpy(info_rpfits_files[i]->filename, arguments.rpfits_files[i], RPBUFSIZE);
   }
   data_reader(READ_SCAN_METADATA, arguments.n_rpfits_files, 0.0, &ampphase_options,
 	      info_rpfits_files, &spectrum_data, &vis_quantities);
@@ -377,21 +379,26 @@ int main(int argc, char *argv[]) {
   // Print out the summary.
   for (i = 0; i < arguments.n_rpfits_files; i++) {
     printf("RPFITS FILE: %s (%d scans):\n",
-	   info_rpfits_files[i]->filename, info_rpfits_files[i]->n_scans);
+           info_rpfits_files[i]->filename, info_rpfits_files[i]->n_scans);
     for (j = 0; j < info_rpfits_files[i]->n_scans; j++) {
       printf("  scan %d (%s, %s) MJD range %.6f -> %.6f\n", (j + 1),
-	     info_rpfits_files[i]->scan_headers[j].source_name,
-	     info_rpfits_files[i]->scan_headers[j].obstype,
-	     info_rpfits_files[i]->scan_start_mjd[j],
-	     info_rpfits_files[i]->scan_end_mjd[j]);
+             info_rpfits_files[i]->scan_headers[j].source_name,
+             info_rpfits_files[i]->scan_headers[j].obstype,
+             info_rpfits_files[i]->scan_start_mjd[j],
+             info_rpfits_files[i]->scan_end_mjd[j]);
     }
     printf("\n");
   }
-
+  
   // Let's try to load one of the spectra.
   printf("Trying to grab a spectrum.\n");
-  data_reader(GRAB_SPECTRUM, arguments.n_rpfits_files, 58501.470312,
-	      &ampphase_options, info_rpfits_files, &spectrum_data, &vis_quantities);
+  srand(time(NULL));
+  ri = rand() % arguments.n_rpfits_files;
+  rj = rand() % info_rpfits_files[ri]->n_scans;
+  mjd_grab = info_rpfits_files[ri]->scan_start_mjd[rj] + 10.0 / 86400.0;
+  printf(" grabbing from random scan %d from file %d, MJD %.6f\n", rj, ri, mjd_grab);
+  data_reader(GRAB_SPECTRUM, arguments.n_rpfits_files, mjd_grab,
+              &ampphase_options, info_rpfits_files, &spectrum_data, &vis_quantities);
   // Save these spectra to a file after packing it.
   fh = fopen("test.dat", "w+b");
   if (fh == NULL) {
