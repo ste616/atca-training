@@ -27,3 +27,8 @@ target_link_libraries(rpfitsfile_server PUBLIC applib atrpfits rpfits m)
 target_include_directories(rpfitsfile_server PUBLIC src/rpfits src/include extern/cmp src/library)
 target_compile_options(rpfitsfile_server PRIVATE -Werror -Wall -Wextra -Wno-missing-field-initializers)
 
+add_executable(nspd src/apps/nspd/nspd.c)
+set_target_properties(nspd PROPERTIES LINKER_LANGUAGE Fortran)
+target_link_libraries(nspd PUBLIC applib atrpfits rpfits m)
+target_include_directories(nspd PUBLIC src/rpfits src/include extern/cmp src/library)
+target_compile_options(nspd PRIVATE -Werror -Wall -Wextra -Wno-missing-field-initializers)

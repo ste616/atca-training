@@ -7,6 +7,8 @@
  */
 
 #pragma once
+#include <stdbool.h>
+#include <stdint.h>
 #include "atrpfits.h"
 #include "cmp.h"
 
@@ -33,52 +35,37 @@ bool read_bytes(void *data, size_t sz, FILE *fh);
 bool file_reader(cmp_ctx_t *ctx, void *data, size_t limit);
 bool file_skipper(cmp_ctx_t *ctx, size_t count);
 size_t file_writer(cmp_ctx_t *ctx, const void *data, size_t count);
+void pack_read_bool(cmp_ctx_t *cmp, bool *value);
+void pack_write_bool(cmp_ctx_t *cmp, bool value);
+void pack_read_sint(cmp_ctx_t *cmp, int *value);
+void pack_write_sint(cmp_ctx_t *cmp, int value);
+void pack_read_uint(cmp_ctx_t *cmp, unsigned int *value);
+void pack_write_uint(cmp_ctx_t *cmp, unsigned int value);
+void pack_read_float(cmp_ctx_t *cmp, float *value);
+void pack_write_float(cmp_ctx_t *cmp, float value);
+void pack_read_string(cmp_ctx_t *cmp, char *value, int maxlength);
+void pack_write_string(cmp_ctx_t *cmp, char *value, long unsigned int maxlength);
+unsigned int pack_readarray_checksize(cmp_ctx_t *cmp, unsigned int expected_length);
+void pack_readarray_float(cmp_ctx_t *cmp, unsigned int expected_length, float *array);
+void pack_writearray_float(cmp_ctx_t *cmp, unsigned int length, float *array);
+void pack_readarray_floatcomplex(cmp_ctx_t *cmp, unsigned int expected_length,
+                                 float complex *array);
+void pack_writearray_floatcomplex(cmp_ctx_t *cmp, unsigned int length,
+                                  float complex *array);
+void pack_readarray_sint(cmp_ctx_t *cmp, unsigned int expected_length, int *array);
+void pack_writearray_sint(cmp_ctx_t *cmp, unsigned int length, int *array);
 void pack_ampphase_options(cmp_ctx_t *cmp, struct ampphase_options *a);
+void unpack_ampphase_options(cmp_ctx_t *cmp, struct ampphase_options *a);
 void pack_ampphase(cmp_ctx_t *cmp, struct ampphase *a);
+void unpack_ampphase(cmp_ctx_t *cmp, struct ampphase *a);
 void pack_spectrum_data(cmp_ctx_t *cmp, struct spectrum_data *a);
+void unpack_spectrum_data(cmp_ctx_t *cmp, struct spectrum_data *a);
+
+#define CMPERROR(c) error_and_exit(cmp_strerror(c))
 
 // Some shortcut definitions for writing and reading to the
 // packing object.
-// Boolean write.
-#define CMPW_BOOL(c, v) if (!cmp_write_bool(c, (bool)v)) error_and_exit(cmp_strerror(c))
-// Signed integer write.
-#define CMPW_SINT(c, v) if (!cmp_write_sint(c, (int)v)) error_and_exit(cmp_strerror(c))
-// Unsigned integer write.
-#define CMPW_UINT(c, v) if (!cmp_write_uint(c, (unsigned int)v)) error_and_exit(cmp_strerror(c))
-// Float write.
-#define CMPW_FLOAT(c, v) if (!cmp_write_float(c, (float)v)) error_and_exit(cmp_strerror(c))
-// String write. We write the length of the string first, then the string.
-#define CMPW_STRING(c, v, m)                                        \
-    do {                                                            \
-        CMPW_UINT(c, (strlen(v) < m) ? strlen(v) : m);              \
-        if (!cmp_write_str(c, v, (strlen(v) < m) ? strlen(v) : m))  \
-            error_and_exit(cmp_strerror(c));                        \
-    } while(0)
 // Array size initialiser.
-#define CMPW_ARRAYINIT(c, l) if (!cmp_write_array(c, l)) error_and_exit(cmp_strerror(c))
-// Array writers.
-#define CMPW_ARRAYFLOAT(c, l, a)                \
-    do {                                        \
-        int ii;                                 \
-        CMPW_ARRAYINIT(c, l);                   \
-        for (ii = 0; ii < l; ii++) {            \
-            CMPW_FLOAT(c, a[ii]);               \
-        }                                       \
-    } while (0)
-#define CMPW_ARRAYFLOATCOMPLEX(c, l, a)         \
-    do {                                        \
-        int ii;                                 \
-        CMPW_ARRAYINIT(c, 2 * l);               \
-        for (ii = 0; ii < l; ii++) {            \
-            CMPW_FLOAT(c, creal(a[ii]));        \
-            CMPW_FLOAT(c, cimag(a[ii]));        \
-        }                                       \
-    } while (0)
-#define CMPW_ARRAYSINT(c, l, a)                 \
-    do {                                        \
-        int ii;                                 \
-        CMPW_ARRAYINIT(c, l);                   \
-        for (ii = 0; ii < l; ii++) {            \
-            CMPW_SINT(c, a[ii]);                \
-        }                                       \
-    } while (0)
+#define CMPW_ARRAYINIT(c, l) if (!cmp_write_array(c, l)) CMPERROR(c)
+// Array size getter.
+#define CMPR_ARRAYSIZE(c, l) if (!cmp_read_array(c, &l)) CMPERROR(c)
