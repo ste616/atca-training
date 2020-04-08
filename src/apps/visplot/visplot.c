@@ -80,7 +80,7 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state) {
   long int ifnum;
   char *token, *eptr = NULL;
   const char s[2] = ",", sp[2] = " ";
-
+  
   switch (key) {
   case 'a':
     strncpy(arguments->array_spec, arg, BUFSIZE);
@@ -91,7 +91,7 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state) {
     while (token != NULL) {
       ifnum = atoi(token);
       if ((ifnum >= 0) && (ifnum <= MAXIFS) && (i < 2)) {
-	arguments->visband[i] = ifnum;
+        arguments->visband[i] = ifnum;
       }
       token = strtok(NULL, s);
     }
@@ -115,17 +115,17 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state) {
       // Check if the string can be straight converted to a number.
       ifnum = strtol(token, &eptr, 10);
       if (*eptr != 0) {
-	// This is a string, just copy it.
-	(void)strncpy(arguments->plot_ifs[arguments->nifs], token, BUFSIZE);
-	arguments->nifs++;
+        // This is a string, just copy it.
+        (void)strncpy(arguments->plot_ifs[arguments->nifs], token, BUFSIZE);
+        arguments->nifs++;
       } else {
-	// It's a number.
-	i = (int)ifnum;
-	if ((i >= 1) && (i <= MAXIFS) && (arguments->nifs < MAXIFS)) {
-	  (void)snprintf(arguments->plot_ifs[arguments->nifs], BUFSIZE,
-			 "f%d", i);
-	  arguments->nifs++;
-	}
+        // It's a number.
+        i = (int)ifnum;
+        if ((i >= 1) && (i <= MAXIFS) && (arguments->nifs < MAXIFS)) {
+          (void)snprintf(arguments->plot_ifs[arguments->nifs], BUFSIZE,
+                         "f%d", i);
+          arguments->nifs++;
+        }
       }
       token = strtok(NULL, s);
     }
@@ -153,17 +153,17 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state) {
     token = strtok(arg, s);
     while (token != NULL) {
       if (strcmp(token, "xx") == 0) {
-	arguments->plot_pols |= PLOT_POL_XX;
-	arguments->npols++;
+        arguments->plot_pols |= PLOT_POL_XX;
+        arguments->npols++;
       } else if (strcmp(token, "yy") == 0) {
-	arguments->plot_pols |= PLOT_POL_YY;
-	arguments->npols++;
+        arguments->plot_pols |= PLOT_POL_YY;
+        arguments->npols++;
       } else if (strcmp(token, "xy") == 0) {
-	arguments->plot_pols |= PLOT_POL_XY;
-	arguments->npols++;
+        arguments->plot_pols |= PLOT_POL_XY;
+        arguments->npols++;
       } else if (strcmp(token, "yx") == 0) {
-	arguments->plot_pols |= PLOT_POL_YX;
-	arguments->npols++;
+        arguments->plot_pols |= PLOT_POL_YX;
+        arguments->npols++;
       }
       token = strtok(NULL, s);
     }
@@ -317,11 +317,11 @@ int main(int argc, char *argv[]) {
   }
   
   init_spd_plotcontrols(&spd_plotcontrols, xaxis_type, yaxis_type,
-			arguments.plot_pols, DEFAULT, spd_pgplot);
+                        arguments.plot_pols, DEFAULT, spd_pgplot);
   init_vis_plotcontrols(&vis_plotcontrols, PLOT_TIME,
-			PLOT_AMPLITUDE | PLOT_PHASE | PLOT_DELAY,
-			arguments.visband,
-			vis_pgplot, &vis_panelspec);
+                        PLOT_AMPLITUDE | PLOT_PHASE | PLOT_DELAY,
+                        arguments.visband,
+                        vis_pgplot, &vis_panelspec);
   spd_plotcontrols.array_spec = interpret_array_string(arguments.array_spec);
   vis_plotcontrols.array_spec = interpret_array_string(arguments.array_spec);
   spd_plotcontrols.interactive = arguments.interactive;
@@ -346,63 +346,63 @@ int main(int argc, char *argv[]) {
       read_response = read_scan_header(&(scan_data->header_data));
       // Adjust the number of IFs.
       num_ifs = (scan_data->header_data.num_ifs < arguments.nifs) ?
-	scan_data->header_data.num_ifs : arguments.nifs;
+        scan_data->header_data.num_ifs : arguments.nifs;
       printf("scan has obs date %s, time %.1f\n",
-	     scan_data->header_data.obsdate,
-	     scan_data->header_data.ut_seconds);
+             scan_data->header_data.obsdate,
+             scan_data->header_data.ut_seconds);
       printf("  type %s, source %s, calcode %s\n",
-	     scan_data->header_data.obstype,
-	     scan_data->header_data.source_name,
-	     scan_data->header_data.calcode);
+             scan_data->header_data.obstype,
+             scan_data->header_data.source_name,
+             scan_data->header_data.calcode);
       printf("  coordinates RA = %.4f, Dec = %.4f\n",
-	     scan_data->header_data.rightascension_hours,
-	     scan_data->header_data.declination_degrees);
+             scan_data->header_data.rightascension_hours,
+             scan_data->header_data.declination_degrees);
       printf("  number of IFs = %d, cycle time = %d\n",
-	     scan_data->header_data.num_ifs, scan_data->header_data.cycle_time);
+             scan_data->header_data.num_ifs, scan_data->header_data.cycle_time);
       if (scan_data->header_data.cycle_time > global_max_cycletime) {
-	global_max_cycletime = scan_data->header_data.cycle_time;
+        global_max_cycletime = scan_data->header_data.cycle_time;
       }
       if (read_response & READER_DATA_AVAILABLE) {
-	// Now start reading the cycle data.
-	read_cycle = 1;
-	while (read_cycle) {
-	  //printf("reading cycle\n");
-	  cycle_data = scan_add_cycle(scan_data);
-	  read_response = read_cycle_data(&(scan_data->header_data),
-					  cycle_data);
-	  /* fprintf(stderr, "found read response %d\n", read_response); */
-	  /* printf("cycle has %d points\n", cycle_data->num_points); */
-	  if (!(read_response & READER_DATA_AVAILABLE)) {
-	    read_cycle = 0;
-	    //keep_reading = 0;
-	    /* printf("something went wrong while reading cycle: %d\n", */
-	    /* 	   read_response); */
-	  }
-	}
+        // Now start reading the cycle data.
+        read_cycle = 1;
+        while (read_cycle) {
+          //printf("reading cycle\n");
+          cycle_data = scan_add_cycle(scan_data);
+          read_response = read_cycle_data(&(scan_data->header_data),
+                                          cycle_data);
+          /* fprintf(stderr, "found read response %d\n", read_response); */
+          /* printf("cycle has %d points\n", cycle_data->num_points); */
+          if (!(read_response & READER_DATA_AVAILABLE)) {
+            read_cycle = 0;
+            //keep_reading = 0;
+            /* printf("something went wrong while reading cycle: %d\n", */
+            /* 	   read_response); */
+          }
+        }
       }
       // We allocate memory if we need to.
       if (num_ifs != old_num_ifs) {
-	/* printf("Reallocating cycle memory...\n"); */
-	for (j = 0; j < old_num_ifs; j++) {
-	  for (k = 0; k < arguments.npols; k++) {
-	    FREE(cycle_ampphase[j][k]);
-	  }
-	  FREE(cycle_ampphase[j]);
-	}
-	FREE(cycle_ampphase);
-	MALLOC(cycle_ampphase, num_ifs);
-	for (j = 0; j < num_ifs; j++) {
-	  MALLOC(cycle_ampphase[j], arguments.npols);
-	  for (k = 0; k < arguments.npols; k++) {
-	    cycle_ampphase[j][k] = NULL;
-	  }
-	}
-	old_num_ifs = num_ifs;
-	// Change the plot control as well.
-	memset(spd_plotcontrols.if_num_spec, 0,
-	       sizeof(spd_plotcontrols.if_num_spec));
+        /* printf("Reallocating cycle memory...\n"); */
+        for (j = 0; j < old_num_ifs; j++) {
+          for (k = 0; k < arguments.npols; k++) {
+            FREE(cycle_ampphase[j][k]);
+          }
+          FREE(cycle_ampphase[j]);
+        }
+        FREE(cycle_ampphase);
+        MALLOC(cycle_ampphase, num_ifs);
+        for (j = 0; j < num_ifs; j++) {
+          MALLOC(cycle_ampphase[j], arguments.npols);
+          for (k = 0; k < arguments.npols; k++) {
+            cycle_ampphase[j][k] = NULL;
+          }
+        }
+        old_num_ifs = num_ifs;
+        // Change the plot control as well.
+        memset(spd_plotcontrols.if_num_spec, 0,
+               sizeof(spd_plotcontrols.if_num_spec));
       }
-
+      
       //printf("working with %d cycles\n", scan_data->num_cycles);
       // Reallocate the vis data.
       vis_num_cycles += scan_data->num_cycles;
@@ -410,92 +410,92 @@ int main(int argc, char *argv[]) {
       REALLOC(cycle_vis_quantities, vis_num_cycles);
       REALLOC(vis_cycle_num_ifs, vis_num_cycles);
       for (k = 0; k < scan_data->num_cycles; k++) {
-	cycle_data = scan_data->cycles[k];
-	/* printf("cycle %d, number of IFs = %d\n", k, num_ifs); */
-	//printf("   current cycle = %d\n", nviscycle);
-	vis_cycle_num_ifs[nviscycle] = num_ifs;
-	MALLOC(cycle_vis_quantities[nviscycle], num_ifs);
-	for (q = 0; q < num_ifs; q++) {
-	  if_no = find_if_name(&(scan_data->header_data),
-			       arguments.plot_ifs[q]);
-	  spd_plotcontrols.if_num_spec[if_no] = 1;
-	  MALLOC(cycle_vis_quantities[nviscycle][q], arguments.npols);
-	  for (p = 0; p < arguments.npols; p++) {
-	    pp = p;
-	    if (pp == 0) {
-	      if (arguments.plot_pols & PLOT_POL_XX) {
-		sp = POL_XX;
-	      } else {
-		pp++;
-	      }
-	    }
-	    if (pp == 1) {
-	      if (arguments.plot_pols & PLOT_POL_YY) {
-		sp = POL_YY;
-	      } else {
-		pp++;
-	      }
-	    }
-	    if (pp == 2) {
-	      if (arguments.plot_pols & PLOT_POL_XY) {
-		sp = POL_XY;
-	      } else {
-		pp++;
-	      }
-	    }
-	    if (pp == 3) {
-	      if (arguments.plot_pols & PLOT_POL_YX) {
-		sp = POL_YX;
-	      } else {
-		sp = POL_XX; // Safety.
-	      }
-	    }
-	    r = vis_ampphase(&(scan_data->header_data), cycle_data,
-			     &(cycle_ampphase[q][p]), sp, if_no,
-			     &ampphase_options);
-	    if (r < 0) {
-	      printf("error encountered while calculating amp and phase\n");
-	      free_ampphase(&(cycle_ampphase[q][p]));
-	      exit(0);
-	    /* } else { */
-	    /*   printf("frequency determined to be %.6f - %.6f\n", */
-	    /* 	     cycle_ampphase[q][p]->frequency[0], */
-	    /* 	     cycle_ampphase[q][p]->frequency */
-	    /* 	     [cycle_ampphase[q][p]->nchannels - 1]); */
-	    /*   fflush(stdout); */
-	    }
-	    // Calculate the vis quantities as well.
-	    cycle_vis_quantities[nviscycle][q][p] = NULL;
-	    r = ampphase_average(cycle_ampphase[q][p],
-				 &(cycle_vis_quantities[nviscycle][q][p]),
-				 &ampphase_options);
-	  }
-	}
-	make_spd_plot(cycle_ampphase, &spd_panelspec, &spd_plotcontrols);
-	for (q = 0; q < num_ifs; q++) {
-	  for (p = 0; p < arguments.npols; p++) {
-	    free_ampphase(&(cycle_ampphase[q][p]));
-	  }
-	}
-	nviscycle++;
-
+        cycle_data = scan_data->cycles[k];
+        /* printf("cycle %d, number of IFs = %d\n", k, num_ifs); */
+        //printf("   current cycle = %d\n", nviscycle);
+        vis_cycle_num_ifs[nviscycle] = num_ifs;
+        MALLOC(cycle_vis_quantities[nviscycle], num_ifs);
+        for (q = 0; q < num_ifs; q++) {
+          if_no = find_if_name(&(scan_data->header_data),
+                               arguments.plot_ifs[q]);
+          spd_plotcontrols.if_num_spec[if_no] = 1;
+          MALLOC(cycle_vis_quantities[nviscycle][q], arguments.npols);
+          for (p = 0; p < arguments.npols; p++) {
+            pp = p;
+            if (pp == 0) {
+              if (arguments.plot_pols & PLOT_POL_XX) {
+                sp = POL_XX;
+              } else {
+                pp++;
+              }
+            }
+            if (pp == 1) {
+              if (arguments.plot_pols & PLOT_POL_YY) {
+                sp = POL_YY;
+              } else {
+                pp++;
+              }
+            }
+            if (pp == 2) {
+              if (arguments.plot_pols & PLOT_POL_XY) {
+                sp = POL_XY;
+              } else {
+                pp++;
+              }
+            }
+            if (pp == 3) {
+              if (arguments.plot_pols & PLOT_POL_YX) {
+                sp = POL_YX;
+              } else {
+                sp = POL_XX; // Safety.
+              }
+            }
+            r = vis_ampphase(&(scan_data->header_data), cycle_data,
+                             &(cycle_ampphase[q][p]), sp, if_no,
+                             &ampphase_options);
+            if (r < 0) {
+              printf("error encountered while calculating amp and phase\n");
+              free_ampphase(&(cycle_ampphase[q][p]));
+              exit(0);
+              /* } else { */
+              /*   printf("frequency determined to be %.6f - %.6f\n", */
+              /* 	     cycle_ampphase[q][p]->frequency[0], */
+              /* 	     cycle_ampphase[q][p]->frequency */
+              /* 	     [cycle_ampphase[q][p]->nchannels - 1]); */
+              /*   fflush(stdout); */
+            }
+            // Calculate the vis quantities as well.
+            cycle_vis_quantities[nviscycle][q][p] = NULL;
+            r = ampphase_average(cycle_ampphase[q][p],
+                                 &(cycle_vis_quantities[nviscycle][q][p]),
+                                 &ampphase_options);
+          }
+        }
+        make_spd_plot(cycle_ampphase, &spd_panelspec, &spd_plotcontrols);
+        for (q = 0; q < num_ifs; q++) {
+          for (p = 0; p < arguments.npols; p++) {
+            free_ampphase(&(cycle_ampphase[q][p]));
+          }
+        }
+        nviscycle++;
+        
       }
-    
+      
       if (read_response == READER_EXHAUSTED) {
-	// No more data in this file.
-	keep_reading = 0;
+        // No more data in this file.
+        keep_reading = 0;
       } // Otherwise we've probably hit another header.
       printf("scan had %d cycles\n", scan_data->num_cycles);
     }
     for (j = 0; j < old_num_ifs; j++) {
       for (k = 0; k < arguments.npols; k++) {
-	FREE(cycle_ampphase[j][k]);
+        FREE(cycle_ampphase[j][k]);
       }
       FREE(cycle_ampphase[j]);
     }
     FREE(cycle_ampphase);
     old_num_ifs = 0;
-
+    
     // Close it before moving on.
     res = close_rpfits_file();
     printf("Attempt to close RPFITS file, %d\n", res);
@@ -505,19 +505,19 @@ int main(int argc, char *argv[]) {
   // Make the vis plot now.
   vis_plotcontrols.cycletime = global_max_cycletime;
   make_vis_plot(cycle_vis_quantities, vis_num_cycles,
-		vis_cycle_num_ifs, arguments.npols,
-		&vis_panelspec, &vis_plotcontrols);
-
+                vis_cycle_num_ifs, arguments.npols,
+                &vis_panelspec, &vis_plotcontrols);
+  
   // Close all the PGPLOT devices.
   cpgend();
-
+  
 
   // Free all the memory we allocated.
   // The vis data.
   for (i = 0; i < vis_num_cycles; i++) {
     for (j = 0; j < vis_cycle_num_ifs[i]; j++) {
       for (k = 0; k < arguments.npols; k++) {
-	free_vis_quantities(&cycle_vis_quantities[i][j][k]);
+        free_vis_quantities(&cycle_vis_quantities[i][j][k]);
       }
       FREE(cycle_vis_quantities[i][j]);
     }

@@ -74,7 +74,7 @@ static struct argp argp = { options, parse_opt, args_doc, doc };
 struct rpfits_file_information {
   char filename[RPBUFSIZE];
   int n_scans;
-  struct scan_header_data *scan_headers;
+  struct scan_header_data **scan_headers;
   double *scan_start_mjd;
   double *scan_end_mjd;
 };
@@ -166,14 +166,17 @@ double date2mjd(char *obsdate, float ut_seconds) {
 void data_reader(int read_type, int n_rpfits_files,
 		 double mjd_required, struct ampphase_options *ampphase_options,
 		 struct rpfits_file_information **info_rpfits_files,
-		 struct spectrum_data *spectrum_data,
+		 struct spectrum_data **spectrum_data,
 		 struct vis_quantities ****vis_quantities) {
-  int i, res, open_file, keep_reading, n, read_cycles, keep_cycling, calcres;
-  int cycle_free, header_free, curr_header, idx_if, idx_pol;
+  int i, res, n, calcres;
+  int curr_header, idx_if, idx_pol;
   int pols[4] = { POL_XX, POL_YY, POL_XY, POL_YX };
+  bool open_file, keep_reading, header_free, read_cycles, keep_cycling;
+  bool cycle_free, spectrum_return;
   double cycle_mjd, cycle_start, cycle_end, half_cycle;
   struct scan_header_data *sh = NULL;
   struct cycle_data *cycle_data = NULL;
+  struct spectrum_data *temp_spectrum = NULL;
 
   if (vis_quantities == NULL) {
     // Resist warnings.
@@ -189,7 +192,7 @@ void data_reader(int read_type, int n_rpfits_files,
     }
     if (read_type & GRAB_SPECTRUM) {
       // Does this file encompass the time we want?
-      half_cycle = (double)info_rpfits_files[i]->scan_headers[0].cycle_time / (2.0 * 86400.0);
+      half_cycle = (double)info_rpfits_files[i]->scan_headers[0]->cycle_time / (2.0 * 86400.0);
       if ((mjd_required >= (info_rpfits_files[i]->scan_start_mjd[0] - half_cycle)) &&
           (mjd_required <= (info_rpfits_files[i]->scan_end_mjd[info_rpfits_files[i]->n_scans - 1]
                             + half_cycle))) {
@@ -221,17 +224,19 @@ void data_reader(int read_type, int n_rpfits_files,
       // We always need to read the scan headers to move through
       // the file, but where we direct the information changes.
       if (!(read_type & READ_SCAN_METADATA)) {
-        MALLOC(sh, 1);
+        CALLOC(sh, 1);
+        header_free = true;
       } else {
-        sh = &(info_rpfits_files[i]->scan_headers[n]);
+        CALLOC(info_rpfits_files[i]->scan_headers[n], 1);
+        sh = info_rpfits_files[i]->scan_headers[n];
+        header_free = false;
       }
       res = read_scan_header(sh);
-      header_free = true;
       if (sh->ut_seconds > 0) {
         curr_header += 1;
         if (read_type & READ_SCAN_METADATA) {
           // Keep track of the times covered by each scan.
-          header_free = false;
+          //header_free = false;
           info_rpfits_files[i]->scan_start_mjd[n] =
             info_rpfits_files[i]->scan_end_mjd[n] = date2mjd(sh->obsdate, sh->ut_seconds);
           info_rpfits_files[i]->n_scans += 1;
@@ -274,25 +279,35 @@ void data_reader(int read_type, int n_rpfits_files,
             if (read_type & READ_SCAN_METADATA) {
               info_rpfits_files[i]->scan_end_mjd[n] = cycle_mjd;
             }
-            if (read_type & GRAB_SPECTRUM) {
-              // We consider this the correct cycle if the requested
+            if ((read_type & GRAB_SPECTRUM) ||
+                (read_type & COMPUTE_VIS_PRODUCTS)) {
+              spectrum_return = false;
+              // If we're trying to grab a specific spectrum,
+              // we consider this the correct cycle if the requested
               // MJD is within half a cycle time of this cycle's time.
               cycle_start = cycle_mjd - ((double)sh->cycle_time / (2 * 86400.0));
               cycle_end = cycle_mjd + ((double)sh->cycle_time / (2 * 86400.0));
               /* printf("%.6f / %.6f / %.6f\n", cycle_start, mjd_required, cycle_end); */
-              if ((mjd_required >= cycle_start) &&
+              if ((read_type & GRAB_SPECTRUM) &&
+                  (mjd_required >= cycle_start) &&
                   (mjd_required <= cycle_end)) {
-                // Convert this cycle into the spectrum that we return.
+                spectrum_return = true;
+              }
+              if ((read_type & COMPUTE_VIS_PRODUCTS) ||
+                  (spectrum_return)) {
+                // We need this cycle.
                 // Allocate all the memory we need.
-                printf("cycle found!\n");
-                spectrum_data->num_ifs = sh->num_ifs;
-                MALLOC(spectrum_data->spectrum, spectrum_data->num_ifs);
-                for (idx_if = 0; idx_if < spectrum_data->num_ifs; idx_if++) {
-                  spectrum_data->num_pols = sh->if_num_stokes[idx_if];
-                  CALLOC(spectrum_data->spectrum[idx_if], spectrum_data->num_pols);
-                  for (idx_pol = 0; idx_pol < spectrum_data->num_pols; idx_pol++) {
+                /* printf("cycle found!\n"); */
+                MALLOC(temp_spectrum, 1);
+                // Prepare the spectrum data structure.
+                temp_spectrum->num_ifs = sh->num_ifs;
+                MALLOC(temp_spectrum->spectrum, temp_spectrum->num_ifs);
+                for (idx_if = 0; idx_if < temp_spectrum->num_ifs; idx_if++) {
+                  temp_spectrum->num_pols = sh->if_num_stokes[idx_if];
+                  CALLOC(temp_spectrum->spectrum[idx_if], temp_spectrum->num_pols);
+                  for (idx_pol = 0; idx_pol < temp_spectrum->num_pols; idx_pol++) {
                     calcres = vis_ampphase(sh, cycle_data,
-                                           &(spectrum_data->spectrum[idx_if][idx_pol]),
+                                           &(temp_spectrum->spectrum[idx_if][idx_pol]),
                                            pols[idx_pol], sh->if_label[idx_if],
                                            ampphase_options);
                     if (calcres < 0) {
@@ -304,9 +319,25 @@ void data_reader(int read_type, int n_rpfits_files,
                     }
                   }
                 }
-                // We don't need to search any more.
-                keep_cycling = false;
-                keep_reading = false;
+                if (spectrum_return) {
+                  // Copy the pointer.
+                  *spectrum_data = temp_spectrum;
+                } else {
+                  // Free the temporary spectrum memory.
+                  for (idx_if = 0; idx_if < temp_spectrum->num_ifs; idx_if++) {
+                    for (idx_pol = 0; idx_pol < temp_spectrum->num_pols; idx_pol++) {
+                      free_ampphase(&(temp_spectrum->spectrum[idx_if][idx_pol]));
+                    }
+                    FREE(temp_spectrum->spectrum[idx_if]);
+                  }
+                  FREE(temp_spectrum->spectrum);
+                  FREE(temp_spectrum);
+                }
+                if (!(read_type & COMPUTE_VIS_PRODUCTS)) {
+                  // We don't need to search any more.
+                  keep_cycling = false;
+                  keep_reading = false;
+                }
               }
             }
             // Do we need to free this memory now?
@@ -316,9 +347,12 @@ void data_reader(int read_type, int n_rpfits_files,
             }
           }
         }
+      } else {
+        header_free = true;
       }
       if (header_free) {
         free_scan_header_data(sh);
+        FREE(sh);
       }
       if (res == READER_EXHAUSTED) {
         keep_reading = false;
@@ -340,7 +374,7 @@ int main(int argc, char *argv[]) {
   double mjd_grab;
   struct rpfits_file_information **info_rpfits_files = NULL;
   struct ampphase_options ampphase_options;
-  struct spectrum_data spectrum_data;
+  struct spectrum_data *spectrum_data;
   struct vis_quantities ***vis_quantities = NULL;
   FILE *fh = NULL;
   cmp_ctx_t cmp;
@@ -374,7 +408,7 @@ int main(int argc, char *argv[]) {
     strncpy(info_rpfits_files[i]->filename, arguments.rpfits_files[i], RPBUFSIZE);
   }
   data_reader(READ_SCAN_METADATA, arguments.n_rpfits_files, 0.0, &ampphase_options,
-	      info_rpfits_files, &spectrum_data, &vis_quantities);
+              info_rpfits_files, &spectrum_data, &vis_quantities);
 
   // Print out the summary.
   for (i = 0; i < arguments.n_rpfits_files; i++) {
@@ -382,8 +416,8 @@ int main(int argc, char *argv[]) {
            info_rpfits_files[i]->filename, info_rpfits_files[i]->n_scans);
     for (j = 0; j < info_rpfits_files[i]->n_scans; j++) {
       printf("  scan %d (%s, %s) MJD range %.6f -> %.6f\n", (j + 1),
-             info_rpfits_files[i]->scan_headers[j].source_name,
-             info_rpfits_files[i]->scan_headers[j].obstype,
+             info_rpfits_files[i]->scan_headers[j]->source_name,
+             info_rpfits_files[i]->scan_headers[j]->obstype,
              info_rpfits_files[i]->scan_start_mjd[j],
              info_rpfits_files[i]->scan_end_mjd[j]);
     }
@@ -405,13 +439,23 @@ int main(int argc, char *argv[]) {
     error_and_exit("Error opening output file");
   }
   cmp_init(&cmp, fh, file_reader, file_skipper, file_writer);
-  pack_spectrum_data(&cmp, &spectrum_data);
+  pack_spectrum_data(&cmp, spectrum_data);
+  // Free the spectrum memory.
+  for (i = 0; i < spectrum_data->num_ifs; i++) {
+    for (j = 0; j < spectrum_data->num_pols; j++) {
+      free_ampphase(&(spectrum_data->spectrum[i][j]));
+    }
+    FREE(spectrum_data->spectrum[i]);
+  }
+  FREE(spectrum_data->spectrum);
+  FREE(spectrum_data);
   fclose(fh);
   
   // We're finished, free all our memory.
   for (i = 0; i < arguments.n_rpfits_files; i++) {
     for (j = 0; j < info_rpfits_files[i]->n_scans; j++) {
-      free_scan_header_data(&(info_rpfits_files[i]->scan_headers[j]));
+      free_scan_header_data(info_rpfits_files[i]->scan_headers[j]);
+      FREE(info_rpfits_files[i]->scan_headers[j]);
     }
     FREE(info_rpfits_files[i]->scan_headers);
     FREE(info_rpfits_files[i]->scan_start_mjd);
