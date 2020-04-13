@@ -429,3 +429,64 @@ void unpack_spectrum_data(cmp_ctx_t *cmp, struct spectrum_data *a) {
     }
   }
 }
+
+void pack_vis_quantities(cmp_ctx_t *cmp, struct vis_quantities *a) {
+  int i;
+  
+  // The options that were used.
+  pack_amphase_options(cmp, a->options);
+
+  // Number of quantities in the array.
+  pack_write_sint(cmp, a->nbaselines);
+
+  // The time.
+  pack_write_string(cmp, a->obsdate, OBSDATE_LENGTH);
+  pack_write_float(cmp, a->ut_seconds);
+
+  // Labels.
+  pack_write_sint(cmp, a->pol);
+  pack_write_sint(cmp, a->window);
+  pack_writearray_sint(cmp, a->nbaselines, a->nbins);
+  pack_writearray_sint(cmp, a->nbaselines, a->baseline);
+  pack_writearray_sint(cmp, a->nbaselines, a->flagged_bad);
+  pack_write_string(cmp, a->scantype, OBSTYPE_LENGTH);
+
+  // The arrays.
+  for (i = 0; i < a->nbaselines; i++) {
+    pack_writearray_float(cmp, a->nbins[i], a->amplitude[i]);
+    pack_writearray_float(cmp, a->nbins[i], a->phase[i]);
+    pack_writearray_float(cmp, a->nbins[i], a->delay[i]);
+  }
+
+  // Metadata.
+  pack_write_float(cmp, a->min_amplitude);
+  pack_write_float(cmp, a->max_amplitude);
+  pack_write_float(cmp, a->min_phase);
+  pack_write_float(cmp, a->max_phase);
+  pack_write_float(cmp, a->min_delay);
+  pack_write_float(cmp, a->max_delay);
+}
+
+void unpack_vis_quantities(cmp_ctx_t *cmp, struct vis_quantities *a) {
+  int i;
+
+  // The options that were used.
+  MALLOC(a->options, 1);
+  unpack_ampphase_options(cmp, a->options);
+
+  // Number of quantities in the array.
+  pack_read_sint(cmp, &(a->nbaselines));
+
+  // The time.
+  pack_read_string(cmp, a->obsdate, OBSDATE_LENGTH);
+  pack_read_float(cmp, &(a->ut_seconds));
+  
+  // Labels.
+  pack_read_sint(cmp, &(a->pol));
+  pack_read_sint(cmp, &(a->window));
+  MALLOC(a->nbins, a->nbaselines);
+  pack_readarray_sint(cmp, a->nbaselines, a->nbins);
+  MALLOC(a->baseline, a->nbaselines);
+  pack_readarray_sint(cmp, a->nbaselines, a->baseline);
+  
+}

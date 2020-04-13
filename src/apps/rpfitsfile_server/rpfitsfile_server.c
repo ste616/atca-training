@@ -164,15 +164,15 @@ double date2mjd(char *obsdate, float ut_seconds) {
 
 
 void data_reader(int read_type, int n_rpfits_files,
-		 double mjd_required, struct ampphase_options *ampphase_options,
-		 struct rpfits_file_information **info_rpfits_files,
-		 struct spectrum_data **spectrum_data,
-		 struct vis_quantities ****vis_quantities) {
-  int i, res, n, calcres;
-  int curr_header, idx_if, idx_pol;
+                 double mjd_required, struct ampphase_options *ampphase_options,
+                 struct rpfits_file_information **info_rpfits_files,
+                 struct spectrum_data **spectrum_data,
+                 int *nviscycles,
+                 struct vis_quantities *****vis_quantities) {
+  int i, res, n, calcres, curr_header, idx_if, idx_pol;
   int pols[4] = { POL_XX, POL_YY, POL_XY, POL_YX };
   bool open_file, keep_reading, header_free, read_cycles, keep_cycling;
-  bool cycle_free, spectrum_return;
+  bool cycle_free, spectrum_return, vis_cycled;
   double cycle_mjd, cycle_start, cycle_end, half_cycle;
   struct scan_header_data *sh = NULL;
   struct cycle_data *cycle_data = NULL;
@@ -181,6 +181,11 @@ void data_reader(int read_type, int n_rpfits_files,
   if (vis_quantities == NULL) {
     // Resist warnings.
     fprintf(stderr, "ignore this message\n");
+  }
+
+  // Reset counters if required.
+  if (read_type & COMPUTE_VIS_PRODUCTS) {
+    *nviscycles = 0;
   }
   
   for (i = 0; i < n_rpfits_files; i++) {
@@ -215,6 +220,7 @@ void data_reader(int read_type, int n_rpfits_files,
     curr_header = -1;
     while (keep_reading) {
       n = info_rpfits_files[i]->n_scans;
+      
       if (read_type & READ_SCAN_METADATA) {
         // We need to expand our metadata arrays as we go.
         REALLOC(info_rpfits_files[i]->scan_headers, (n + 1));
@@ -232,7 +238,7 @@ void data_reader(int read_type, int n_rpfits_files,
         header_free = false;
       }
       res = read_scan_header(sh);
-      if (sh->ut_seconds > 0) {
+       if (sh->ut_seconds > 0) {
         curr_header += 1;
         if (read_type & READ_SCAN_METADATA) {
           // Keep track of the times covered by each scan.
@@ -302,9 +308,17 @@ void data_reader(int read_type, int n_rpfits_files,
                 // Prepare the spectrum data structure.
                 temp_spectrum->num_ifs = sh->num_ifs;
                 MALLOC(temp_spectrum->spectrum, temp_spectrum->num_ifs);
+                if (read_type & COMPUTE_VIS_PRODUCTS) {
+                  REALLOC(*vis_quantities, (*nviscycles + 1));
+                  MALLOC((*vis_quantities)[*nviscycles], temp_spectrum->num_ifs);
+                }
+                vis_cycled = false;
                 for (idx_if = 0; idx_if < temp_spectrum->num_ifs; idx_if++) {
                   temp_spectrum->num_pols = sh->if_num_stokes[idx_if];
                   CALLOC(temp_spectrum->spectrum[idx_if], temp_spectrum->num_pols);
+                  if (read_type & COMPUTE_VIS_PRODUCTS) {
+                    CALLOC((*vis_quantities)[*nviscycles][idx_if], temp_spectrum->num_pols);
+                  }
                   for (idx_pol = 0; idx_pol < temp_spectrum->num_pols; idx_pol++) {
                     calcres = vis_ampphase(sh, cycle_data,
                                            &(temp_spectrum->spectrum[idx_if][idx_pol]),
@@ -313,11 +327,20 @@ void data_reader(int read_type, int n_rpfits_files,
                     if (calcres < 0) {
                       fprintf(stderr, "CALCULATING AMP AND PHASE FAILED FOR IF %d POL %d, CODE %d\n",
                               sh->if_label[idx_if], pols[idx_pol], calcres);
-                    } else {
-                      printf("CONVERTED SPECTRUM FOR CYCLE IF %d POL %d AT MJD %.6f\n",
-                             sh->if_label[idx_if], pols[idx_pol], cycle_mjd);
+                    /* } else { */
+                    /*   printf("CONVERTED SPECTRUM FOR CYCLE IF %d POL %d AT MJD %.6f\n", */
+                    /*          sh->if_label[idx_if], pols[idx_pol], cycle_mjd); */
+                    }
+                    if (read_type & COMPUTE_VIS_PRODUCTS) {
+                      ampphase_average(temp_spectrum->spectrum[idx_if][idx_pol],
+                                       &((*vis_quantities)[*nviscycles][idx_if][idx_pol]),
+                                       ampphase_options);
+                      vis_cycled = true;
                     }
                   }
+                }
+                if (vis_cycled) {
+                  *nviscycles += 1;
                 }
                 if (spectrum_return) {
                   // Copy the pointer.
@@ -370,12 +393,12 @@ void data_reader(int read_type, int n_rpfits_files,
 
 int main(int argc, char *argv[]) {
   struct arguments arguments;
-  int i, j, ri, rj;
+  int i, j, ri, rj, nviscycles = 0;
   double mjd_grab;
   struct rpfits_file_information **info_rpfits_files = NULL;
   struct ampphase_options ampphase_options;
   struct spectrum_data *spectrum_data;
-  struct vis_quantities ***vis_quantities = NULL;
+  struct vis_quantities ****vis_quantities = NULL;
   FILE *fh = NULL;
   cmp_ctx_t cmp;
   
@@ -408,7 +431,7 @@ int main(int argc, char *argv[]) {
     strncpy(info_rpfits_files[i]->filename, arguments.rpfits_files[i], RPBUFSIZE);
   }
   data_reader(READ_SCAN_METADATA, arguments.n_rpfits_files, 0.0, &ampphase_options,
-              info_rpfits_files, &spectrum_data, &vis_quantities);
+              info_rpfits_files, &spectrum_data, &nviscycles, &vis_quantities);
 
   // Print out the summary.
   for (i = 0; i < arguments.n_rpfits_files; i++) {
@@ -431,8 +454,9 @@ int main(int argc, char *argv[]) {
   rj = rand() % info_rpfits_files[ri]->n_scans;
   mjd_grab = info_rpfits_files[ri]->scan_start_mjd[rj] + 10.0 / 86400.0;
   printf(" grabbing from random scan %d from file %d, MJD %.6f\n", rj, ri, mjd_grab);
-  data_reader(GRAB_SPECTRUM, arguments.n_rpfits_files, mjd_grab,
-              &ampphase_options, info_rpfits_files, &spectrum_data, &vis_quantities);
+  data_reader(GRAB_SPECTRUM | COMPUTE_VIS_PRODUCTS, arguments.n_rpfits_files, mjd_grab,
+              &ampphase_options, info_rpfits_files, &spectrum_data,
+              &nviscycles, &vis_quantities);
   // Save these spectra to a file after packing it.
   fh = fopen("test.dat", "w+b");
   if (fh == NULL) {
