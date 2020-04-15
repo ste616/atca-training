@@ -434,7 +434,7 @@ void pack_vis_quantities(cmp_ctx_t *cmp, struct vis_quantities *a) {
   int i;
   
   // The options that were used.
-  pack_amphase_options(cmp, a->options);
+  pack_ampphase_options(cmp, a->options);
 
   // Number of quantities in the array.
   pack_write_sint(cmp, a->nbaselines);
@@ -488,5 +488,29 @@ void unpack_vis_quantities(cmp_ctx_t *cmp, struct vis_quantities *a) {
   pack_readarray_sint(cmp, a->nbaselines, a->nbins);
   MALLOC(a->baseline, a->nbaselines);
   pack_readarray_sint(cmp, a->nbaselines, a->baseline);
+  MALLOC(a->flagged_bad, a->nbaselines);
+  pack_readarray_sint(cmp, a->nbaselines, a->flagged_bad);
+  pack_read_string(cmp, a->scantype, OBSTYPE_LENGTH);
+
+  // The arrays.
+  MALLOC(a->amplitude, a->nbaselines);
+  MALLOC(a->phase, a->nbaselines);
+  MALLOC(a->delay, a->nbaselines);
+  for (i = 0; i < a->nbaselines; i++) {
+    MALLOC(a->amplitude[i], a->nbins[i]);
+    pack_readarray_float(cmp, a->nbins[i], a->amplitude[i]);
+    MALLOC(a->phase[i], a->nbins[i]);
+    pack_readarray_float(cmp, a->nbins[i], a->phase[i]);
+    MALLOC(a->delay[i], a->nbins[i]);
+    pack_readarray_float(cmp, a->nbins[i], a->delay[i]);
+  }
+
+  // Metadata.
+  pack_read_float(cmp, &(a->min_amplitude));
+  pack_read_float(cmp, &(a->max_amplitude));
+  pack_read_float(cmp, &(a->min_phase));
+  pack_read_float(cmp, &(a->max_phase));
+  pack_read_float(cmp, &(a->min_delay));
+  pack_read_float(cmp, &(a->max_delay));
   
 }

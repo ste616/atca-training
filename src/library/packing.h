@@ -61,6 +61,7 @@ void unpack_ampphase(cmp_ctx_t *cmp, struct ampphase *a);
 void pack_spectrum_data(cmp_ctx_t *cmp, struct spectrum_data *a);
 void unpack_spectrum_data(cmp_ctx_t *cmp, struct spectrum_data *a);
 void pack_vis_quantities(cmp_ctx_t *cmp, struct vis_quantities *a);
+void unpack_vis_quantities(cmp_ctx_t *cmp, struct vis_quantities *a);
 
 #define CMPERROR(c) error_and_exit(cmp_strerror(c))
 
