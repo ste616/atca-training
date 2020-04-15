@@ -28,6 +28,18 @@ struct spectrum_data {
   struct ampphase ***spectrum;
 };
 
+// This structure wraps around all the vis_quantities structures
+// and will allow for easy transport.
+struct vis_data {
+  // The number of cycles contained here.
+  int nviscycles;
+  // The number of IFs per cycle.
+  int *num_ifs;
+  // The number of pols per cycle per IF.
+  int **num_pols;
+  // The vis_quantities structures.
+  struct vis_quantities ****vis_quantities;
+};
 
 // Our routine definitions.
 void error_and_exit(const char *msg);
@@ -62,6 +74,8 @@ void pack_spectrum_data(cmp_ctx_t *cmp, struct spectrum_data *a);
 void unpack_spectrum_data(cmp_ctx_t *cmp, struct spectrum_data *a);
 void pack_vis_quantities(cmp_ctx_t *cmp, struct vis_quantities *a);
 void unpack_vis_quantities(cmp_ctx_t *cmp, struct vis_quantities *a);
+void pack_vis_data(cmp_ctx_t *cmp, struct vis_data *a);
+void unpack_vis_data(cmp_ctx_t *cmp, struct vis_data *a);
 
 #define CMPERROR(c) error_and_exit(cmp_strerror(c))
 

@@ -167,8 +167,7 @@ void data_reader(int read_type, int n_rpfits_files,
                  double mjd_required, struct ampphase_options *ampphase_options,
                  struct rpfits_file_information **info_rpfits_files,
                  struct spectrum_data **spectrum_data,
-                 int *nviscycles,
-                 struct vis_quantities *****vis_quantities) {
+		 struct vis_data **vis_data) {
   int i, res, n, calcres, curr_header, idx_if, idx_pol;
   int pols[4] = { POL_XX, POL_YY, POL_XY, POL_YX };
   bool open_file, keep_reading, header_free, read_cycles, keep_cycling;
@@ -178,14 +177,21 @@ void data_reader(int read_type, int n_rpfits_files,
   struct cycle_data *cycle_data = NULL;
   struct spectrum_data *temp_spectrum = NULL;
 
-  if (vis_quantities == NULL) {
+  if (vis_data == NULL) {
     // Resist warnings.
     fprintf(stderr, "ignore this message\n");
   }
 
   // Reset counters if required.
   if (read_type & COMPUTE_VIS_PRODUCTS) {
-    *nviscycles = 0;
+    if ((vis_data != NULL) && (*vis_data == NULL)) {
+      // Need to allocate some memory.
+      MALLOC(*vis_data, 1);
+    }
+    (*vis_data)->nviscycles = 0;
+    (*vis_data)->num_ifs = NULL;
+    (*vis_data)->num_pols = NULL;
+    (*vis_data)->vis_quantities = NULL;
   }
   
   for (i = 0; i < n_rpfits_files; i++) {
@@ -309,15 +315,27 @@ void data_reader(int read_type, int n_rpfits_files,
                 temp_spectrum->num_ifs = sh->num_ifs;
                 MALLOC(temp_spectrum->spectrum, temp_spectrum->num_ifs);
                 if (read_type & COMPUTE_VIS_PRODUCTS) {
-                  REALLOC(*vis_quantities, (*nviscycles + 1));
-                  MALLOC((*vis_quantities)[*nviscycles], temp_spectrum->num_ifs);
+                  REALLOC((*vis_data)->vis_quantities,
+			  ((*vis_data)->nviscycles + 1));
+		  REALLOC((*vis_data)->num_ifs,
+			  ((*vis_data)->nviscycles + 1));
+		  REALLOC((*vis_data)->num_pols,
+			  ((*vis_data)->nviscycles + 1));
+		  (*vis_data)->num_ifs[(*vis_data)->nviscycles] = temp_spectrum->num_ifs;
+		  MALLOC((*vis_data)->num_pols[(*vis_data)->nviscycles],
+			 temp_spectrum->num_ifs);
+                  MALLOC((*vis_data)->vis_quantities[(*vis_data)->nviscycles],
+			 temp_spectrum->num_ifs);
                 }
                 vis_cycled = false;
                 for (idx_if = 0; idx_if < temp_spectrum->num_ifs; idx_if++) {
                   temp_spectrum->num_pols = sh->if_num_stokes[idx_if];
                   CALLOC(temp_spectrum->spectrum[idx_if], temp_spectrum->num_pols);
                   if (read_type & COMPUTE_VIS_PRODUCTS) {
-                    CALLOC((*vis_quantities)[*nviscycles][idx_if], temp_spectrum->num_pols);
+		    (*vis_data)->num_pols[(*vis_data)->nviscycles][idx_if] =
+		      temp_spectrum->num_pols;
+                    CALLOC((*vis_data)->vis_quantities[(*vis_data)->nviscycles][idx_if],
+			   temp_spectrum->num_pols);
                   }
                   for (idx_pol = 0; idx_pol < temp_spectrum->num_pols; idx_pol++) {
                     calcres = vis_ampphase(sh, cycle_data,
@@ -333,14 +351,14 @@ void data_reader(int read_type, int n_rpfits_files,
                     }
                     if (read_type & COMPUTE_VIS_PRODUCTS) {
                       ampphase_average(temp_spectrum->spectrum[idx_if][idx_pol],
-                                       &((*vis_quantities)[*nviscycles][idx_if][idx_pol]),
+                                       &((*vis_data)->vis_quantities[(*vis_data)->nviscycles][idx_if][idx_pol]),
                                        ampphase_options);
                       vis_cycled = true;
                     }
                   }
                 }
                 if (vis_cycled) {
-                  *nviscycles += 1;
+                  (*vis_data)->nviscycles += 1;
                 }
                 if (spectrum_return) {
                   // Copy the pointer.
@@ -393,12 +411,12 @@ void data_reader(int read_type, int n_rpfits_files,
 
 int main(int argc, char *argv[]) {
   struct arguments arguments;
-  int i, j, ri, rj, nviscycles = 0;
+  int i, j, ri, rj;
   double mjd_grab;
   struct rpfits_file_information **info_rpfits_files = NULL;
   struct ampphase_options ampphase_options;
   struct spectrum_data *spectrum_data;
-  struct vis_quantities ****vis_quantities = NULL;
+  struct vis_data *vis_data = NULL;
   FILE *fh = NULL;
   cmp_ctx_t cmp;
   
@@ -431,7 +449,7 @@ int main(int argc, char *argv[]) {
     strncpy(info_rpfits_files[i]->filename, arguments.rpfits_files[i], RPBUFSIZE);
   }
   data_reader(READ_SCAN_METADATA, arguments.n_rpfits_files, 0.0, &ampphase_options,
-              info_rpfits_files, &spectrum_data, &nviscycles, &vis_quantities);
+              info_rpfits_files, &spectrum_data, &vis_data);
 
   // Print out the summary.
   for (i = 0; i < arguments.n_rpfits_files; i++) {
@@ -455,12 +473,11 @@ int main(int argc, char *argv[]) {
   mjd_grab = info_rpfits_files[ri]->scan_start_mjd[rj] + 10.0 / 86400.0;
   printf(" grabbing from random scan %d from file %d, MJD %.6f\n", rj, ri, mjd_grab);
   data_reader(GRAB_SPECTRUM | COMPUTE_VIS_PRODUCTS, arguments.n_rpfits_files, mjd_grab,
-              &ampphase_options, info_rpfits_files, &spectrum_data,
-              &nviscycles, &vis_quantities);
+              &ampphase_options, info_rpfits_files, &spectrum_data, &vis_data);
   // Save these spectra to a file after packing it.
-  fh = fopen("test.dat", "w+b");
+  fh = fopen("test_spd.dat", "wb");
   if (fh == NULL) {
-    error_and_exit("Error opening output file");
+    error_and_exit("Error opening spd output file");
   }
   cmp_init(&cmp, fh, file_reader, file_skipper, file_writer);
   pack_spectrum_data(&cmp, spectrum_data);
@@ -473,6 +490,15 @@ int main(int argc, char *argv[]) {
   }
   FREE(spectrum_data->spectrum);
   FREE(spectrum_data);
+  fclose(fh);
+
+  // Save the vis data to a file after packing it.
+  fh = fopen("test_vis.dat", "wb");
+  if (fh == NULL) {
+    error_and_exit("Error opening vis output file");
+  }
+  cmp_init(&cmp, fh, file_reader, file_skipper, file_writer);
+  pack_vis_data(&cmp, vis_data);
   fclose(fh);
   
   // We're finished, free all our memory.

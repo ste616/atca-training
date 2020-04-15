@@ -74,7 +74,7 @@ int max_size_of_vis(void) {
  * This routine attempts to open an RPFITS file.
  */
 int open_rpfits_file(char *filename) {
-  int this_jstat = JSTAT_UNSUCCESSFUL, rpfits_result;
+  int this_jstat = JSTAT_UNSUCCESSFUL;
   size_t flen = 0;
   
   // We load in the name of the file to read.
@@ -82,10 +82,10 @@ int open_rpfits_file(char *filename) {
   if (flen > 0) {
     strncpy(names_.file, filename, flen);
     this_jstat = JSTAT_OPENFILE;
-    rpfits_result = rpfitsin_(&this_jstat, NULL, NULL, NULL, NULL, NULL,
-			      NULL, NULL, NULL, NULL, NULL, NULL);
+    rpfitsin_(&this_jstat, NULL, NULL, NULL, NULL, NULL,
+	      NULL, NULL, NULL, NULL, NULL, NULL);
   }
-  if ((this_jstat == JSTAT_UNSUCCESSFUL) || (rpfits_result == 0)) {
+  if (this_jstat == JSTAT_UNSUCCESSFUL) {
     fprintf(stderr, "Cannot open RPFITS file %s\n", filename);
   }
 
@@ -96,11 +96,11 @@ int open_rpfits_file(char *filename) {
  * This routine attempts to close the currently open RPFITS file.
  */
 int close_rpfits_file(void) {
-  int this_jstat = JSTAT_CLOSEFILE, rpfits_result = 0;
+  int this_jstat = JSTAT_CLOSEFILE;
 
-  rpfits_result = rpfitsin_(&this_jstat, NULL, NULL, NULL, NULL, NULL,
-			    NULL, NULL, NULL, NULL, NULL, NULL);
-  if (rpfits_result == 0) {
+  rpfitsin_(&this_jstat, NULL, NULL, NULL, NULL, NULL,
+	    NULL, NULL, NULL, NULL, NULL, NULL);
+  if (this_jstat == JSTAT_UNSUCCESSFUL) {
     fprintf(stderr, "Problem when closing RPFITS file\n");
   }
   

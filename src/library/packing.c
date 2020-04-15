@@ -514,3 +514,57 @@ void unpack_vis_quantities(cmp_ctx_t *cmp, struct vis_quantities *a) {
   pack_read_float(cmp, &(a->max_delay));
   
 }
+
+void pack_vis_data(cmp_ctx_t *cmp, struct vis_data *a) {
+  int i, j, k;
+  // The number of cycles contained here.
+  pack_write_sint(cmp, a->nviscycles);
+
+  // The number of IFs per cycle.
+  pack_writearray_sint(cmp, a->nviscycles, a->num_ifs);
+
+  // The number of pols per cycle per IF.
+  for (i = 0; i < a->nviscycles; i++) {
+    pack_writearray_sint(cmp, a->num_ifs[i], a->num_pols[i]);
+  }
+
+  // The vis_quantities structures.
+  for (i = 0; i < a->nviscycles; i++) {
+    for (j = 0; j < a->num_ifs[i]; j++) {
+      for (k = 0; k < a->num_pols[i][j]; k++) {
+	pack_vis_quantities(cmp, a->vis_quantities[i][j][k]);
+      }
+    }
+  }
+}
+
+void unpack_vis_data(cmp_ctx_t *cmp, struct vis_data *a) {
+  int i, j, k;
+
+  // The number of cycles contained here.
+  pack_read_sint(cmp, &(a->nviscycles));
+
+  // The number of IFs per cycle.
+  MALLOC(a->num_ifs, a->nviscycles);
+  pack_readarray_sint(cmp, a->nviscycles, a->num_ifs);
+
+  // The number of pols per cycle per IF.
+  MALLOC(a->num_pols, a->nviscycles);
+  for (i = 0; i < a->nviscycles; i++) {
+    MALLOC(a->num_pols[i], a->num_ifs[i]);
+    pack_readarray_sint(cmp, a->num_ifs[i], a->num_pols[i]);
+  }
+
+  // The vis_quantities structures.
+  MALLOC(a->vis_quantities, a->nviscycles);
+  for (i = 0; i < a->nviscycles; i++) {
+    MALLOC(a->vis_quantities[i], a->num_ifs[i]);
+    for (j = 0; j < a->num_ifs[i]; j++) {
+      MALLOC(a->vis_quantities[i][j], a->num_pols[i][j]);
+      for (k = 0; k < a->num_pols[i][j]; k++) {
+	MALLOC(a->vis_quantities[i][j][k], 1);
+	unpack_vis_quantities(cmp, a->vis_quantities[i][j][k]);
+      }
+    }
+  }
+}
