@@ -411,7 +411,7 @@ void data_reader(int read_type, int n_rpfits_files,
 
 int main(int argc, char *argv[]) {
   struct arguments arguments;
-  int i, j, ri, rj;
+  int i, j, k, ri, rj;
   double mjd_grab;
   struct rpfits_file_information **info_rpfits_files = NULL;
   struct ampphase_options ampphase_options;
@@ -499,6 +499,22 @@ int main(int argc, char *argv[]) {
   }
   cmp_init(&cmp, fh, file_reader, file_skipper, file_writer);
   pack_vis_data(&cmp, vis_data);
+  // Free the vis memory.
+  for (i = 0; i < vis_data->nviscycles; i++) {
+    for (j = 0; j < vis_data->num_ifs[i]; j++) {
+      for (k = 0; k < vis_data->num_pols[i][j]; k++) {
+	free_vis_quantities(&(vis_data->vis_quantities[i][j][k]));
+	//FREE(vis_data->vis_quantities[i][j][k]);
+      }
+      FREE(vis_data->vis_quantities[i][j]);
+    }
+    FREE(vis_data->num_pols[i]);
+    FREE(vis_data->vis_quantities[i]);
+  }
+  FREE(vis_data->num_pols);
+  FREE(vis_data->num_ifs);
+  FREE(vis_data->vis_quantities);
+  FREE(vis_data);
   fclose(fh);
   
   // We're finished, free all our memory.

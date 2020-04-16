@@ -86,6 +86,9 @@ struct vis_quantities* prepare_vis_quantities(void) {
   vis_quantities->pol = -1;
   vis_quantities->window = -1;
   vis_quantities->nbins = NULL;
+  vis_quantities->baseline = NULL;
+  vis_quantities->flagged_bad = NULL;
+  vis_quantities->scantype[0] = 0;
   
   vis_quantities->amplitude = NULL;
   vis_quantities->phase = NULL;
@@ -175,6 +178,7 @@ void free_vis_quantities(struct vis_quantities **vis_quantities) {
   FREE((*vis_quantities)->delay);
   FREE((*vis_quantities)->nbins);
   FREE((*vis_quantities)->baseline);
+  FREE((*vis_quantities)->flagged_bad);
   FREE(*vis_quantities);
 }
 
