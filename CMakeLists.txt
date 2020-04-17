@@ -29,7 +29,7 @@ target_compile_options(rpfitsfile_server PRIVATE -Werror -Wall -Wextra -Wno-miss
 
 add_executable(nspd src/apps/nspd/nspd.c)
 set_target_properties(nspd PROPERTIES LINKER_LANGUAGE Fortran)
-target_link_libraries(nspd PUBLIC applib atrpfits rpfits m cpgplot pgplot png z X11)
+target_link_libraries(nspd PUBLIC applib atrpfits rpfits m cpgplot pgplot png z X11 readline)
 target_include_directories(nspd PUBLIC src/rpfits src/include extern/cmp src/library)
 target_compile_options(nspd PRIVATE -Werror -Wall -Wextra -Wno-missing-field-initializers)
 
