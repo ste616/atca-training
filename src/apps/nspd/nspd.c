@@ -136,7 +136,9 @@ static void interpret_command(char *line) {
   if ((line == NULL) || (strcmp(line, "exit") == 0) ||
       (strcmp(line, "quit") == 0)) {
     action_required = ACTION_QUIT;
-    return;
+    if (line == 0) {
+      return;
+    }
   }
 
   if (*line) {
@@ -186,6 +188,17 @@ void reconcile_spd_plotcontrols(struct spectrum_data *spectrum_data,
   STRUCTCOPY(user_plotcontrols, data_plotcontrols, interactive);
   STRUCTCOPY(user_plotcontrols, data_plotcontrols, pgplot_device);
   
+}
+
+void free_spectrum_data(struct spectrum_data *spectrum_data) {
+  int i, j;
+  for (i = 0; i < spectrum_data->num_ifs; i++) {
+    for (j = 0; j < spectrum_data->num_pols; j++) {
+      free_ampphase(&(spectrum_data->spectrum[i][j]));
+    }
+    FREE(spectrum_data->spectrum[i]);
+  }
+  FREE(spectrum_data->spectrum);
 }
 
 int main(int argc, char *argv[]) {
@@ -272,12 +285,13 @@ int main(int argc, char *argv[]) {
   }
 
   // Remove our callbacks.
-  printf("\n\n  NSPD EXITS\n");
   rl_callback_handler_remove();
+  printf("\n\n  NSPD EXITS\n");
   
   // Release the plotting device.
   release_spd_device(&spd_device_opened);
 
   // Release all the memory.
-
+  free_spectrum_data(&spectrum_data);
+  
 }
