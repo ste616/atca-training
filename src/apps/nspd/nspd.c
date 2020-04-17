@@ -130,9 +130,30 @@ static void sighandler(int sig) {
 #define ACTION_REFRESH_PLOT 1<<0
 #define ACTION_QUIT         1<<1
 
+int split_string(char *s, char *delim, char ***elements) {
+  int i = 0;
+  char *token = NULL;
+
+  // Skip any leading delimiters.
+  while (*s == *delim) {
+    s++;
+  }
+  while ((token = strtok_r(s, delim, &s))) {
+    REALLOC(*elements, (i + 1));
+    (*elements)[i] = token;
+    i++;
+  }
+
+  return i;
+}
+
 // Callback function called for each line when accept-line
 // executed, EOF seen, or EOF character read.
 static void interpret_command(char *line) {
+  char **line_els = NULL;
+  char delim[] = " ";
+  int nels = -1, i;
+  
   if ((line == NULL) || (strcmp(line, "exit") == 0) ||
       (strcmp(line, "quit") == 0)) {
     action_required = ACTION_QUIT;
@@ -146,7 +167,11 @@ static void interpret_command(char *line) {
     add_history(line);
 
     // Figure out what we're supposed to do.
-    
+    nels = split_string(line, delim, &line_els);
+    for (i = 0; i < nels; i++) {
+      fprintf(stderr, "%d: %s\n", i, line_els[i]);
+    }
+    FREE(line_els);
   }
 
   // We need to free the memory.
