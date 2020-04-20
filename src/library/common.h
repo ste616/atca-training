@@ -151,6 +151,10 @@ struct vis_line {
 
 // Our routine definitions.
 int interpret_array_string(char *array_string);
+void count_polarisations(struct spd_plotcontrols *plotcontrols);
+void change_spd_plotcontrols(struct spd_plotcontrols *plotcontrols,
+			     int *xaxis_type, int *yaxis_type, int *pols,
+			     int *corr_type);
 void init_spd_plotcontrols(struct spd_plotcontrols *plotcontrols,
 			   int xaxis_type, int yaxis_type, int pols,
 			   int corr_type, int pgplot_device);

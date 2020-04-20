@@ -130,6 +130,32 @@ static void sighandler(int sig) {
 #define ACTION_REFRESH_PLOT 1<<0
 #define ACTION_QUIT         1<<1
 
+bool minmatch(char *ref, char *chk, int minlength) {
+  // This routine compares the string chk to the string
+  // ref. If the entire string chk represents ref up the
+  // the length of chk or ref, it returns true.
+  // eg. if ref = "select", and chk = "sel", true
+  //        ref = "select", and chk = "s", minlength = 3, false
+  //        ref = "select", and chk = "selects", false
+  int chklen, reflen;
+
+  reflen = strlen(ref);
+  chklen = strlen(chk);
+  if ((minlength > chklen) || (minlength > reflen)) {
+    return false;
+  }
+
+  if (chklen > reflen) {
+    return false;
+  }
+
+  if (strncasecmp(chk, ref, chklen) == 0) {
+    return true;
+  }
+
+  return false;
+}
+
 int split_string(char *s, char *delim, char ***elements) {
   int i = 0;
   char *token = NULL;
@@ -152,10 +178,11 @@ int split_string(char *s, char *delim, char ***elements) {
 static void interpret_command(char *line) {
   char **line_els = NULL;
   char delim[] = " ";
-  int nels = -1, i;
+  int nels = -1, i, pols_specified;
+  bool pols_selected;
   
-  if ((line == NULL) || (strcmp(line, "exit") == 0) ||
-      (strcmp(line, "quit") == 0)) {
+  if ((line == NULL) || (strcasecmp(line, "exit") == 0) ||
+      (strcasecmp(line, "quit") == 0)) {
     action_required = ACTION_QUIT;
     if (line == 0) {
       return;
@@ -170,6 +197,29 @@ static void interpret_command(char *line) {
     nels = split_string(line, delim, &line_els);
     for (i = 0; i < nels; i++) {
       fprintf(stderr, "%d: %s\n", i, line_els[i]);
+    }
+    if (minmatch("select", line_els[0], 3)) {
+      // We've been given a selection command.
+      pols_specified = 0;
+      for (i = 1; i < nels; i++) {
+	if (strcasecmp(line_els[i], "aa") == 0) {
+	  pols_selected = true;
+	  // Select aa.
+	  pols_specified |= PLOT_POL_XX;
+	} else if (strcasecmp(line_els[i], "bb") == 0) {
+	  pols_selected = true;
+	  pols_specified |= PLOT_POL_YY;
+	} else if (strcasecmp(line_els[i], "ab") == 0) {
+	  pols_selected = true;
+	  pols_specified |= PLOT_POL_XY;
+	}
+      }
+      if (pols_selected) {
+	// Reset the polarisations.
+	change_spd_plotcontrols(&spd_plotcontrols, NULL, NULL, &pols_specified,
+				NULL);
+	action_required = ACTION_REFRESH_PLOT;
+      }
     }
     FREE(line_els);
   }

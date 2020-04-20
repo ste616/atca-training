@@ -31,6 +31,64 @@ int interpret_array_string(char *array_string) {
   return r;
 }
 
+void count_polarisations(struct spd_plotcontrols *plotcontrols) {
+
+  plotcontrols->npols = 0;
+  if (plotcontrols->plot_options & PLOT_POL_XX) {
+    plotcontrols->npols++;
+  }
+  if (plotcontrols->plot_options & PLOT_POL_YY) {
+    plotcontrols->npols++;
+  }
+  if (plotcontrols->plot_options & PLOT_POL_XY) {
+    plotcontrols->npols++;
+  }
+  if (plotcontrols->plot_options & PLOT_POL_YX) {
+    plotcontrols->npols++;
+  }
+
+}
+
+void change_spd_plotcontrols(struct spd_plotcontrols *plotcontrols,
+			     int *xaxis_type, int *yaxis_type, int *pols,
+			     int *corr_type) {
+  // Change some values.
+  if (xaxis_type != NULL) {
+    // There can only be one x-axis type.
+    if (plotcontrols->plot_options & PLOT_CHANNEL) {
+      plotcontrols->plot_options -= PLOT_CHANNEL;
+    } else if (plotcontrols->plot_options & PLOT_FREQUENCY) {
+      plotcontrols->plot_options -= PLOT_FREQUENCY;
+    }
+    plotcontrols->plot_options |= *xaxis_type;
+  }
+
+  if (yaxis_type != NULL) {
+
+  }
+  
+  if (pols != NULL) {
+    if (plotcontrols->plot_options & PLOT_POL_XX) {
+      plotcontrols->plot_options -= PLOT_POL_XX;
+    }
+    if (plotcontrols->plot_options & PLOT_POL_YY) {
+      plotcontrols->plot_options -= PLOT_POL_YY;
+    }
+    if (plotcontrols->plot_options & PLOT_POL_XY) {
+      plotcontrols->plot_options -= PLOT_POL_XY;
+    }
+    if (plotcontrols->plot_options & PLOT_POL_XY) {
+      plotcontrols->plot_options -= PLOT_POL_YX;
+    }
+    plotcontrols->plot_options |= *pols;
+    count_polarisations(plotcontrols);
+  }
+
+  if (corr_type != NULL) {
+
+  }
+}
+
 void init_spd_plotcontrols(struct spd_plotcontrols *plotcontrols,
 			   int xaxis_type, int yaxis_type, int pols,
 			   int corr_type, int pgplot_device) {
@@ -53,19 +111,7 @@ void init_spd_plotcontrols(struct spd_plotcontrols *plotcontrols,
   plotcontrols->plot_options = xaxis_type | yaxis_type | pols | corr_type;
 
   // Work out the number of pols.
-  plotcontrols->npols = 0;
-  if (pols & PLOT_POL_XX) {
-    plotcontrols->npols++;
-  }
-  if (pols & PLOT_POL_YY) {
-    plotcontrols->npols++;
-  }
-  if (pols & PLOT_POL_XY) {
-    plotcontrols->npols++;
-  }
-  if (pols & PLOT_POL_YX) {
-    plotcontrols->npols++;
-  }
+  count_polarisations(plotcontrols);
   
   plotcontrols->channel_range_limit = NO;
   plotcontrols->yaxis_range_limit = NO;
