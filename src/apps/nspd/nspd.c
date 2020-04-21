@@ -346,7 +346,9 @@ int main(int argc, char *argv[]) {
   yaxis_type = PLOT_AMPLITUDE | PLOT_AMPLITUDE_LINEAR;
   plot_pols = PLOT_POL_XX | PLOT_POL_YY;
   init_spd_plotcontrols(&spd_plotcontrols, xaxis_type, yaxis_type,
-			plot_pols, DEFAULT, spd_device_number);
+                        plot_pols, DEFAULT, spd_device_number);
+  // The number of pols is set by the data though, not the selection.
+  spd_plotcontrols.npols = spectrum_data.num_pols;
 
   action_required = ACTION_REFRESH_PLOT;
   while(true) {

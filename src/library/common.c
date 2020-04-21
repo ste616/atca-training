@@ -81,7 +81,6 @@ void change_spd_plotcontrols(struct spd_plotcontrols *plotcontrols,
       plotcontrols->plot_options -= PLOT_POL_YX;
     }
     plotcontrols->plot_options |= *pols;
-    count_polarisations(plotcontrols);
   }
 
   if (corr_type != NULL) {
