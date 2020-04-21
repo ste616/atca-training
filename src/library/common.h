@@ -188,5 +188,5 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
 		   struct panelspec *panelspec,
 		   struct vis_plotcontrols *plot_controls);
 void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspec,
-		   struct spd_plotcontrols *plot_controls);
+                   struct spd_plotcontrols *plot_controls, bool all_data_present);
 void seconds_to_hourlabel(float seconds, char *hourlabel);

@@ -213,35 +213,35 @@ int read_scan_header(struct scan_header_data *scan_header_data) {
       // IF each zoom corresponds to.
       MALLOC(scan_header_data->if_name[i][2], 8);
       if (scan_header_data->if_chain[i] > nfound_if) {
-	REALLOC(nfound_chain, scan_header_data->if_chain[i]);
-	for (j = nfound_if; j < scan_header_data->if_chain[i]; j++) {
-	  nfound_chain[j] = 0;
-	}
-	nfound_if = scan_header_data->if_chain[i];
+        REALLOC(nfound_chain, scan_header_data->if_chain[i]);
+        for (j = nfound_if; j < scan_header_data->if_chain[i]; j++) {
+          nfound_chain[j] = 0;
+        }
+        nfound_if = scan_header_data->if_chain[i];
       }
       if (nfound_chain[scan_header_data->if_chain[i] - 1] == 0) {
-	// This is the first one in this chain, it is the wideband.
-	(void)snprintf(scan_header_data->if_name[i][1], 8,
-		       "f%d", scan_header_data->if_chain[i]);
-	(void)strncpy(scan_header_data->if_name[i][2],
-		      scan_header_data->if_name[i][1], 8);
+        // This is the first one in this chain, it is the wideband.
+        (void)snprintf(scan_header_data->if_name[i][1], 8,
+                       "f%d", scan_header_data->if_chain[i]);
+        (void)strncpy(scan_header_data->if_name[i][2],
+                      scan_header_data->if_name[i][1], 8);
       } else {
-	// This must be a zoom.
-	zn++;
-	(void)snprintf(scan_header_data->if_name[i][1], 8,
-		       "z%d", zn);
-	(void)snprintf(scan_header_data->if_name[i][2], 8,
-		       "z%d-%d", scan_header_data->if_chain[i],
-		       nfound_chain[scan_header_data->if_chain[i] - 1]);
+        // This must be a zoom.
+        zn++;
+        (void)snprintf(scan_header_data->if_name[i][1], 8,
+                       "z%d", zn);
+        (void)snprintf(scan_header_data->if_name[i][2], 8,
+                       "z%d-%d", scan_header_data->if_chain[i],
+                       nfound_chain[scan_header_data->if_chain[i] - 1]);
       }
       nfound_chain[scan_header_data->if_chain[i] - 1] += 1;
-		       		       
+      
       MALLOC(scan_header_data->if_stokes_names[i], NSTOKES(i));
       for (j = 0; j < NSTOKES(i); j++) {
-	MALLOC(scan_header_data->if_stokes_names[i][j], 3);
-	(void)strncpy(scan_header_data->if_stokes_names[i][j],
-		      CSTOKES(i, j), 2);
-	scan_header_data->if_stokes_names[i][j][2] = '\0';
+        MALLOC(scan_header_data->if_stokes_names[i][j], 3);
+        (void)strncpy(scan_header_data->if_stokes_names[i][j],
+                      CSTOKES(i, j), 2);
+        scan_header_data->if_stokes_names[i][j][2] = '\0';
       }
     }
     scan_header_data->num_ants = anten_.nant;
@@ -262,7 +262,7 @@ int read_scan_header(struct scan_header_data *scan_header_data) {
 
     // We read the data if there is data to read.
     if ((scan_header_data->if_num_stokes[0] *
-	 scan_header_data->if_num_channels[0]) > 0) {
+         scan_header_data->if_num_channels[0]) > 0) {
       keep_reading = keep_reading | READER_DATA_AVAILABLE;
     }
 

@@ -167,7 +167,7 @@ void data_reader(int read_type, int n_rpfits_files,
                  double mjd_required, struct ampphase_options *ampphase_options,
                  struct rpfits_file_information **info_rpfits_files,
                  struct spectrum_data **spectrum_data,
-		 struct vis_data **vis_data) {
+                 struct vis_data **vis_data) {
   int i, res, n, calcres, curr_header, idx_if, idx_pol;
   int pols[4] = { POL_XX, POL_YY, POL_XY, POL_YX };
   bool open_file, keep_reading, header_free, read_cycles, keep_cycling;
@@ -244,7 +244,7 @@ void data_reader(int read_type, int n_rpfits_files,
         header_free = false;
       }
       res = read_scan_header(sh);
-       if (sh->ut_seconds > 0) {
+      if (sh->ut_seconds > 0) {
         curr_header += 1;
         if (read_type & READ_SCAN_METADATA) {
           // Keep track of the times covered by each scan.
@@ -313,29 +313,30 @@ void data_reader(int read_type, int n_rpfits_files,
                 MALLOC(temp_spectrum, 1);
                 // Prepare the spectrum data structure.
                 temp_spectrum->num_ifs = sh->num_ifs;
+                temp_spectrum->header_data = info_rpfits_files[i]->scan_headers[curr_header];
                 MALLOC(temp_spectrum->spectrum, temp_spectrum->num_ifs);
                 if (read_type & COMPUTE_VIS_PRODUCTS) {
                   REALLOC((*vis_data)->vis_quantities,
-			  ((*vis_data)->nviscycles + 1));
-		  REALLOC((*vis_data)->num_ifs,
-			  ((*vis_data)->nviscycles + 1));
-		  REALLOC((*vis_data)->num_pols,
-			  ((*vis_data)->nviscycles + 1));
-		  (*vis_data)->num_ifs[(*vis_data)->nviscycles] = temp_spectrum->num_ifs;
-		  MALLOC((*vis_data)->num_pols[(*vis_data)->nviscycles],
-			 temp_spectrum->num_ifs);
+                          ((*vis_data)->nviscycles + 1));
+                  REALLOC((*vis_data)->num_ifs,
+                          ((*vis_data)->nviscycles + 1));
+                  REALLOC((*vis_data)->num_pols,
+                          ((*vis_data)->nviscycles + 1));
+                  (*vis_data)->num_ifs[(*vis_data)->nviscycles] = temp_spectrum->num_ifs;
+                  MALLOC((*vis_data)->num_pols[(*vis_data)->nviscycles],
+                         temp_spectrum->num_ifs);
                   MALLOC((*vis_data)->vis_quantities[(*vis_data)->nviscycles],
-			 temp_spectrum->num_ifs);
+                         temp_spectrum->num_ifs);
                 }
                 vis_cycled = false;
                 for (idx_if = 0; idx_if < temp_spectrum->num_ifs; idx_if++) {
                   temp_spectrum->num_pols = sh->if_num_stokes[idx_if];
                   CALLOC(temp_spectrum->spectrum[idx_if], temp_spectrum->num_pols);
                   if (read_type & COMPUTE_VIS_PRODUCTS) {
-		    (*vis_data)->num_pols[(*vis_data)->nviscycles][idx_if] =
-		      temp_spectrum->num_pols;
+                    (*vis_data)->num_pols[(*vis_data)->nviscycles][idx_if] =
+                      temp_spectrum->num_pols;
                     CALLOC((*vis_data)->vis_quantities[(*vis_data)->nviscycles][idx_if],
-			   temp_spectrum->num_pols);
+                           temp_spectrum->num_pols);
                   }
                   for (idx_pol = 0; idx_pol < temp_spectrum->num_pols; idx_pol++) {
                     calcres = vis_ampphase(sh, cycle_data,

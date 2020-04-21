@@ -83,6 +83,16 @@ void pack_write_float(cmp_ctx_t *cmp, float value) {
   if (!cmp_write_float(cmp, value)) CMPERROR(cmp);
 }
 
+// Double.
+// Reader.
+void pack_read_double(cmp_ctx_t *cmp, double *value) {
+  if (!cmp_read_double(cmp, value)) CMPERROR(cmp);
+}
+// Writer.
+void pack_write_double(cmp_ctx_t *cmp, double value) {
+  if (!cmp_write_double(cmp, value)) CMPERROR(cmp);
+}
+
 // String.
 // Reader.
 void pack_read_string(cmp_ctx_t *cmp, char *value, int maxlength) {
@@ -133,6 +143,26 @@ void pack_writearray_float(cmp_ctx_t *cmp, unsigned int length,
   }
 }
 
+// Double.
+// Reader.
+void pack_readarray_double(cmp_ctx_t *cmp, unsigned int expected_length,
+                           double *array) {
+  unsigned int i;
+  pack_readarray_checksize(cmp, expected_length);
+  for (i = 0; i < expected_length; i++) {
+    pack_read_double(cmp, &(array[i]));
+  }
+}
+// Writer.
+void pack_writearray_double(cmp_ctx_t *cmp, unsigned int length,
+                            double *array) {
+  unsigned int i;
+  CMPW_ARRAYINIT(cmp, length);
+  for (i = 0; i < length; i++) {
+    pack_write_double(cmp, array[i]);
+  }
+}
+
 // Float complex.
 // Reader.
 void pack_readarray_floatcomplex(cmp_ctx_t *cmp, unsigned int expected_length,
@@ -180,6 +210,28 @@ void pack_writearray_sint(cmp_ctx_t *cmp, unsigned int length,
 
   for (i = 0; i < length; i++) {
     pack_write_sint(cmp, array[i]);
+  }
+}
+
+// String.
+// Reader.
+void pack_readarray_string(cmp_ctx_t *cmp, unsigned int expected_length,
+                           char **array, long unsigned int maxlength) {
+  unsigned int i;
+  pack_readarray_checksize(cmp, expected_length);
+
+  for (i = 0; i < expected_length; i++) {
+    pack_read_string(cmp, array[i], maxlength);
+  }
+}
+// Writer.
+void pack_writearray_string(cmp_ctx_t *cmp, unsigned int length,
+                            char **array, long unsigned int maxlength) {
+  unsigned int i;
+  CMPW_ARRAYINIT(cmp, length);
+
+  for (i = 0; i < length; i++) {
+    pack_write_string(cmp, array[i], maxlength);
   }
 }
 
@@ -397,6 +449,9 @@ void unpack_ampphase(cmp_ctx_t *cmp, struct ampphase *a) {
 void pack_spectrum_data(cmp_ctx_t *cmp, struct spectrum_data *a) {
   int i, j;
 
+  // The spectrum header.
+  pack_scan_header_data(cmp, a->header_data);
+
   // The number of IFs in this spectra set.
   pack_write_sint(cmp, a->num_ifs);
   // The number of polarisations.
@@ -413,6 +468,10 @@ void pack_spectrum_data(cmp_ctx_t *cmp, struct spectrum_data *a) {
 void unpack_spectrum_data(cmp_ctx_t *cmp, struct spectrum_data *a) {
   int i, j;
   /* fprintf(stderr, "DEBUG: in unpack_spectrum_data\n"); */
+
+  // The spectrum header.
+  MALLOC(a->header_data, 1);
+  unpack_scan_header_data(cmp, a->header_data);
   
   // The number of IFs in this spectra set.
   pack_read_sint(cmp, &(a->num_ifs));
@@ -562,9 +621,113 @@ void unpack_vis_data(cmp_ctx_t *cmp, struct vis_data *a) {
     for (j = 0; j < a->num_ifs[i]; j++) {
       MALLOC(a->vis_quantities[i][j], a->num_pols[i][j]);
       for (k = 0; k < a->num_pols[i][j]; k++) {
-	MALLOC(a->vis_quantities[i][j][k], 1);
-	unpack_vis_quantities(cmp, a->vis_quantities[i][j][k]);
+        MALLOC(a->vis_quantities[i][j][k], 1);
+        unpack_vis_quantities(cmp, a->vis_quantities[i][j][k]);
       }
     }
   }
+}
+
+void pack_scan_header_data(cmp_ctx_t *cmp, struct scan_header_data *a) {
+  int i;
+  // Time variables.
+  pack_write_string(cmp, a->obsdate, OBSDATE_LENGTH);
+  pack_write_float(cmp, a->ut_seconds);
+
+  // Details about the observation.
+  pack_write_string(cmp, a->obstype, OBSTYPE_LENGTH);
+  pack_write_string(cmp, a->calcode, CALCODE_LENGTH);
+  pack_write_sint(cmp, a->cycle_time);
+
+  // Name of the source.
+  pack_write_string(cmp, a->source_name, SOURCE_LENGTH);
+
+  // Source coordinates.
+  pack_write_float(cmp, a->rightascension_hours);
+  pack_write_float(cmp, a->declination_degrees);
+
+  // Frequency configuration.
+  pack_write_sint(cmp, a->num_ifs);
+  pack_writearray_float(cmp, a->num_ifs, a->if_centre_freq);
+  pack_writearray_float(cmp, a->num_ifs, a->if_bandwidth);
+  pack_writearray_sint(cmp, a->num_ifs, a->if_num_channels);
+  pack_writearray_sint(cmp, a->num_ifs, a->if_num_stokes);
+  pack_writearray_sint(cmp, a->num_ifs, a->if_sideband);
+  pack_writearray_sint(cmp, a->num_ifs, a->if_chain);
+  pack_writearray_sint(cmp, a->num_ifs, a->if_label);
+  for (i = 0; i < a->num_ifs; i++) {
+    pack_writearray_string(cmp, 3, a->if_name[i], 8);
+    pack_writearray_string(cmp, a->if_num_stokes[i], a->if_stokes_names[i], 3);
+  }
+  pack_write_sint(cmp, a->num_ants);
+  pack_writearray_sint(cmp, a->num_ants, a->ant_label);
+  pack_writearray_string(cmp, a->num_ants, a->ant_name, 9);
+  for (i = 0; i < a->num_ants; i++) {
+    pack_writearray_double(cmp, 3, a->ant_cartesian[i]);
+  }
+
+}
+
+void unpack_scan_header_data(cmp_ctx_t *cmp, struct scan_header_data *a) {
+  int i, j;
+  // Time variables.
+  pack_read_string(cmp, a->obsdate, OBSDATE_LENGTH);
+  pack_read_float(cmp, &(a->ut_seconds));
+
+  // Details about the observation.
+  pack_read_string(cmp, a->obstype, OBSTYPE_LENGTH);
+  pack_read_string(cmp, a->calcode, CALCODE_LENGTH);
+  pack_read_sint(cmp, &(a->cycle_time));
+
+  // Name of the source.
+  pack_read_string(cmp, a->source_name, SOURCE_LENGTH);
+
+  // Source coordinates.
+  pack_read_float(cmp, &(a->rightascension_hours));
+  pack_read_float(cmp, &(a->declination_degrees));
+
+  // Frequency configuration.
+  pack_read_sint(cmp, &(a->num_ifs));
+  MALLOC(a->if_centre_freq, a->num_ifs);
+  pack_readarray_float(cmp, a->num_ifs, a->if_centre_freq);
+  MALLOC(a->if_bandwidth, a->num_ifs);
+  pack_readarray_float(cmp, a->num_ifs, a->if_bandwidth);
+  MALLOC(a->if_num_channels, a->num_ifs);
+  pack_readarray_sint(cmp, a->num_ifs, a->if_num_channels);
+  MALLOC(a->if_num_stokes, a->num_ifs);
+  pack_readarray_sint(cmp, a->num_ifs, a->if_num_stokes);
+  MALLOC(a->if_sideband, a->num_ifs);
+  pack_readarray_sint(cmp, a->num_ifs, a->if_sideband);
+  MALLOC(a->if_chain, a->num_ifs);
+  pack_readarray_sint(cmp, a->num_ifs, a->if_chain);
+  MALLOC(a->if_label, a->num_ifs);
+  pack_readarray_sint(cmp, a->num_ifs, a->if_label);
+  MALLOC(a->if_name, a->num_ifs);
+  MALLOC(a->if_stokes_names, a->num_ifs);
+  for (i = 0; i < a->num_ifs; i++) {
+    MALLOC(a->if_name[i], 3);
+    for (j = 0; j < 3; j++) {
+      MALLOC(a->if_name[i][j], 8);
+    }
+    MALLOC(a->if_stokes_names[i], a->if_num_stokes[i]);
+    for (j = 0; j < a->if_num_stokes[i]; j++) {
+      MALLOC(a->if_stokes_names[i][j], 3);
+    }
+    pack_readarray_string(cmp, 3, a->if_name[i], 8);
+    pack_readarray_string(cmp, a->if_num_stokes[i], a->if_stokes_names[i], 3);
+  }
+  pack_read_sint(cmp, &(a->num_ants));
+  MALLOC(a->ant_label, a->num_ants);
+  pack_readarray_sint(cmp, a->num_ants, a->ant_label);
+  MALLOC(a->ant_name, a->num_ants);
+  for (i = 0; i < a->num_ants; i++) {
+    MALLOC(a->ant_name[i], 9);
+  }
+  pack_readarray_string(cmp, a->num_ants, a->ant_name, 9);
+  MALLOC(a->ant_cartesian, a->num_ants);
+  for (i = 0; i < a->num_ants; i++) {
+    MALLOC(a->ant_cartesian[i], 3);
+    pack_readarray_double(cmp, 3, a->ant_cartesian[i]);
+  }
+  
 }

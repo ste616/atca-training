@@ -20,6 +20,8 @@
 // This structure wraps around all the ampphase structures and
 // will allow for easy transport.
 struct spectrum_data {
+  // The spectrum header.
+  struct scan_header_data *header_data;
   // The number of IFs in this spectra set.
   int num_ifs;
   // The number of polarisations.
@@ -55,17 +57,25 @@ void pack_read_uint(cmp_ctx_t *cmp, unsigned int *value);
 void pack_write_uint(cmp_ctx_t *cmp, unsigned int value);
 void pack_read_float(cmp_ctx_t *cmp, float *value);
 void pack_write_float(cmp_ctx_t *cmp, float value);
+void pack_read_double(cmp_ctx_t *cmp, double *value);
+void pack_write_double(cmp_ctx_t *cmp, double value);
 void pack_read_string(cmp_ctx_t *cmp, char *value, int maxlength);
 void pack_write_string(cmp_ctx_t *cmp, char *value, long unsigned int maxlength);
 unsigned int pack_readarray_checksize(cmp_ctx_t *cmp, unsigned int expected_length);
 void pack_readarray_float(cmp_ctx_t *cmp, unsigned int expected_length, float *array);
 void pack_writearray_float(cmp_ctx_t *cmp, unsigned int length, float *array);
+void pack_readarray_double(cmp_ctx_t *cmp, unsigned int expected_length, double *array);
+void pack_writearray_double(cmp_ctx_t *cmp, unsigned int length, double *array);
 void pack_readarray_floatcomplex(cmp_ctx_t *cmp, unsigned int expected_length,
                                  float complex *array);
 void pack_writearray_floatcomplex(cmp_ctx_t *cmp, unsigned int length,
                                   float complex *array);
 void pack_readarray_sint(cmp_ctx_t *cmp, unsigned int expected_length, int *array);
 void pack_writearray_sint(cmp_ctx_t *cmp, unsigned int length, int *array);
+void pack_readarray_string(cmp_ctx_t *cmp, unsigned int expected_length, char **array,
+                           long unsigned int maxlength);
+void pack_writearray_string(cmp_ctx_t *cmp, unsigned int length, char **array,
+                            long unsigned int maxlength);
 void pack_ampphase_options(cmp_ctx_t *cmp, struct ampphase_options *a);
 void unpack_ampphase_options(cmp_ctx_t *cmp, struct ampphase_options *a);
 void pack_ampphase(cmp_ctx_t *cmp, struct ampphase *a);
@@ -76,6 +86,8 @@ void pack_vis_quantities(cmp_ctx_t *cmp, struct vis_quantities *a);
 void unpack_vis_quantities(cmp_ctx_t *cmp, struct vis_quantities *a);
 void pack_vis_data(cmp_ctx_t *cmp, struct vis_data *a);
 void unpack_vis_data(cmp_ctx_t *cmp, struct vis_data *a);
+void pack_scan_header_data(cmp_ctx_t *cmp, struct scan_header_data *a);
+void unpack_scan_header_data(cmp_ctx_t *cmp, struct scan_header_data *a);
 
 #define CMPERROR(c) error_and_exit(cmp_strerror(c))
 

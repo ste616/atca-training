@@ -471,7 +471,7 @@ int main(int argc, char *argv[]) {
                                  &ampphase_options);
           }
         }
-        make_spd_plot(cycle_ampphase, &spd_panelspec, &spd_plotcontrols);
+        make_spd_plot(cycle_ampphase, &spd_panelspec, &spd_plotcontrols, false);
         for (q = 0; q < num_ifs; q++) {
           for (p = 0; p < arguments.npols; p++) {
             free_ampphase(&(cycle_ampphase[q][p]));

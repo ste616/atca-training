@@ -53,6 +53,7 @@ int spd_device_number;
 int xaxis_type, yaxis_type, plot_pols;
 struct spd_plotcontrols spd_plotcontrols;
 struct panelspec spd_panelspec;
+struct spectrum_data spectrum_data;
 
 static error_t parse_opt(int key, char *arg, struct argp_state *state) {
   struct arguments *arguments = state->input;
@@ -178,8 +179,9 @@ int split_string(char *s, char *delim, char ***elements) {
 static void interpret_command(char *line) {
   char **line_els = NULL;
   char delim[] = " ";
-  int nels = -1, i, pols_specified;
-  bool pols_selected;
+  int nels = -1, i, pols_specified, if_no;
+  int if_num_spec[MAXIFS];
+  bool pols_selected = false, if_selected = false;
   
   if ((line == NULL) || (strcasecmp(line, "exit") == 0) ||
       (strcasecmp(line, "quit") == 0)) {
@@ -189,6 +191,10 @@ static void interpret_command(char *line) {
     }
   }
 
+  for (i = 0; i < MAXIFS; i++) {
+    if_num_spec[i] = 0;
+  }
+  
   if (*line) {
     // Keep this history.
     add_history(line);
@@ -202,23 +208,41 @@ static void interpret_command(char *line) {
       // We've been given a selection command.
       pols_specified = 0;
       for (i = 1; i < nels; i++) {
-	if (strcasecmp(line_els[i], "aa") == 0) {
-	  pols_selected = true;
-	  // Select aa.
-	  pols_specified |= PLOT_POL_XX;
-	} else if (strcasecmp(line_els[i], "bb") == 0) {
-	  pols_selected = true;
-	  pols_specified |= PLOT_POL_YY;
-	} else if (strcasecmp(line_els[i], "ab") == 0) {
-	  pols_selected = true;
-	  pols_specified |= PLOT_POL_XY;
-	}
+        if (strcasecmp(line_els[i], "aa") == 0) {
+          pols_selected = true;
+          // Select aa.
+          pols_specified |= PLOT_POL_XX;
+        } else if (strcasecmp(line_els[i], "bb") == 0) {
+          pols_selected = true;
+          pols_specified |= PLOT_POL_YY;
+        } else if (strcasecmp(line_els[i], "ab") == 0) {
+          pols_selected = true;
+          pols_specified |= PLOT_POL_XY;
+        } else if ((strncasecmp(line_els[i], "f", 1) == 0) ||
+                   (strncasecmp(line_els[i], "z", 1) == 0)) {
+          // Probably selecting a band, search for it.
+          if_no = find_if_name(spectrum_data.header_data, line_els[i]);
+          if ((if_no >= 0) && (if_no < MAXIFS)) {
+            if_num_spec[if_no - 1] = 1;
+            if_selected = true;
+            fprintf(stderr, " IF band %s is band number %d\n", line_els[i], if_no);
+          } else {
+            fprintf(stderr, " IF band %s not found\n", line_els[i]);
+          }
+        }
       }
       if (pols_selected) {
-	// Reset the polarisations.
-	change_spd_plotcontrols(&spd_plotcontrols, NULL, NULL, &pols_specified,
-				NULL);
-	action_required = ACTION_REFRESH_PLOT;
+        // Reset the polarisations.
+        change_spd_plotcontrols(&spd_plotcontrols, NULL, NULL, &pols_specified,
+                                NULL);
+        action_required = ACTION_REFRESH_PLOT;
+      }
+      if (if_selected) {
+        // Reset the IF selection.
+        for (i = 0; i < MAXIFS; i++) {
+          spd_plotcontrols.if_num_spec[i] = if_num_spec[i];
+        }
+        action_required = ACTION_REFRESH_PLOT;
       }
     }
     FREE(line_els);
@@ -244,8 +268,8 @@ void reconcile_spd_plotcontrols(struct spectrum_data *spectrum_data,
     if (user_plotcontrols->if_num_spec[i]) {
       // The user will allow this to be plotted if possible.
       if (i < spectrum_data->num_ifs) {
-	// This IF is in the data.
-	data_plotcontrols->if_num_spec[i] = 1;
+        // This IF is in the data.
+        data_plotcontrols->if_num_spec[i] = 1;
       }
     }
   }
@@ -278,7 +302,6 @@ void free_spectrum_data(struct spectrum_data *spectrum_data) {
 
 int main(int argc, char *argv[]) {
   struct arguments arguments;
-  struct spectrum_data spectrum_data;
   bool spd_device_opened = false;
   struct spd_plotcontrols spd_alteredcontrols;
   fd_set watchset;
@@ -331,7 +354,7 @@ int main(int argc, char *argv[]) {
       // Let's make a plot.
       // First, ensure the plotter doesn't try to do something it can't.
       reconcile_spd_plotcontrols(&spectrum_data, &spd_plotcontrols, &spd_alteredcontrols);
-      make_spd_plot(spectrum_data.spectrum, &spd_panelspec, &spd_alteredcontrols);
+      make_spd_plot(spectrum_data.spectrum, &spd_panelspec, &spd_alteredcontrols, true);
       action_required -= ACTION_REFRESH_PLOT;
     }
 
