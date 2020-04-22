@@ -50,7 +50,7 @@ struct arguments {
 // And some fun, totally necessary, global state variables.
 int action_required;
 int spd_device_number;
-int xaxis_type, yaxis_type, plot_pols;
+int xaxis_type, yaxis_type, plot_pols, yaxis_scaling;
 struct spd_plotcontrols spd_plotcontrols;
 struct panelspec spd_panelspec;
 struct spectrum_data spectrum_data;
@@ -180,7 +180,7 @@ static void interpret_command(char *line) {
   char **line_els = NULL, *cvt = NULL;
   char delim[] = " ";
   int nels = -1, i, pols_specified, if_no;
-  int if_num_spec[MAXIFS];
+  int if_num_spec[MAXIFS], yaxis_change_type;
   bool pols_selected = false, if_selected = false, range_valid = false;
   float range_limit_low, range_limit_high, range_swap;
   
@@ -287,11 +287,28 @@ static void interpret_command(char *line) {
       }
       if (minmatch("phase", line_els[0], 1)) {
         yaxis_type = PLOT_PHASE;
+        yaxis_change_type = yaxis_type;
       } else if (minmatch("amplitude", line_els[0], 1)) {
-        yaxis_type = PLOT_AMPLITUDE | PLOT_AMPLITUDE_LINEAR;
+        yaxis_type = PLOT_AMPLITUDE;
+        yaxis_change_type = yaxis_type | yaxis_scaling;
       }
-      change_spd_plotcontrols(&spd_plotcontrols, NULL, &yaxis_type, NULL, NULL);
+      change_spd_plotcontrols(&spd_plotcontrols, NULL, &yaxis_change_type, NULL, NULL);
       action_required = ACTION_REFRESH_PLOT;
+    } else if ((minmatch("scale", line_els[0], 3)) &&
+               (nels == 2)) {
+      // We've been asked to change how to scale the y axis.
+      yaxis_change_type = -1;
+      if (minmatch("logarithmic", line_els[1], 3)) {
+        yaxis_scaling = PLOT_AMPLITUDE_LOG;
+        yaxis_change_type = yaxis_type | yaxis_scaling;
+      } else if (minmatch("linear", line_els[1], 3)) {
+        yaxis_scaling = PLOT_AMPLITUDE_LINEAR;
+        yaxis_change_type = yaxis_type | yaxis_scaling;
+      }
+      if (yaxis_change_type >= 0) {
+        change_spd_plotcontrols(&spd_plotcontrols, NULL, &yaxis_change_type, NULL, NULL);
+        action_required = ACTION_REFRESH_PLOT;
+      }
     }
     FREE(line_els);
   }
@@ -391,9 +408,10 @@ int main(int argc, char *argv[]) {
 
   // We will need to have a default plot upon entry.
   xaxis_type = PLOT_FREQUENCY;
-  yaxis_type = PLOT_AMPLITUDE | PLOT_AMPLITUDE_LINEAR;
+  yaxis_type = PLOT_AMPLITUDE;
+  yaxis_scaling = PLOT_AMPLITUDE_LINEAR;
   plot_pols = PLOT_POL_XX | PLOT_POL_YY;
-  init_spd_plotcontrols(&spd_plotcontrols, xaxis_type, yaxis_type,
+  init_spd_plotcontrols(&spd_plotcontrols, xaxis_type, yaxis_type | yaxis_scaling,
                         plot_pols, DEFAULT, spd_device_number);
   // The number of pols is set by the data though, not the selection.
   spd_plotcontrols.npols = spectrum_data.num_pols;

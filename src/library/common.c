@@ -356,13 +356,13 @@ void plotpanel_minmax(struct ampphase **plot_ampphase,
     *plotmax_x = plot_ampphase[0]->nchannels;
     if (plot_controls->channel_range_limit == YES) {
       if ((plot_controls->channel_range_min >= 0) &&
-	  (plot_controls->channel_range_min < plot_ampphase[0]->nchannels)) {
-	*plotmin_x = plot_controls->channel_range_min;
+          (plot_controls->channel_range_min < plot_ampphase[0]->nchannels)) {
+        *plotmin_x = plot_controls->channel_range_min;
       }
       if ((plot_controls->channel_range_max > 0) &&
-	  (plot_controls->channel_range_max < plot_ampphase[0]->nchannels) &&
-	  (plot_controls->channel_range_max > *plotmin_x)) {
-	*plotmax_x = plot_controls->channel_range_max;
+          (plot_controls->channel_range_max < plot_ampphase[0]->nchannels) &&
+          (plot_controls->channel_range_max > *plotmin_x)) {
+        *plotmax_x = plot_controls->channel_range_max;
       }
     }
   } else if (plot_controls->plot_options & PLOT_FREQUENCY) {
@@ -371,15 +371,15 @@ void plotpanel_minmax(struct ampphase **plot_ampphase,
       [plot_ampphase[0]->nchannels - 1];
     if (plot_controls->channel_range_limit == YES) {
       if ((plot_controls->channel_range_min >= 0) &&
-	  (plot_controls->channel_range_min < plot_ampphase[0]->nchannels)) {
-	*plotmin_x = plot_ampphase[0]->frequency
-	  [plot_controls->channel_range_min];
+          (plot_controls->channel_range_min < plot_ampphase[0]->nchannels)) {
+        *plotmin_x = plot_ampphase[0]->frequency
+          [plot_controls->channel_range_min];
       }
       if ((plot_controls->channel_range_max > 0) &&
-	  (plot_controls->channel_range_max < plot_ampphase[0]->nchannels) &&
-	  (plot_controls->channel_range_max > plot_controls->channel_range_min)) {
-	*plotmax_x = plot_ampphase[0]->frequency
-	  [plot_controls->channel_range_max];
+          (plot_controls->channel_range_max < plot_ampphase[0]->nchannels) &&
+          (plot_controls->channel_range_max > plot_controls->channel_range_min)) {
+        *plotmax_x = plot_ampphase[0]->frequency
+          [plot_controls->channel_range_max];
       }
     }
     // Check for frequency inversion.
@@ -418,14 +418,14 @@ void plotpanel_minmax(struct ampphase **plot_ampphase,
   for (i = 1; i < npols; i++) {
     if (plot_controls->plot_options & PLOT_AMPLITUDE) {
       MINASSIGN(*plotmin_y,
-		plot_ampphase[polidx[i]]->min_amplitude[plot_baseline_idx]);
+                plot_ampphase[polidx[i]]->min_amplitude[plot_baseline_idx]);
       MAXASSIGN(*plotmax_y,
-		plot_ampphase[polidx[i]]->max_amplitude[plot_baseline_idx]);
+                plot_ampphase[polidx[i]]->max_amplitude[plot_baseline_idx]);
     } else if (plot_controls->plot_options & PLOT_PHASE) {
       MINASSIGN(*plotmin_y,
-		plot_ampphase[polidx[i]]->min_phase[plot_baseline_idx]);
+                plot_ampphase[polidx[i]]->min_phase[plot_baseline_idx]);
       MAXASSIGN(*plotmax_y,
-		plot_ampphase[polidx[i]]->max_phase[plot_baseline_idx]);
+                plot_ampphase[polidx[i]]->max_phase[plot_baseline_idx]);
     }
   }
   
@@ -446,20 +446,20 @@ void plotpanel_minmax(struct ampphase **plot_ampphase,
       base_to_ants(plot_ampphase[0]->baseline[i], &ant1, &ant2);
       // TODO: check the antennas are in the array spec.
       if (((ant1 == ant2) && (bltype == 0)) ||
-	  ((ant1 != ant2) && (bltype == 1))) {
-	for (j = 0; j < npols; j++) {
-	  if (plot_controls->plot_options & PLOT_AMPLITUDE) {
-	    MINASSIGN(*plotmin_y,
-		      plot_ampphase[polidx[j]]->min_amplitude[i]);
-	    MAXASSIGN(*plotmax_y,
-		      plot_ampphase[polidx[j]]->max_amplitude[i]);
-	  } else if (plot_controls->plot_options & PLOT_PHASE) {
-	    MINASSIGN(*plotmin_y,
-		      plot_ampphase[polidx[j]]->min_phase[i]);
-	    MAXASSIGN(*plotmax_y,
-		      plot_ampphase[polidx[j]]->max_phase[i]);
-	  }
-	}
+          ((ant1 != ant2) && (bltype == 1))) {
+        for (j = 0; j < npols; j++) {
+          if (plot_controls->plot_options & PLOT_AMPLITUDE) {
+            MINASSIGN(*plotmin_y,
+                      plot_ampphase[polidx[j]]->min_amplitude[i]);
+            MAXASSIGN(*plotmax_y,
+                      plot_ampphase[polidx[j]]->max_amplitude[i]);
+          } else if (plot_controls->plot_options & PLOT_PHASE) {
+            MINASSIGN(*plotmin_y,
+                      plot_ampphase[polidx[j]]->min_phase[i]);
+            MAXASSIGN(*plotmax_y,
+                      plot_ampphase[polidx[j]]->max_phase[i]);
+          }
+        }
       }
     }
   }
@@ -668,9 +668,9 @@ float fracwidth(struct panelspec *panelspec,
 }
 
 void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
-		   int ncycles, int *cycle_numifs, int npols,
-		   struct panelspec *panelspec,
-		   struct vis_plotcontrols *plot_controls) {
+                   int ncycles, int *cycle_numifs, int npols,
+                   struct panelspec *panelspec,
+                   struct vis_plotcontrols *plot_controls) {
   int nants = 0, i = 0, n_vis_lines = 0, j = 0, k = 0, p = 0;
   int singleant = 0, l = 0, m = 0, n = 0, connidx = 0;
   int **n_plot_lines = NULL;
@@ -704,55 +704,55 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
     // Check if only a single antenna is requested.
     for (i = 1; i <= MAXANTS; i++) {
       if ((plot_controls->vis_products[p]->antenna_spec == (1<<i)) &&
-	  (plot_controls->array_spec & (1<<i))) {
-	singleant = i;
-	break;
+          (plot_controls->array_spec & (1<<i))) {
+        singleant = i;
+        break;
       }
     }
     for (i = 1; i <= MAXANTS; i++) {
       if (((1 << i) & plot_controls->array_spec) &&
-	  (((1 << i) & plot_controls->vis_products[p]->antenna_spec) ||
-	   (singleant > i))) {
-	for (j = i; j <= MAXANTS; j++) {
-	  if (((1 << j) & plot_controls->array_spec) &&
-	      ((1 << j) & plot_controls->vis_products[p]->antenna_spec)) {
-	    if (i != j) {
-	      // Cross-correlations allow XX and YY.
-	      if (plot_controls->vis_products[p]->pol_spec & PLOT_POL_XX) {
-		if (plot_controls->vis_products[p]->if_spec & VIS_PLOT_IF1) {
-		  add_vis_line(&vis_lines, &n_vis_lines,
-			       i, j, plot_controls->visbands[0], POL_XX);
-		}
-		if (plot_controls->vis_products[p]->if_spec & VIS_PLOT_IF2) {
-		  add_vis_line(&vis_lines, &n_vis_lines,
-			       i, j, plot_controls->visbands[1], POL_XX);
-		}
-	      }
-	      if (plot_controls->vis_products[p]->pol_spec & PLOT_POL_YY) {
-		if (plot_controls->vis_products[p]->if_spec & VIS_PLOT_IF1) {
-		  add_vis_line(&vis_lines, &n_vis_lines,
-			       i, j, plot_controls->visbands[0], POL_YY);
-		}
-		if (plot_controls->vis_products[p]->if_spec & VIS_PLOT_IF2) {
-		  add_vis_line(&vis_lines, &n_vis_lines,
-			       i, j, plot_controls->visbands[1], POL_YY);
-		}
-	      }
-	    } else {
-	      // Auto-correlations allow XY and YX.
-	      if (plot_controls->vis_products[p]->pol_spec & PLOT_POL_XY) {
-		if (plot_controls->vis_products[p]->if_spec & VIS_PLOT_IF1) {
-		  add_vis_line(&vis_lines, &n_vis_lines,
-			       i, j, plot_controls->visbands[0], POL_XY);
-		}
-		if (plot_controls->vis_products[p]->if_spec & VIS_PLOT_IF2) {
-		  add_vis_line(&vis_lines, &n_vis_lines,
-			       i, j, plot_controls->visbands[1], POL_XY);
-		}
-	      }
-	    }
-	  }
-	}
+          (((1 << i) & plot_controls->vis_products[p]->antenna_spec) ||
+           (singleant > i))) {
+        for (j = i; j <= MAXANTS; j++) {
+          if (((1 << j) & plot_controls->array_spec) &&
+              ((1 << j) & plot_controls->vis_products[p]->antenna_spec)) {
+            if (i != j) {
+              // Cross-correlations allow XX and YY.
+              if (plot_controls->vis_products[p]->pol_spec & PLOT_POL_XX) {
+                if (plot_controls->vis_products[p]->if_spec & VIS_PLOT_IF1) {
+                  add_vis_line(&vis_lines, &n_vis_lines,
+                               i, j, plot_controls->visbands[0], POL_XX);
+                }
+                if (plot_controls->vis_products[p]->if_spec & VIS_PLOT_IF2) {
+                  add_vis_line(&vis_lines, &n_vis_lines,
+                               i, j, plot_controls->visbands[1], POL_XX);
+                }
+              }
+              if (plot_controls->vis_products[p]->pol_spec & PLOT_POL_YY) {
+                if (plot_controls->vis_products[p]->if_spec & VIS_PLOT_IF1) {
+                  add_vis_line(&vis_lines, &n_vis_lines,
+                               i, j, plot_controls->visbands[0], POL_YY);
+                }
+                if (plot_controls->vis_products[p]->if_spec & VIS_PLOT_IF2) {
+                  add_vis_line(&vis_lines, &n_vis_lines,
+                               i, j, plot_controls->visbands[1], POL_YY);
+                }
+              }
+            } else {
+              // Auto-correlations allow XY and YX.
+              if (plot_controls->vis_products[p]->pol_spec & PLOT_POL_XY) {
+                if (plot_controls->vis_products[p]->if_spec & VIS_PLOT_IF1) {
+                  add_vis_line(&vis_lines, &n_vis_lines,
+                               i, j, plot_controls->visbands[0], POL_XY);
+                }
+                if (plot_controls->vis_products[p]->if_spec & VIS_PLOT_IF2) {
+                  add_vis_line(&vis_lines, &n_vis_lines,
+                               i, j, plot_controls->visbands[1], POL_XY);
+                }
+              }
+            }
+          }
+        }
       }
     }
   }
@@ -791,65 +791,65 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
       // The fourth dimension is the points to plot in the line.
       // We accumulate these now.
       for (k = 0; k < ncycles; k++) {
-	/* printf(" cycle %d has %d IFs, type %s\n", k, cycle_numifs[k], */
-	/*        cycle_vis_quantities[k][0][0]->scantype); */
-	for (l = 0; l < cycle_numifs[k]; l++) {
-	  for (m = 0; m < npols; m++) {
-	    /* printf("comparing pols %d to %d, window %d to %d\n", */
-	    /* 	   cycle_vis_quantities[k][l][m]->pol, vis_lines[j]->pol, */
-	    /* 	   cycle_vis_quantities[k][l][m]->window, vis_lines[j]->if_number); */
-	    if ((cycle_vis_quantities[k][l][m]->pol &
-		 vis_lines[j]->pol) &&
-		(cycle_vis_quantities[k][l][m]->window ==
-		 vis_lines[j]->if_number)) {
-	      //printf("   found appropriate vis quantity!\n");
-	      // Find the correct baseline.
-	      for (n = 0; n < cycle_vis_quantities[k][l][m]->nbaselines; n++) {
-		if (cycle_vis_quantities[k][l][m]->baseline[n] ==
-		    ants_to_base(vis_lines[j]->ant1, vis_lines[j]->ant2)) {
-		  /* printf("  IF %d, pol %d, baseline %d, flagged = %d\n", */
-		  /* 	 l, m, n, cycle_vis_quantities[k][l][m]->flagged_bad[n]); */
-		  if (cycle_vis_quantities[k][l][m]->flagged_bad[n] > 0) {
-		    continue;
-		  }
-		  // Found it.
-		  n_plot_lines[i][j] += 1;
-		  REALLOC(plot_lines[i][j][0], n_plot_lines[i][j]);
-		  REALLOC(plot_lines[i][j][1], n_plot_lines[i][j]);
-		  plot_lines[i][j][0][n_plot_lines[i][j] - 1] =
-		    cycle_vis_quantities[k][l][m]->ut_seconds;
-		  /* printf("  number of points is now %d, time %.3f\n", */
-		  /* 	 n_plot_lines[i][j], */
-		  /* 	 plot_lines[i][j][0][n_plot_lines[i][j] - 1]); */
-		  if (plot_lines[i][j][0][n_plot_lines[i][j] - 1] < min_x) {
-		    min_x = plot_lines[i][j][0][n_plot_lines[i][j] - 1];
-		  }
-		  if (plot_lines[i][j][0][n_plot_lines[i][j] - 1] > max_x) {
-		    max_x = plot_lines[i][j][0][n_plot_lines[i][j] - 1];
-		  }
-		  // Need to fix for bin.
-		  if (plot_controls->panel_type[i] == PLOT_AMPLITUDE) {
-		    plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
-		      cycle_vis_quantities[k][l][m]->amplitude[n][0];
-		  } else if (plot_controls->panel_type[i] == PLOT_PHASE) {
-		    plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
-		      cycle_vis_quantities[k][l][m]->phase[n][0];
-		  } else if (plot_controls->panel_type[i] == PLOT_DELAY) {
-		    plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
-		      cycle_vis_quantities[k][l][m]->delay[n][0];
-		  }
-		  if (plot_lines[i][j][1][n_plot_lines[i][j] - 1] < min_y) {
-		    min_y = plot_lines[i][j][1][n_plot_lines[i][j] -1 ];
-		  }
-		  if (plot_lines[i][j][1][n_plot_lines[i][j] - 1] > max_y) {
-		    max_y = plot_lines[i][j][1][n_plot_lines[i][j] - 1];
-		  }
-		  break;
-		}
-	      }
-	    }
-	  }
-	}
+        /* printf(" cycle %d has %d IFs, type %s\n", k, cycle_numifs[k], */
+        /*        cycle_vis_quantities[k][0][0]->scantype); */
+        for (l = 0; l < cycle_numifs[k]; l++) {
+          for (m = 0; m < npols; m++) {
+            /* printf("comparing pols %d to %d, window %d to %d\n", */
+            /* 	   cycle_vis_quantities[k][l][m]->pol, vis_lines[j]->pol, */
+            /* 	   cycle_vis_quantities[k][l][m]->window, vis_lines[j]->if_number); */
+            if ((cycle_vis_quantities[k][l][m]->pol &
+                 vis_lines[j]->pol) &&
+                (cycle_vis_quantities[k][l][m]->window ==
+                 vis_lines[j]->if_number)) {
+              //printf("   found appropriate vis quantity!\n");
+              // Find the correct baseline.
+              for (n = 0; n < cycle_vis_quantities[k][l][m]->nbaselines; n++) {
+                if (cycle_vis_quantities[k][l][m]->baseline[n] ==
+                    ants_to_base(vis_lines[j]->ant1, vis_lines[j]->ant2)) {
+                  /* printf("  IF %d, pol %d, baseline %d, flagged = %d\n", */
+                  /* 	 l, m, n, cycle_vis_quantities[k][l][m]->flagged_bad[n]); */
+                  if (cycle_vis_quantities[k][l][m]->flagged_bad[n] > 0) {
+                    continue;
+                  }
+                  // Found it.
+                  n_plot_lines[i][j] += 1;
+                  REALLOC(plot_lines[i][j][0], n_plot_lines[i][j]);
+                  REALLOC(plot_lines[i][j][1], n_plot_lines[i][j]);
+                  plot_lines[i][j][0][n_plot_lines[i][j] - 1] =
+                    cycle_vis_quantities[k][l][m]->ut_seconds;
+                  /* printf("  number of points is now %d, time %.3f\n", */
+                  /* 	 n_plot_lines[i][j], */
+                  /* 	 plot_lines[i][j][0][n_plot_lines[i][j] - 1]); */
+                  if (plot_lines[i][j][0][n_plot_lines[i][j] - 1] < min_x) {
+                    min_x = plot_lines[i][j][0][n_plot_lines[i][j] - 1];
+                  }
+                  if (plot_lines[i][j][0][n_plot_lines[i][j] - 1] > max_x) {
+                    max_x = plot_lines[i][j][0][n_plot_lines[i][j] - 1];
+                  }
+                  // Need to fix for bin.
+                  if (plot_controls->panel_type[i] == PLOT_AMPLITUDE) {
+                    plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
+                      cycle_vis_quantities[k][l][m]->amplitude[n][0];
+                  } else if (plot_controls->panel_type[i] == PLOT_PHASE) {
+                    plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
+                      cycle_vis_quantities[k][l][m]->phase[n][0];
+                  } else if (plot_controls->panel_type[i] == PLOT_DELAY) {
+                    plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
+                      cycle_vis_quantities[k][l][m]->delay[n][0];
+                  }
+                  if (plot_lines[i][j][1][n_plot_lines[i][j] - 1] < min_y) {
+                    min_y = plot_lines[i][j][1][n_plot_lines[i][j] -1 ];
+                  }
+                  if (plot_lines[i][j][1][n_plot_lines[i][j] - 1] > max_y) {
+                    max_y = plot_lines[i][j][1][n_plot_lines[i][j] - 1];
+                  }
+                  break;
+                }
+              }
+            }
+          }
+        }
       }
     }
     // Make the panel.
@@ -887,21 +887,21 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
       // Print the baselines on the bottom.
       labtotalwidth = 0;
       for (j = 0; j < n_vis_lines; j++) {
-	labtotalwidth += fracwidth(panelspec, min_x, max_x, 0, 1,
-				   vis_lines[j]->label);
+        labtotalwidth += fracwidth(panelspec, min_x, max_x, 0, 1,
+                                   vis_lines[j]->label);
       }
       // Work out the extra spacing to make the labels go all
       // the way across the bottom.
       labspacing = (1 - labtotalwidth) /
-	(float)(n_vis_lines - 1);
+        (float)(n_vis_lines - 1);
       cxpos = 0;
       for (j = 0; j < n_vis_lines; j++) {
-	cpgsci(vis_lines[j]->pgplot_colour);
-	dxpos = fracwidth(panelspec, min_x, max_x, 0, i,
-			  vis_lines[j]->label);
-	cpgmtxt("B", 4, cxpos, 0, vis_lines[j]->label);
-	//printf("printing label %s\n", vis_lines[j]->label);
-	cxpos += dxpos + labspacing;
+        cpgsci(vis_lines[j]->pgplot_colour);
+        dxpos = fracwidth(panelspec, min_x, max_x, 0, i,
+                          vis_lines[j]->label);
+        cpgmtxt("B", 4, cxpos, 0, vis_lines[j]->label);
+        //printf("printing label %s\n", vis_lines[j]->label);
+        cxpos += dxpos + labspacing;
       }
     } else if (i == 0) {
       // Print the array antennas at the top left.
@@ -911,15 +911,15 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
       cpgmtxt("T", 0.5, cxpos, 0, "Ants:");
       cxpos = dxpos;
       for (j = 1; j <= MAXANTS; j++) {
-	if ((1 << j) & plot_controls->array_spec) {
-	  (void)sprintf(antstring, "%d", j);
-	} else {
-	  (void)strcpy(antstring, "-");
-	}
-	cpgsci(j + 3);
-	dxpos = fracwidth(panelspec, min_x, max_x, 0, i, antstring);
-	cpgmtxt("T", 0.5, cxpos, 0, antstring);
-	cxpos += dxpos;
+        if ((1 << j) & plot_controls->array_spec) {
+          (void)sprintf(antstring, "%d", j);
+        } else {
+          (void)strcpy(antstring, "-");
+        }
+        cpgsci(j + 3);
+        dxpos = fracwidth(panelspec, min_x, max_x, 0, i, antstring);
+        cpgmtxt("T", 0.5, cxpos, 0, antstring);
+        cxpos += dxpos;
       }
     }
     cpgsci(1);
@@ -927,19 +927,19 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
       cpgsci(vis_lines[j]->pgplot_colour);
       // Plot the line in segments connected in time.
       for (k = 0, connidx = 0; k < n_plot_lines[i][j]; k++) {
-	if ((plot_lines[i][j][0][k + 1] >
-	     (plot_lines[i][j][0][k] + (1.5 * plot_controls->cycletime)))) {
-	  // Disconnect.
-	  cpgline((k - connidx), plot_lines[i][j][0] + connidx,
-		  plot_lines[i][j][1] + connidx);
-	  connidx = (k + 1);
-	}
+        if ((plot_lines[i][j][0][k + 1] >
+             (plot_lines[i][j][0][k] + (1.5 * plot_controls->cycletime)))) {
+          // Disconnect.
+          cpgline((k - connidx), plot_lines[i][j][0] + connidx,
+                  plot_lines[i][j][1] + connidx);
+          connidx = (k + 1);
+        }
       }
       cpgline((n_plot_lines[i][j] - connidx),
-	      plot_lines[i][j][0] + connidx, plot_lines[i][j][1] + connidx);
+              plot_lines[i][j][0] + connidx, plot_lines[i][j][1] + connidx);
     }
   }
-
+  
   // Free our memory.
   for (i = 0; i < n_vis_lines; i++) {
     FREE(vis_lines[i]);
@@ -948,7 +948,7 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
   for (i = 0; i < plot_controls->num_panels; i++) {
     for (j = 0; j < n_vis_lines; j++) {
       for (k = 0; k < 2; k++) {
-	FREE(plot_lines[i][j][k]);
+        FREE(plot_lines[i][j][k]);
       }
       FREE(plot_lines[i][j]);
     }
@@ -959,13 +959,23 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
   FREE(plot_lines);
 }
 
+// Take the dB log of value v, compared with max value m, store
+// the log value in s.
+#define LOGAMP(v, m, s)                               \
+  if (v < (m / 1.0E12)) {                             \
+    s = -120.0;                                       \
+  } else {                                            \
+    s = (float)(10.0 * log10((double)v / (double)m)); \
+  }
+
 void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspec,
                    struct spd_plotcontrols *plot_controls, bool all_data_present) {
   int i, ant1, ant2, nants = 0, px, py, iauto = 0, icross = 0;
   int npols = 0, *polidx = NULL, poli, num_ifs = 0, panels_per_if = 0;
   int idxif, ni, ri, rj, rp, bi, bn, pc, inverted = NO, plot_started = NO;
   float xaxis_min, xaxis_max, yaxis_min, yaxis_max, theight = 0.4;
-  float *freq_ordered = NULL, *freq_amp = NULL, *freq_phase = NULL;
+  float ylog_min, ylog_max;
+  float *plot_xvalues = NULL, *plot_yvalues = NULL;
   char ptitle[BIGBUFSIZE], ptype[BUFSIZE], ftype[BUFSIZE];
   struct ampphase **ampphase_if = NULL;
 
@@ -1077,7 +1087,11 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
           changepanel(px, py, panelspec);
           // Set the title for the plot.
           if (plot_controls->plot_options & PLOT_AMPLITUDE) {
-            snprintf(ptype, BUFSIZE, "AMPL.");
+            if (plot_controls->plot_options & PLOT_AMPLITUDE_LOG) {
+              snprintf(ptype, BUFSIZE, "LOG(dB) AMPL.");
+            } else {
+              snprintf(ptype, BUFSIZE, "AMPL.");
+            }
           } else if (plot_controls->plot_options & PLOT_PHASE) {
             snprintf(ptype, BUFSIZE, "PHASE");
           }
@@ -1093,6 +1107,15 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
                            &xaxis_min, &xaxis_max, &yaxis_min, &yaxis_max);
           /* printf("max/max x = %.6f / %.6f, y = %.6f / %.6f\n", */
           /* 	 xaxis_min, xaxis_max, yaxis_min, yaxis_max); */
+
+          if ((plot_controls->plot_options & PLOT_AMPLITUDE) &&
+              (plot_controls->plot_options & PLOT_AMPLITUDE_LOG)) {
+            ylog_min = yaxis_min;
+            ylog_max = yaxis_max;
+            yaxis_max = 1.0;
+            LOGAMP(ylog_min, ylog_max, yaxis_min);
+          }
+          
           cpgsci(1);
           cpgswin(xaxis_min, xaxis_max, yaxis_min, yaxis_max);
           cpgbox("BCNTS1", 0, 0, "BCNTS", 0, 0);
@@ -1110,70 +1133,65 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
                 ampphase_if[0]->f_frequency[i][0]
                 [ampphase_if[0]->f_nchannels[i][0] - 1]) {
               // Inverted band.
-              FREE(freq_ordered);
-              FREE(freq_amp);
-              FREE(freq_phase);
-              MALLOC(freq_ordered, ampphase_if[0]->f_nchannels[i][0]);
-              MALLOC(freq_amp, ampphase_if[0]->f_nchannels[i][0]);
-              MALLOC(freq_phase, ampphase_if[0]->f_nchannels[i][0]);
               inverted = YES;
             }
           }
+
+          // Allocate the output arrays.
+          MALLOC(plot_xvalues, ampphase_if[0]->f_nchannels[i][0]);
+          MALLOC(plot_yvalues, ampphase_if[0]->f_nchannels[i][0]);
           
           pc = 1;
           for (rp = 0; rp < npols; rp++) {
             for (bi = 0; bi < bn; bi++) {
-              if (inverted == YES) {
-                for (ri = 0, rj = ampphase_if[polidx[rp]]->f_nchannels[i][bi] - 1;
-                     ri < ampphase_if[polidx[rp]]->f_nchannels[i][bi];
-                     ri++, rj--) {
+              for (ri = 0, rj = ampphase_if[polidx[rp]]->f_nchannels[i][bi] - 1;
+                   ri < ampphase_if[polidx[rp]]->f_nchannels[i][bi];
+                   ri++, rj--) {
+                if (inverted == YES) {
                   // Swap the frequencies.
                   if (rp == 0) {
-                    freq_ordered[ri] =
+                    plot_xvalues[ri] =
                       ampphase_if[polidx[rp]]->f_frequency[i][bi][rj];
                   }
                   if (plot_controls->plot_options & PLOT_AMPLITUDE) {
-                    freq_amp[ri] =
-                      ampphase_if[polidx[rp]]->f_amplitude[i][bi][rj];
+                    if (plot_controls->plot_options & PLOT_AMPLITUDE_LOG) {
+                      LOGAMP(ampphase_if[polidx[rp]]->f_amplitude[i][bi][rj], ylog_max,
+                             plot_yvalues[ri]);
+                    } else {
+                      plot_yvalues[ri] = 
+                        ampphase_if[polidx[rp]]->f_amplitude[i][bi][rj];
+                    }
                   } else {
-                    freq_phase[ri] =
+                    plot_yvalues[ri] =
                       ampphase_if[polidx[rp]]->f_phase[i][bi][rj];
                   }
+                } else {
+                  if (plot_controls->plot_options & PLOT_FREQUENCY) {
+                    plot_xvalues[ri] = ampphase_if[polidx[rp]]->f_frequency[i][bi][ri];
+                  } else if (plot_controls->plot_options & PLOT_CHANNEL) {
+                    plot_xvalues[ri] = ampphase_if[polidx[rp]]->f_channel[i][bi][ri];
+                  }
+                  if (plot_controls->plot_options & PLOT_AMPLITUDE) {
+                    if (plot_controls->plot_options & PLOT_AMPLITUDE_LOG) {
+                      LOGAMP(ampphase_if[polidx[rp]]->f_amplitude[i][bi][ri], ylog_max,
+                             plot_yvalues[ri]);
+                    } else {
+                      plot_yvalues[ri] = ampphase_if[polidx[rp]]->f_amplitude[i][bi][ri];
+                    }
+                  } else if (plot_controls->plot_options & PLOT_PHASE) {
+                    plot_yvalues[ri] = ampphase_if[polidx[rp]]->f_phase[i][bi][ri];
+                  }
                 }
-              } else {
-                freq_ordered = ampphase_if[polidx[rp]]->f_frequency[i][bi];
-                freq_amp = ampphase_if[polidx[rp]]->f_amplitude[i][bi];
-                freq_phase = ampphase_if[polidx[rp]]->f_phase[i][bi];
               }
               cpgsci(pc);
-              if (plot_controls->plot_options & PLOT_AMPLITUDE) {
-                if (plot_controls->plot_options & PLOT_CHANNEL) {
-                  cpgline(ampphase_if[polidx[rp]]->f_nchannels[i][bi],
-                          ampphase_if[polidx[rp]]->f_channel[i][bi],
-                          ampphase_if[polidx[rp]]->f_amplitude[i][bi]);
-                } else if (plot_controls->plot_options & PLOT_FREQUENCY) {
-                  cpgline(ampphase_if[polidx[rp]]->f_nchannels[i][bi],
-                          freq_ordered, freq_amp);
-                }
-              } else if (plot_controls->plot_options & PLOT_PHASE) {
-                if (plot_controls->plot_options & PLOT_CHANNEL) {
-                  cpgline(ampphase_if[polidx[rp]]->f_nchannels[i][bi],
-                          ampphase_if[polidx[rp]]->f_channel[i][bi],
-                          ampphase_if[polidx[rp]]->f_phase[i][bi]);
-                } else if (plot_controls->plot_options & PLOT_FREQUENCY) {
-                  cpgline(ampphase_if[polidx[rp]]->f_nchannels[i][bi],
-                          freq_ordered, freq_phase);
-                }
-              }
+              cpgline(ampphase_if[polidx[rp]]->f_nchannels[i][bi],
+                      plot_xvalues, plot_yvalues);
               pc++;
             }
           }
           
-          if (inverted == YES) {
-            FREE(freq_ordered);
-            FREE(freq_amp);
-            FREE(freq_phase);
-          }
+          FREE(plot_xvalues);
+          FREE(plot_yvalues);
         }
       }
       num_ifs++;
