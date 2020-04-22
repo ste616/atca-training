@@ -64,9 +64,24 @@ void change_spd_plotcontrols(struct spd_plotcontrols *plotcontrols,
   }
 
   if (yaxis_type != NULL) {
-
+    if (plotcontrols->plot_options & PLOT_AMPLITUDE) {
+      plotcontrols->plot_options -= PLOT_AMPLITUDE;
+    }
+    if (plotcontrols->plot_options & PLOT_PHASE) {
+      plotcontrols->plot_options -= PLOT_PHASE;
+    }
+    if (plotcontrols->plot_options & PLOT_AMPLITUDE_LINEAR) {
+      plotcontrols->plot_options -= PLOT_AMPLITUDE_LINEAR;
+    }
+    if (plotcontrols->plot_options & PLOT_AMPLITUDE_LOG) {
+      plotcontrols->plot_options -= PLOT_AMPLITUDE_LOG;
+    }
+    if (plotcontrols->plot_options & PLOT_CONSISTENT_YRANGE) {
+      plotcontrols->plot_options -= PLOT_CONSISTENT_YRANGE;
+    }
+    plotcontrols->plot_options |= *yaxis_type;
   }
-  
+
   if (pols != NULL) {
     if (plotcontrols->plot_options & PLOT_POL_XX) {
       plotcontrols->plot_options -= PLOT_POL_XX;
@@ -1080,7 +1095,7 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
           /* 	 xaxis_min, xaxis_max, yaxis_min, yaxis_max); */
           cpgsci(1);
           cpgswin(xaxis_min, xaxis_max, yaxis_min, yaxis_max);
-          cpgbox("BCNTS", 0, 0, "BCNTS", 0, 0);
+          cpgbox("BCNTS1", 0, 0, "BCNTS", 0, 0);
           cpgmtxt("T", theight, 0.5, 0.5, ptitle);
           
           // We loop over the bins we need to plot.

@@ -177,11 +177,12 @@ int split_string(char *s, char *delim, char ***elements) {
 // Callback function called for each line when accept-line
 // executed, EOF seen, or EOF character read.
 static void interpret_command(char *line) {
-  char **line_els = NULL;
+  char **line_els = NULL, *cvt = NULL;
   char delim[] = " ";
   int nels = -1, i, pols_specified, if_no;
   int if_num_spec[MAXIFS];
-  bool pols_selected = false, if_selected = false;
+  bool pols_selected = false, if_selected = false, range_valid = false;
+  float range_limit_low, range_limit_high, range_swap;
   
   if ((line == NULL) || (strcasecmp(line, "exit") == 0) ||
       (strcasecmp(line, "quit") == 0)) {
@@ -244,6 +245,53 @@ static void interpret_command(char *line) {
         }
         action_required = ACTION_REFRESH_PLOT;
       }
+    } else if ((strcasecmp(line_els[0], "x") == 0) &&
+               (nels == 1)) {
+      // Change between frequency and channel X axes.
+      if (xaxis_type == PLOT_FREQUENCY) {
+        xaxis_type = PLOT_CHANNEL;
+      } else if (xaxis_type == PLOT_CHANNEL) {
+        xaxis_type = PLOT_FREQUENCY;
+      }
+      change_spd_plotcontrols(&spd_plotcontrols, &xaxis_type, NULL, NULL, NULL);
+      action_required = ACTION_REFRESH_PLOT;
+    } else if ((minmatch("phase", line_els[0], 1)) ||
+               (minmatch("amplitude", line_els[0], 1))) {
+      // We've been asked to show phase or amplitude.
+      // Have we been given y-range limits?
+      if (nels == 3) {
+        // Try to interpret the limits.
+        cvt = NULL;
+        range_valid = true;
+        range_limit_low = strtof(line_els[1], &cvt);
+        if ((cvt == line_els[1]) || (errno == ERANGE)) {
+          range_valid = false;
+        }
+        range_limit_high = strtof(line_els[2], &cvt);
+        if ((cvt == line_els[2]) || (errno == ERANGE)) {
+          range_valid = false;
+        }
+        if (range_valid == true) {
+          if (range_limit_low > range_limit_high) {
+            // Silly user, swap the numbers for them.
+            range_swap = range_limit_low;
+            range_limit_low = range_limit_high;
+            range_limit_high = range_swap;
+          }
+          spd_plotcontrols.yaxis_range_min = range_limit_low;
+          spd_plotcontrols.yaxis_range_max = range_limit_high;
+          spd_plotcontrols.yaxis_range_limit = YES;
+        }
+      } else {
+        spd_plotcontrols.yaxis_range_limit = NO;
+      }
+      if (minmatch("phase", line_els[0], 1)) {
+        yaxis_type = PLOT_PHASE;
+      } else if (minmatch("amplitude", line_els[0], 1)) {
+        yaxis_type = PLOT_AMPLITUDE | PLOT_AMPLITUDE_LINEAR;
+      }
+      change_spd_plotcontrols(&spd_plotcontrols, NULL, &yaxis_type, NULL, NULL);
+      action_required = ACTION_REFRESH_PLOT;
     }
     FREE(line_els);
   }
