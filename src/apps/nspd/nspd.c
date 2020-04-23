@@ -50,10 +50,14 @@ struct arguments {
 // And some fun, totally necessary, global state variables.
 int action_required;
 int spd_device_number;
-int xaxis_type, yaxis_type, plot_pols, yaxis_scaling;
+int xaxis_type, yaxis_type, plot_pols, yaxis_scaling, nxpanels, nypanels;
 struct spd_plotcontrols spd_plotcontrols;
 struct panelspec spd_panelspec;
 struct spectrum_data spectrum_data;
+
+// The maximum number of divisions supported on the plot.
+#define MAX_XPANELS 6
+#define MAX_YPANELS 6
 
 static error_t parse_opt(int key, char *arg, struct argp_state *state) {
   struct arguments *arguments = state->input;
@@ -99,7 +103,8 @@ void prepare_spd_device(char *device_name, bool *device_opened) {
 
   // Set up the device with the current settings.
   cpgask(0);
-  splitpanels(5, 5, spd_device_number, 0, 5, &spd_panelspec);
+  spd_panelspec.measured = NO;
+  splitpanels(nxpanels, nypanels, spd_device_number, 0, 5, &spd_panelspec);
   
 }
 
@@ -128,8 +133,9 @@ static void sighandler(int sig) {
   }
 }
 
-#define ACTION_REFRESH_PLOT 1<<0
-#define ACTION_QUIT         1<<1
+#define ACTION_REFRESH_PLOT        1<<0
+#define ACTION_QUIT                1<<1
+#define ACTION_CHANGE_PLOTSURFACE  1<<2
 
 bool minmatch(char *ref, char *chk, int minlength) {
   // This routine compares the string chk to the string
@@ -181,7 +187,7 @@ static void interpret_command(char *line) {
   char delim[] = " ";
   int nels = -1, i, j, k, pols_specified, if_no;
   int if_num_spec[MAXIFS], yaxis_change_type, array_change_spec;
-  int flag_change, flag_change_mode;
+  int flag_change, flag_change_mode, change_nxpanels, change_nypanels;
   bool pols_selected = false, if_selected = false, range_valid = false;
   float range_limit_low, range_limit_high, range_swap;
   
@@ -375,6 +381,20 @@ static void interpret_command(char *line) {
           action_required = ACTION_REFRESH_PLOT;
         }
       }
+    } else if (strcasecmp("nxy", line_els[0]) == 0) {
+      // Change the panel layout.
+      if (nels == 3) {
+        // The arguments need to be x and y number of panels.
+        change_nxpanels = atoi(line_els[1]);
+        change_nypanels = atoi(line_els[2]);
+        if ((change_nxpanels > 0) && (change_nxpanels <= MAX_XPANELS) &&
+            (change_nypanels > 0) && (change_nypanels <= MAX_YPANELS)) {
+          // We can change to this.
+          nxpanels = change_nxpanels;
+          nypanels = change_nypanels;
+          action_required = ACTION_CHANGE_PLOTSURFACE;
+        }
+      }
     }
     FREE(line_els);
   }
@@ -444,6 +464,10 @@ int main(int argc, char *argv[]) {
   arguments.input_file[0] = 0;
   arguments.spd_device[0] = 0;
 
+  // And defaults for some of the parameters.
+  nxpanels = 5;
+  nypanels = 5;
+  
   // Parse the arguments.
   argp_parse(&argp, argc, argv, 0, 0, &arguments);
 
@@ -485,6 +509,14 @@ int main(int argc, char *argv[]) {
 
   action_required = ACTION_REFRESH_PLOT;
   while(true) {
+    if (action_required & ACTION_CHANGE_PLOTSURFACE) {
+      // The plotting window needs to be split into a different set of windows.
+      free_panelspec(&spd_panelspec);
+      splitpanels(nxpanels, nypanels, spd_device_number, 0, 5, &spd_panelspec);
+      action_required -= ACTION_CHANGE_PLOTSURFACE;
+      action_required |= ACTION_REFRESH_PLOT;
+    }
+    
     if (action_required & ACTION_REFRESH_PLOT) {
       // Let's make a plot.
       // First, ensure the plotter doesn't try to do something it can't.

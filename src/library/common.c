@@ -255,7 +255,7 @@ void splitpanels(int nx, int ny, int pgplot_device, int abut,
                  struct panelspec *panelspec) {
   int i, j;
   float panel_width, panel_height, panel_px_width, panel_px_height;
-  float padding_fraction = 2, padding_x, padding_y;
+  float padding_fraction = 1.8, padding_x, padding_y;
   float padding_px_x, padding_px_y, dpx_x, dpx_y;
   float orig_charheight, charheight;
   
@@ -282,25 +282,28 @@ void splitpanels(int nx, int ny, int pgplot_device, int abut,
   }
 
   // Get the original settings.
-  cpgslct(pgplot_device);
-  cpgqvp(3, &(panelspec->orig_px_x1), &(panelspec->orig_px_x2),
-         &(panelspec->orig_px_y1), &(panelspec->orig_px_y2));
-  cpgqvp(0, &(panelspec->orig_x1), &(panelspec->orig_x2),
-         &(panelspec->orig_y1), &(panelspec->orig_y2));
-  // Reduce the margins.
-  panelspec->orig_x1 /= margin_reduction;
-  dpx_x = panelspec->orig_px_x1 - (panelspec->orig_px_x1 / margin_reduction);
-  dpx_y = panelspec->orig_px_y1 - (panelspec->orig_px_y1 / margin_reduction);
-  panelspec->orig_px_x1 /= margin_reduction;
-  panelspec->orig_x2 = 1 - panelspec->orig_x1;
-  panelspec->orig_px_x2 += dpx_x;
-  panelspec->orig_y1 /= margin_reduction;
-  panelspec->orig_px_y1 /= margin_reduction;
-  panelspec->orig_y2 = 1 - panelspec->orig_y1;
-  panelspec->orig_px_y2 += dpx_y;
-  /* printf("viewport is x = %.2f -> %.2f, y = %.2f -> %.2f\n", */
-  /* 	 panelspec->orig_x1, panelspec->orig_x2, */
-  /* 	 panelspec->orig_y1, panelspec->orig_y2); */
+  if (panelspec->measured == NO) {
+    cpgslct(pgplot_device);
+    cpgqvp(3, &(panelspec->orig_px_x1), &(panelspec->orig_px_x2),
+           &(panelspec->orig_px_y1), &(panelspec->orig_px_y2));
+    cpgqvp(0, &(panelspec->orig_x1), &(panelspec->orig_x2),
+           &(panelspec->orig_y1), &(panelspec->orig_y2));
+  
+    // Reduce the margins.
+    panelspec->orig_x1 /= margin_reduction;
+    dpx_x = panelspec->orig_px_x1 - (panelspec->orig_px_x1 / margin_reduction);
+    dpx_y = panelspec->orig_px_y1 - (panelspec->orig_px_y1 / margin_reduction);
+    panelspec->orig_px_x1 /= margin_reduction;
+    panelspec->orig_x2 = 1 - panelspec->orig_x1;
+    panelspec->orig_px_x2 += dpx_x;
+    panelspec->orig_y1 /= 0.7 * margin_reduction;
+    panelspec->orig_px_y1 /= 0.7 * margin_reduction;
+    panelspec->orig_y2 = 1 - panelspec->orig_y1;
+    panelspec->orig_px_y2 += dpx_y;
+  }
+    /* printf("viewport is x = %.2f -> %.2f, y = %.2f -> %.2f\n", */
+    /* 	 panelspec->orig_x1, panelspec->orig_x2, */
+    /* 	 panelspec->orig_y1, panelspec->orig_y2); */
   if (abut == 0) {
     // Space between the panels should be some fraction of the margin.
     padding_x = panelspec->orig_x1 * padding_fraction;
@@ -314,7 +317,7 @@ void splitpanels(int nx, int ny, int pgplot_device, int abut,
     padding_px_x = 0;
     padding_px_y = 0;
   }
-  
+
   panel_width = (panelspec->orig_x2 - panelspec->orig_x1 -
                  (float)(nx - 1) * padding_x) / (float)nx;
   panel_px_width = (panelspec->orig_px_x2 - panelspec->orig_px_x1 -
@@ -338,11 +341,18 @@ void splitpanels(int nx, int ny, int pgplot_device, int abut,
       panelspec->px_y1[i][j] = panelspec->px_y2[i][j] - panel_px_height;
     }
   }
+
+  if (panelspec->measured == NO) {
+    // Change the character height.
+    cpgqch(&orig_charheight);
+    charheight = orig_charheight / 2;
+    cpgsch(charheight);
+
+    // Don't do this stuff again if the user changes the number of
+    // panels.
+    panelspec->measured = YES;
+  }
   
-  // Change the character height.
-  cpgqch(&orig_charheight);
-  charheight = orig_charheight / 2;
-  cpgsch(charheight);
 }
 
 void changepanel(int x, int y, struct panelspec *panelspec) {
@@ -998,9 +1008,9 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
   int i, ant1, ant2, nants = 0, px, py, iauto = 0, icross = 0, isauto = NO;
   int npols = 0, *polidx = NULL, poli, num_ifs = 0, panels_per_if = 0;
   int idxif, ni, ri, rj, rp, bi, bn, pc, inverted = NO, plot_started = NO;
-  int **panel_plotted = NULL;
+  float **panel_plotted = NULL;
   float xaxis_min, xaxis_max, yaxis_min, yaxis_max, theight;
-  float ylog_min, ylog_max, pollab_height, pollab_width;
+  float ylog_min, ylog_max, pollab_height, pollab_xlen, pollab_ylen, pollab_padding;
   float *plot_xvalues = NULL, *plot_yvalues = NULL;
   char ptitle[BIGBUFSIZE], ptype[BUFSIZE], ftype[BUFSIZE], poltitle[BUFSIZE];
   struct ampphase **ampphase_if = NULL;
@@ -1010,8 +1020,8 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
   theight = 0.4;
   // The height below the bottom axis for the polarisation labels.
   pollab_height = 2.2;
-  // The increment in width for the polarisation labels.
-  pollab_width = 0.052;
+  // The padding fraction width for the polarisation labels.
+  pollab_padding = 1.2;
   
   // Work out how many antennas we will show.
   for (i = 1, nants = 0; i <= MAXANTS; i++) {
@@ -1279,8 +1289,11 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
                 strcpy(poltitle, "BA");
                 break;
               }
-              cpgmtxt("B", pollab_height, (panel_plotted[px][py] * pollab_width), 0.0, poltitle);
-              panel_plotted[px][py] += 1;
+              //cpgmtxt("B", pollab_height, (panel_plotted[px][py] * pollab_width), 0.0, poltitle);
+              cpgmtxt("B", pollab_height, panel_plotted[px][py], 0.0, poltitle);
+              cpglen(5, poltitle, &pollab_xlen, &pollab_ylen);
+              panel_plotted[px][py] += pollab_xlen * pollab_padding;
+              
               pc++;
             }
           }

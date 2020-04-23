@@ -76,6 +76,7 @@ struct panelspec {
   float orig_px_x2;
   float orig_px_y1;
   float orig_px_y2;
+  int measured;
 };
 
 // This structure holds all the details about user plot control
