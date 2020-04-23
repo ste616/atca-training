@@ -995,7 +995,7 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
 
 void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspec,
                    struct spd_plotcontrols *plot_controls, bool all_data_present) {
-  int i, ant1, ant2, nants = 0, px, py, iauto = 0, icross = 0;
+  int i, ant1, ant2, nants = 0, px, py, iauto = 0, icross = 0, isauto = NO;
   int npols = 0, *polidx = NULL, poli, num_ifs = 0, panels_per_if = 0;
   int idxif, ni, ri, rj, rp, bi, bn, pc, inverted = NO, plot_started = NO;
   float xaxis_min, xaxis_max, yaxis_min, yaxis_max, theight = 0.4;
@@ -1084,6 +1084,7 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
             py = (int)((num_ifs * panels_per_if + iauto - px) / panelspec->nx);
             iauto++;
             bn = 2;
+            isauto = YES;
           } else if ((ant1 != ant2) &&
                      (plot_controls->plot_flags & PLOT_FLAG_CROSSCORRELATIONS)) {
             if (plot_controls->plot_flags & PLOT_FLAG_AUTOCORRELATIONS) {
@@ -1096,6 +1097,7 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
             }
             icross++;
             bn = 1;
+            isauto = NO;
           } else {
             // We're not plotting this product.
             continue;
@@ -1172,6 +1174,29 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
           pc = 1;
           for (rp = 0; rp < npols; rp++) {
             for (bi = 0; bi < bn; bi++) {
+              // Check if we actually proceed for this polarisation and bin
+              // combination.
+              if ((isauto == YES) && (bi > 0) &&
+                  ((ampphase_if[polidx[rp]]->pol == POL_XY) ||
+                   (ampphase_if[polidx[rp]]->pol == POL_YX))) {
+                // Don't plot the second bins for the cross-pols.
+                continue;
+              }
+              if ((isauto == YES) && (ampphase_if[polidx[rp]]->pol == POL_YX) &&
+                  (!(plot_controls->plot_flags & PLOT_FLAG_POL_YX))) {
+                // Don't plot the YX bin in the autos without explicit instruction.
+                // We include only this one here since we do allow XX, YY, XY plotting in the
+                // autos without instruction.
+                continue;
+              }
+              if ((isauto == NO) && (((ampphase_if[polidx[rp]]->pol == POL_XY) &&
+                                      (!(plot_controls->plot_flags & PLOT_FLAG_POL_XY))) ||
+                                     ((ampphase_if[polidx[rp]]->pol == POL_YX) &&
+                                      (!(plot_controls->plot_flags & PLOT_FLAG_POL_YX))))) {
+                // Don't show the cross-pols in the cross-correlations without
+                // explicit instruction.
+                continue;
+              }
               for (ri = 0, rj = ampphase_if[polidx[rp]]->f_nchannels[i][bi] - 1;
                    ri < ampphase_if[polidx[rp]]->f_nchannels[i][bi];
                    ri++, rj--) {
