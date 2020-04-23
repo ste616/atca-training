@@ -251,14 +251,14 @@ void free_panelspec(struct panelspec *panelspec) {
 }
 
 void splitpanels(int nx, int ny, int pgplot_device, int abut,
-		 float margin_reduction,
-		 struct panelspec *panelspec) {
+                 float margin_reduction,
+                 struct panelspec *panelspec) {
   int i, j;
   float panel_width, panel_height, panel_px_width, panel_px_height;
   float padding_fraction = 2, padding_x, padding_y;
   float padding_px_x, padding_px_y, dpx_x, dpx_y;
   float orig_charheight, charheight;
-
+  
   // Allocate some memory.
   panelspec->nx = nx;
   panelspec->ny = ny;
@@ -284,9 +284,9 @@ void splitpanels(int nx, int ny, int pgplot_device, int abut,
   // Get the original settings.
   cpgslct(pgplot_device);
   cpgqvp(3, &(panelspec->orig_px_x1), &(panelspec->orig_px_x2),
-	 &(panelspec->orig_px_y1), &(panelspec->orig_px_y2));
+         &(panelspec->orig_px_y1), &(panelspec->orig_px_y2));
   cpgqvp(0, &(panelspec->orig_x1), &(panelspec->orig_x2),
-	 &(panelspec->orig_y1), &(panelspec->orig_y2));
+         &(panelspec->orig_y1), &(panelspec->orig_y2));
   // Reduce the margins.
   panelspec->orig_x1 /= margin_reduction;
   dpx_x = panelspec->orig_px_x1 - (panelspec->orig_px_x1 / margin_reduction);
@@ -316,14 +316,14 @@ void splitpanels(int nx, int ny, int pgplot_device, int abut,
   }
   
   panel_width = (panelspec->orig_x2 - panelspec->orig_x1 -
-		 (float)(nx - 1) * padding_x) / (float)nx;
+                 (float)(nx - 1) * padding_x) / (float)nx;
   panel_px_width = (panelspec->orig_px_x2 - panelspec->orig_px_x1 -
-		 (float)(nx - 1) * padding_px_x) / (float)nx;
+                    (float)(nx - 1) * padding_px_x) / (float)nx;
   panel_height = (panelspec->orig_y2 - panelspec->orig_y1 -
-		  (float)(ny - 1) * padding_y) / (float)ny;
+                  (float)(ny - 1) * padding_y) / (float)ny;
   panel_px_height = (panelspec->orig_px_y2 - panelspec->orig_px_y1 -
-		  (float)(ny - 1) * padding_px_y) / (float)ny;
-
+                     (float)(ny - 1) * padding_px_y) / (float)ny;
+  
   for (i = 0; i < nx; i++) {
     for (j = 0; j < ny; j++) {
       panelspec->x1[i][j] = panelspec->orig_x1 + i * (panel_width + padding_x);
@@ -331,14 +331,14 @@ void splitpanels(int nx, int ny, int pgplot_device, int abut,
       panelspec->y2[i][j] = panelspec->orig_y2 - j * (panel_height + padding_y);
       panelspec->y1[i][j] = panelspec->y2[i][j] - panel_height;
       panelspec->px_x1[i][j] = panelspec->orig_px_x1 +
-	i * (panel_px_width + padding_px_x);
+        i * (panel_px_width + padding_px_x);
       panelspec->px_x2[i][j] = panelspec->px_x1[i][j] + panel_px_width;
       panelspec->px_y2[i][j] = panelspec->orig_px_y2 -
-	j * (panel_px_height + padding_px_y);
+        j * (panel_px_height + padding_px_y);
       panelspec->px_y1[i][j] = panelspec->px_y2[i][j] - panel_px_height;
     }
   }
-
+  
   // Change the character height.
   cpgqch(&orig_charheight);
   charheight = orig_charheight / 2;
@@ -998,12 +998,21 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
   int i, ant1, ant2, nants = 0, px, py, iauto = 0, icross = 0, isauto = NO;
   int npols = 0, *polidx = NULL, poli, num_ifs = 0, panels_per_if = 0;
   int idxif, ni, ri, rj, rp, bi, bn, pc, inverted = NO, plot_started = NO;
-  float xaxis_min, xaxis_max, yaxis_min, yaxis_max, theight = 0.4;
-  float ylog_min, ylog_max;
+  int **panel_plotted = NULL;
+  float xaxis_min, xaxis_max, yaxis_min, yaxis_max, theight;
+  float ylog_min, ylog_max, pollab_height, pollab_width;
   float *plot_xvalues = NULL, *plot_yvalues = NULL;
-  char ptitle[BIGBUFSIZE], ptype[BUFSIZE], ftype[BUFSIZE];
+  char ptitle[BIGBUFSIZE], ptype[BUFSIZE], ftype[BUFSIZE], poltitle[BUFSIZE];
   struct ampphase **ampphase_if = NULL;
 
+  // Definitions of some magic numbers that we use.
+  // The height above the top axis for the plot title.
+  theight = 0.4;
+  // The height below the bottom axis for the polarisation labels.
+  pollab_height = 2.2;
+  // The increment in width for the polarisation labels.
+  pollab_width = 0.052;
+  
   // Work out how many antennas we will show.
   for (i = 1, nants = 0; i <= MAXANTS; i++) {
     if ((1 << i) & plot_controls->array_spec) {
@@ -1025,6 +1034,13 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
 
   // Select the PGPLOT device.
   cpgslct(plot_controls->pgplot_device);
+
+  // We need to keep track of how many plots have been made on each
+  // panel, for labelling.
+  MALLOC(panel_plotted, panelspec->nx);
+  for (i = 0; i < panelspec->nx; i++) {
+    CALLOC(panel_plotted[i], panelspec->ny);
+  }
   
   /* printf("time of cycle = %s %.6f\n", cycle_ampphase[0][0]->obsdate, */
   /* 	 cycle_ampphase[0][0]->ut_seconds); */
@@ -1145,11 +1161,14 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
             yaxis_max = 1.0;
             LOGAMP(ylog_min, ylog_max, yaxis_min);
           }
-          
-          cpgsci(1);
-          cpgswin(xaxis_min, xaxis_max, yaxis_min, yaxis_max);
-          cpgbox("BCNTS1", 0, 0, "BCNTS", 0, 0);
-          cpgmtxt("T", theight, 0.5, 0.5, ptitle);
+
+          if (panel_plotted[px][py] == 0) {
+            // Only plot the borders and title once.
+            cpgsci(1);
+            cpgswin(xaxis_min, xaxis_max, yaxis_min, yaxis_max);
+            cpgbox("BCNTS1", 0, 0, "BCNTS", 0, 0);
+            cpgmtxt("T", theight, 0.5, 0.5, ptitle);
+          }
           
           // We loop over the bins we need to plot.
           if (bn > ampphase_if[0]->nbins[i]) {
@@ -1239,6 +1258,29 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
               cpgsci(pc);
               cpgline(ampphase_if[polidx[rp]]->f_nchannels[i][bi],
                       plot_xvalues, plot_yvalues);
+              // Add the polarisation label.
+              switch (ampphase_if[polidx[rp]]->pol) {
+              case POL_XX:
+                strcpy(poltitle, "AA");
+                if ((isauto) && (bi > 0)) {
+                  strcpy(poltitle, "aa");
+                }
+                break;
+              case POL_YY:
+                strcpy(poltitle, "BB");
+                if ((isauto) && (bi > 0)) {
+                  strcpy(poltitle, "bb");
+                }
+                break;
+              case POL_XY:
+                strcpy(poltitle, "AB");
+                break;
+              case POL_YX:
+                strcpy(poltitle, "BA");
+                break;
+              }
+              cpgmtxt("B", pollab_height, (panel_plotted[px][py] * pollab_width), 0.0, poltitle);
+              panel_plotted[px][py] += 1;
               pc++;
             }
           }

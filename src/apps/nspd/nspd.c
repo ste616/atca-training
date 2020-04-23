@@ -177,7 +177,7 @@ int split_string(char *s, char *delim, char ***elements) {
 // Callback function called for each line when accept-line
 // executed, EOF seen, or EOF character read.
 static void interpret_command(char *line) {
-  char **line_els = NULL, *cvt = NULL;
+  char **line_els = NULL, *cvt = NULL, *cycomma = NULL;
   char delim[] = " ";
   int nels = -1, i, j, k, pols_specified, if_no;
   int if_num_spec[MAXIFS], yaxis_change_type, array_change_spec;
@@ -202,6 +202,12 @@ static void interpret_command(char *line) {
     add_history(line);
 
     // Figure out what we're supposed to do.
+    // We will split by spaces, but people might separate arguments with commas.
+    // So we first replace all commas with spaces.
+    cycomma = line;
+    while ((cycomma = strchr(cycomma, ','))) {
+      cycomma[0] = ' ';
+    }
     nels = split_string(line, delim, &line_els);
     for (i = 0; i < nels; i++) {
       fprintf(stderr, "%d: %s\n", i, line_els[i]);
@@ -223,6 +229,10 @@ static void interpret_command(char *line) {
         } else if (strcasecmp(line_els[i], "ba") == 0) {
           pols_selected = true;
           pols_specified |= PLOT_POL_YX;
+        } else if (strcasecmp(line_els[i], "*") == 0) {
+          // Select all the pols.
+          pols_selected = true;
+          pols_specified |= PLOT_POL_XX | PLOT_POL_YY | PLOT_POL_XY | PLOT_POL_YX;
         } else if ((strncasecmp(line_els[i], "f", 1) == 0) ||
                    (strncasecmp(line_els[i], "z", 1) == 0)) {
           // Probably selecting a band, search for it.
