@@ -317,7 +317,7 @@ int main(int argc, char *argv[]) {
   }
   
   init_spd_plotcontrols(&spd_plotcontrols, xaxis_type, yaxis_type,
-                        arguments.plot_pols, DEFAULT, spd_pgplot);
+                        arguments.plot_pols, spd_pgplot);
   init_vis_plotcontrols(&vis_plotcontrols, PLOT_TIME,
                         PLOT_AMPLITUDE | PLOT_PHASE | PLOT_DELAY,
                         arguments.visband,

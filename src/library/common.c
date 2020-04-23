@@ -50,8 +50,7 @@ void count_polarisations(struct spd_plotcontrols *plotcontrols) {
 }
 
 void change_spd_plotcontrols(struct spd_plotcontrols *plotcontrols,
-			     int *xaxis_type, int *yaxis_type, int *pols,
-			     int *corr_type) {
+                             int *xaxis_type, int *yaxis_type, int *pols) {
   // Change some values.
   if (xaxis_type != NULL) {
     // There can only be one x-axis type.
@@ -92,20 +91,44 @@ void change_spd_plotcontrols(struct spd_plotcontrols *plotcontrols,
     if (plotcontrols->plot_options & PLOT_POL_XY) {
       plotcontrols->plot_options -= PLOT_POL_XY;
     }
-    if (plotcontrols->plot_options & PLOT_POL_XY) {
+    if (plotcontrols->plot_options & PLOT_POL_YX) {
       plotcontrols->plot_options -= PLOT_POL_YX;
     }
     plotcontrols->plot_options |= *pols;
   }
 
-  if (corr_type != NULL) {
+}
 
+int change_spd_plotflags(struct spd_plotcontrols *plotcontrols,
+                          long int changed_flags, int add_remove) {
+  int i, changemade = NO;
+  long int available_flags[PLOT_FLAGS_AVAILABLE] =
+    { PLOT_FLAG_POL_XX, PLOT_FLAG_POL_YY, PLOT_FLAG_POL_XY, PLOT_FLAG_POL_YX,
+      PLOT_FLAG_AUTOCORRELATIONS, PLOT_FLAG_CROSSCORRELATIONS };
+                                                    
+  // Enable or disable flags.
+  for (i = 0; i < PLOT_FLAGS_AVAILABLE; i++) {
+    if (changed_flags & available_flags[i]) {
+      if ((plotcontrols->plot_flags & available_flags[i]) &&
+          (add_remove < 0)) {
+        // Remove this flag.
+        plotcontrols->plot_flags -= available_flags[i];
+        changemade = YES;
+      } else if ((!(plotcontrols->plot_flags & available_flags[i])) &&
+                 (add_remove > 0)) {
+        // Add this flag.
+        plotcontrols->plot_flags += available_flags[i];
+        changemade = YES;
+      }
+    }
   }
+
+  return changemade;
 }
 
 void init_spd_plotcontrols(struct spd_plotcontrols *plotcontrols,
 			   int xaxis_type, int yaxis_type, int pols,
-			   int corr_type, int pgplot_device) {
+			   int pgplot_device) {
   int i;
 
   // Initialise the plotcontrols structure.
@@ -119,10 +142,12 @@ void init_spd_plotcontrols(struct spd_plotcontrols *plotcontrols,
   if (pols == DEFAULT) {
     pols = PLOT_POL_XX | PLOT_POL_YY;
   }
-  if (corr_type == DEFAULT) {
-    corr_type = PLOT_AUTOCORRELATIONS | PLOT_CROSSCORRELATIONS;
-  }
-  plotcontrols->plot_options = xaxis_type | yaxis_type | pols | corr_type;
+  plotcontrols->plot_options = xaxis_type | yaxis_type | pols;
+
+  // By default, only display XX and YY pols, and both auto and cross
+  // correlations.
+  plotcontrols->plot_flags = PLOT_FLAG_POL_XX | PLOT_FLAG_POL_YY |
+    PLOT_FLAG_AUTOCORRELATIONS | PLOT_FLAG_CROSSCORRELATIONS;
 
   // Work out the number of pols.
   count_polarisations(plotcontrols);
@@ -151,8 +176,8 @@ void init_vis_plotcontrols(struct vis_plotcontrols *plotcontrols,
 			   struct panelspec *panelspec) {
   int npanels = 0, i, j;
   int available_panels[NAVAILABLE_PANELS] = { PLOT_AMPLITUDE,
-					      PLOT_PHASE,
-					      PLOT_DELAY };
+                                              PLOT_PHASE,
+                                              PLOT_DELAY };
   
   // Initialise the plotcontrols structure and form the panelspec
   // structure using the same information.
@@ -991,10 +1016,10 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
   }
   
   // How many panels per IF?
-  if (plot_controls->plot_options & PLOT_AUTOCORRELATIONS) {
+  if (plot_controls->plot_flags & PLOT_FLAG_AUTOCORRELATIONS) {
     panels_per_if += nants;
   }
-  if (plot_controls->plot_options & PLOT_CROSSCORRELATIONS) {
+  if (plot_controls->plot_flags & PLOT_FLAG_CROSSCORRELATIONS) {
     panels_per_if += (nants * (nants - 1)) / 2;
   }
 
@@ -1054,14 +1079,14 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
             ((1 << ant2) & plot_controls->array_spec)) {
           // Work out which panel to use.
           if ((ant1 == ant2) &&
-              (plot_controls->plot_options & PLOT_AUTOCORRELATIONS)) {
+              (plot_controls->plot_flags & PLOT_FLAG_AUTOCORRELATIONS)) {
             px = (num_ifs * panels_per_if + iauto) % panelspec->nx;
             py = (int)((num_ifs * panels_per_if + iauto - px) / panelspec->nx);
             iauto++;
             bn = 2;
           } else if ((ant1 != ant2) &&
-                     (plot_controls->plot_options & PLOT_CROSSCORRELATIONS)) {
-            if (plot_controls->plot_options & PLOT_AUTOCORRELATIONS) {
+                     (plot_controls->plot_flags & PLOT_FLAG_CROSSCORRELATIONS)) {
+            if (plot_controls->plot_flags & PLOT_FLAG_AUTOCORRELATIONS) {
               px = (num_ifs * panels_per_if + nants + icross) % panelspec->nx;
               py = (int)((num_ifs * panels_per_if + nants + icross - px) /
                          panelspec->nx);
@@ -1071,6 +1096,9 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
             }
             icross++;
             bn = 1;
+          } else {
+            // We're not plotting this product.
+            continue;
           }
           // Check if we've exceeded the space for this plot.
           if (py >= panelspec->ny) {

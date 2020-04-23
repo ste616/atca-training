@@ -30,17 +30,23 @@
 #define PLOT_PHASE                1<<1
 #define PLOT_CHANNEL              1<<2
 #define PLOT_FREQUENCY            1<<3
-#define PLOT_AUTOCORRELATIONS     1<<4
-#define PLOT_CROSSCORRELATIONS    1<<5
-#define PLOT_POL_XX               1<<6
-#define PLOT_POL_YY               1<<7
-#define PLOT_POL_XY               1<<8
-#define PLOT_POL_YX               1<<9
-#define PLOT_AMPLITUDE_LINEAR     1<<10
-#define PLOT_AMPLITUDE_LOG        1<<11
-#define PLOT_CONSISTENT_YRANGE    1<<12
-#define PLOT_DELAY                1<<13
-#define PLOT_TIME                 1<<14
+#define PLOT_POL_XX               1<<4
+#define PLOT_POL_YY               1<<5
+#define PLOT_POL_XY               1<<6
+#define PLOT_POL_YX               1<<7
+#define PLOT_AMPLITUDE_LINEAR     1<<8
+#define PLOT_AMPLITUDE_LOG        1<<9
+#define PLOT_CONSISTENT_YRANGE    1<<10
+#define PLOT_DELAY                1<<11
+#define PLOT_TIME                 1<<12
+
+#define PLOT_FLAG_POL_XX             1<<1
+#define PLOT_FLAG_POL_YY             1<<2
+#define PLOT_FLAG_POL_XY             1<<3
+#define PLOT_FLAG_POL_YX             1<<4
+#define PLOT_FLAG_AUTOCORRELATIONS   1<<5
+#define PLOT_FLAG_CROSSCORRELATIONS  1<<6
+#define PLOT_FLAGS_AVAILABLE         6
 
 #define MINASSIGN(a, b) a = (b < a) ? b : a
 #define MAXASSIGN(a, b) a = (b > a) ? b : a
@@ -77,6 +83,7 @@ struct panelspec {
 struct spd_plotcontrols {
   // General plot options.
   long int plot_options;
+  long int plot_flags;
   // Has the user specified a channel range to look at.
   int channel_range_limit;
   int channel_range_min;
@@ -153,11 +160,12 @@ struct vis_line {
 int interpret_array_string(char *array_string);
 void count_polarisations(struct spd_plotcontrols *plotcontrols);
 void change_spd_plotcontrols(struct spd_plotcontrols *plotcontrols,
-			     int *xaxis_type, int *yaxis_type, int *pols,
-			     int *corr_type);
+                             int *xaxis_type, int *yaxis_type, int *pols);
+int change_spd_plotflags(struct spd_plotcontrols *plotcontrols,
+                         long int changed_flags, int add_remove);
 void init_spd_plotcontrols(struct spd_plotcontrols *plotcontrols,
 			   int xaxis_type, int yaxis_type, int pols,
-			   int corr_type, int pgplot_device);
+			   int pgplot_device);
 void init_vis_plotcontrols(struct vis_plotcontrols *plotcontrols,
 			   int xaxis_type, int paneltypes, int *visbands,
 			   int pgplot_device,

@@ -179,8 +179,9 @@ int split_string(char *s, char *delim, char ***elements) {
 static void interpret_command(char *line) {
   char **line_els = NULL, *cvt = NULL;
   char delim[] = " ";
-  int nels = -1, i, pols_specified, if_no;
-  int if_num_spec[MAXIFS], yaxis_change_type;
+  int nels = -1, i, j, k, pols_specified, if_no;
+  int if_num_spec[MAXIFS], yaxis_change_type, array_change_spec;
+  int flag_change, flag_change_mode;
   bool pols_selected = false, if_selected = false, range_valid = false;
   float range_limit_low, range_limit_high, range_swap;
   
@@ -219,6 +220,9 @@ static void interpret_command(char *line) {
         } else if (strcasecmp(line_els[i], "ab") == 0) {
           pols_selected = true;
           pols_specified |= PLOT_POL_XY;
+        } else if (strcasecmp(line_els[i], "ba") == 0) {
+          pols_selected = true;
+          pols_specified |= PLOT_POL_YX;
         } else if ((strncasecmp(line_els[i], "f", 1) == 0) ||
                    (strncasecmp(line_els[i], "z", 1) == 0)) {
           // Probably selecting a band, search for it.
@@ -234,8 +238,7 @@ static void interpret_command(char *line) {
       }
       if (pols_selected) {
         // Reset the polarisations.
-        change_spd_plotcontrols(&spd_plotcontrols, NULL, NULL, &pols_specified,
-                                NULL);
+        change_spd_plotcontrols(&spd_plotcontrols, NULL, NULL, &pols_specified);
         action_required = ACTION_REFRESH_PLOT;
       }
       if (if_selected) {
@@ -253,7 +256,7 @@ static void interpret_command(char *line) {
       } else if (xaxis_type == PLOT_CHANNEL) {
         xaxis_type = PLOT_FREQUENCY;
       }
-      change_spd_plotcontrols(&spd_plotcontrols, &xaxis_type, NULL, NULL, NULL);
+      change_spd_plotcontrols(&spd_plotcontrols, &xaxis_type, NULL, NULL);
       action_required = ACTION_REFRESH_PLOT;
     } else if ((minmatch("phase", line_els[0], 1)) ||
                (minmatch("amplitude", line_els[0], 1))) {
@@ -292,7 +295,7 @@ static void interpret_command(char *line) {
         yaxis_type = PLOT_AMPLITUDE;
         yaxis_change_type = yaxis_type | yaxis_scaling;
       }
-      change_spd_plotcontrols(&spd_plotcontrols, NULL, &yaxis_change_type, NULL, NULL);
+      change_spd_plotcontrols(&spd_plotcontrols, NULL, &yaxis_change_type, NULL);
       action_required = ACTION_REFRESH_PLOT;
     } else if ((minmatch("scale", line_els[0], 3)) &&
                (nels == 2)) {
@@ -306,8 +309,61 @@ static void interpret_command(char *line) {
         yaxis_change_type = yaxis_type | yaxis_scaling;
       }
       if (yaxis_change_type >= 0) {
-        change_spd_plotcontrols(&spd_plotcontrols, NULL, &yaxis_change_type, NULL, NULL);
+        change_spd_plotcontrols(&spd_plotcontrols, NULL, &yaxis_change_type, NULL);
         action_required = ACTION_REFRESH_PLOT;
+      }
+    } else if (minmatch("array", line_els[0], 3)) {
+      // Change which antennas are being shown. We look at all the
+      // elements on this line.
+      array_change_spec = 0;
+      for (j = 1; j < nels; j++) {
+        if (MAXANTS < 10) {
+          // We just look for the numeral in all the arguments.
+          for (k = 1; k <= MAXANTS; k++) {
+            if (strchr(line_els[j], (k + '0'))) {
+              array_change_spec |= 1<<k;
+            }
+          }
+        }// We'll need to put more code here if we are to support
+        // arrays with more than 9 antennas.
+      }
+
+      if (array_change_spec > 0) {
+        spd_plotcontrols.array_spec = array_change_spec;
+        action_required = ACTION_REFRESH_PLOT;
+      }
+    } else if ((strcasecmp("on", line_els[0]) == 0) ||
+               (strcasecmp("off", line_els[0]) == 0)) {
+      // Enable or disable plotting flags.
+      flag_change = 0;
+      if (strcasecmp("on", line_els[0]) == 0) {
+        flag_change_mode = 1;
+      } else if (strcasecmp("off", line_els[0]) == 0) {
+        flag_change_mode = -1;
+      }
+      for (j = 1; j < nels; j++) {
+        if (strcasecmp(line_els[j], "acs") == 0) {
+          // Autocorrelation switch.
+          flag_change |= PLOT_FLAG_AUTOCORRELATIONS;
+        } else if (strcasecmp(line_els[j], "ccs") == 0) {
+          // Cross-correlation switch.
+          flag_change |= PLOT_FLAG_CROSSCORRELATIONS;
+        } else if (strcasecmp(line_els[j], "aa") == 0) {
+          flag_change |= PLOT_FLAG_POL_XX;
+        } else if (strcasecmp(line_els[j], "bb") == 0) {
+          flag_change |= PLOT_FLAG_POL_YY;
+        } else if (strcasecmp(line_els[j], "ab") == 0) {
+          flag_change |= PLOT_FLAG_POL_XY;
+        } else if (strcasecmp(line_els[j], "ba") == 0) {
+          flag_change |= PLOT_FLAG_POL_YX;
+        }
+      }
+
+      if (flag_change > 0) {
+        if (change_spd_plotflags(&spd_plotcontrols, flag_change,
+                                 flag_change_mode) == YES) {
+          action_required = ACTION_REFRESH_PLOT;
+        }
       }
     }
     FREE(line_els);
@@ -341,6 +397,7 @@ void reconcile_spd_plotcontrols(struct spectrum_data *spectrum_data,
 
   // Copy over the other parameters.
   STRUCTCOPY(user_plotcontrols, data_plotcontrols, plot_options);
+  STRUCTCOPY(user_plotcontrols, data_plotcontrols, plot_flags);
   STRUCTCOPY(user_plotcontrols, data_plotcontrols, channel_range_limit);
   STRUCTCOPY(user_plotcontrols, data_plotcontrols, channel_range_min);
   STRUCTCOPY(user_plotcontrols, data_plotcontrols, channel_range_max);
@@ -412,7 +469,7 @@ int main(int argc, char *argv[]) {
   yaxis_scaling = PLOT_AMPLITUDE_LINEAR;
   plot_pols = PLOT_POL_XX | PLOT_POL_YY;
   init_spd_plotcontrols(&spd_plotcontrols, xaxis_type, yaxis_type | yaxis_scaling,
-                        plot_pols, DEFAULT, spd_device_number);
+                        plot_pols, spd_device_number);
   // The number of pols is set by the data though, not the selection.
   spd_plotcontrols.npols = spectrum_data.num_pols;
 
