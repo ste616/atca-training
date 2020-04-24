@@ -54,12 +54,16 @@
 #define VIS_PLOT_IF1     1<<0
 #define VIS_PLOT_IF2     1<<1
 
+#define PANEL_ORIGINAL    -1
+#define PANEL_INFORMATION -2
 
 // This structure holds pre-calculated panel positions for a PGPLOT
 // device with nx x ny panels.
 struct panelspec {
+  // The number of panels in each direction.
   int nx;
   int ny;
+  // The coordinates of each panel, first coordinate X, second Y.
   float **x1;
   float **x2;
   float **y1;
@@ -68,15 +72,24 @@ struct panelspec {
   float **px_x2;
   float **px_y1;
   float **px_y2;
+  // The limits of the window in normalised device coordinates.
   float orig_x1;
   float orig_x2;
   float orig_y1;
   float orig_y2;
+  // The limits of the window in pixels.
   float orig_px_x1;
   float orig_px_x2;
   float orig_px_y1;
   float orig_px_y2;
+  // A flag which prevents the window coordinates from being
+  // recomputed, which screws things up since PGPLOT remembers.
   int measured;
+  // The coordinates of the information area at the top.
+  float information_x1;
+  float information_x2;
+  float information_y1;
+  float information_y2;
 };
 
 // This structure holds all the details about user plot control

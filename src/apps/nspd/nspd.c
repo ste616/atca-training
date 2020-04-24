@@ -105,6 +105,10 @@ void prepare_spd_device(char *device_name, bool *device_opened) {
   cpgask(0);
   spd_panelspec.measured = NO;
   splitpanels(nxpanels, nypanels, spd_device_number, 0, 5, &spd_panelspec);
+  fprintf(stderr, "PGPLOT X %.4f -> %.4f\n", spd_panelspec.orig_x1,
+          spd_panelspec.orig_x2);
+  fprintf(stderr, "PGPLOT Y %.4f -> %.4f\n", spd_panelspec.orig_y1,
+          spd_panelspec.orig_y2);
   
 }
 

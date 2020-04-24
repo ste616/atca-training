@@ -298,8 +298,14 @@ void splitpanels(int nx, int ny, int pgplot_device, int abut,
     panelspec->orig_px_x2 += dpx_x;
     panelspec->orig_y1 /= 0.7 * margin_reduction;
     panelspec->orig_px_y1 /= 0.7 * margin_reduction;
-    panelspec->orig_y2 = 1 - panelspec->orig_y1;
+    panelspec->orig_y2 = 1 - 2 * panelspec->orig_y1;
     panelspec->orig_px_y2 += dpx_y;
+
+    // Keep the information area dimensions.
+    panelspec->information_x1 = panelspec->orig_x1;
+    panelspec->information_x2 = panelspec->orig_x2;
+    panelspec->information_y1 = panelspec->orig_y2 + panelspec->orig_y1;
+    panelspec->information_y2 = 1.0; //panelspec->orig_y2 + panelspec->orig_y1;
   }
     /* printf("viewport is x = %.2f -> %.2f, y = %.2f -> %.2f\n", */
     /* 	 panelspec->orig_x1, panelspec->orig_x2, */
@@ -359,11 +365,18 @@ void changepanel(int x, int y, struct panelspec *panelspec) {
   if ((x >= 0) && (x < panelspec->nx) &&
       (y >= 0) && (y < panelspec->ny)) {
     cpgsvp(panelspec->x1[x][y], panelspec->x2[x][y],
-	   panelspec->y1[x][y], panelspec->y2[x][y]);
-  } else if ((x == -1) && (y == -1)) {
+           panelspec->y1[x][y], panelspec->y2[x][y]);
+  } else if ((x == PANEL_ORIGINAL) && (y == PANEL_ORIGINAL)) {
     // Set it back to original.
     cpgsvp(panelspec->orig_x1, panelspec->orig_x2,
-	   panelspec->orig_y1, panelspec->orig_y2);
+           panelspec->orig_y1, panelspec->orig_y2);
+  } else if ((x == PANEL_INFORMATION) && (y == PANEL_INFORMATION)) {
+    // Set it to the information panel.
+    /* fprintf(stderr, "CHANGEPANEL to X %.4f -> %.4f, Y %.4f -> %.4f\n", */
+    /*         panelspec->information_x1, panelspec->information_x2, */
+    /*         panelspec->information_y1, panelspec->information_y2); */
+    cpgsvp(panelspec->information_x1, panelspec->information_x2,
+           panelspec->information_y1, panelspec->information_y2);
   }
 }
 
@@ -1008,11 +1021,12 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
   int i, ant1, ant2, nants = 0, px, py, iauto = 0, icross = 0, isauto = NO;
   int npols = 0, *polidx = NULL, poli, num_ifs = 0, panels_per_if = 0;
   int idxif, ni, ri, rj, rp, bi, bn, pc, inverted = NO, plot_started = NO;
-  float **panel_plotted = NULL;
-  float xaxis_min, xaxis_max, yaxis_min, yaxis_max, theight;
+  float **panel_plotted = NULL, information_x_pos = 0.01, information_text_width;
+  float information_text_height, xaxis_min, xaxis_max, yaxis_min, yaxis_max, theight;
   float ylog_min, ylog_max, pollab_height, pollab_xlen, pollab_ylen, pollab_padding;
   float *plot_xvalues = NULL, *plot_yvalues = NULL;
   char ptitle[BIGBUFSIZE], ptype[BUFSIZE], ftype[BUFSIZE], poltitle[BUFSIZE];
+  char information_text[BUFSIZE];
   struct ampphase **ampphase_if = NULL;
 
   // Definitions of some magic numbers that we use.
@@ -1139,6 +1153,20 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
             }
             cpgpage();
             plot_started = YES;
+            // Put some information in the information area.
+            changepanel(PANEL_INFORMATION, PANEL_INFORMATION, panelspec);
+            cpgswin(0, 1, 0, 1);
+            cpgsci(1);
+            cpgbox("BC", 0, 0, "BC", 0, 0);
+            cpgptxt(information_x_pos, 0.5, 0, 0, cycle_ampphase[0][0]->obsdate);
+            cpglen(4, cycle_ampphase[0][0]->obsdate, &information_text_width,
+                   &information_text_height);
+            information_x_pos += information_text_width + 0.02;
+            seconds_to_hourlabel(cycle_ampphase[0][0]->ut_seconds,
+                                 information_text);
+            cpgptxt(information_x_pos, 0.5, 0, 0, information_text);
+            cpglen(4, information_text, &information_text_width, &information_text_height);
+            information_x_pos += information_text_width + 0.02;
           }
           changepanel(px, py, panelspec);
           // Set the title for the plot.
