@@ -14,13 +14,19 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/select.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <netdb.h>
 #include <signal.h>
 #include <readline/readline.h>
 #include <readline/history.h>
+#include <errno.h>
 #include "memory.h"
 #include "packing.h"
 #include "cpgplot.h"
 #include "common.h"
+#include "atnetworking.h"
 
 const char *argp_program_version = "nspd 1.0";
 const char *argp_program_bug_address = "<Jamie.Stevens@csiro.au>";
@@ -35,6 +41,8 @@ static char args_doc[] = "[options]";
 static struct argp_option options[] = {
   { "device", 'd', "PGPLOT_DEVICE", 0, "The PGPLOT device to use" },
   { "file", 'f', "FILE", 0, "Use an output file as the input" },
+  { "server", 's', "SERVER", 0, "The server name or address to connect to" },
+  { "port", 'p', "PORTNUM", 0, "The port number on the server to connect to" },
   { 0 }
 };
 
@@ -45,6 +53,9 @@ struct arguments {
   bool use_file;
   char input_file[SPDBUFSIZE];
   char spd_device[SPDBUFSIZE];
+  int port_number;
+  char server_name[SPDBUFSIZE];
+  bool network_operation;
 };
 
 // And some fun, totally necessary, global state variables.
@@ -69,6 +80,13 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state) {
   case 'f':
     arguments->use_file = true;
     strncpy(arguments->input_file, arg, SPDBUFSIZE);
+    break;
+  case 's':
+    arguments->network_operation = true;
+    strncpy(arguments->server_name, arg, SPDBUFSIZE);
+    break;
+  case 'p':
+    arguments->port_number = atoi(arg);
     break;
 
   default:
@@ -456,17 +474,31 @@ void free_spectrum_data(struct spectrum_data *spectrum_data) {
   FREE(spectrum_data->spectrum);
 }
 
+#define SPDRECVBUFSIZE 52428800
+
 int main(int argc, char *argv[]) {
   struct arguments arguments;
   bool spd_device_opened = false;
   struct spd_plotcontrols spd_alteredcontrols;
   fd_set watchset;
-  int r;
+  int r, bytes_received;//, br, bytes_expected;
+  size_t recv_buffer_length;
+  struct requests server_request;
+  struct responses server_response;
+  struct addrinfo hints, *peer_address;
+  char address_buffer[SPDBUFSIZE], service_buffer[SPDBUFSIZE];
+  char port_string[SPDBUFSIZE], send_buffer[SPDBUFSIZE];
+  char *recv_buffer = NULL;
+  SOCKET socket_peer;
+  cmp_ctx_t cmp;
   
   // Set the default for the arguments.
   arguments.use_file = false;
   arguments.input_file[0] = 0;
   arguments.spd_device[0] = 0;
+  arguments.server_name[0] = 0;
+  arguments.port_number = 8880;
+  arguments.network_operation = false;
 
   // And defaults for some of the parameters.
   nxpanels = 5;
@@ -475,12 +507,6 @@ int main(int argc, char *argv[]) {
   // Parse the arguments.
   argp_parse(&argp, argc, argv, 0, 0, &arguments);
 
-  // At the moment we must have a file.
-  if (arguments.use_file == false) {
-    fprintf(stderr, "NSPD CURRENTLY ONLY SUPPORTS FILE INPUT!\n");
-    exit(1);
-  }
-
   // Handle window size changes.
   signal(SIGWINCH, sighandler);
 
@@ -488,7 +514,42 @@ int main(int argc, char *argv[]) {
   rl_callback_handler_install(prompt, interpret_command);
   
   // Open and unpack the file if we have one.
-  read_data_from_file(arguments.input_file, &spectrum_data);
+  if (arguments.use_file) {
+    read_data_from_file(arguments.input_file, &spectrum_data);
+  } else if (arguments.network_operation) {
+    // Prepare our connection.
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_socktype = SOCK_STREAM;
+    snprintf(port_string, SPDBUFSIZE, "%d", arguments.port_number);
+    if (getaddrinfo(arguments.server_name, port_string, &hints,
+                    &peer_address)) {
+      fprintf(stderr, "getaddrinfo() failed. (%d)\n", GETSOCKETERRNO());
+      return(1);
+    }
+    getnameinfo(peer_address->ai_addr, peer_address->ai_addrlen,
+                address_buffer, sizeof(address_buffer),
+                service_buffer, sizeof(service_buffer), NI_NUMERICHOST);
+    printf("Remote address is: %s %s\n", address_buffer, service_buffer);
+    socket_peer = socket(peer_address->ai_family, peer_address->ai_socktype,
+                         peer_address->ai_protocol);
+    if (!ISVALIDSOCKET(socket_peer)) {
+      fprintf(stderr, "socket() failed. (%d)\n", GETSOCKETERRNO());
+      return(1);
+    }
+    printf("Connecting...\n");
+    if (connect(socket_peer, peer_address->ai_addr, peer_address->ai_addrlen)) {
+      fprintf(stderr, "connect() failed. (%d)\n", GETSOCKETERRNO());
+      return(1);
+    }
+    freeaddrinfo(peer_address);
+    printf("Connected.\n");
+    // Send a request for the currently available spectrum.
+    server_request.request_type = REQUEST_CURRENT_SPECTRUM;
+    reset_cumulative_size();
+    cmp_init(&cmp, send_buffer, buffer_reader, buffer_skipper, buffer_writer);
+    pack_requests(&cmp, &server_request);
+    send(socket_peer, send_buffer, get_cumulative_size(), 0);
+  }
 
   // Open the plotting device.
   prepare_spd_device(arguments.spd_device, &spd_device_opened);
@@ -500,6 +561,10 @@ int main(int argc, char *argv[]) {
   FD_ZERO(&watchset);
   // We'll be looking at the terminal.
   FD_SET(fileno(rl_instream), &watchset);
+  if (arguments.network_operation) {
+    // And the connection to the server.
+    FD_SET(socket_peer, &watchset);
+  }
 
   // We will need to have a default plot upon entry.
   xaxis_type = PLOT_FREQUENCY;
@@ -549,6 +614,41 @@ int main(int argc, char *argv[]) {
     }
     if (FD_ISSET(fileno(rl_instream), &watchset)) {
       rl_callback_read_char();
+    } else if (FD_ISSET(socket_peer, &watchset)) {
+      //MALLOC(recv_buffer, SPDRECVBUFSIZE);
+      //bytes_received = 0;
+      fprintf(stderr, "Data coming in...\n");
+      // The first bit of data can be used to determine how much data to expect.
+      //bytes_expected = 1;
+      bytes_received = socket_recv_buffer(socket_peer, &recv_buffer, &recv_buffer_length);
+      /* while ((br = recv(socket_peer, recv_buffer + bytes_received, */
+      /*                   SPDRECVBUFSIZE - bytes_received, 0)) || */
+      /*        (bytes_received < bytes_expected)) { */
+      /*   fprintf(stderr, "     %d bytes (%d total)\n", br, bytes_received); */
+      /*   bytes_received += br; */
+      /*   if (bytes_expected == 1) { */
+      /*     // We get how much we expect. */
+      /*     init_cmp_buffer(&cmp, recv_buffer); */
+      /*     unpack_responses(&cmp, &server_response); */
+      /*     bytes_expected = server_response.response_size; */
+      /*     fprintf(stderr, "   expecting %d bytes\n", bytes_expected); */
+      /*   } */
+      /* } */
+      fprintf(stderr, "  received %d bytes total\n", bytes_received);
+      if (bytes_received <= 0) {
+        printf("Connection closed by peer.\n");
+        action_required = ACTION_QUIT;
+        continue;
+      }
+      init_cmp_buffer(&cmp, recv_buffer);
+      unpack_responses(&cmp, &server_response);
+      fprintf(stderr, "Response is type %d\n", server_response.response_type);
+      // Check we're getting what we expect.
+      if (server_response.response_type == RESPONSE_CURRENT_SPECTRUM) {
+        unpack_spectrum_data(&cmp, &spectrum_data);
+        // Refresh the plot next time through.
+        action_required = ACTION_REFRESH_PLOT;
+      }
     }
     
   }

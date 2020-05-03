@@ -24,11 +24,9 @@
 #include "memory.h"
 #include "cmp.h"
 #include "packing.h"
+#include "atnetworking.h"
 
-#define ISVALIDSOCKET(s) ((s) >= 0)
-#define CLOSESOCKET(s) close(s)
-#define GETSOCKETERRNO() (errno)
-#define SOCKET int
+#define RPSBUFSIZE 1024
 
 const char *argp_program_version = "rpfitsfile_server 1.0";
 const char *argp_program_bug_address = "<Jamie.Stevens@csiro.au>";
@@ -41,6 +39,10 @@ static char args_doc[] = "[options] RPFITS_FILES...";
 
 // Our options.
 static struct argp_option options[] = {
+                                       { "networked", 'n', 0, 0,
+                                         "Switch to operate as a network data server " },
+                                       { "port", 'p', "PORTNUM", 0,
+                                         "The port number to listen on" },
   { 0 }
 };
 
@@ -48,12 +50,20 @@ static struct argp_option options[] = {
 struct arguments {
   int n_rpfits_files;
   char **rpfits_files;
+  int port_number;
+  bool network_operation;
 };
 
 static error_t parse_opt(int key, char *arg, struct argp_state *state) {
   struct arguments *arguments = state->input;
   
   switch (key) {
+  case 'n':
+    arguments->network_operation = true;
+    break;
+  case 'p':
+    arguments->port_number = atoi(arg);
+    break;
   case ARGP_KEY_ARG:
     arguments->n_rpfits_files += 1;
     REALLOC(arguments->rpfits_files, arguments->n_rpfits_files);
@@ -69,10 +79,8 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state) {
 
 static struct argp argp = { options, parse_opt, args_doc, doc };
 
-#define RPBUFSIZE 2048
-
 struct rpfits_file_information {
-  char filename[RPBUFSIZE];
+  char filename[RPSBUFSIZE];
   int n_scans;
   struct scan_header_data **scan_headers;
   double *scan_start_mjd;
@@ -410,9 +418,11 @@ void data_reader(int read_type, int n_rpfits_files,
   }
 }
 
+#define RPSENDBUFSIZE 104857600
+
 int main(int argc, char *argv[]) {
   struct arguments arguments;
-  int i, j, k, ri, rj;
+  int i, j, k, ri, rj, bytes_received;
   double mjd_grab;
   struct rpfits_file_information **info_rpfits_files = NULL;
   struct ampphase_options ampphase_options;
@@ -420,10 +430,22 @@ int main(int argc, char *argv[]) {
   struct vis_data *vis_data = NULL;
   FILE *fh = NULL;
   cmp_ctx_t cmp;
+  struct addrinfo hints, *bind_address;
+  char port_string[RPSBUFSIZE], address_buffer[RPSBUFSIZE];
+  char read_buffer[RPSBUFSIZE], *send_buffer = NULL;
+  SOCKET socket_listen, max_socket, loop_i, socket_client;
+  fd_set master, reads;
+  struct sockaddr_storage client_address;
+  socklen_t client_len;
+  struct requests client_request;
+  struct responses client_response;
+  ssize_t bytes_sent;
   
   // Set the defaults for the arguments.
   arguments.n_rpfits_files = 0;
   arguments.rpfits_files = NULL;
+  arguments.port_number = 8880;
+  arguments.network_operation = false;
 
   // And the default for the calculator options.
   ampphase_options.phase_in_degrees = true;
@@ -439,7 +461,7 @@ int main(int argc, char *argv[]) {
   // Stop here if we don't have any RPFITS files.
   if (arguments.n_rpfits_files == 0) {
     fprintf(stderr, "NO RPFITS FILES SPECIFIED, EXITING\n");
-    exit(-1);
+    return(-1);
   }
 
   // Do a scan of each RPFITS file to get time information.
@@ -447,7 +469,7 @@ int main(int argc, char *argv[]) {
   // Put the names of the RPFITS files into the info structure.
   for (i = 0; i < arguments.n_rpfits_files; i++) {
     info_rpfits_files[i] = new_rpfits_file();
-    strncpy(info_rpfits_files[i]->filename, arguments.rpfits_files[i], RPBUFSIZE);
+    strncpy(info_rpfits_files[i]->filename, arguments.rpfits_files[i], RPSBUFSIZE);
   }
   data_reader(READ_SCAN_METADATA, arguments.n_rpfits_files, 0.0, &ampphase_options,
               info_rpfits_files, &spectrum_data, &vis_data);
@@ -465,9 +487,10 @@ int main(int argc, char *argv[]) {
     }
     printf("\n");
   }
-  
-  // Let's try to load one of the spectra.
-  printf("Trying to grab a spectrum.\n");
+
+  // Let's try to load one of the spectra at startup, so we can send
+  // something if required to.
+  printf("Preparing for operation...\n");
   srand(time(NULL));
   ri = rand() % arguments.n_rpfits_files;
   rj = rand() % info_rpfits_files[ri]->n_scans;
@@ -475,37 +498,137 @@ int main(int argc, char *argv[]) {
   printf(" grabbing from random scan %d from file %d, MJD %.6f\n", rj, ri, mjd_grab);
   data_reader(GRAB_SPECTRUM | COMPUTE_VIS_PRODUCTS, arguments.n_rpfits_files, mjd_grab,
               &ampphase_options, info_rpfits_files, &spectrum_data, &vis_data);
-  // Save these spectra to a file after packing it.
-  fh = fopen("test_spd.dat", "wb");
-  if (fh == NULL) {
-    error_and_exit("Error opening spd output file");
-  }
-  cmp_init(&cmp, fh, file_reader, file_skipper, file_writer);
-  pack_spectrum_data(&cmp, spectrum_data);
-  // Free the spectrum memory.
-  for (i = 0; i < spectrum_data->num_ifs; i++) {
-    for (j = 0; j < spectrum_data->num_pols; j++) {
-      free_ampphase(&(spectrum_data->spectrum[i][j]));
+  
+  if (!arguments.network_operation) {
+    // Save these spectra to a file after packing it.
+    printf("Writing SPD data output file...\n");
+    fh = fopen("test_spd.dat", "wb");
+    if (fh == NULL) {
+      error_and_exit("Error opening spd output file");
     }
-    FREE(spectrum_data->spectrum[i]);
-  }
-  FREE(spectrum_data->spectrum);
-  FREE(spectrum_data);
-  fclose(fh);
+    cmp_init(&cmp, fh, file_reader, file_skipper, file_writer);
+    pack_spectrum_data(&cmp, spectrum_data);
+    fclose(fh);
 
-  // Save the vis data to a file after packing it.
-  fh = fopen("test_vis.dat", "wb");
-  if (fh == NULL) {
-    error_and_exit("Error opening vis output file");
+    // Save the vis data to a file after packing it.
+    fh = fopen("test_vis.dat", "wb");
+    if (fh == NULL) {
+      error_and_exit("Error opening vis output file");
+    }
+    cmp_init(&cmp, fh, file_reader, file_skipper, file_writer);
+    pack_vis_data(&cmp, vis_data);
+    fclose(fh);
+  } else {
+
+    printf("Configuring network server...\n");
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_flags = AI_PASSIVE;
+    snprintf(port_string, RPSBUFSIZE, "%d", arguments.port_number);
+    getaddrinfo(0, port_string, &hints, &bind_address);
+
+    printf("Creating socket...\n");
+    socket_listen = socket(bind_address->ai_family,
+                           bind_address->ai_socktype,
+                           bind_address->ai_protocol);
+    if (!ISVALIDSOCKET(socket_listen)) {
+      fprintf(stderr, "socket() failed (%d)\n", GETSOCKETERRNO());
+      return(1);
+    }
+
+    printf("Binding socket to local address...\n");
+    if (bind(socket_listen, bind_address->ai_addr, bind_address->ai_addrlen)) {
+      fprintf(stderr, "bind() failed. (%d)\n", GETSOCKETERRNO());
+      return(1);
+    }
+    freeaddrinfo(bind_address);
+
+    printf("Listening...\n");
+    if (listen(socket_listen, 10) < 0) {
+      fprintf(stderr, "listen() failed. (%d)\n", GETSOCKETERRNO());
+      return(1);
+    }
+    
+
+    // Enter our main loop.
+    FD_ZERO(&master);
+    FD_SET(socket_listen, &master);
+    max_socket = socket_listen;
+
+    printf("Waiting for connections...\n");
+    while (true) {
+      // We wait for someone to ask for something.
+      reads = master;
+      if (select(max_socket + 1, &reads, 0, 0, 0) < 0) {
+        fprintf(stderr, "select() failed. (%d)\n", GETSOCKETERRNO());
+        break;
+      }
+      for (loop_i = 1; loop_i <= max_socket; ++loop_i) {
+        if (FD_ISSET(loop_i, &reads)) {
+          // Handle this request.
+          if (loop_i == socket_listen) {
+            client_len = sizeof(client_address);
+            socket_client = accept(socket_listen,
+                                   (struct sockaddr*)&client_address,
+                                   &client_len);
+            if (!ISVALIDSOCKET(socket_client)) {
+              fprintf(stderr, "accept() failed. (%d)\n", GETSOCKETERRNO());
+              continue;
+            }
+
+            FD_SET(socket_client, &master);
+            if (socket_client > max_socket) {
+              max_socket = socket_client;
+            }
+
+            getnameinfo((struct sockaddr*)&client_address, client_len,
+                        address_buffer, sizeof(address_buffer), 0, 0,
+                        NI_NUMERICHOST);
+            printf("New connection from %s\n", address_buffer);
+          } else {
+            // Get the requests structure.
+            bytes_received = recv(loop_i, read_buffer, RPSBUFSIZE, 0);
+            if (bytes_received < 1) {
+              printf("Closing connection, no data received.\n");
+              // The connection failed.
+              FD_CLR(loop_i, &master);
+              CLOSESOCKET(i);
+              continue;
+            }
+            printf("Received %d bytes.\n", bytes_received);
+            init_cmp_buffer(&cmp, read_buffer);
+            //cmp_init(&cmp, read_buffer, buffer_reader, buffer_skipper, buffer_writer);
+            unpack_requests(&cmp, &client_request);
+
+            // Do what we've been asked to do.
+            printf(" The request type is %d.\n", client_request.request_type);
+            if (client_request.request_type == REQUEST_CURRENT_SPECTRUM) {
+              // We're going to send the current spectrum to this socket.
+              // Make the buffers the size we may need.
+              MALLOC(send_buffer, RPSENDBUFSIZE);
+              // Set up the response.
+              client_response.response_type = RESPONSE_CURRENT_SPECTRUM;
+              // Now move to writing to the send buffer.
+              init_cmp_buffer(&cmp, send_buffer);
+              pack_responses(&cmp, &client_response);
+              //pack_spectrum_data(&cmp, spectrum_data);
+              // Send this data.
+              bytes_sent = socket_send_buffer(loop_i, send_buffer, get_cumulative_size());
+              printf(" Sent %ld bytes\n", bytes_sent);
+              // Free our memory.
+              FREE(send_buffer);
+            }
+          }
+        }
+      }
+    }
   }
-  cmp_init(&cmp, fh, file_reader, file_skipper, file_writer);
-  pack_vis_data(&cmp, vis_data);
   // Free the vis memory.
   for (i = 0; i < vis_data->nviscycles; i++) {
     for (j = 0; j < vis_data->num_ifs[i]; j++) {
       for (k = 0; k < vis_data->num_pols[i][j]; k++) {
-	free_vis_quantities(&(vis_data->vis_quantities[i][j][k]));
-	//FREE(vis_data->vis_quantities[i][j][k]);
+        free_vis_quantities(&(vis_data->vis_quantities[i][j][k]));
       }
       FREE(vis_data->vis_quantities[i][j]);
     }
@@ -516,8 +639,17 @@ int main(int argc, char *argv[]) {
   FREE(vis_data->num_ifs);
   FREE(vis_data->vis_quantities);
   FREE(vis_data);
-  fclose(fh);
-  
+
+  // Free the spectrum memory.
+  for (i = 0; i < spectrum_data->num_ifs; i++) {
+    for (j = 0; j < spectrum_data->num_pols; j++) {
+      free_ampphase(&(spectrum_data->spectrum[i][j]));
+    }
+    FREE(spectrum_data->spectrum[i]);
+  }
+  FREE(spectrum_data->spectrum);
+  FREE(spectrum_data);
+
   // We're finished, free all our memory.
   for (i = 0; i < arguments.n_rpfits_files; i++) {
     for (j = 0; j < info_rpfits_files[i]->n_scans; j++) {
@@ -531,5 +663,12 @@ int main(int argc, char *argv[]) {
   }
   FREE(info_rpfits_files);
   FREE(arguments.rpfits_files);
+
+  if (arguments.network_operation) {
+    // Close our socket.
+    printf("Closing listening socket...\n");
+    CLOSESOCKET(socket_listen);
+  }
+
   
 }

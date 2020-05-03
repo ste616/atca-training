@@ -12,6 +12,20 @@
 #include <string.h>
 #include "packing.h"
 #include "memory.h"
+#include "atnetworking.h"
+
+// When packing to a buffer, we need to keep track of total size
+// for later sending.
+size_t cumulative_size;
+
+// And the calling routines need some way to access the size.
+void reset_cumulative_size() {
+  cumulative_size = 0;
+}
+
+size_t get_cumulative_size() {
+  return cumulative_size;
+}
 
 // Some definitions for the packing routines.
 void error_and_exit(const char *msg) {
@@ -23,16 +37,38 @@ bool read_bytes(void *data, size_t sz, FILE *fh) {
   return fread(data, sizeof(uint8_t), sz, fh) == (sz * sizeof(uint8_t));
 }
 
+bool buffer_read_bytes(void *data, size_t sz, char *buffer) {
+  memcpy(data, buffer, sz);
+  return true;
+}
+
 bool file_reader(cmp_ctx_t *ctx, void *data, size_t limit) {
   return read_bytes(data, limit, (FILE *)ctx->buf);
+}
+
+bool buffer_reader(cmp_ctx_t *ctx, void *data, size_t limit) {
+  return buffer_read_bytes(data, limit, (char *)ctx->buf);
 }
 
 bool file_skipper(cmp_ctx_t *ctx, size_t count) {
   return fseek((FILE *)ctx->buf, count, SEEK_CUR);
 }
 
+bool buffer_skipper(cmp_ctx_t *ctx, size_t count) {
+  size_t i;
+  for (i = 0; i < count; (char*)ctx->buf++, i++);
+  //(char *)ctx->buf += count;
+  return true;
+}
+
 size_t file_writer(cmp_ctx_t *ctx, const void *data, size_t count) {
   return fwrite(data, sizeof(uint8_t), count, (FILE *)ctx->buf);
+}
+
+size_t buffer_writer(cmp_ctx_t *ctx, const void *data, size_t count) {
+  memcpy(ctx->buf, data, count);
+  cumulative_size += count;
+  return count;
 }
 
 // Routines that wrap around the fundamental serializer routines, to
@@ -730,4 +766,31 @@ void unpack_scan_header_data(cmp_ctx_t *cmp, struct scan_header_data *a) {
     pack_readarray_double(cmp, 3, a->ant_cartesian[i]);
   }
   
+}
+
+void pack_requests(cmp_ctx_t *cmp, struct requests *a) {
+  // The request type.
+  pack_write_sint(cmp, a->request_type);
+}
+
+void unpack_requests(cmp_ctx_t *cmp, struct requests *a) {
+  // The request type
+  pack_read_sint(cmp, &(a->request_type));
+}
+
+void pack_responses(cmp_ctx_t *cmp, struct responses *a) {
+  // The response type.
+  pack_write_sint(cmp, a->response_type);
+}
+
+void unpack_responses(cmp_ctx_t *cmp, struct responses *a) {
+  // The response type.
+  pack_read_sint(cmp, &(a->response_type));
+}
+
+void init_cmp_buffer(cmp_ctx_t *cmp, void *buffer) {
+  // This allows us to shortcut the initialisation for reading from
+  // and writing to a buffer.
+  reset_cumulative_size();
+  cmp_init(cmp, buffer, buffer_reader, buffer_skipper, buffer_writer);
 }
