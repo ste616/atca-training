@@ -594,9 +594,6 @@ int main(int argc, char *argv[]) {
   action_required = ACTION_REFRESH_PLOT;
   while(true) {
     reads = watchset;
-    if (arguments.debugging_output) {
-      fprintf(stderr, "Event loop entered.\n");
-    }
     if (action_required & ACTION_CHANGE_PLOTSURFACE) {
       // The plotting window needs to be split into a different set of windows.
       if (arguments.debugging_output) {
@@ -624,13 +621,7 @@ int main(int argc, char *argv[]) {
     }
 
     // Have a look at our inputs.
-    if (arguments.debugging_output) {
-      fprintf(stderr, "Selecting our sockets, max socket is %d\n", max_socket);
-    }
     r = select((max_socket + 1), &reads, NULL, NULL, NULL);
-    if (arguments.debugging_output) {
-      fprintf(stderr, "Got some activity.\n");
-    }
     if ((r < 0) && (errno != EINTR)) {
       perror("  NSPD FAILS!\n");
       break;
@@ -643,9 +634,10 @@ int main(int argc, char *argv[]) {
       // Nothing got selected.
       continue;
     }
-    if (FD_ISSET(fileno(rl_instream), &watchset)) {
+    if (FD_ISSET(fileno(rl_instream), &reads)) {
       rl_callback_read_char();
-    } else if (FD_ISSET(socket_peer, &watchset)) {
+    }
+    if (FD_ISSET(socket_peer, &reads)) {
       if (arguments.debugging_output) {
         fprintf(stderr, "Data coming in...\n");
       }
