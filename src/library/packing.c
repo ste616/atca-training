@@ -794,3 +794,8 @@ void init_cmp_buffer(cmp_ctx_t *cmp, void *buffer) {
   reset_cumulative_size();
   cmp_init(cmp, buffer, buffer_reader, buffer_skipper, buffer_writer);
 }
+
+void init_cmp_memory_buffer(cmp_ctx_t *cmp, cmp_mem_access_t *mem, void *buffer,
+                            size_t buffer_len) {
+  cmp_mem_access_init(cmp, mem, buffer, buffer_len);
+}

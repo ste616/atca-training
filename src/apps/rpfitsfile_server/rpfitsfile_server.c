@@ -22,7 +22,6 @@
 #include <time.h>
 #include "atrpfits.h"
 #include "memory.h"
-#include "cmp.h"
 #include "packing.h"
 #include "atnetworking.h"
 
@@ -430,6 +429,7 @@ int main(int argc, char *argv[]) {
   struct vis_data *vis_data = NULL;
   FILE *fh = NULL;
   cmp_ctx_t cmp;
+  cmp_mem_access_t mem;
   struct addrinfo hints, *bind_address;
   char port_string[RPSBUFSIZE], address_buffer[RPSBUFSIZE];
   char read_buffer[RPSBUFSIZE], *send_buffer = NULL;
@@ -597,7 +597,7 @@ int main(int argc, char *argv[]) {
               continue;
             }
             printf("Received %d bytes.\n", bytes_received);
-            init_cmp_buffer(&cmp, read_buffer);
+            init_cmp_memory_buffer(&cmp, &mem, read_buffer, (size_t)RPSBUFSIZE);
             //cmp_init(&cmp, read_buffer, buffer_reader, buffer_skipper, buffer_writer);
             unpack_requests(&cmp, &client_request);
 
@@ -610,11 +610,11 @@ int main(int argc, char *argv[]) {
               // Set up the response.
               client_response.response_type = RESPONSE_CURRENT_SPECTRUM;
               // Now move to writing to the send buffer.
-              init_cmp_buffer(&cmp, send_buffer);
+              init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)RPSENDBUFSIZE);
               pack_responses(&cmp, &client_response);
-              //pack_spectrum_data(&cmp, spectrum_data);
+              pack_spectrum_data(&cmp, spectrum_data);
               // Send this data.
-              bytes_sent = socket_send_buffer(loop_i, send_buffer, get_cumulative_size());
+              bytes_sent = socket_send_buffer(loop_i, send_buffer, cmp_mem_access_get_pos(&mem));
               printf(" Sent %ld bytes\n", bytes_sent);
               // Free our memory.
               FREE(send_buffer);

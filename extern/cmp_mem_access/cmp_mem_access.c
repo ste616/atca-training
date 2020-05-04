@@ -38,7 +38,7 @@ void cmp_mem_access_init(cmp_ctx_t *cmp, cmp_mem_access_t *m, void *buf, size_t 
     m->buf = (char*)buf;
     m->size = size;
     m->index = 0;
-    cmp_init(cmp, m, cmp_mem_reader, cmp_mem_writer);
+    cmp_init(cmp, m, cmp_mem_reader, cmp_mem_access_skip_pos, cmp_mem_writer);
 }
 
 void cmp_mem_access_ro_init(cmp_ctx_t *cmp, cmp_mem_access_t *m, const void *buf, size_t size)
@@ -46,7 +46,7 @@ void cmp_mem_access_ro_init(cmp_ctx_t *cmp, cmp_mem_access_t *m, const void *buf
     m->buf = (char*)buf;
     m->size = size;
     m->index = 0;
-    cmp_init(cmp, m, cmp_mem_reader, cmp_mem_writer_ro);
+    cmp_init(cmp, m, cmp_mem_reader, cmp_mem_access_skip_pos, cmp_mem_writer_ro);
 }
 
 size_t cmp_mem_access_get_pos(cmp_mem_access_t *m)
@@ -71,4 +71,13 @@ bool cmp_mem_access_pos_is_valid(cmp_mem_access_t *m, size_t pos)
     } else {
         return true;
     }
+}
+
+bool cmp_mem_access_skip_pos(cmp_ctx_t *cmp, size_t count) {
+  cmp_mem_access_t *mem = (cmp_mem_access_t*)cmp->buf;
+  if (mem->index + count < mem->size) {
+    mem->index += count;
+    return true;
+  }
+  return false;
 }

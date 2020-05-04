@@ -491,6 +491,7 @@ int main(int argc, char *argv[]) {
   char *recv_buffer = NULL;
   SOCKET socket_peer;
   cmp_ctx_t cmp;
+  cmp_mem_access_t mem;
   
   // Set the default for the arguments.
   arguments.use_file = false;
@@ -640,7 +641,7 @@ int main(int argc, char *argv[]) {
         action_required = ACTION_QUIT;
         continue;
       }
-      init_cmp_buffer(&cmp, recv_buffer);
+      init_cmp_memory_buffer(&cmp, &mem, recv_buffer, recv_buffer_length);
       unpack_responses(&cmp, &server_response);
       fprintf(stderr, "Response is type %d\n", server_response.response_type);
       // Check we're getting what we expect.

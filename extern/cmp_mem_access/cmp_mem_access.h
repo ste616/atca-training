@@ -8,7 +8,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include <cmp/cmp.h>
+#include <cmp.h>
 
 typedef struct {
     char *buf;
@@ -40,6 +40,8 @@ void *cmp_mem_access_get_ptr_at_pos(cmp_mem_access_t *m, size_t pos);
 // check if the position is inside the buffer
 bool cmp_mem_access_pos_is_valid(cmp_mem_access_t *m, size_t pos);
 
+bool cmp_mem_access_skip_pos(cmp_ctx_t *cmp, size_t count);
+  
 #ifdef __cplusplus
 }
 #endif

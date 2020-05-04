@@ -2,8 +2,8 @@ cmake_minimum_required (VERSION 3.5)
 project (ATCATraining LANGUAGES C Fortran)
 set(CMAKE_BUILD_TYPE Debug)
 
-add_library(applib STATIC src/library/common.c src/library/packing.c extern/cmp/cmp.c src/library/atnetworking.c)
-target_include_directories(applib PUBLIC src/library src/rpfits src/include extern/cmp)
+add_library(applib STATIC src/library/common.c src/library/packing.c extern/cmp/cmp.c src/library/atnetworking.c extern/cmp_mem_access/cmp_mem_access.c)
+target_include_directories(applib PUBLIC src/library src/rpfits src/include extern/cmp extern/cmp_mem_access)
 target_compile_options(applib PRIVATE -Werror -Wall -Wextra)
 
 add_library(atrpfits STATIC src/rpfits/reader.c src/rpfits/compute.c
@@ -24,17 +24,17 @@ target_compile_options(visplot PRIVATE -Werror -Wall -Wextra -Wno-missing-field-
 add_executable(rpfitsfile_server src/apps/rpfitsfile_server/rpfitsfile_server.c)
 set_target_properties(rpfitsfile_server PROPERTIES LINKER_LANGUAGE Fortran)
 target_link_libraries(rpfitsfile_server PUBLIC applib atrpfits rpfits m)
-target_include_directories(rpfitsfile_server PUBLIC src/rpfits src/include extern/cmp src/library)
+target_include_directories(rpfitsfile_server PUBLIC src/rpfits src/include extern/cmp extern/cmp_mem_access src/library)
 target_compile_options(rpfitsfile_server PRIVATE -Werror -Wall -Wextra -Wno-missing-field-initializers)
 
 add_executable(nspd src/apps/nspd/nspd.c)
 set_target_properties(nspd PROPERTIES LINKER_LANGUAGE Fortran)
 target_link_libraries(nspd PUBLIC applib atrpfits rpfits m cpgplot pgplot png z X11 readline)
-target_include_directories(nspd PUBLIC src/rpfits src/include extern/cmp src/library)
+target_include_directories(nspd PUBLIC src/rpfits src/include extern/cmp extern/cmp_mem_access src/library)
 target_compile_options(nspd PRIVATE -Werror -Wall -Wextra -Wno-missing-field-initializers)
 
 add_executable(nvis src/apps/nvis/nvis.c)
 set_target_properties(nvis PROPERTIES LINKER_LANGUAGE Fortran)
 target_link_libraries(nvis PUBLIC applib atrpfits rpfits m)
-target_include_directories(nvis PUBLIC src/rpfits src/include extern/cmp src/library)
+target_include_directories(nvis PUBLIC src/rpfits src/include extern/cmp extern/cmp_mem_access src/library)
 target_compile_options(nvis PRIVATE -Werror -Wall -Wextra -Wno-missing-field-initializers)

@@ -11,6 +11,7 @@
 #include <stdint.h>
 #include "atrpfits.h"
 #include "cmp.h"
+#include "cmp_mem_access.h"
 #include "atnetworking.h"
 
 // The ways in which we can read data.
@@ -100,6 +101,8 @@ void unpack_requests(cmp_ctx_t *cmp, struct requests *a);
 void pack_responses(cmp_ctx_t *cmp, struct responses *a);
 void unpack_responses(cmp_ctx_t *cmp, struct responses *a);
 void init_cmp_buffer(cmp_ctx_t *cmp, void *buffer);
+void init_cmp_memory_buffer(cmp_ctx_t *cmp, cmp_mem_access_t *mem, void *buffer,
+                            size_t buffer_len);
 
 #define CMPERROR(c) error_and_exit(cmp_strerror(c))
 
