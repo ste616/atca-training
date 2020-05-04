@@ -40,6 +40,7 @@ static char args_doc[] = "[options]";
 // Our options.
 static struct argp_option options[] = {
   { "device", 'd', "PGPLOT_DEVICE", 0, "The PGPLOT device to use" },
+  { "debug", 'D', 0, 0, "Output debugging information" },
   { "file", 'f', "FILE", 0, "Use an output file as the input" },
   { "server", 's', "SERVER", 0, "The server name or address to connect to" },
   { "port", 'p', "PORTNUM", 0, "The port number on the server to connect to" },
@@ -51,6 +52,7 @@ static struct argp_option options[] = {
 // The arguments structure.
 struct arguments {
   bool use_file;
+  bool debugging_output;
   char input_file[SPDBUFSIZE];
   char spd_device[SPDBUFSIZE];
   int port_number;
@@ -76,6 +78,9 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state) {
   switch (key) {
   case 'd':
     strncpy(arguments->spd_device, arg, SPDBUFSIZE);
+    break;
+  case 'D':
+    arguments->debugging_output = true;
     break;
   case 'f':
     arguments->use_file = true;
@@ -480,8 +485,8 @@ int main(int argc, char *argv[]) {
   struct arguments arguments;
   bool spd_device_opened = false;
   struct spd_plotcontrols spd_alteredcontrols;
-  fd_set watchset;
-  int r, bytes_received;//, br, bytes_expected;
+  fd_set watchset, reads;
+  int r, bytes_received, max_socket = -1;
   size_t recv_buffer_length;
   struct requests server_request;
   struct responses server_response;
@@ -495,6 +500,7 @@ int main(int argc, char *argv[]) {
   
   // Set the default for the arguments.
   arguments.use_file = false;
+  arguments.debugging_output = false;
   arguments.input_file[0] = 0;
   arguments.spd_device[0] = 0;
   arguments.server_name[0] = 0;
@@ -511,9 +517,6 @@ int main(int argc, char *argv[]) {
   // Handle window size changes.
   signal(SIGWINCH, sighandler);
 
-  // Install the line handler.
-  rl_callback_handler_install(prompt, interpret_command);
-  
   // Open and unpack the file if we have one.
   if (arguments.use_file) {
     read_data_from_file(arguments.input_file, &spectrum_data);
@@ -530,41 +533,52 @@ int main(int argc, char *argv[]) {
     getnameinfo(peer_address->ai_addr, peer_address->ai_addrlen,
                 address_buffer, sizeof(address_buffer),
                 service_buffer, sizeof(service_buffer), NI_NUMERICHOST);
-    printf("Remote address is: %s %s\n", address_buffer, service_buffer);
+    if (arguments.debugging_output) {
+      fprintf(stderr, "Remote address is: %s %s\n", address_buffer, service_buffer);
+    }
     socket_peer = socket(peer_address->ai_family, peer_address->ai_socktype,
                          peer_address->ai_protocol);
     if (!ISVALIDSOCKET(socket_peer)) {
       fprintf(stderr, "socket() failed. (%d)\n", GETSOCKETERRNO());
       return(1);
     }
-    printf("Connecting...\n");
+    if (arguments.debugging_output) {
+      fprintf(stderr, "Connecting...\n");
+    }
     if (connect(socket_peer, peer_address->ai_addr, peer_address->ai_addrlen)) {
       fprintf(stderr, "connect() failed. (%d)\n", GETSOCKETERRNO());
       return(1);
     }
     freeaddrinfo(peer_address);
-    printf("Connected.\n");
+    if (arguments.debugging_output) {
+      fprintf(stderr, "Connected.\n");
+    }
     // Send a request for the currently available spectrum.
     server_request.request_type = REQUEST_CURRENT_SPECTRUM;
-    reset_cumulative_size();
-    cmp_init(&cmp, send_buffer, buffer_reader, buffer_skipper, buffer_writer);
+    init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)SPDBUFSIZE);
     pack_requests(&cmp, &server_request);
-    send(socket_peer, send_buffer, get_cumulative_size(), 0);
+    send(socket_peer, send_buffer, cmp_mem_access_get_pos(&mem), 0);
   }
 
   // Open the plotting device.
   prepare_spd_device(arguments.spd_device, &spd_device_opened);
-  
-  // Let's print something to check.
-  //printf("Data has %d IFs and %d pols\n", spectrum_data.num_ifs, spectrum_data.num_pols);
 
+  // Install the line handler.
+  rl_callback_handler_install(prompt, interpret_command);
+  
   // Set up our main loop.
   FD_ZERO(&watchset);
   // We'll be looking at the terminal.
   FD_SET(fileno(rl_instream), &watchset);
+  if (fileno(rl_instream) > max_socket) {
+    max_socket = fileno(rl_instream);
+  }
   if (arguments.network_operation) {
     // And the connection to the server.
     FD_SET(socket_peer, &watchset);
+    if (socket_peer > max_socket) {
+      max_socket = socket_peer;
+    }
   }
 
   // We will need to have a default plot upon entry.
@@ -579,8 +593,15 @@ int main(int argc, char *argv[]) {
 
   action_required = ACTION_REFRESH_PLOT;
   while(true) {
+    reads = watchset;
+    if (arguments.debugging_output) {
+      fprintf(stderr, "Event loop entered.\n");
+    }
     if (action_required & ACTION_CHANGE_PLOTSURFACE) {
       // The plotting window needs to be split into a different set of windows.
+      if (arguments.debugging_output) {
+        fprintf(stderr, "Changing plot surface.\n");
+      }
       free_panelspec(&spd_panelspec);
       splitpanels(nxpanels, nypanels, spd_device_number, 0, 5, &spd_panelspec);
       action_required -= ACTION_CHANGE_PLOTSURFACE;
@@ -589,6 +610,9 @@ int main(int argc, char *argv[]) {
     
     if (action_required & ACTION_REFRESH_PLOT) {
       // Let's make a plot.
+      if (arguments.debugging_output) {
+        fprintf(stderr, "Refreshing plot.\n");
+      }
       // First, ensure the plotter doesn't try to do something it can't.
       reconcile_spd_plotcontrols(&spectrum_data, &spd_plotcontrols, &spd_alteredcontrols);
       make_spd_plot(spectrum_data.spectrum, &spd_panelspec, &spd_alteredcontrols, true);
@@ -600,7 +624,13 @@ int main(int argc, char *argv[]) {
     }
 
     // Have a look at our inputs.
-    r = select(FD_SETSIZE, &watchset, NULL, NULL, NULL);
+    if (arguments.debugging_output) {
+      fprintf(stderr, "Selecting our sockets, max socket is %d\n", max_socket);
+    }
+    r = select((max_socket + 1), &reads, NULL, NULL, NULL);
+    if (arguments.debugging_output) {
+      fprintf(stderr, "Got some activity.\n");
+    }
     if ((r < 0) && (errno != EINTR)) {
       perror("  NSPD FAILS!\n");
       break;
@@ -616,39 +646,31 @@ int main(int argc, char *argv[]) {
     if (FD_ISSET(fileno(rl_instream), &watchset)) {
       rl_callback_read_char();
     } else if (FD_ISSET(socket_peer, &watchset)) {
-      //MALLOC(recv_buffer, SPDRECVBUFSIZE);
-      //bytes_received = 0;
-      fprintf(stderr, "Data coming in...\n");
+      if (arguments.debugging_output) {
+        fprintf(stderr, "Data coming in...\n");
+      }
       // The first bit of data can be used to determine how much data to expect.
-      //bytes_expected = 1;
       bytes_received = socket_recv_buffer(socket_peer, &recv_buffer, &recv_buffer_length);
-      /* while ((br = recv(socket_peer, recv_buffer + bytes_received, */
-      /*                   SPDRECVBUFSIZE - bytes_received, 0)) || */
-      /*        (bytes_received < bytes_expected)) { */
-      /*   fprintf(stderr, "     %d bytes (%d total)\n", br, bytes_received); */
-      /*   bytes_received += br; */
-      /*   if (bytes_expected == 1) { */
-      /*     // We get how much we expect. */
-      /*     init_cmp_buffer(&cmp, recv_buffer); */
-      /*     unpack_responses(&cmp, &server_response); */
-      /*     bytes_expected = server_response.response_size; */
-      /*     fprintf(stderr, "   expecting %d bytes\n", bytes_expected); */
-      /*   } */
-      /* } */
-      fprintf(stderr, "  received %d bytes total\n", bytes_received);
+      if (arguments.debugging_output) {
+        fprintf(stderr, "  received %d bytes total\n", bytes_received);
+      }
       if (bytes_received <= 0) {
-        printf("Connection closed by peer.\n");
+        if (arguments.debugging_output) {
+          fprintf(stderr, "Connection closed by peer.\n");
+        }
         action_required = ACTION_QUIT;
         continue;
       }
       init_cmp_memory_buffer(&cmp, &mem, recv_buffer, recv_buffer_length);
       unpack_responses(&cmp, &server_response);
-      fprintf(stderr, "Response is type %d\n", server_response.response_type);
+      if (arguments.debugging_output) {
+        fprintf(stderr, "Response is type %d\n", server_response.response_type);
+      }
       // Check we're getting what we expect.
       if (server_response.response_type == RESPONSE_CURRENT_SPECTRUM) {
         unpack_spectrum_data(&cmp, &spectrum_data);
         // Refresh the plot next time through.
-        action_required = ACTION_REFRESH_PLOT;
+        action_required = ACTION_CHANGE_PLOTSURFACE;
       }
     }
     

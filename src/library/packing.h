@@ -46,17 +46,11 @@ struct vis_data {
 };
 
 // Our routine definitions.
-void reset_cumulative_size();
-size_t get_cumulative_size();
 void error_and_exit(const char *msg);
-bool read_bytes(void *data, size_t sz, FILE *fh);
 bool buffer_read_bytes(void *data, size_t sz, char *buffer);
 bool file_reader(cmp_ctx_t *ctx, void *data, size_t limit);
-bool buffer_reader(cmp_ctx_t *ctx, void *data, size_t limit);
 bool file_skipper(cmp_ctx_t *ctx, size_t count);
-bool buffer_skipper(cmp_ctx_t *ctx, size_t count);
 size_t file_writer(cmp_ctx_t *ctx, const void *data, size_t count);
-size_t buffer_writer(cmp_ctx_t *ctx, const void *data, size_t count);
 void pack_read_bool(cmp_ctx_t *cmp, bool *value);
 void pack_write_bool(cmp_ctx_t *cmp, bool value);
 void pack_read_sint(cmp_ctx_t *cmp, int *value);
@@ -100,7 +94,6 @@ void pack_requests(cmp_ctx_t *cmp, struct requests *a);
 void unpack_requests(cmp_ctx_t *cmp, struct requests *a);
 void pack_responses(cmp_ctx_t *cmp, struct responses *a);
 void unpack_responses(cmp_ctx_t *cmp, struct responses *a);
-void init_cmp_buffer(cmp_ctx_t *cmp, void *buffer);
 void init_cmp_memory_buffer(cmp_ctx_t *cmp, cmp_mem_access_t *mem, void *buffer,
                             size_t buffer_len);
 
