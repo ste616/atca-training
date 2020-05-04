@@ -593,7 +593,7 @@ int main(int argc, char *argv[]) {
               printf("Closing connection, no data received.\n");
               // The connection failed.
               FD_CLR(loop_i, &master);
-              CLOSESOCKET(i);
+              CLOSESOCKET(loop_i);
               continue;
             }
             printf("Received %d bytes.\n", bytes_received);

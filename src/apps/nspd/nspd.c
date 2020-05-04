@@ -128,10 +128,10 @@ void prepare_spd_device(char *device_name, bool *device_opened) {
   cpgask(0);
   spd_panelspec.measured = NO;
   splitpanels(nxpanels, nypanels, spd_device_number, 0, 5, &spd_panelspec);
-  fprintf(stderr, "PGPLOT X %.4f -> %.4f\n", spd_panelspec.orig_x1,
-          spd_panelspec.orig_x2);
-  fprintf(stderr, "PGPLOT Y %.4f -> %.4f\n", spd_panelspec.orig_y1,
-          spd_panelspec.orig_y2);
+  /* fprintf(stderr, "PGPLOT X %.4f -> %.4f\n", spd_panelspec.orig_x1, */
+  /*         spd_panelspec.orig_x2); */
+  /* fprintf(stderr, "PGPLOT Y %.4f -> %.4f\n", spd_panelspec.orig_y1, */
+  /*         spd_panelspec.orig_y2); */
   
 }
 
@@ -163,6 +163,7 @@ static void sighandler(int sig) {
 #define ACTION_REFRESH_PLOT        1<<0
 #define ACTION_QUIT                1<<1
 #define ACTION_CHANGE_PLOTSURFACE  1<<2
+#define ACTION_NEW_DATA_RECEIVED   1<<3
 
 bool minmatch(char *ref, char *chk, int minlength) {
   // This routine compares the string chk to the string
@@ -242,9 +243,9 @@ static void interpret_command(char *line) {
       cycomma[0] = ' ';
     }
     nels = split_string(line, delim, &line_els);
-    for (i = 0; i < nels; i++) {
-      fprintf(stderr, "%d: %s\n", i, line_els[i]);
-    }
+    /* for (i = 0; i < nels; i++) { */
+    /*   fprintf(stderr, "%d: %s\n", i, line_els[i]); */
+    /* } */
     if (minmatch("select", line_els[0], 3)) {
       // We've been given a selection command.
       pols_specified = 0;
@@ -273,7 +274,7 @@ static void interpret_command(char *line) {
           if ((if_no >= 0) && (if_no < MAXIFS)) {
             if_num_spec[if_no - 1] = 1;
             if_selected = true;
-            fprintf(stderr, " IF band %s is band number %d\n", line_els[i], if_no);
+            /* fprintf(stderr, " IF band %s is band number %d\n", line_els[i], if_no); */
           } else {
             fprintf(stderr, " IF band %s not found\n", line_els[i]);
           }
@@ -479,8 +480,6 @@ void free_spectrum_data(struct spectrum_data *spectrum_data) {
   FREE(spectrum_data->spectrum);
 }
 
-#define SPDRECVBUFSIZE 52428800
-
 int main(int argc, char *argv[]) {
   struct arguments arguments;
   bool spd_device_opened = false;
@@ -589,11 +588,18 @@ int main(int argc, char *argv[]) {
   init_spd_plotcontrols(&spd_plotcontrols, xaxis_type, yaxis_type | yaxis_scaling,
                         plot_pols, spd_device_number);
   // The number of pols is set by the data though, not the selection.
-  spd_plotcontrols.npols = spectrum_data.num_pols;
+  /* spd_plotcontrols.npols = spectrum_data.num_pols; */
 
-  action_required = ACTION_REFRESH_PLOT;
+  action_required = ACTION_NEW_DATA_RECEIVED;
   while(true) {
     reads = watchset;
+    if (action_required & ACTION_NEW_DATA_RECEIVED) {
+      // Adjust the number of pols.
+      spd_plotcontrols.npols = spectrum_data.num_pols;
+      action_required -= ACTION_NEW_DATA_RECEIVED;
+      action_required |= ACTION_CHANGE_PLOTSURFACE;
+    }
+    
     if (action_required & ACTION_CHANGE_PLOTSURFACE) {
       // The plotting window needs to be split into a different set of windows.
       if (arguments.debugging_output) {
@@ -637,7 +643,7 @@ int main(int argc, char *argv[]) {
     if (FD_ISSET(fileno(rl_instream), &reads)) {
       rl_callback_read_char();
     }
-    if (FD_ISSET(socket_peer, &reads)) {
+    if (arguments.network_operation && FD_ISSET(socket_peer, &reads)) {
       if (arguments.debugging_output) {
         fprintf(stderr, "Data coming in...\n");
       }
@@ -662,7 +668,7 @@ int main(int argc, char *argv[]) {
       if (server_response.response_type == RESPONSE_CURRENT_SPECTRUM) {
         unpack_spectrum_data(&cmp, &spectrum_data);
         // Refresh the plot next time through.
-        action_required = ACTION_CHANGE_PLOTSURFACE;
+        action_required = ACTION_NEW_DATA_RECEIVED;
       }
     }
     

@@ -98,7 +98,6 @@ void pack_write_double(cmp_ctx_t *cmp, double value) {
 // Reader.
 void pack_read_string(cmp_ctx_t *cmp, char *value, int maxlength) {
   uint32_t string_size = (uint32_t)maxlength;
-  /* fprintf(stderr, "DEBUG: in pack_read_string\n"); */
   if (!cmp_read_str(cmp, value, &string_size)) CMPERROR(cmp);
 }
 // Writer.
@@ -127,7 +126,6 @@ unsigned int pack_readarray_checksize(cmp_ctx_t *cmp, unsigned int expected_leng
 void pack_readarray_float(cmp_ctx_t *cmp, unsigned int expected_length,
                           float *array) {
   unsigned int i;
-  /* fprintf(stderr, "DEBUG: in pack_readarray_float\n"); */
   pack_readarray_checksize(cmp, expected_length);
   
   for (i = 0; i < expected_length; i++) {
@@ -170,7 +168,6 @@ void pack_readarray_floatcomplex(cmp_ctx_t *cmp, unsigned int expected_length,
                                  float complex *array) {
   unsigned int i;
   float fr, fi;
-  /* fprintf(stderr, "DEBUG: in pack_readarray_floatcomplex\n"); */
   pack_readarray_checksize(cmp, 2 * expected_length);
 
   for (i = 0; i < expected_length; i++) {
@@ -196,7 +193,6 @@ void pack_writearray_floatcomplex(cmp_ctx_t *cmp, unsigned int length,
 void pack_readarray_sint(cmp_ctx_t *cmp, unsigned int expected_length,
                          int *array) {
   unsigned int i;
-  /* fprintf(stderr, "DEBUG: in pack_readarray_sint\n"); */
   pack_readarray_checksize(cmp, expected_length);
 
   for (i = 0; i < expected_length; i++) {
@@ -250,7 +246,6 @@ void pack_ampphase_options(cmp_ctx_t *cmp, struct ampphase_options *a) {
 void unpack_ampphase_options(cmp_ctx_t *cmp, struct ampphase_options *a) {
   // This routine unpacks an ampphase_options structure from the
   // serializer, and stores it in the passed structure.
-  /* fprintf(stderr, "DEBUG: in unpack_ampphase_options\n"); */
   pack_read_bool(cmp, &(a->phase_in_degrees));
   pack_read_sint(cmp, &(a->delay_averaging));
   pack_read_sint(cmp, &(a->min_tvchannel));
@@ -330,7 +325,6 @@ void unpack_ampphase(cmp_ctx_t *cmp, struct ampphase *a) {
   // This routine unpacks an ampphase structure from the
   // serializer and stores it in the passed structure.
   int i, j;
-  /* fprintf(stderr, "DEBUG: in unpack_ampphase\n"); */
   // The number of quantities in each array.
   pack_read_sint(cmp, &(a->nchannels));
   pack_read_sint(cmp, &(a->nbaselines));
@@ -351,14 +345,10 @@ void unpack_ampphase(cmp_ctx_t *cmp, struct ampphase *a) {
   pack_read_float(cmp, &(a->ut_seconds));
   pack_read_string(cmp, a->scantype, OBSTYPE_LENGTH);
 
-  /* fprintf(stderr, "DEBUG: going to get baseline arrays\n"); */
-
   // The bin arrays have one element per baseline.
   MALLOC(a->nbins, a->nbaselines);
   pack_readarray_sint(cmp, a->nbaselines, a->nbins);
 
-  /* fprintf(stderr, "DEBUG: going to get baseline bin arrays\n"); */
-  
   // The flag array has the indexing:
   // array[baseline][bin]
   MALLOC(a->flagged_bad, a->nbaselines);
@@ -367,8 +357,6 @@ void unpack_ampphase(cmp_ctx_t *cmp, struct ampphase *a) {
     pack_readarray_sint(cmp, a->nbins[i], a->flagged_bad[i]);
   }
 
-  /* fprintf(stderr, "DEBUG: going to get baseline bin channel arrays\n"); */
-  
   // The arrays here have the following indexing.
   // array[baseline][bin][channel]
   MALLOC(a->weight, a->nbaselines);
@@ -392,7 +380,6 @@ void unpack_ampphase(cmp_ctx_t *cmp, struct ampphase *a) {
     }
   }
 
-  /* fprintf(stderr, "DEBUG: going to get flagged arrays\n"); */
   
   // These next arrays contain the same data as above, but
   // do not include the flagged channels.
@@ -468,8 +455,6 @@ void pack_spectrum_data(cmp_ctx_t *cmp, struct spectrum_data *a) {
 
 void unpack_spectrum_data(cmp_ctx_t *cmp, struct spectrum_data *a) {
   int i, j;
-  /* fprintf(stderr, "DEBUG: in unpack_spectrum_data\n"); */
-
   // The spectrum header.
   MALLOC(a->header_data, 1);
   unpack_scan_header_data(cmp, a->header_data);
@@ -682,11 +667,11 @@ void unpack_scan_header_data(cmp_ctx_t *cmp, struct scan_header_data *a) {
 
   // Name of the source.
   pack_read_string(cmp, a->source_name, SOURCE_LENGTH);
-
+  
   // Source coordinates.
   pack_read_float(cmp, &(a->rightascension_hours));
   pack_read_float(cmp, &(a->declination_degrees));
-
+  
   // Frequency configuration.
   pack_read_sint(cmp, &(a->num_ifs));
   MALLOC(a->if_centre_freq, a->num_ifs);
