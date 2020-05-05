@@ -15,8 +15,6 @@
 #include <errno.h>
 #include "memory.h"
 
-#define DEBUG_NBYTES 16
-
 ssize_t socket_send_buffer(SOCKET socket, char *buffer, size_t buffer_length) {
   // Send the buffer with length buffer_length over the socket.
   ssize_t init_bytes_sent, bytes_sent;
@@ -77,4 +75,45 @@ ssize_t socket_recv_buffer(SOCKET socket, char **buffer, size_t *buffer_length) 
   /* } */
   
   return(bytes_read);
+}
+
+bool prepare_client_connection(char *server_name, int port_number,
+                               SOCKET *socket_peer, bool debugging) {
+  // Prepare a connection from the client to the server.
+  // Returns true if socket is correctly connected, false otherwise.
+  struct addrinfo hints, *peer_address;
+  char port_string[SOCKBUFSIZE];
+  char address_buffer[SOCKBUFSIZE], service_buffer[SOCKBUFSIZE];
+  
+  memset(&hints, 0, sizeof(hints));
+  hints.ai_socktype = SOCK_STREAM;
+  snprintf(port_string, SOCKBUFSIZE, "%d", port_number);
+  if (getaddrinfo(server_name, port_string, &hints, &peer_address)) {
+    fprintf(stderr, "getaddrinfo() failed. (%d)\n", GETSOCKETERRNO());
+    return(false);
+  }
+  getnameinfo(peer_address->ai_addr, peer_address->ai_addrlen,
+              address_buffer, sizeof(address_buffer),
+              service_buffer, sizeof(service_buffer), NI_NUMERICHOST);
+  if (debugging) {
+    fprintf(stderr, "Remote address is: %s %s\n", address_buffer, service_buffer);
+  }
+  *socket_peer = socket(peer_address->ai_family, peer_address->ai_socktype,
+                        peer_address->ai_protocol);
+  if (!ISVALIDSOCKET(*socket_peer)) {
+    fprintf(stderr, "socket() failed. (%d)\n", GETSOCKETERRNO());
+    return(false);
+  }
+  if (debugging) {
+    fprintf(stderr, "Connecting...\n");
+  }
+  if (connect(*socket_peer, peer_address->ai_addr, peer_address->ai_addrlen)) {
+    fprintf(stderr, "connect() failed. (%d)\n", GETSOCKETERRNO());
+    return(false);
+  }
+  freeaddrinfo(peer_address);
+  if (debugging) {
+    fprintf(stderr, "Connected.\n");
+  }
+  return(true);
 }

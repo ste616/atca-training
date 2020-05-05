@@ -35,6 +35,6 @@ target_compile_options(nspd PRIVATE -Werror -Wall -Wextra -Wno-missing-field-ini
 
 add_executable(nvis src/apps/nvis/nvis.c)
 set_target_properties(nvis PROPERTIES LINKER_LANGUAGE Fortran)
-target_link_libraries(nvis PUBLIC applib atrpfits rpfits m)
+target_link_libraries(nvis PUBLIC applib atrpfits rpfits m cpgplot pgplot png z X11 readline)
 target_include_directories(nvis PUBLIC src/rpfits src/include extern/cmp extern/cmp_mem_access src/library)
 target_compile_options(nvis PRIVATE -Werror -Wall -Wextra -Wno-missing-field-initializers)

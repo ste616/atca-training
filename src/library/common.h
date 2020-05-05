@@ -212,3 +212,5 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
 void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspec,
                    struct spd_plotcontrols *plot_controls, bool all_data_present);
 void seconds_to_hourlabel(float seconds, char *hourlabel);
+bool minmatch(char *ref, char *chk, int minlength);
+int split_string(char *s, char *delim, char ***elements);

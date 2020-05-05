@@ -24,6 +24,7 @@
 #include "memory.h"
 #include "packing.h"
 #include "atnetworking.h"
+#include "common.h"
 
 #define RPSBUFSIZE 1024
 
@@ -578,9 +579,7 @@ int main(int argc, char *argv[]) {
             }
 
             FD_SET(socket_client, &master);
-            if (socket_client > max_socket) {
-              max_socket = socket_client;
-            }
+            MAXASSIGN(max_socket, socket_client);
 
             getnameinfo((struct sockaddr*)&client_address, client_len,
                         address_buffer, sizeof(address_buffer), 0, 0,
@@ -603,16 +602,28 @@ int main(int argc, char *argv[]) {
 
             // Do what we've been asked to do.
             printf(" The request type is %d.\n", client_request.request_type);
-            if (client_request.request_type == REQUEST_CURRENT_SPECTRUM) {
-              // We're going to send the current spectrum to this socket.
+            if ((client_request.request_type == REQUEST_CURRENT_SPECTRUM) ||
+                (client_request.request_type == REQUEST_CURRENT_VISDATA)) {
+              // We're going to send the currently cached data to this socket.
               // Make the buffers the size we may need.
               MALLOC(send_buffer, RPSENDBUFSIZE);
+
               // Set up the response.
-              client_response.response_type = RESPONSE_CURRENT_SPECTRUM;
+              if (client_request.request_type == REQUEST_CURRENT_SPECTRUM) {
+                client_response.response_type = RESPONSE_CURRENT_SPECTRUM;
+              } else if (client_request.request_type == REQUEST_CURRENT_VISDATA) {
+                client_response.response_type = RESPONSE_CURRENT_VISDATA;
+              }
+
               // Now move to writing to the send buffer.
               init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)RPSENDBUFSIZE);
               pack_responses(&cmp, &client_response);
-              pack_spectrum_data(&cmp, spectrum_data);
+              if (client_request.request_type == REQUEST_CURRENT_SPECTRUM) {
+                pack_spectrum_data(&cmp, spectrum_data);
+              } else if (client_request.request_type == REQUEST_CURRENT_VISDATA) {
+                pack_vis_data(&cmp, vis_data);
+              }
+
               // Send this data.
               bytes_sent = socket_send_buffer(loop_i, send_buffer, cmp_mem_access_get_pos(&mem));
               printf(" Sent %ld bytes\n", bytes_sent);

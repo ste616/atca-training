@@ -1362,3 +1362,46 @@ void seconds_to_hourlabel(float seconds, char *hourlabel) {
     (void)sprintf(hourlabel, "%02d:%02d:%02d", h, m, s);
   }
 }
+
+bool minmatch(char *ref, char *chk, int minlength) {
+  // This routine compares the string chk to the string
+  // ref. If the entire string chk represents ref up the
+  // the length of chk or ref, it returns true.
+  // eg. if ref = "select", and chk = "sel", true
+  //        ref = "select", and chk = "s", minlength = 3, false
+  //        ref = "select", and chk = "selects", false
+  int chklen, reflen;
+
+  reflen = strlen(ref);
+  chklen = strlen(chk);
+  if ((minlength > chklen) || (minlength > reflen)) {
+    return false;
+  }
+
+  if (chklen > reflen) {
+    return false;
+  }
+
+  if (strncasecmp(chk, ref, chklen) == 0) {
+    return true;
+  }
+
+  return false;
+}
+
+int split_string(char *s, char *delim, char ***elements) {
+  int i = 0;
+  char *token = NULL;
+
+  // Skip any leading delimiters.
+  while (*s == *delim) {
+    s++;
+  }
+  while ((token = strtok_r(s, delim, &s))) {
+    REALLOC(*elements, (i + 1));
+    (*elements)[i] = token;
+    i++;
+  }
+
+  return i;
+}

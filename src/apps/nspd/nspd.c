@@ -42,8 +42,8 @@ static struct argp_option options[] = {
   { "device", 'd', "PGPLOT_DEVICE", 0, "The PGPLOT device to use" },
   { "debug", 'D', 0, 0, "Output debugging information" },
   { "file", 'f', "FILE", 0, "Use an output file as the input" },
-  { "server", 's', "SERVER", 0, "The server name or address to connect to" },
   { "port", 'p', "PORTNUM", 0, "The port number on the server to connect to" },
+  { "server", 's', "SERVER", 0, "The server name or address to connect to" },
   { 0 }
 };
 
@@ -86,12 +86,12 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state) {
     arguments->use_file = true;
     strncpy(arguments->input_file, arg, SPDBUFSIZE);
     break;
+  case 'p':
+    arguments->port_number = atoi(arg);
+    break;
   case 's':
     arguments->network_operation = true;
     strncpy(arguments->server_name, arg, SPDBUFSIZE);
-    break;
-  case 'p':
-    arguments->port_number = atoi(arg);
     break;
 
   default:
@@ -165,48 +165,6 @@ static void sighandler(int sig) {
 #define ACTION_CHANGE_PLOTSURFACE  1<<2
 #define ACTION_NEW_DATA_RECEIVED   1<<3
 
-bool minmatch(char *ref, char *chk, int minlength) {
-  // This routine compares the string chk to the string
-  // ref. If the entire string chk represents ref up the
-  // the length of chk or ref, it returns true.
-  // eg. if ref = "select", and chk = "sel", true
-  //        ref = "select", and chk = "s", minlength = 3, false
-  //        ref = "select", and chk = "selects", false
-  int chklen, reflen;
-
-  reflen = strlen(ref);
-  chklen = strlen(chk);
-  if ((minlength > chklen) || (minlength > reflen)) {
-    return false;
-  }
-
-  if (chklen > reflen) {
-    return false;
-  }
-
-  if (strncasecmp(chk, ref, chklen) == 0) {
-    return true;
-  }
-
-  return false;
-}
-
-int split_string(char *s, char *delim, char ***elements) {
-  int i = 0;
-  char *token = NULL;
-
-  // Skip any leading delimiters.
-  while (*s == *delim) {
-    s++;
-  }
-  while ((token = strtok_r(s, delim, &s))) {
-    REALLOC(*elements, (i + 1));
-    (*elements)[i] = token;
-    i++;
-  }
-
-  return i;
-}
 
 // Callback function called for each line when accept-line
 // executed, EOF seen, or EOF character read.
@@ -489,9 +447,9 @@ int main(int argc, char *argv[]) {
   size_t recv_buffer_length;
   struct requests server_request;
   struct responses server_response;
-  struct addrinfo hints, *peer_address;
-  char address_buffer[SPDBUFSIZE], service_buffer[SPDBUFSIZE];
-  char port_string[SPDBUFSIZE], send_buffer[SPDBUFSIZE];
+  /* struct addrinfo hints, *peer_address; */
+  /* char address_buffer[SPDBUFSIZE], service_buffer[SPDBUFSIZE]; */
+  char send_buffer[SPDBUFSIZE];
   char *recv_buffer = NULL;
   SOCKET socket_peer;
   cmp_ctx_t cmp;
@@ -521,36 +479,9 @@ int main(int argc, char *argv[]) {
     read_data_from_file(arguments.input_file, &spectrum_data);
   } else if (arguments.network_operation) {
     // Prepare our connection.
-    memset(&hints, 0, sizeof(hints));
-    hints.ai_socktype = SOCK_STREAM;
-    snprintf(port_string, SPDBUFSIZE, "%d", arguments.port_number);
-    if (getaddrinfo(arguments.server_name, port_string, &hints,
-                    &peer_address)) {
-      fprintf(stderr, "getaddrinfo() failed. (%d)\n", GETSOCKETERRNO());
+    if (!prepare_client_connection(arguments.server_name, arguments.port_number,
+                                   &socket_peer, arguments.debugging_output)) {
       return(1);
-    }
-    getnameinfo(peer_address->ai_addr, peer_address->ai_addrlen,
-                address_buffer, sizeof(address_buffer),
-                service_buffer, sizeof(service_buffer), NI_NUMERICHOST);
-    if (arguments.debugging_output) {
-      fprintf(stderr, "Remote address is: %s %s\n", address_buffer, service_buffer);
-    }
-    socket_peer = socket(peer_address->ai_family, peer_address->ai_socktype,
-                         peer_address->ai_protocol);
-    if (!ISVALIDSOCKET(socket_peer)) {
-      fprintf(stderr, "socket() failed. (%d)\n", GETSOCKETERRNO());
-      return(1);
-    }
-    if (arguments.debugging_output) {
-      fprintf(stderr, "Connecting...\n");
-    }
-    if (connect(socket_peer, peer_address->ai_addr, peer_address->ai_addrlen)) {
-      fprintf(stderr, "connect() failed. (%d)\n", GETSOCKETERRNO());
-      return(1);
-    }
-    freeaddrinfo(peer_address);
-    if (arguments.debugging_output) {
-      fprintf(stderr, "Connected.\n");
     }
     // Send a request for the currently available spectrum.
     server_request.request_type = REQUEST_CURRENT_SPECTRUM;
@@ -569,15 +500,11 @@ int main(int argc, char *argv[]) {
   FD_ZERO(&watchset);
   // We'll be looking at the terminal.
   FD_SET(fileno(rl_instream), &watchset);
-  if (fileno(rl_instream) > max_socket) {
-    max_socket = fileno(rl_instream);
-  }
+  MAXASSIGN(max_socket, fileno(rl_instream));
   if (arguments.network_operation) {
     // And the connection to the server.
     FD_SET(socket_peer, &watchset);
-    if (socket_peer > max_socket) {
-      max_socket = socket_peer;
-    }
+    MAXASSIGN(max_socket, socket_peer);
   }
 
   // We will need to have a default plot upon entry.
@@ -588,8 +515,6 @@ int main(int argc, char *argv[]) {
   init_spd_plotcontrols(&spd_plotcontrols, xaxis_type, yaxis_type | yaxis_scaling,
                         plot_pols, spd_device_number);
   // The number of pols is set by the data though, not the selection.
-  /* spd_plotcontrols.npols = spectrum_data.num_pols; */
-
   action_required = ACTION_NEW_DATA_RECEIVED;
   while(true) {
     reads = watchset;
