@@ -738,7 +738,7 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
     // Nothing to plot!
     return;
   }
-
+  
   // Select the PGPLOT device.
   cpgslct(plot_controls->pgplot_device);
 

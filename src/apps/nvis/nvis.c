@@ -38,12 +38,12 @@ static char args_doc[] = "[options]";
 
 // Our options.
 static struct argp_option options[] = {
-                                       { "device", 'd', "PGPLOT_DEVICE", 0, "The PGPLOT device to use" },
+  { "device", 'd', "PGPLOT_DEVICE", 0, "The PGPLOT device to use" },
   { "file", 'f', "FILE", 0, "Use an output file as the input" },
-                                       { "port", 'p', "PORTNUM", 0,
-                                         "The port number on the server to connect to" },
-                                       { "server", 's', "SERVER", 0,
-                                         "The server name or address to connect to" },
+  { "port", 'p', "PORTNUM", 0,
+    "The port number on the server to connect to" },
+  { "server", 's', "SERVER", 0,
+    "The server name or address to connect to" },
   { 0 }
 };
 
@@ -261,7 +261,11 @@ int main(int argc, char *argv[]) {
   yaxis_type = PLOT_AMPLITUDE | PLOT_PHASE | PLOT_DELAY;
   init_vis_plotcontrols(&vis_plotcontrols, xaxis_type, yaxis_type,
                         visband, vis_device_number, &vis_panelspec);
-
+  vis_plotcontrols.array_spec = interpret_array_string("1,2,3,4,5,6");
+  MALLOC(vis_plotcontrols.vis_products, 1);
+  vis_plotcontrols.nproducts = 1;
+  vis_interpret_product("aa", &(vis_plotcontrols.vis_products[0]));
+  vis_plotcontrols.cycletime = 10;
   action_required = 0;
   while(true) {
     reads = watchset;
@@ -272,9 +276,9 @@ int main(int argc, char *argv[]) {
 
     if (action_required & ACTION_REFRESH_PLOT) {
       // Let's make a plot.
-      fprintf(stderr, "Received %d cycles, first cycle has %d IFs\n", vis_data.nviscycles,
-              vis_data.num_ifs[0]);
-      
+      fprintf(stderr, "Received %d cycles, first cycle has %d IFs\n",
+	      vis_data.nviscycles, vis_data.num_ifs[0]);
+      fprintf(stderr, "The array spec is %d\n", vis_plotcontrols.array_spec);
       make_vis_plot(vis_data.vis_quantities, vis_data.nviscycles,
                     vis_data.num_ifs, 4,
                     &vis_panelspec, &vis_plotcontrols);
