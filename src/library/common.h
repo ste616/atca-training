@@ -187,8 +187,8 @@ void init_vis_plotcontrols(struct vis_plotcontrols *plotcontrols,
 void free_vis_plotcontrols(struct vis_plotcontrols *plotcontrols);
 void free_panelspec(struct panelspec *panelspec);
 void splitpanels(int nx, int ny, int pgplot_device, int abut,
-		 float margin_reduction,
-		 struct panelspec *panelspec);
+                 float margin_reduction, int make_info_area,
+                 struct panelspec *panelspec);
 void changepanel(int x, int y, struct panelspec *panelspec);
 void plotnum_to_xy(struct panelspec *panelspec, int plotnum, int *px, int *py);
 void plotpanel_minmax(struct ampphase **plot_ampphase,

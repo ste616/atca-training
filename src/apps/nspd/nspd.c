@@ -127,7 +127,7 @@ void prepare_spd_device(char *device_name, bool *device_opened) {
   // Set up the device with the current settings.
   cpgask(0);
   spd_panelspec.measured = NO;
-  splitpanels(nxpanels, nypanels, spd_device_number, 0, 5, &spd_panelspec);
+  splitpanels(nxpanels, nypanels, spd_device_number, 0, 5, 1, &spd_panelspec);
   /* fprintf(stderr, "PGPLOT X %.4f -> %.4f\n", spd_panelspec.orig_x1, */
   /*         spd_panelspec.orig_x2); */
   /* fprintf(stderr, "PGPLOT Y %.4f -> %.4f\n", spd_panelspec.orig_y1, */
@@ -531,7 +531,7 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Changing plot surface.\n");
       }
       free_panelspec(&spd_panelspec);
-      splitpanels(nxpanels, nypanels, spd_device_number, 0, 5, &spd_panelspec);
+      splitpanels(nxpanels, nypanels, spd_device_number, 0, 5, 1, &spd_panelspec);
       action_required -= ACTION_CHANGE_PLOTSURFACE;
       action_required |= ACTION_REFRESH_PLOT;
     }

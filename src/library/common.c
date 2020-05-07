@@ -205,7 +205,7 @@ void init_vis_plotcontrols(struct vis_plotcontrols *plotcontrols,
   plotcontrols->pgplot_device = pgplot_device;
   
   // Set up the panelspec structure for this.
-  splitpanels(1, npanels, pgplot_device, 1, 0.9, panelspec);
+  splitpanels(1, npanels, pgplot_device, 1, 1, 0, panelspec);
 
   // Initialise the products to display.
   plotcontrols->nproducts = 0;
@@ -251,7 +251,7 @@ void free_panelspec(struct panelspec *panelspec) {
 }
 
 void splitpanels(int nx, int ny, int pgplot_device, int abut,
-                 float margin_reduction,
+                 float margin_reduction, int make_info_area,
                  struct panelspec *panelspec) {
   int i, j;
   float panel_width, panel_height, panel_px_width, panel_px_height;
@@ -298,14 +298,25 @@ void splitpanels(int nx, int ny, int pgplot_device, int abut,
     panelspec->orig_px_x2 += dpx_x;
     panelspec->orig_y1 /= 0.7 * margin_reduction;
     panelspec->orig_px_y1 /= 0.7 * margin_reduction;
-    panelspec->orig_y2 = 1 - 2 * panelspec->orig_y1;
+    if (make_info_area) {
+      panelspec->orig_y2 = 1 - 2 * panelspec->orig_y1;
+    } else {
+      panelspec->orig_y2 = 1 - panelspec->orig_y1;
+    }
     panelspec->orig_px_y2 += dpx_y;
 
-    // Keep the information area dimensions.
-    panelspec->information_x1 = panelspec->orig_x1;
-    panelspec->information_x2 = panelspec->orig_x2;
-    panelspec->information_y1 = panelspec->orig_y2 + panelspec->orig_y1;
-    panelspec->information_y2 = 1.0; //panelspec->orig_y2 + panelspec->orig_y1;
+    if (make_info_area) {
+      // Keep the information area dimensions.
+      panelspec->information_x1 = panelspec->orig_x1;
+      panelspec->information_x2 = panelspec->orig_x2;
+      panelspec->information_y1 = panelspec->orig_y2 + panelspec->orig_y1;
+      panelspec->information_y2 = 1.0; //panelspec->orig_y2 + panelspec->orig_y1;
+    } else {
+      panelspec->information_x1 = 0;
+      panelspec->information_x2 = 0;
+      panelspec->information_y1 = 0;
+      panelspec->information_y2 = 0;
+    }
   }
     /* printf("viewport is x = %.2f -> %.2f, y = %.2f -> %.2f\n", */
     /* 	 panelspec->orig_x1, panelspec->orig_x2, */
@@ -741,7 +752,8 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
   
   // Select the PGPLOT device.
   cpgslct(plot_controls->pgplot_device);
-
+  cpgpage();
+  
   // We make up to 16 lines per panel.
   // The first dimension will be the panel number.
   MALLOC(plot_lines, plot_controls->num_panels);

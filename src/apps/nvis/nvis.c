@@ -116,7 +116,6 @@ void prepare_vis_device(char *device_name, bool *device_opened) {
   // Set up the device with the current settings.
   cpgask(0);
   vis_panelspec.measured = NO;
-  splitpanels(nxpanels, nypanels, vis_device_number, 0, 5, &vis_panelspec);
 }
 
 void release_vis_device(bool *device_opened) {
@@ -152,7 +151,7 @@ static void sighandler(int sig) {
 // executed, EOF seen, or EOF character read.
 static void interpret_command(char *line) {
   char **line_els = NULL, *cycomma = NULL, delim[] = " ";
-  int nels, i;
+  int nels, i, j, k, array_change_spec;
 
   if ((line == NULL) || (strcasecmp(line, "exit") == 0) ||
       (strcasecmp(line, "quit") == 0)) {
@@ -179,6 +178,25 @@ static void interpret_command(char *line) {
       // We've been given a selection command.
       for (i = 1; i < nels; i++) {
         
+      }
+    } else if (minmatch("array", line_els[0], 3)) {
+      // Change which antennas are being shown. We look at all the
+      // elements on this line.
+      array_change_spec = 0;
+      for (j = 1; j < nels; j++) {
+        if (MAXANTS < 10) {
+          // We just look for the numeral in all the arguments.
+          for (k = 1; k <= MAXANTS; k++) {
+            if (strchr(line_els[j], (k + '0'))) {
+              array_change_spec |= 1<<k;
+            }
+          }
+        } // We'll need to put more code here if we are to support
+        // arrays with more than 9 antennas.
+      }
+      if (array_change_spec > 0) {
+        vis_plotcontrols.array_spec = array_change_spec;
+        action_required = ACTION_REFRESH_PLOT;
       }
     }
     
@@ -276,9 +294,6 @@ int main(int argc, char *argv[]) {
 
     if (action_required & ACTION_REFRESH_PLOT) {
       // Let's make a plot.
-      fprintf(stderr, "Received %d cycles, first cycle has %d IFs\n",
-	      vis_data.nviscycles, vis_data.num_ifs[0]);
-      fprintf(stderr, "The array spec is %d\n", vis_plotcontrols.array_spec);
       make_vis_plot(vis_data.vis_quantities, vis_data.nviscycles,
                     vis_data.num_ifs, 4,
                     &vis_panelspec, &vis_plotcontrols);
