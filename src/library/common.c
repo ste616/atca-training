@@ -217,6 +217,10 @@ void init_vis_plotcontrols(struct vis_plotcontrols *plotcontrols,
 
   // Some default cycle time, but this should always be set (seconds).
   plotcontrols->cycletime = 120;
+
+  // The default history lengths are set to 20 minutes.
+  plotcontrols->history_length = 20;
+  plotcontrols->history_start = 20;
 }
 
 void free_vis_plotcontrols(struct vis_plotcontrols *plotcontrols) {
@@ -914,6 +918,15 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
     }
     // Make the panel.
     changepanel(0, i, panelspec);
+    // Adjust the time constraints based on the history specification.
+    min_x = (min_x < (max_x - plot_controls->history_start * 60)) ?
+      (max_x - plot_controls->history_start * 60) : min_x;
+    max_x = (max_x > (min_x + plot_controls->history_length * 60)) ?
+      (min_x + plot_controls->history_length * 60) : max_x;
+
+    // Always keep another 5% on the right side.
+    max_x += (max_x - min_x) * 0.05;
+    
     /* printf("plotting panel %d with %.2f <= x <= %.2f, %.2f <= y <= %.2f\n", */
     /* 	   i, min_x, max_x, min_y, max_y); */
     cpgswin(min_x, max_x, min_y, max_y);

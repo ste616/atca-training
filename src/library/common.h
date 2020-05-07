@@ -144,6 +144,8 @@ struct vis_plotcontrols {
   int *panel_type;
   // The maximum history to plot (minutes).
   float history_length;
+  // The history start point (minutes).
+  float history_start;
   // The PGPLOT device number used.
   int pgplot_device;
   // The bands to assign as IFs 1 and 2.
