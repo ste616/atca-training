@@ -216,3 +216,5 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
 void seconds_to_hourlabel(float seconds, char *hourlabel);
 bool minmatch(char *ref, char *chk, int minlength);
 int split_string(char *s, char *delim, char ***elements);
+void minutes_representation(float minutes, char *representation);
+float string_to_minutes(char *s);

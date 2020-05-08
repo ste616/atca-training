@@ -5,8 +5,11 @@
  * This library contains functions that are useful for many of the
  * applications.
  */
+#include <stdio.h>
 #include <string.h>
 #include <math.h>
+#include <sys/types.h>
+#include <regex.h>
 #include "common.h"
 #include "cpgplot.h"
 #include "memory.h"
@@ -844,7 +847,43 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
     max_x = -INFINITY;
     min_y = INFINITY;
     max_y = -INFINITY;
-    
+
+    // We need to work out the time limits first.
+    for (j = 0; j < n_vis_lines; j++) {
+      for (k = 0; k < ncycles; k++) {
+        for (l = 0; l < cycle_numifs[k]; l++) {
+          for (m = 0; m < npols; m++) {
+            if ((cycle_vis_quantities[k][l][m]->pol &
+                 vis_lines[j]->pol) &&
+                (cycle_vis_quantities[k][l][m]->window ==
+                 vis_lines[j]->if_number)) {
+              for (n = 0; n < cycle_vis_quantities[k][l][m]->nbaselines; n++) {
+                if (cycle_vis_quantities[k][l][m]->baseline[n] ==
+                    ants_to_base(vis_lines[j]->ant1, vis_lines[j]->ant2)) {
+                  if (cycle_vis_quantities[k][l][m]->flagged_bad[n] > 0) {
+                    continue;
+                  }
+                  MINASSIGN(min_x, cycle_vis_quantities[k][l][m]->ut_seconds);
+                  MAXASSIGN(max_x, cycle_vis_quantities[k][l][m]->ut_seconds);
+                  break;
+                }
+              }
+              break;
+            }
+          }
+        }
+      }
+    }
+    // Adjust the time constraints based on the history specification.
+    min_x = (min_x < (max_x - plot_controls->history_start * 60)) ?
+      (max_x - plot_controls->history_start * 60) : min_x;
+    max_x = (max_x > (min_x + plot_controls->history_length * 60)) ?
+      (min_x + plot_controls->history_length * 60) : max_x;
+
+    // Always keep another 5% on the right side.
+    max_x += (max_x - min_x) * 0.05;
+
+    // Now go through the data and make our arrays.
     // The third dimension of the plot lines will be the X and Y
     // coordinates.
     for (j = 0; j < n_vis_lines; j++) {
@@ -862,6 +901,11 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
             /* printf("comparing pols %d to %d, window %d to %d\n", */
             /* 	   cycle_vis_quantities[k][l][m]->pol, vis_lines[j]->pol, */
             /* 	   cycle_vis_quantities[k][l][m]->window, vis_lines[j]->if_number); */
+            // Exclude data outside our history range.
+            if ((cycle_vis_quantities[k][l][m]->ut_seconds < min_x) ||
+                (cycle_vis_quantities[k][l][m]->ut_seconds > max_x)) {
+              break;
+            }
             if ((cycle_vis_quantities[k][l][m]->pol &
                  vis_lines[j]->pol) &&
                 (cycle_vis_quantities[k][l][m]->window ==
@@ -885,12 +929,6 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
                   /* printf("  number of points is now %d, time %.3f\n", */
                   /* 	 n_plot_lines[i][j], */
                   /* 	 plot_lines[i][j][0][n_plot_lines[i][j] - 1]); */
-                  if (plot_lines[i][j][0][n_plot_lines[i][j] - 1] < min_x) {
-                    min_x = plot_lines[i][j][0][n_plot_lines[i][j] - 1];
-                  }
-                  if (plot_lines[i][j][0][n_plot_lines[i][j] - 1] > max_x) {
-                    max_x = plot_lines[i][j][0][n_plot_lines[i][j] - 1];
-                  }
                   // Need to fix for bin.
                   if (plot_controls->panel_type[i] == PLOT_AMPLITUDE) {
                     plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
@@ -902,12 +940,8 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
                     plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
                       cycle_vis_quantities[k][l][m]->delay[n][0];
                   }
-                  if (plot_lines[i][j][1][n_plot_lines[i][j] - 1] < min_y) {
-                    min_y = plot_lines[i][j][1][n_plot_lines[i][j] -1 ];
-                  }
-                  if (plot_lines[i][j][1][n_plot_lines[i][j] - 1] > max_y) {
-                    max_y = plot_lines[i][j][1][n_plot_lines[i][j] - 1];
-                  }
+                  MINASSIGN(min_y, plot_lines[i][j][l][n_plot_lines[i][j] - 1]);
+                  MAXASSIGN(max_y, plot_lines[i][j][l][n_plot_lines[i][j] - 1]);
                   break;
                 }
               }
@@ -918,14 +952,6 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
     }
     // Make the panel.
     changepanel(0, i, panelspec);
-    // Adjust the time constraints based on the history specification.
-    min_x = (min_x < (max_x - plot_controls->history_start * 60)) ?
-      (max_x - plot_controls->history_start * 60) : min_x;
-    max_x = (max_x > (min_x + plot_controls->history_length * 60)) ?
-      (min_x + plot_controls->history_length * 60) : max_x;
-
-    // Always keep another 5% on the right side.
-    max_x += (max_x - min_x) * 0.05;
     
     /* printf("plotting panel %d with %.2f <= x <= %.2f, %.2f <= y <= %.2f\n", */
     /* 	   i, min_x, max_x, min_y, max_y); */
@@ -1429,4 +1455,68 @@ int split_string(char *s, char *delim, char ***elements) {
   }
 
   return i;
+}
+
+void minutes_representation(float minutes, char *representation) {
+  // We look at the number of minutes, and output the best human representation
+  // of that duration.
+  if (minutes < 1) {
+    // Output in seconds.
+    sprintf(representation, "%.1f sec", (minutes * 60));
+  } else if (minutes > 2800) {
+    // Output in days.
+    sprintf(representation, "%.2f days", (minutes / 1440));
+  } else if (minutes > 120) {
+    // Output in hours.
+    sprintf(representation, "%.2f hours", (minutes / 60));
+  } else {
+    // Output in minutes.
+    sprintf(representation, "%.1f min", minutes);
+  }
+}
+
+float string_to_minutes(char *s) {
+  // Parse a string like 2.1m or 1.3h or 30s or 1h30m into the
+  // number of minutes that string represents.
+  float nmin = 0, num;
+  regex_t regex;
+  regmatch_t matches[4];
+  int reti;
+  char *cursor, numstr[100], *eptr = NULL;
+
+  reti = regcomp(&regex, "([0-9]+)([dhms])", REG_EXTENDED);
+
+  if (reti) {
+    fprintf(stderr, "[string_to_minutes] Unable to compile regex\n");
+    return nmin;
+  }
+  cursor = s;
+  while (!(regexec(&regex, cursor, 4, matches, 0))) {
+    strncpy(numstr, cursor + matches[1].rm_so,
+            (1 + matches[1].rm_eo - matches[1].rm_so));
+    num = strtof(numstr, &eptr);
+    if (eptr != numstr) {
+      // We got a conversion.
+      switch ((cursor + matches[2].rm_so)[0]) {
+      case 'd':
+        nmin += num * 1440;
+        break;
+      case 'h':
+        nmin += num * 60;
+        break;
+      case 'm':
+        nmin += num;
+        break;
+      case 's':
+        nmin += num / 60;
+        break;
+      }
+    }
+    
+    cursor += matches[0].rm_eo;
+  }
+
+  regfree(&regex);
+  
+  return nmin;
 }

@@ -151,7 +151,9 @@ static void sighandler(int sig) {
 // executed, EOF seen, or EOF character read.
 static void interpret_command(char *line) {
   char **line_els = NULL, *cycomma = NULL, delim[] = " ";
+  char duration[VISBUFSIZE], historystart[VISBUFSIZE];
   int nels, i, j, k, array_change_spec;
+  float histlength;
 
   if ((line == NULL) || (strcasecmp(line, "exit") == 0) ||
       (strcasecmp(line, "quit") == 0)) {
@@ -198,10 +200,34 @@ static void interpret_command(char *line) {
         vis_plotcontrols.array_spec = array_change_spec;
         action_required = ACTION_REFRESH_PLOT;
       }
+    } else if (minmatch("history", line_els[0], 4)) {
+      // Change the amount of data being shown.
+      if (nels < 2) {
+        // Just print the history length.
+        minutes_representation(vis_plotcontrols.history_length, duration);
+        minutes_representation(vis_plotcontrols.history_start, historystart);
+        printf(" History currently set to show %s starting %s ago\n",
+               duration, historystart);
+      } else {
+        // Get the history length.
+        histlength = string_to_minutes(line_els[1]);
+        if (histlength > 0) {
+          action_required = ACTION_REFRESH_PLOT;
+          vis_plotcontrols.history_length = histlength;
+          vis_plotcontrols.history_start = histlength;
+          // Check for a history start time.
+          if (nels > 2) {
+            histlength = string_to_minutes(line_els[2]);
+            if (histlength > 0) {
+              vis_plotcontrols.history_start = histlength;
+            }
+          }
+        }
+      }
     }
     
     FREE(line_els);
-  }
+  } 
 
   // We need to free the memory.
   FREE(line);
