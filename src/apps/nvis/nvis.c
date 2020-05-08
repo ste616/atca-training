@@ -152,8 +152,10 @@ static void sighandler(int sig) {
 static void interpret_command(char *line) {
   char **line_els = NULL, *cycomma = NULL, delim[] = " ";
   char duration[VISBUFSIZE], historystart[VISBUFSIZE];
-  int nels, i, j, k, array_change_spec;
+  int nels, i, j, k, array_change_spec, nproducts, pr;
   float histlength;
+  struct vis_product **vis_products = NULL, *tproduct = NULL;
+  bool products_selected;
 
   if ((line == NULL) || (strcasecmp(line, "exit") == 0) ||
       (strcasecmp(line, "quit") == 0)) {
@@ -178,8 +180,28 @@ static void interpret_command(char *line) {
 
     if (minmatch("select", line_els[0], 3)) {
       // We've been given a selection command.
+      products_selected = false;
+      nproducts = 0;
       for (i = 1; i < nels; i++) {
-        
+        tproduct = NULL;
+        pr = vis_interpret_product(line_els[i], &tproduct);
+        if (pr == 0) {
+          // Successfully matched a product.
+          REALLOC(vis_products, ++nproducts);
+          vis_products[nproducts - 1] = tproduct;
+          products_selected = true;
+        } else {
+          FREE(tproduct);
+        }
+      }
+      if (products_selected) {
+        // Free the memory in the current options.
+        for (i = 0; i < vis_plotcontrols.nproducts; i++) {
+          FREE(vis_plotcontrols.vis_products[i]);
+        }
+        vis_plotcontrols.nproducts = nproducts;
+        vis_plotcontrols.vis_products = vis_products;
+        action_required = ACTION_REFRESH_PLOT;
       }
     } else if (minmatch("array", line_els[0], 3)) {
       // Change which antennas are being shown. We look at all the

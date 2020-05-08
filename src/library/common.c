@@ -631,7 +631,7 @@ void vis_interpret_pol(char *pol, struct vis_product *vis_product) {
   }
 }
 
-void vis_interpret_product(char *product, struct vis_product **vis_product) {
+int vis_interpret_product(char *product, struct vis_product **vis_product) {
   int ant1, ant2, nmatch = 0, i;
   char p1[3];
 
@@ -645,6 +645,7 @@ void vis_interpret_product(char *product, struct vis_product **vis_product) {
     // Everything was specified.
     (*vis_product)->antenna_spec = 1<<ant1 | 1<<ant2;
     vis_interpret_pol(p1, *vis_product);
+    return 0;
   } else if (nmatch == 2) {
     // The character wasn't matched.
     (*vis_product)->antenna_spec = 1<<ant1 | 1<<ant2;
@@ -657,6 +658,7 @@ void vis_interpret_product(char *product, struct vis_product **vis_product) {
       (*vis_product)->if_spec = VIS_PLOT_IF1 | VIS_PLOT_IF2;
       (*vis_product)->pol_spec = PLOT_POL_XX | PLOT_POL_YY | PLOT_POL_XY;
     }
+    return 0;
   } else if (nmatch == 1) {
     // We were given the first antenna number.
     (*vis_product)->antenna_spec = 1<<ant1;
@@ -666,13 +668,14 @@ void vis_interpret_product(char *product, struct vis_product **vis_product) {
     } else {
       nmatch = sscanf(product, "%1d%1s", &ant1, p1);
       if (nmatch == 2) {
-	vis_interpret_pol(p1, *vis_product);
+        vis_interpret_pol(p1, *vis_product);
       } else {
-	// Only given the first antenna number.
-	(*vis_product)->if_spec = VIS_PLOT_IF1 | VIS_PLOT_IF2;
-	(*vis_product)->pol_spec = PLOT_POL_XX | PLOT_POL_YY | PLOT_POL_XY;
+        // Only given the first antenna number.
+        (*vis_product)->if_spec = VIS_PLOT_IF1 | VIS_PLOT_IF2;
+        (*vis_product)->pol_spec = PLOT_POL_XX | PLOT_POL_YY | PLOT_POL_XY;
       }
     }
+    return 0;
   } else {
     // We weren't given any antenna specifications.
     (*vis_product)->antenna_spec = 0;
@@ -685,12 +688,13 @@ void vis_interpret_product(char *product, struct vis_product **vis_product) {
     } else {
       nmatch = sscanf(product, "%1s", p1);
       if (nmatch == 1) {
-	vis_interpret_pol(p1, *vis_product);
+        vis_interpret_pol(p1, *vis_product);
       } else {
-	(*vis_product)->if_spec = VIS_PLOT_IF1 | VIS_PLOT_IF2;
-	(*vis_product)->pol_spec = PLOT_POL_XX | PLOT_POL_YY | PLOT_POL_XY;
+        (*vis_product)->if_spec = VIS_PLOT_IF1 | VIS_PLOT_IF2;
+        (*vis_product)->pol_spec = PLOT_POL_XX | PLOT_POL_YY | PLOT_POL_XY;
       }
     }
+    return 0;
   }
 }
 
@@ -853,7 +857,7 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
       for (k = 0; k < ncycles; k++) {
         for (l = 0; l < cycle_numifs[k]; l++) {
           for (m = 0; m < npols; m++) {
-            if ((cycle_vis_quantities[k][l][m]->pol &
+            if ((cycle_vis_quantities[k][l][m]->pol ==
                  vis_lines[j]->pol) &&
                 (cycle_vis_quantities[k][l][m]->window ==
                  vis_lines[j]->if_number)) {
@@ -898,15 +902,15 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
         /*        cycle_vis_quantities[k][0][0]->scantype); */
         for (l = 0; l < cycle_numifs[k]; l++) {
           for (m = 0; m < npols; m++) {
-            /* printf("comparing pols %d to %d, window %d to %d\n", */
-            /* 	   cycle_vis_quantities[k][l][m]->pol, vis_lines[j]->pol, */
-            /* 	   cycle_vis_quantities[k][l][m]->window, vis_lines[j]->if_number); */
             // Exclude data outside our history range.
             if ((cycle_vis_quantities[k][l][m]->ut_seconds < min_x) ||
                 (cycle_vis_quantities[k][l][m]->ut_seconds > max_x)) {
               break;
             }
-            if ((cycle_vis_quantities[k][l][m]->pol &
+            /* printf("comparing pols %d to %d, window %d to %d\n", */
+            /* 	   cycle_vis_quantities[k][l][m]->pol, vis_lines[j]->pol, */
+            /* 	   cycle_vis_quantities[k][l][m]->window, vis_lines[j]->if_number); */
+            if ((cycle_vis_quantities[k][l][m]->pol ==
                  vis_lines[j]->pol) &&
                 (cycle_vis_quantities[k][l][m]->window ==
                  vis_lines[j]->if_number)) {

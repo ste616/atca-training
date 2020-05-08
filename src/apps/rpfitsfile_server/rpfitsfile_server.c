@@ -354,7 +354,7 @@ void data_reader(int read_type, int n_rpfits_files,
                     if (calcres < 0) {
                       fprintf(stderr, "CALCULATING AMP AND PHASE FAILED FOR IF %d POL %d, CODE %d\n",
                               sh->if_label[idx_if], pols[idx_pol], calcres);
-                    /* } else { */
+                    /* } else if (read_type & COMPUTE_VIS_PRODUCTS) { */
                     /*   printf("CONVERTED SPECTRUM FOR CYCLE IF %d POL %d AT MJD %.6f\n", */
                     /*          sh->if_label[idx_if], pols[idx_pol], cycle_mjd); */
                     }
@@ -451,8 +451,8 @@ int main(int argc, char *argv[]) {
   // And the default for the calculator options.
   ampphase_options.phase_in_degrees = true;
   ampphase_options.delay_averaging = 1;
-  ampphase_options.min_tvchannel = 1;
-  ampphase_options.max_tvchannel = 2048;
+  ampphase_options.min_tvchannel = 513;
+  ampphase_options.max_tvchannel = 1537;
   ampphase_options.averaging_method = AVERAGETYPE_MEAN | AVERAGETYPE_SCALAR;
   ampphase_options.include_flagged_data = 1;
   
