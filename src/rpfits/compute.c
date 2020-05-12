@@ -217,13 +217,77 @@ struct ampphase_options ampphase_options_default(void) {
 
   options.phase_in_degrees = false;
   options.delay_averaging = 1;
-  options.min_tvchannel = 513;
-  options.max_tvchannel = 1537;
+  options.num_ifs = 0;
+  options.min_tvchannel = NULL;
+  options.max_tvchannel = NULL;
   options.averaging_method = AVERAGETYPE_MEAN | AVERAGETYPE_VECTOR;
   options.include_flagged_data = 0;
 
   return options;
 }
+
+/**
+ * Routine that computes the "default" tv channel range given
+ * the number of channels present in an IF, the channel width,
+ * and the centre frequency in MHz.
+ */
+void default_tvchannels(int num_chan, float chan_width,
+			float centre_freq, int *min_tvchannel,
+			int *max_tvchannel) {
+  if (num_chan <= 33) {
+    // We're likely in 64 MHz mode.
+    *min_tvchannel = 9;
+    *max_tvchannel = 17;
+    return;
+  } else {
+    if (chan_width < 1) {
+      // A zoom band.
+      *min_tvchannel = 256;
+      *max_tvchannel = 1792;
+      return;
+    } else {
+      // 1 Mhz continuum band.
+      if (centre_freq == 2100) {
+	*min_tvchannel = 200;
+	*max_tvchannel = 900;
+	return;
+      } else {
+	*min_tvchannel = 513;
+	*max_tvchannel = 1537;
+	return;
+      }
+    }
+  }
+
+  // For safety:
+  *min_tvchannel = 2;
+  *max_tvchannel = num_chan - 2;
+}
+
+/**
+ * Routine to add a tvchannel specification for a specified window
+ * into the ampphase_options structure. It takes care of putting in
+ * defaults which get recognised as not being set if windows are missing.
+ */
+void add_tvchannels_to_options(struct ampphase_options *ampphase_options,
+			       int window, int min_tvchannel, int max_tvchannel) {
+  int i;
+  if (window > ampphase_options->num_ifs) {
+    // We have to reallocate the memory.
+    REALLOC(ampphase_options->min_tvchannel, window);
+    REALLOC(ampphase_options->max_tvchannel, window);
+    for (i = ampphase_options->num_ifs; i < window; i++) {
+      ampphase_options->min_tvchannel[i] = -1;
+      ampphase_options->max_tvchannel[i] = -1;
+    }
+    ampphase_options->num_ifs = window;
+  }
+
+  // Set the tvchannels.
+  ampphase_options->min_tvchannel[window - 1] = min_tvchannel;
+  ampphase_options->max_tvchannel[window - 1] = max_tvchannel;
+}
+
 
 /**
  * Routine to compute amplitude and phase from a vis array.
@@ -239,7 +303,6 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
   int j = 0, jflag = 0, vidx = -1, cidx = -1, ifno;
   float rcheck = 0, chanwidth, firstfreq, nhalfchan;
   struct ampphase_options default_options;
-
 
   // Check we know about the window number we were given.
   if ((ifnum < 1) || (ifnum > scan_header_data->num_ifs)) {
@@ -504,6 +567,7 @@ int ampphase_average(struct ampphase *ampphase,
 		     struct ampphase_options *options) {
   int n_points = 0, i, j, k, n_expected = 0, n_delavg_expected = 0;
   int *delavg_n = NULL, delavg_idx = 0, n_delay_points = 0;
+  int min_tvchannel, max_tvchannel;
   float total_amplitude = 0, total_phase = 0, total_delay = 0;
   float delta_phase, delta_frequency;
   float *median_array_amplitude = NULL, *median_array_phase = NULL;
@@ -548,8 +612,24 @@ int ampphase_average(struct ampphase *ampphase,
     MALLOC((*vis_quantities)->phase[i], (*vis_quantities)->nbins[i]);
     MALLOC((*vis_quantities)->delay[i], (*vis_quantities)->nbins[i]);
   }
-
-  n_expected = (options->max_tvchannel - options->min_tvchannel) + 1;
+  
+  if ((ampphase->window < options->num_ifs) &&
+      (options->min_tvchannel[ampphase->window - 1] > 0) &&
+      (options->max_tvchannel[ampphase->window - 1] > 0)) {
+    // Use the set tvchannels if possible.
+    min_tvchannel = options->min_tvchannel[ampphase->window - 1];
+    max_tvchannel = options->max_tvchannel[ampphase->window - 1];
+  } else {
+    // Get the default values for this type of IF.
+    default_tvchannels(ampphase->nchannels,
+		       (ampphase->frequency[1] - ampphase->frequency[0]) * 1000,
+		       (1000 * ampphase->frequency[(ampphase->nchannels + 1) / 2]),
+		       &min_tvchannel, &max_tvchannel);
+    add_tvchannels_to_options(options, ampphase->window,
+			      min_tvchannel, max_tvchannel);
+  }
+  //n_expected = (options->max_tvchannel - options->min_tvchannel) + 1;
+  n_expected = (max_tvchannel - min_tvchannel) + 1;
   MALLOC(median_array_amplitude, n_expected);
   MALLOC(median_array_phase, n_expected);
   MALLOC(median_complex, n_expected);
@@ -576,8 +656,8 @@ int ampphase_average(struct ampphase *ampphase,
       n_points = 0;
       for (j = 0; j < ampphase->f_nchannels[i][k]; j++) {
 	// Check for in range.
-	if ((ampphase->f_channel[i][k][j] >= options->min_tvchannel) &&
-	    (ampphase->f_channel[i][k][j] < options->max_tvchannel)) {
+	if ((ampphase->f_channel[i][k][j] >= min_tvchannel) &&
+	    (ampphase->f_channel[i][k][j] < max_tvchannel)) {
 	  total_amplitude += ampphase->f_amplitude[i][k][j];
 	  total_phase += ampphase->f_phase[i][k][j];
 	  total_complex += ampphase->f_raw[i][k][j];
@@ -587,7 +667,7 @@ int ampphase_average(struct ampphase *ampphase,
 	  array_frequency[n_points] = ampphase->f_frequency[i][k][j];
 	  n_points++;
 	  delavg_idx =
-	    (int)(floorf(ampphase->f_channel[i][k][j] - options->min_tvchannel) /
+	    (int)(floorf(ampphase->f_channel[i][k][j] - min_tvchannel) /
 		  options->delay_averaging);
 	  delavg_frequency[delavg_idx] += ampphase->f_frequency[i][k][j];
 	  delavg_raw[delavg_idx] += ampphase->f_raw[i][k][j];

@@ -290,12 +290,15 @@ int main(int argc, char *argv[]) {
   // Get phase in degrees.
   ampphase_options.phase_in_degrees = true;
   ampphase_options.delay_averaging = arguments.delavg;
-  ampphase_options.min_tvchannel =
-    (arguments.tvchannels[0] < arguments.tvchannels[1]) ?
-    arguments.tvchannels[0] : arguments.tvchannels[1];
-  ampphase_options.max_tvchannel =
-    (arguments.tvchannels[0] > arguments.tvchannels[1]) ?
-    arguments.tvchannels[0] : arguments.tvchannels[1];
+  // FIX THIS COMMAND LINE STUFF NOW THAT THE TVCHANNEL
+  // SPECIFICATIONS HAVE CHANGED.
+  ampphase_options.num_ifs = 0;
+  ampphase_options.min_tvchannel = NULL;
+    /* (arguments.tvchannels[0] < arguments.tvchannels[1]) ? */
+    /* arguments.tvchannels[0] : arguments.tvchannels[1]; */
+  ampphase_options.max_tvchannel = NULL;
+    /* (arguments.tvchannels[0] > arguments.tvchannels[1]) ? */
+    /* arguments.tvchannels[0] : arguments.tvchannels[1]; */
   if (arguments.median_averaging == NO) {
     ampphase_options.averaging_method = AVERAGETYPE_MEAN;
   } else {

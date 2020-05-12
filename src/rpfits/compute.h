@@ -52,11 +52,12 @@ struct ampphase_options {
   // The delay averaging factor (default is 1).
   int delay_averaging;
 
-  // The range of channels to use to calculate the amplitude,
-  // phase and delay quantities (default is min 513, max 1537).
-  int min_tvchannel;
-  int max_tvchannel;
-
+  // The "tv" channels can be set independently for
+  // all the IFs.
+  int num_ifs;
+  int *min_tvchannel;
+  int *max_tvchannel;
+  
   // The method to do the averaging (default is mean).
   int averaging_method;
 
@@ -167,6 +168,12 @@ struct vis_quantities* prepare_vis_quantities(void);
 void free_ampphase(struct ampphase **ampphase);
 void free_vis_quantities(struct vis_quantities **vis_quantities);
 int polarisation_number(char *polstring);
+struct ampphase_options ampphase_options_default(void);
+void default_tvchannels(int num_chan, float chan_width,
+			float centre_freq, int *min_tvchannel,
+			int *max_tvchannel);
+void add_tvchannels_to_options(struct ampphase_options *ampphase_options,
+			       int window, int min_tvchannel, int max_tvchannel);
 int vis_ampphase(struct scan_header_data *scan_header_data,
 		 struct cycle_data *cycle_data,
 		 struct ampphase **ampphase, int pol, int ifno,

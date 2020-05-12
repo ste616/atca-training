@@ -451,8 +451,9 @@ int main(int argc, char *argv[]) {
   // And the default for the calculator options.
   ampphase_options.phase_in_degrees = true;
   ampphase_options.delay_averaging = 1;
-  ampphase_options.min_tvchannel = 513;
-  ampphase_options.max_tvchannel = 1537;
+  ampphase_options.num_ifs = 0;
+  ampphase_options.min_tvchannel = NULL;
+  ampphase_options.max_tvchannel = NULL;
   ampphase_options.averaging_method = AVERAGETYPE_MEAN | AVERAGETYPE_SCALAR;
   ampphase_options.include_flagged_data = 1;
   

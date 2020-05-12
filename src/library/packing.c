@@ -237,8 +237,9 @@ void pack_ampphase_options(cmp_ctx_t *cmp, struct ampphase_options *a) {
   // transport.
   pack_write_bool(cmp, a->phase_in_degrees);
   pack_write_sint(cmp, a->delay_averaging);
-  pack_write_sint(cmp, a->min_tvchannel);
-  pack_write_sint(cmp, a->max_tvchannel);
+  pack_write_sint(cmp, a->num_ifs);
+  pack_writearray_sint(cmp, a->num_ifs, a->min_tvchannel);
+  pack_writearray_sint(cmp, a->num_ifs, a->max_tvchannel);
   pack_write_sint(cmp, a->averaging_method);
   pack_write_sint(cmp, a->include_flagged_data);
 }
@@ -248,8 +249,9 @@ void unpack_ampphase_options(cmp_ctx_t *cmp, struct ampphase_options *a) {
   // serializer, and stores it in the passed structure.
   pack_read_bool(cmp, &(a->phase_in_degrees));
   pack_read_sint(cmp, &(a->delay_averaging));
-  pack_read_sint(cmp, &(a->min_tvchannel));
-  pack_read_sint(cmp, &(a->max_tvchannel));
+  pack_read_sint(cmp, &(a->num_ifs));
+  pack_readarray_sint(cmp, a->num_ifs, a->min_tvchannel);
+  pack_readarray_sint(cmp, a->num_ifs, a->max_tvchannel);
   pack_read_sint(cmp, &(a->averaging_method));
   pack_read_sint(cmp, &(a->include_flagged_data));
 }
