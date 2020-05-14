@@ -271,21 +271,21 @@ void default_tvchannels(int num_chan, float chan_width,
  */
 void add_tvchannels_to_options(struct ampphase_options *ampphase_options,
 			       int window, int min_tvchannel, int max_tvchannel) {
-  int i;
-  if (window > ampphase_options->num_ifs) {
+  int i, nwindow = window + 1;
+  if (nwindow > ampphase_options->num_ifs) {
     // We have to reallocate the memory.
-    REALLOC(ampphase_options->min_tvchannel, window);
-    REALLOC(ampphase_options->max_tvchannel, window);
-    for (i = ampphase_options->num_ifs; i < window; i++) {
+    REALLOC(ampphase_options->min_tvchannel, nwindow);
+    REALLOC(ampphase_options->max_tvchannel, nwindow);
+    for (i = ampphase_options->num_ifs; i < nwindow; i++) {
       ampphase_options->min_tvchannel[i] = -1;
       ampphase_options->max_tvchannel[i] = -1;
     }
-    ampphase_options->num_ifs = window;
+    ampphase_options->num_ifs = nwindow;
   }
 
   // Set the tvchannels.
-  ampphase_options->min_tvchannel[window - 1] = min_tvchannel;
-  ampphase_options->max_tvchannel[window - 1] = max_tvchannel;
+  ampphase_options->min_tvchannel[window] = min_tvchannel;
+  ampphase_options->max_tvchannel[window] = max_tvchannel;
 }
 
 
@@ -614,11 +614,11 @@ int ampphase_average(struct ampphase *ampphase,
   }
   
   if ((ampphase->window < options->num_ifs) &&
-      (options->min_tvchannel[ampphase->window - 1] > 0) &&
-      (options->max_tvchannel[ampphase->window - 1] > 0)) {
+      (options->min_tvchannel[ampphase->window] > 0) &&
+      (options->max_tvchannel[ampphase->window] > 0)) {
     // Use the set tvchannels if possible.
-    min_tvchannel = options->min_tvchannel[ampphase->window - 1];
-    max_tvchannel = options->max_tvchannel[ampphase->window - 1];
+    min_tvchannel = options->min_tvchannel[ampphase->window];
+    max_tvchannel = options->max_tvchannel[ampphase->window];
   } else {
     // Get the default values for this type of IF.
     default_tvchannels(ampphase->nchannels,

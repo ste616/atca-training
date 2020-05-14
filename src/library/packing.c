@@ -250,6 +250,8 @@ void unpack_ampphase_options(cmp_ctx_t *cmp, struct ampphase_options *a) {
   pack_read_bool(cmp, &(a->phase_in_degrees));
   pack_read_sint(cmp, &(a->delay_averaging));
   pack_read_sint(cmp, &(a->num_ifs));
+  MALLOC(a->min_tvchannel, a->num_ifs);
+  MALLOC(a->max_tvchannel, a->num_ifs);
   pack_readarray_sint(cmp, a->num_ifs, a->min_tvchannel);
   pack_readarray_sint(cmp, a->num_ifs, a->max_tvchannel);
   pack_read_sint(cmp, &(a->averaging_method));
