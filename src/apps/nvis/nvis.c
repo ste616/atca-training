@@ -63,6 +63,7 @@ struct arguments {
 int action_required;
 int vis_device_number;
 int xaxis_type, yaxis_type, nxpanels, nypanels, visband[2];
+//float describe_time;
 struct vis_plotcontrols vis_plotcontrols;
 struct panelspec vis_panelspec;
 struct vis_data vis_data;
@@ -146,6 +147,7 @@ static void sighandler(int sig) {
 #define ACTION_QUIT                1<<1
 #define ACTION_CHANGE_PLOTSURFACE  1<<2
 #define ACTION_NEW_DATA_RECEIVED   1<<3
+#define ACTION_DESCRIBE_DATA       1<<4
 
 // Callback function called for each line when accept-line
 // executed, EOF seen, or EOF character read.
@@ -246,6 +248,12 @@ static void interpret_command(char *line) {
           }
         }
       }
+    } else if (minmatch("data", line_els[0], 3)) {
+      // Output a description of the data, at some time or for
+      // the latest time.
+      // TODO: Interpret the time given by the user, if there
+      // is one.
+      action_required = ACTION_DESCRIBE_DATA;
     }
     
     FREE(line_els);
@@ -255,20 +263,33 @@ static void interpret_command(char *line) {
   FREE(line);
 }
 
+// This is the maximum number of messages that can be passed to
+// the readline message routine (simply because we have a statically allocated
+// array to shove the messages in).
+#define MAX_N_MESSAGES 100
+
 int main(int argc, char *argv[]) {
   struct arguments arguments;
   struct vis_data vis_data;
-  int r, bytes_received;
+  int i, r, bytes_received, selidx;
   cmp_ctx_t cmp;
   cmp_mem_access_t mem;
   struct requests server_request;
   struct responses server_response;
   SOCKET socket_peer, max_socket = -1;
-  char *recv_buffer = NULL, send_buffer[VISBUFSIZE];
+  char *recv_buffer = NULL, send_buffer[VISBUFSIZE], htime[20];
+  char **mesgout = NULL;
   fd_set watchset, reads;
   bool vis_device_opened = false;
   size_t recv_buffer_length;
+  struct vis_quantities ***described_ptr = NULL;
 
+  // Allocate some memory.
+  MALLOC(mesgout, MAX_N_MESSAGES);
+  for (i = 0; i < MAX_N_MESSAGES; i++) {
+    CALLOC(mesgout[i], VISBUFSIZE);
+  }
+  
   // Set the default for the arguments.
   arguments.use_file = false;
   arguments.input_file[0] = 0;
@@ -348,6 +369,17 @@ int main(int argc, char *argv[]) {
       action_required -= ACTION_REFRESH_PLOT;
     }
 
+    if (action_required & ACTION_DESCRIBE_DATA) {
+      // Describe the data.
+      selidx = vis_data.nviscycles - 1;
+      described_ptr = vis_data.vis_quantities[selidx];
+      seconds_to_hourlabel(described_ptr[0][0]->ut_seconds, htime);
+      snprintf(mesgout[0], VISBUFSIZE, "DATA AT %s %s:\n", described_ptr[0][0]->obsdate, htime);
+      snprintf(mesgout[1], VISBUFSIZE, "  HAS %d IFS\n\r", vis_data.num_ifs[selidx]);
+      readline_print_messages(2, mesgout);
+      action_required -= ACTION_DESCRIBE_DATA;
+    }
+    
     if (action_required & ACTION_QUIT) {
       break;
     }

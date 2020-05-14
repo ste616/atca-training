@@ -18,7 +18,7 @@ target_compile_options(summariser PRIVATE -Werror -Wall -Wextra -Wno-missing-fie
 
 add_executable(visplot src/apps/visplot/visplot.c)
 set_target_properties(visplot PROPERTIES LINKER_LANGUAGE Fortran)
-target_link_libraries(visplot PUBLIC atrpfits rpfits applib cpgplot pgplot png z m X11)
+target_link_libraries(visplot PUBLIC atrpfits rpfits applib cpgplot pgplot png z m X11 readline)
 target_compile_options(visplot PRIVATE -Werror -Wall -Wextra -Wno-missing-field-initializers)
 
 add_executable(rpfitsfile_server src/apps/rpfitsfile_server/rpfitsfile_server.c)

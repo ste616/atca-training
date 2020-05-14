@@ -218,3 +218,4 @@ bool minmatch(char *ref, char *chk, int minlength);
 int split_string(char *s, char *delim, char ***elements);
 void minutes_representation(float minutes, char *representation);
 float string_to_minutes(char *s);
+void readline_print_messages(int nmesg, char **mesg);
