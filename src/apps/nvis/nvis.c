@@ -365,7 +365,7 @@ int main(int argc, char *argv[]) {
       // Let's make a plot.
       make_vis_plot(vis_data.vis_quantities, vis_data.nviscycles,
                     vis_data.num_ifs, 4,
-                    &vis_panelspec, &vis_plotcontrols);
+                    &vis_panelspec, &vis_plotcontrols, vis_data.header_data);
       action_required -= ACTION_REFRESH_PLOT;
     }
 
@@ -375,7 +375,8 @@ int main(int argc, char *argv[]) {
       described_ptr = vis_data.vis_quantities[selidx];
       seconds_to_hourlabel(described_ptr[0][0]->ut_seconds, htime);
       snprintf(mesgout[0], VISBUFSIZE, "DATA AT %s %s:\n", described_ptr[0][0]->obsdate, htime);
-      snprintf(mesgout[1], VISBUFSIZE, "  HAS %d IFS\n\r", vis_data.num_ifs[selidx]);
+      snprintf(mesgout[1], VISBUFSIZE, "  HAS %d IFS CYCLE TIME %d\n\r", vis_data.num_ifs[selidx],
+               vis_data.header_data[selidx]->cycle_time);
       snprintf(mesgout[2], VISBUFSIZE, "  SOURCE %s OBSTYPE %s\n",
                vis_data.header_data[selidx]->source_name,
                vis_data.header_data[selidx]->obstype);

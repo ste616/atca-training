@@ -208,9 +208,10 @@ float fracwidth(struct panelspec *panelspec,
 		float axis_min_x, float axis_max_x,
 		int x, int y, char *label);
 void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
-		   int ncycles, int *cycle_numifs, int npols,
-		   struct panelspec *panelspec,
-		   struct vis_plotcontrols *plot_controls);
+                   int ncycles, int *cycle_numifs, int npols,
+                   struct panelspec *panelspec,
+                   struct vis_plotcontrols *plot_controls,
+                   struct scan_header_data **header_data);
 void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspec,
                    struct spd_plotcontrols *plot_controls, bool all_data_present);
 void seconds_to_hourlabel(float seconds, char *hourlabel);

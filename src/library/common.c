@@ -742,7 +742,8 @@ float fracwidth(struct panelspec *panelspec,
 void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
                    int ncycles, int *cycle_numifs, int npols,
                    struct panelspec *panelspec,
-                   struct vis_plotcontrols *plot_controls) {
+                   struct vis_plotcontrols *plot_controls,
+                   struct scan_header_data **header_data) {
   int nants = 0, i = 0, n_vis_lines = 0, j = 0, k = 0, p = 0;
   int singleant = 0, l = 0, m = 0, n = 0, connidx = 0;
   int **n_plot_lines = NULL;
@@ -894,9 +895,10 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
     // coordinates.
     for (j = 0; j < n_vis_lines; j++) {
       n_plot_lines[i][j] = 0;
-      MALLOC(plot_lines[i][j], 2);
+      MALLOC(plot_lines[i][j], 3);
       plot_lines[i][j][0] = NULL;
       plot_lines[i][j][1] = NULL;
+      plot_lines[i][j][2] = NULL;
       // The fourth dimension is the points to plot in the line.
       // We accumulate these now.
       for (k = 0; k < ncycles; k++) {
@@ -930,8 +932,18 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
                   n_plot_lines[i][j] += 1;
                   REALLOC(plot_lines[i][j][0], n_plot_lines[i][j]);
                   REALLOC(plot_lines[i][j][1], n_plot_lines[i][j]);
+                  REALLOC(plot_lines[i][j][2], n_plot_lines[i][j]);
                   plot_lines[i][j][0][n_plot_lines[i][j] - 1] =
                     cycle_vis_quantities[k][l][m]->ut_seconds;
+                  if (header_data != NULL) {
+                    // Get the cycle time from this cycle.
+                    plot_lines[i][j][2][n_plot_lines[i][j] - 1] =
+                      header_data[k]->cycle_time;
+                  } else {
+                    // Get the cycle time from the plot options.
+                    plot_lines[i][j][2][n_plot_lines[i][j] - 1] =
+                      plot_controls->cycletime;
+                  }
                   /* printf("  number of points is now %d, time %.3f\n", */
                   /* 	 n_plot_lines[i][j], */
                   /* 	 plot_lines[i][j][0][n_plot_lines[i][j] - 1]); */
@@ -1033,7 +1045,7 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
       // Plot the line in segments connected in time.
       for (k = 0, connidx = 0; k < n_plot_lines[i][j]; k++) {
         if ((plot_lines[i][j][0][k + 1] >
-             (plot_lines[i][j][0][k] + (1.5 * plot_controls->cycletime)))) {
+             (plot_lines[i][j][0][k] + (1.5 * plot_lines[i][j][2][k])))) {
           // Disconnect.
           cpgline((k - connidx), plot_lines[i][j][0] + connidx,
                   plot_lines[i][j][1] + connidx);
