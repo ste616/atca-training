@@ -37,6 +37,8 @@ struct spectrum_data {
 struct vis_data {
   // The number of cycles contained here.
   int nviscycles;
+  // The header data for each cycle.
+  struct scan_header_data **header_data;
   // The number of IFs per cycle.
   int *num_ifs;
   // The number of pols per cycle per IF.

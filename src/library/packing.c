@@ -569,6 +569,11 @@ void pack_vis_data(cmp_ctx_t *cmp, struct vis_data *a) {
   // The number of cycles contained here.
   pack_write_sint(cmp, a->nviscycles);
 
+  // The header data for each cycle.
+  for (i = 0; i < a->nviscycles; i++) {
+    pack_scan_header_data(cmp, a->header_data[i]);
+  }
+  
   // The number of IFs per cycle.
   pack_writearray_sint(cmp, a->nviscycles, a->num_ifs);
 
@@ -593,6 +598,13 @@ void unpack_vis_data(cmp_ctx_t *cmp, struct vis_data *a) {
   // The number of cycles contained here.
   pack_read_sint(cmp, &(a->nviscycles));
 
+  // The header data for each cycle.
+  MALLOC(a->header_data, a->nviscycles);
+  for (i = 0; i < a->nviscycles; i++) {
+    MALLOC(a->header_data[i], 1);
+    unpack_scan_header_data(cmp, a->header_data[i]);
+  }
+  
   // The number of IFs per cycle.
   MALLOC(a->num_ifs, a->nviscycles);
   pack_readarray_sint(cmp, a->nviscycles, a->num_ifs);

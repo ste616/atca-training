@@ -376,7 +376,10 @@ int main(int argc, char *argv[]) {
       seconds_to_hourlabel(described_ptr[0][0]->ut_seconds, htime);
       snprintf(mesgout[0], VISBUFSIZE, "DATA AT %s %s:\n", described_ptr[0][0]->obsdate, htime);
       snprintf(mesgout[1], VISBUFSIZE, "  HAS %d IFS\n\r", vis_data.num_ifs[selidx]);
-      readline_print_messages(2, mesgout);
+      snprintf(mesgout[2], VISBUFSIZE, "  SOURCE %s OBSTYPE %s\n",
+               vis_data.header_data[selidx]->source_name,
+               vis_data.header_data[selidx]->obstype);
+      readline_print_messages(3, mesgout);
       action_required -= ACTION_DESCRIBE_DATA;
     }
     

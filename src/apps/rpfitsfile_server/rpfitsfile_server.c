@@ -197,6 +197,7 @@ void data_reader(int read_type, int n_rpfits_files,
       MALLOC(*vis_data, 1);
     }
     (*vis_data)->nviscycles = 0;
+    (*vis_data)->header_data = NULL;
     (*vis_data)->num_ifs = NULL;
     (*vis_data)->num_pols = NULL;
     (*vis_data)->vis_quantities = NULL;
@@ -326,11 +327,15 @@ void data_reader(int read_type, int n_rpfits_files,
                 if (read_type & COMPUTE_VIS_PRODUCTS) {
                   REALLOC((*vis_data)->vis_quantities,
                           ((*vis_data)->nviscycles + 1));
+                  REALLOC((*vis_data)->header_data,
+                          ((*vis_data)->nviscycles + 1));
                   REALLOC((*vis_data)->num_ifs,
                           ((*vis_data)->nviscycles + 1));
                   REALLOC((*vis_data)->num_pols,
                           ((*vis_data)->nviscycles + 1));
                   (*vis_data)->num_ifs[(*vis_data)->nviscycles] = temp_spectrum->num_ifs;
+                  (*vis_data)->header_data[(*vis_data)->nviscycles] =
+                    info_rpfits_files[i]->scan_headers[curr_header];
                   MALLOC((*vis_data)->num_pols[(*vis_data)->nviscycles],
                          temp_spectrum->num_ifs);
                   MALLOC((*vis_data)->vis_quantities[(*vis_data)->nviscycles],
