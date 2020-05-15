@@ -748,7 +748,7 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
   int singleant = 0, l = 0, m = 0, n = 0, connidx = 0;
   int **n_plot_lines = NULL;
   float ****plot_lines = NULL, min_x, max_x, min_y, max_y;
-  float cxpos, dxpos, labtotalwidth, labspacing;
+  float cxpos, dxpos, labtotalwidth, labspacing, dy;
   char xopts[BUFSIZE], yopts[BUFSIZE], panellabel[BUFSIZE], panelunits[BUFSIZE];
   char antstring[BUFSIZE];
   struct vis_line **vis_lines = NULL;
@@ -843,56 +843,59 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
   for (i = 0; i < n_vis_lines; i++) {
     vis_lines[i]->pgplot_colour = (i + 1);
   }
+
+  // Keep track of the min and max values to plot.
+  // We can determine the time range for all panels at once.
+  min_x = INFINITY;
+  max_x = -INFINITY;
+
+  for (j = 0; j < n_vis_lines; j++) {
+    for (k = 0; k < ncycles; k++) {
+      for (l = 0; l < cycle_numifs[k]; l++) {
+        for (m = 0; m < npols; m++) {
+          if ((cycle_vis_quantities[k][l][m]->pol ==
+               vis_lines[j]->pol) &&
+              (cycle_vis_quantities[k][l][m]->window ==
+               vis_lines[j]->if_number)) {
+            for (n = 0; n < cycle_vis_quantities[k][l][m]->nbaselines; n++) {
+              if (cycle_vis_quantities[k][l][m]->baseline[n] ==
+                  ants_to_base(vis_lines[j]->ant1, vis_lines[j]->ant2)) {
+                if (cycle_vis_quantities[k][l][m]->flagged_bad[n] > 0) {
+                  continue;
+                }
+                MINASSIGN(min_x, cycle_vis_quantities[k][l][m]->ut_seconds);
+                MAXASSIGN(max_x, cycle_vis_quantities[k][l][m]->ut_seconds);
+                break;
+              }
+            }
+            break;
+          }
+        }
+      }
+    }
+  }
+  // Adjust the time constraints based on the history specification.
+  MAXASSIGN(min_x, (max_x - plot_controls->history_start * 60));
+  /* min_x = (min_x < (max_x - plot_controls->history_start * 60)) ? */
+  /*   (max_x - plot_controls->history_start * 60) : min_x; */
+  MINASSIGN(max_x, (min_x + plot_controls->history_length * 60));
+  /* max_x = (max_x > (min_x + plot_controls->history_length * 60)) ? */
+  /*   (min_x + plot_controls->history_length * 60) : max_x; */
+  
+  // Always keep another 5% on the right side.
+  max_x += (max_x - min_x) * 0.05;
   
   for (i = 0; i < plot_controls->num_panels; i++) {
     // Make the lines.
     MALLOC(plot_lines[i], n_vis_lines);
     MALLOC(n_plot_lines[i], n_vis_lines);
 
-    // Keep track of the min and max values to plot.
-    min_x = INFINITY;
-    max_x = -INFINITY;
     min_y = INFINITY;
     max_y = -INFINITY;
 
-    // We need to work out the time limits first.
-    for (j = 0; j < n_vis_lines; j++) {
-      for (k = 0; k < ncycles; k++) {
-        for (l = 0; l < cycle_numifs[k]; l++) {
-          for (m = 0; m < npols; m++) {
-            if ((cycle_vis_quantities[k][l][m]->pol ==
-                 vis_lines[j]->pol) &&
-                (cycle_vis_quantities[k][l][m]->window ==
-                 vis_lines[j]->if_number)) {
-              for (n = 0; n < cycle_vis_quantities[k][l][m]->nbaselines; n++) {
-                if (cycle_vis_quantities[k][l][m]->baseline[n] ==
-                    ants_to_base(vis_lines[j]->ant1, vis_lines[j]->ant2)) {
-                  if (cycle_vis_quantities[k][l][m]->flagged_bad[n] > 0) {
-                    continue;
-                  }
-                  MINASSIGN(min_x, cycle_vis_quantities[k][l][m]->ut_seconds);
-                  MAXASSIGN(max_x, cycle_vis_quantities[k][l][m]->ut_seconds);
-                  break;
-                }
-              }
-              break;
-            }
-          }
-        }
-      }
-    }
-    // Adjust the time constraints based on the history specification.
-    min_x = (min_x < (max_x - plot_controls->history_start * 60)) ?
-      (max_x - plot_controls->history_start * 60) : min_x;
-    max_x = (max_x > (min_x + plot_controls->history_length * 60)) ?
-      (min_x + plot_controls->history_length * 60) : max_x;
-
-    // Always keep another 5% on the right side.
-    max_x += (max_x - min_x) * 0.05;
-
     // Now go through the data and make our arrays.
     // The third dimension of the plot lines will be the X and Y
-    // coordinates.
+    // coordinates, then the cycle time in seconds.
     for (j = 0; j < n_vis_lines; j++) {
       n_plot_lines[i][j] = 0;
       MALLOC(plot_lines[i][j], 3);
@@ -958,8 +961,8 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
                     plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
                       cycle_vis_quantities[k][l][m]->delay[n][0];
                   }
-                  MINASSIGN(min_y, plot_lines[i][j][l][n_plot_lines[i][j] - 1]);
-                  MAXASSIGN(max_y, plot_lines[i][j][l][n_plot_lines[i][j] - 1]);
+                  MINASSIGN(min_y, plot_lines[i][j][1][n_plot_lines[i][j] - 1]);
+                  MAXASSIGN(max_y, plot_lines[i][j][1][n_plot_lines[i][j] - 1]);
                   break;
                 }
               }
@@ -973,6 +976,15 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
     
     /* printf("plotting panel %d with %.2f <= x <= %.2f, %.2f <= y <= %.2f\n", */
     /* 	   i, min_x, max_x, min_y, max_y); */
+    // Extend the y-range slightly.
+    dy = 0.05 * (max_y - min_y);
+    min_y -= dy;
+    max_y += dy;
+    if ((plot_controls->panel_type[i] == PLOT_AMPLITUDE) && (min_y < 0)) {
+      // Amplitude cannot be below 0.
+      min_y = 0;
+    }
+    
     cpgswin(min_x, max_x, min_y, max_y);
     cpgsci(3);
     cpgsch(1.1);
