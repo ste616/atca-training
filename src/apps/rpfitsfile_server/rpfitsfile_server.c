@@ -20,6 +20,7 @@
 #include <errno.h>
 #include <stdbool.h>
 #include <time.h>
+#include <signal.h>
 #include "atrpfits.h"
 #include "memory.h"
 #include "packing.h"
@@ -425,9 +426,18 @@ void data_reader(int read_type, int n_rpfits_files,
 
 #define RPSENDBUFSIZE 104857600
 
+bool sigint_received;
+
+// Handle signals that we receive.
+static void sighandler(int sig) {
+  if (sig == SIGINT) {
+    sigint_received = true;
+  }
+}
+
 int main(int argc, char *argv[]) {
   struct arguments arguments;
-  int i, j, k, ri, rj, bytes_received;
+  int i, j, k, ri, rj, bytes_received, r;
   double mjd_grab;
   struct rpfits_file_information **info_rpfits_files = NULL;
   struct ampphase_options ampphase_options;
@@ -471,6 +481,9 @@ int main(int argc, char *argv[]) {
     return(-1);
   }
 
+  // Set up our signal handler.
+  signal(SIGINT, sighandler);
+  
   // Do a scan of each RPFITS file to get time information.
   MALLOC(info_rpfits_files, arguments.n_rpfits_files);
   // Put the names of the RPFITS files into the info structure.
@@ -567,10 +580,21 @@ int main(int argc, char *argv[]) {
     while (true) {
       // We wait for someone to ask for something.
       reads = master;
-      if (select(max_socket + 1, &reads, 0, 0, 0) < 0) {
+      r = select(max_socket + 1, &reads, 0, 0, 0);
+      if ((r < 0) && (errno != EINTR)) {
         fprintf(stderr, "select() failed. (%d)\n", GETSOCKETERRNO());
         break;
       }
+      // Check we got a valid selection.
+      if (sigint_received == true) {
+        sigint_received = false;
+        break;
+      }
+      if (r < 0) {
+        // Nothing got selected.
+        continue;
+      }
+      
       for (loop_i = 1; loop_i <= max_socket; ++loop_i) {
         if (FD_ISSET(loop_i, &reads)) {
           // Handle this request.
@@ -649,14 +673,21 @@ int main(int argc, char *argv[]) {
       }
       FREE(vis_data->vis_quantities[i][j]);
     }
+    /* free_scan_header_data(vis_data->header_data[i]); */
+    /* FREE(vis_data->header_data[i]); */
     FREE(vis_data->num_pols[i]);
     FREE(vis_data->vis_quantities[i]);
   }
+  FREE(vis_data->header_data);
   FREE(vis_data->num_pols);
   FREE(vis_data->num_ifs);
   FREE(vis_data->vis_quantities);
   FREE(vis_data);
 
+  // Free the ampphase options.
+  FREE(ampphase_options.min_tvchannel);
+  FREE(ampphase_options.max_tvchannel);
+  
   // Free the spectrum memory.
   for (i = 0; i < spectrum_data->num_ifs; i++) {
     for (j = 0; j < spectrum_data->num_pols; j++) {

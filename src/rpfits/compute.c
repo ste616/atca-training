@@ -432,7 +432,7 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
     if (bidx < 0) {
       // This is wrong.
       if (ap_created) {
-	free_ampphase(ampphase);
+        free_ampphase(ampphase);
       }
       return -1;
     }

@@ -133,7 +133,7 @@ void release_vis_device(bool *device_opened) {
   free_panelspec(&vis_panelspec);
 }
 
-bool sigwinch_received;
+bool sigwinch_received, sigint_received;
 const char *prompt = "NVIS> ";
 
 // Handle SIGWINCH and window size changes when readline is
@@ -141,6 +141,8 @@ const char *prompt = "NVIS> ";
 static void sighandler(int sig) {
   if (sig == SIGWINCH) {
     sigwinch_received = true;
+  } else if (sig == SIGINT) {
+    sigint_received = true;
   }
 }
 
@@ -345,6 +347,8 @@ int main(int argc, char *argv[]) {
 
   // Handle window size changes.
   signal(SIGWINCH, sighandler);
+  // And interrupts.
+  signal(SIGINT, sighandler);
   
   // Open and unpack the file if we have one.
   if (arguments.use_file) {
@@ -450,6 +454,9 @@ int main(int argc, char *argv[]) {
     if (sigwinch_received) {
       rl_resize_terminal();
       sigwinch_received = false;
+    }
+    if (sigint_received) {
+      break;
     }
     if (r < 0) {
       // Nothing got selected.
