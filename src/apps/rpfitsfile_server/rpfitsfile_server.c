@@ -360,8 +360,8 @@ void data_reader(int read_type, int n_rpfits_files,
                       fprintf(stderr, "CALCULATING AMP AND PHASE FAILED FOR IF %d POL %d, CODE %d\n",
                               sh->if_label[idx_if], pols[idx_pol], calcres);
                     /* } else if (read_type & COMPUTE_VIS_PRODUCTS) { */
-                    /*   printf("CONVERTED SPECTRUM FOR CYCLE IF %d POL %d AT MJD %.6f\n", */
-                    /*          sh->if_label[idx_if], pols[idx_pol], cycle_mjd); */
+                    /*     printf("CONVERTED SPECTRUM FOR CYCLE IF %d POL %d AT MJD %.6f\n", */
+                    /*            sh->if_label[idx_if], pols[idx_pol], cycle_mjd); */
                     }
                     if (read_type & COMPUTE_VIS_PRODUCTS) {
                       ampphase_average(temp_spectrum->spectrum[idx_if][idx_pol],

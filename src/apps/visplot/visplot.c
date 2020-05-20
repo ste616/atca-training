@@ -31,7 +31,7 @@ static struct argp_option options[] = {
   { "array", 'a', "ARRAY", 0,
     "Which antennas to plot, as a comma-separated list" },
   { "visband", 'c', "VISBAND", 0,
-    "Two comma-separated numbers representing the visband setting" },
+    "Two comma-separated IFs representing the visband setting" },
   { "device", 'd', "PGPLOT_DEVICE", 0, "Direct SPD plots to this PGGPLOT device" },
   { "delavg", 'D', "DELAVG", 0,
     "Number of channels to average together while calculating delay" },
@@ -68,15 +68,34 @@ struct arguments {
   int interactive;
   int nselect;
   char **vis_select;
-  int visband[2];
+  int nvisbands;
+  char **visband;
   int tvchannels[2];
   int median_averaging;
   int delavg;
 };
 
+void interpret_band_argument(char *dest, char *arg, size_t destlen) {
+  long int ifnum;
+  int i;
+  char *eptr = NULL;
+  // Check if the string can be straight converted to a number.
+  ifnum = strtol(arg, &eptr, 10);
+  if (*eptr != 0) {
+    // This is a string, just copy it.
+    strncpy(dest, arg, destlen);
+  } else {
+    // It's a number.
+    i = (int)ifnum;
+    if ((i >= 1) && (i <= MAXIFS)) {
+      snprintf(dest, destlen, "f%d", i);
+    }
+  }
+}
+
 static error_t parse_opt(int key, char *arg, struct argp_state *state) {
   struct arguments *arguments = state->input;
-  int i;
+  int i, j;
   long int ifnum;
   char *token, *eptr = NULL;
   const char s[2] = ",", sp[2] = " ";
@@ -87,12 +106,22 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state) {
     break;
   case 'c':
     token = strtok(arg, s);
-    i = 0;
-    while (token != NULL) {
-      ifnum = atoi(token);
-      if ((ifnum >= 0) && (ifnum <= MAXIFS) && (i < 2)) {
-        arguments->visband[i] = ifnum;
+    if (arguments->nvisbands > 0) {
+      // We reallocate.
+      for (j = 0; j < arguments->nvisbands; j++) {
+        FREE(arguments->visband[j]);
       }
+    }
+    arguments->nvisbands = 0;
+    FREE(arguments->visband);
+    while (token != NULL) {
+      REALLOC(arguments->visband, (arguments->nvisbands + 1));
+      MALLOC(arguments->visband[arguments->nvisbands], VISBANDLEN);
+      interpret_band_argument(arguments->visband[arguments->nvisbands++], token, VISBANDLEN);
+      /* ifnum = atoi(token); */
+      /* if ((ifnum >= 0) && (ifnum <= MAXIFS) && (i < 2)) { */
+      /*   arguments->visband[i] = ifnum; */
+      /* } */
       token = strtok(NULL, s);
     }
     break;
@@ -254,8 +283,12 @@ int main(int argc, char *argv[]) {
   MALLOC(arguments.vis_select, arguments.nselect);
   strcpy(defselect, "aa");
   arguments.vis_select[0] = defselect;
-  arguments.visband[0] = 0;
-  arguments.visband[1] = 0;
+  arguments.nvisbands = 2;
+  MALLOC(arguments.visband, arguments.nvisbands);
+  for (i = 0; i < arguments.nvisbands; i++) {
+    MALLOC(arguments.visband[i], VISBANDLEN);
+    snprintf(arguments.visband[i], VISBANDLEN, "f%d", (i + 1));
+  }
   arguments.tvchannels[0] = 513;
   arguments.tvchannels[1] = 1537;
   arguments.median_averaging = NO;
@@ -267,21 +300,21 @@ int main(int argc, char *argv[]) {
     printf("Must specify at least 1 IF to plot!\n");
     exit(-1);
   }
-  // Resolve the visbands.
-  if (arguments.visband[0] == 0) {
-    arguments.visband[0] = 1;
-  } else if (arguments.visband[0] > arguments.nifs) {
-    arguments.visband[0] = arguments.nifs;
-  }
-  if (arguments.visband[1] == 0) {
-    if (arguments.nifs > 1) {
-      arguments.visband[1] = 2;
-    } else {
-      arguments.visband[1] = 1;
-    }
-  } else if (arguments.visband[1] > arguments.nifs) {
-    arguments.visband[1] = arguments.nifs;
-  }
+  /* // Resolve the visbands. */
+  /* if (arguments.visband[0] == 0) { */
+  /*   arguments.visband[0] = 1; */
+  /* } else if (arguments.visband[0] > arguments.nifs) { */
+  /*   arguments.visband[0] = arguments.nifs; */
+  /* } */
+  /* if (arguments.visband[1] == 0) { */
+  /*   if (arguments.nifs > 1) { */
+  /*     arguments.visband[1] = 2; */
+  /*   } else { */
+  /*     arguments.visband[1] = 1; */
+  /*   } */
+  /* } else if (arguments.visband[1] > arguments.nifs) { */
+  /*   arguments.visband[1] = arguments.nifs; */
+  /* } */
   
   spd_pgplot = cpgopen(arguments.spd_device);
   cpgask(1);
@@ -323,7 +356,7 @@ int main(int argc, char *argv[]) {
                         arguments.plot_pols, spd_pgplot);
   init_vis_plotcontrols(&vis_plotcontrols, PLOT_TIME,
                         PLOT_AMPLITUDE | PLOT_PHASE | PLOT_DELAY,
-                        arguments.visband,
+                        arguments.nvisbands, arguments.visband,
                         vis_pgplot, &vis_panelspec);
   spd_plotcontrols.array_spec = interpret_array_string(arguments.array_spec);
   vis_plotcontrols.array_spec = interpret_array_string(arguments.array_spec);

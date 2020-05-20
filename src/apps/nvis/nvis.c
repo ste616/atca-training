@@ -48,6 +48,7 @@ static struct argp_option options[] = {
 };
 
 #define VISBUFSIZE 1024
+#define MAXVISBANDS 2
 
 // The arguments structure.
 struct arguments {
@@ -62,7 +63,8 @@ struct arguments {
 // And some fun, totally necessary, global state variables.
 int action_required;
 int vis_device_number;
-int xaxis_type, yaxis_type, nxpanels, nypanels, visband[2];
+int xaxis_type, yaxis_type, nxpanels, nypanels, nvisbands;
+char **visband;
 //float describe_time;
 struct vis_plotcontrols vis_plotcontrols;
 struct panelspec vis_panelspec;
@@ -148,6 +150,7 @@ static void sighandler(int sig) {
 #define ACTION_CHANGE_PLOTSURFACE  1<<2
 #define ACTION_NEW_DATA_RECEIVED   1<<3
 #define ACTION_DESCRIBE_DATA       1<<4
+#define ACTION_VISBANDS_CHANGED    1<<5
 
 // Callback function called for each line when accept-line
 // executed, EOF seen, or EOF character read.
@@ -230,6 +233,7 @@ static void interpret_command(char *line) {
         // Just print the history length.
         minutes_representation(vis_plotcontrols.history_length, duration);
         minutes_representation(vis_plotcontrols.history_start, historystart);
+        
         printf(" History currently set to show %s starting %s ago\n",
                duration, historystart);
       } else {
@@ -254,6 +258,31 @@ static void interpret_command(char *line) {
       // TODO: Interpret the time given by the user, if there
       // is one.
       action_required = ACTION_DESCRIBE_DATA;
+    } else if (minmatch("calband", line_els[0], 4)) {
+      // We can change which bands get plotted as aa/bb/ab and cc/dd/cd.
+      if (nels > 1) {
+        nvisbands = ((nels - 1) > MAXVISBANDS) ? MAXVISBANDS : (nels - 1);
+        for (i = 0; i < nvisbands; i++) {
+          if (strcmp(line_els[(i + 1)], "f") == 0) {
+            // We put the position argument on the end.
+            snprintf(visband[i], VISBANDLEN, "f%d", (i + 1));
+          } else if (strcmp(line_els[(i + 1)], "z") == 0) {
+            // We select the first zoom in the current band.
+            snprintf(visband[i], VISBANDLEN, "z%d-1", (i + 1));
+          } else {
+            // We assume the user knows what they're doing.
+            strncpy(visband[i], line_els[(i + 1)], VISBANDLEN);
+          }
+        }
+        action_required = ACTION_VISBANDS_CHANGED;
+      } else {
+        // Output the current settings.
+        printf(" Bands being plotted are ");
+        for (i = 0; i < nvisbands; i++) {
+          printf("%s ", visband[i]);
+        }
+        printf("\n");
+      }
     }
     
     FREE(line_els);
@@ -271,7 +300,7 @@ static void interpret_command(char *line) {
 int main(int argc, char *argv[]) {
   struct arguments arguments;
   struct vis_data vis_data;
-  int i, r, bytes_received, selidx;
+  int i, j, r, bytes_received, selidx, nmesg = 0;
   cmp_ctx_t cmp;
   cmp_mem_access_t mem;
   struct requests server_request;
@@ -289,6 +318,15 @@ int main(int argc, char *argv[]) {
   for (i = 0; i < MAX_N_MESSAGES; i++) {
     CALLOC(mesgout[i], VISBUFSIZE);
   }
+  nvisbands = (2 > MAXVISBANDS) ? MAXVISBANDS : 2;
+  MALLOC(visband, MAXVISBANDS);
+  for (i = 0; i < MAXVISBANDS; i++) {
+    MALLOC(visband[i], VISBANDLEN);
+    // Set a default.
+    if (i < nvisbands) {
+      snprintf(visband[i], VISBANDLEN, "f%d", (i + 1));
+    }
+  }
   
   // Set the default for the arguments.
   arguments.use_file = false;
@@ -301,8 +339,6 @@ int main(int argc, char *argv[]) {
   // And defaults for some of the parameters.
   nxpanels = 1;
   nypanels = 3;
-  visband[0] = 1;
-  visband[1] = 2;
   
   // Parse the arguments.
   argp_parse(&argp, argc, argv, 0, 0, &arguments);
@@ -347,9 +383,9 @@ int main(int argc, char *argv[]) {
   xaxis_type = PLOT_TIME;
   yaxis_type = PLOT_AMPLITUDE | PLOT_PHASE | PLOT_DELAY;
   init_vis_plotcontrols(&vis_plotcontrols, xaxis_type, yaxis_type,
-                        visband, vis_device_number, &vis_panelspec);
+                        nvisbands, visband, vis_device_number, &vis_panelspec);
   vis_plotcontrols.array_spec = interpret_array_string("1,2,3,4,5,6");
-  MALLOC(vis_plotcontrols.vis_products, 1);
+  CALLOC(vis_plotcontrols.vis_products, 1);
   vis_plotcontrols.nproducts = 1;
   vis_interpret_product("aa", &(vis_plotcontrols.vis_products[0]));
   vis_plotcontrols.cycletime = 10;
@@ -358,6 +394,14 @@ int main(int argc, char *argv[]) {
     reads = watchset;
     if (action_required & ACTION_NEW_DATA_RECEIVED) {
       action_required -= ACTION_NEW_DATA_RECEIVED;
+      action_required |= ACTION_VISBANDS_CHANGED;
+    }
+
+    if (action_required & ACTION_VISBANDS_CHANGED) {
+      // TODO: Check that the visbands are actually present in the data.
+      vis_plotcontrols.nvisbands = nvisbands;
+      vis_plotcontrols.visbands = visband;
+      action_required -= ACTION_VISBANDS_CHANGED;
       action_required |= ACTION_REFRESH_PLOT;
     }
 
@@ -374,13 +418,22 @@ int main(int argc, char *argv[]) {
       selidx = vis_data.nviscycles - 1;
       described_ptr = vis_data.vis_quantities[selidx];
       seconds_to_hourlabel(described_ptr[0][0]->ut_seconds, htime);
-      snprintf(mesgout[0], VISBUFSIZE, "DATA AT %s %s:\n", described_ptr[0][0]->obsdate, htime);
-      snprintf(mesgout[1], VISBUFSIZE, "  HAS %d IFS CYCLE TIME %d\n\r", vis_data.num_ifs[selidx],
+      nmesg = 0;
+      snprintf(mesgout[nmesg++], VISBUFSIZE, "DATA AT %s %s:\n", described_ptr[0][0]->obsdate, htime);
+      snprintf(mesgout[nmesg++], VISBUFSIZE, "  HAS %d IFS CYCLE TIME %d\n\r", vis_data.num_ifs[selidx],
                vis_data.header_data[selidx]->cycle_time);
-      snprintf(mesgout[2], VISBUFSIZE, "  SOURCE %s OBSTYPE %s\n",
+      snprintf(mesgout[nmesg++], VISBUFSIZE, "  SOURCE %s OBSTYPE %s\n",
                vis_data.header_data[selidx]->source_name,
                vis_data.header_data[selidx]->obstype);
-      readline_print_messages(3, mesgout);
+      for (i = 0; i < vis_data.num_ifs[selidx]; i++) {
+        snprintf(mesgout[nmesg++], VISBUFSIZE, " IF %d: WINDOW %d NAMES: ", (i + 1),
+                 vis_data.header_data[selidx]->if_label[i]);
+        for (j = 0; j < 3; j++) {
+          snprintf(mesgout[nmesg++], VISBUFSIZE, "%s ", vis_data.header_data[selidx]->if_name[i][j]);
+        }
+        snprintf(mesgout[nmesg++], VISBUFSIZE, "\n");
+      }
+      readline_print_messages(nmesg, mesgout);
       action_required -= ACTION_DESCRIBE_DATA;
     }
     
@@ -417,7 +470,7 @@ int main(int argc, char *argv[]) {
       // Check we're getting what we expect.
       if (server_response.response_type == RESPONSE_CURRENT_VISDATA) {
         unpack_vis_data(&cmp, &vis_data);
-        action_required = ACTION_NEW_DATA_RECEIVED;
+        action_required = ACTION_VISBANDS_CHANGED;
       }
     }
   }

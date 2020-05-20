@@ -176,9 +176,9 @@ void init_spd_plotcontrols(struct spd_plotcontrols *plotcontrols,
 #define NAVAILABLE_PANELS 3
 
 void init_vis_plotcontrols(struct vis_plotcontrols *plotcontrols,
-			   int xaxis_type, int paneltypes, int *visbands,
-			   int pgplot_device,
-			   struct panelspec *panelspec) {
+                           int xaxis_type, int paneltypes, int nvisbands, char **visbands,
+                           int pgplot_device,
+                           struct panelspec *panelspec) {
   int npanels = 0, i, j;
   int available_panels[NAVAILABLE_PANELS] = { PLOT_AMPLITUDE,
                                               PLOT_PHASE,
@@ -215,9 +215,11 @@ void init_vis_plotcontrols(struct vis_plotcontrols *plotcontrols,
   // Initialise the products to display.
   plotcontrols->nproducts = 0;
   plotcontrols->vis_products = NULL;
-
-  for (i = 0; i < 2; i++) {
-    plotcontrols->visbands[i] = visbands[i];
+  plotcontrols->nvisbands = nvisbands;
+  MALLOC(plotcontrols->visbands, nvisbands);
+  for (i = 0; i < nvisbands; i++) {
+    MALLOC(plotcontrols->visbands[i], VISBANDLEN);
+    strncpy(plotcontrols->visbands[i], visbands[i], VISBANDLEN);
   }
 
   // Some default cycle time, but this should always be set (seconds).
@@ -582,7 +584,7 @@ void pol_to_vis_name(int pol, int if_num, char *vis_name) {
 }
 
 void add_vis_line(struct vis_line ***vis_lines, int *n_vis_lines,
-		  int ant1, int ant2, int if_number, int pol) {
+                  int ant1, int ant2, int ifnum, char *if_label, int pol) {
   struct vis_line *new_line = NULL;
   char polname[8];
   // Add a potential vis line.
@@ -591,9 +593,10 @@ void add_vis_line(struct vis_line ***vis_lines, int *n_vis_lines,
   MALLOC(new_line, 1);
   new_line->ant1 = ant1;
   new_line->ant2 = ant2;
-  new_line->if_number = if_number;
+  //new_line->if_number = if_number;
+  strncpy(new_line->if_label, if_label, BUFSIZE);
   new_line->pol = pol;
-  pol_to_vis_name(new_line->pol, new_line->if_number, polname);
+  pol_to_vis_name(new_line->pol, ifnum, polname);
   snprintf(new_line->label, BUFSIZE, "%d%d%s",
 	   new_line->ant1, new_line->ant2, polname);
   (*vis_lines)[*n_vis_lines - 1] = new_line;
@@ -703,6 +706,7 @@ int vis_interpret_product(char *product, struct vis_product **vis_product) {
 int find_if_name(struct scan_header_data *scan_header_data,
                  char *name) {
   int res = -1, i, j;
+  /* fprintf(stderr, "[find_if_name] searching for band %s\n", name); */
   for (i = 0; i < scan_header_data->num_ifs; i++) {
     for (j = 0; j < 3; j++) {
       if (strcmp(scan_header_data->if_name[i][j], name) == 0) {
@@ -718,7 +722,8 @@ int find_if_name(struct scan_header_data *scan_header_data,
   if (res < 0) {
     res = 1; // For safety.
   }
-  
+
+  /* fprintf(stderr, "[find_if_name] found band %d %s\n", res, scan_header_data->if_name[res - 1][0]); */
   return res;
 }
 
@@ -795,21 +800,21 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
               if (plot_controls->vis_products[p]->pol_spec & PLOT_POL_XX) {
                 if (plot_controls->vis_products[p]->if_spec & VIS_PLOT_IF1) {
                   add_vis_line(&vis_lines, &n_vis_lines,
-                               i, j, plot_controls->visbands[0], POL_XX);
+                               i, j, 1, plot_controls->visbands[0], POL_XX);
                 }
                 if (plot_controls->vis_products[p]->if_spec & VIS_PLOT_IF2) {
                   add_vis_line(&vis_lines, &n_vis_lines,
-                               i, j, plot_controls->visbands[1], POL_XX);
+                               i, j, 2, plot_controls->visbands[1], POL_XX);
                 }
               }
               if (plot_controls->vis_products[p]->pol_spec & PLOT_POL_YY) {
                 if (plot_controls->vis_products[p]->if_spec & VIS_PLOT_IF1) {
                   add_vis_line(&vis_lines, &n_vis_lines,
-                               i, j, plot_controls->visbands[0], POL_YY);
+                               i, j, 1, plot_controls->visbands[0], POL_YY);
                 }
                 if (plot_controls->vis_products[p]->if_spec & VIS_PLOT_IF2) {
                   add_vis_line(&vis_lines, &n_vis_lines,
-                               i, j, plot_controls->visbands[1], POL_YY);
+                               i, j, 2, plot_controls->visbands[1], POL_YY);
                 }
               }
             } else {
@@ -817,11 +822,11 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
               if (plot_controls->vis_products[p]->pol_spec & PLOT_POL_XY) {
                 if (plot_controls->vis_products[p]->if_spec & VIS_PLOT_IF1) {
                   add_vis_line(&vis_lines, &n_vis_lines,
-                               i, j, plot_controls->visbands[0], POL_XY);
+                               i, j, 1, plot_controls->visbands[0], POL_XY);
                 }
                 if (plot_controls->vis_products[p]->if_spec & VIS_PLOT_IF2) {
                   add_vis_line(&vis_lines, &n_vis_lines,
-                               i, j, plot_controls->visbands[1], POL_XY);
+                               i, j, 2, plot_controls->visbands[1], POL_XY);
                 }
               }
             }
@@ -856,7 +861,7 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
           if ((cycle_vis_quantities[k][l][m]->pol ==
                vis_lines[j]->pol) &&
               (cycle_vis_quantities[k][l][m]->window ==
-               vis_lines[j]->if_number)) {
+               find_if_name(header_data[k], vis_lines[j]->if_label))) {
             for (n = 0; n < cycle_vis_quantities[k][l][m]->nbaselines; n++) {
               if (cycle_vis_quantities[k][l][m]->baseline[n] ==
                   ants_to_base(vis_lines[j]->ant1, vis_lines[j]->ant2)) {
@@ -914,14 +919,14 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
                 (cycle_vis_quantities[k][l][m]->ut_seconds > max_x)) {
               break;
             }
-            /* printf("comparing pols %d to %d, window %d to %d\n", */
-            /* 	   cycle_vis_quantities[k][l][m]->pol, vis_lines[j]->pol, */
-            /* 	   cycle_vis_quantities[k][l][m]->window, vis_lines[j]->if_number); */
+            /* printf("comparing pols %d to %d, window %d\n", */
+            /*        cycle_vis_quantities[k][l][m]->pol, vis_lines[j]->pol, */
+            /*        cycle_vis_quantities[k][l][m]->window); */
             if ((cycle_vis_quantities[k][l][m]->pol ==
                  vis_lines[j]->pol) &&
                 (cycle_vis_quantities[k][l][m]->window ==
-                 vis_lines[j]->if_number)) {
-              //printf("   found appropriate vis quantity!\n");
+                 find_if_name(header_data[k], vis_lines[j]->if_label))) {
+              /* printf("   found appropriate vis quantity!\n"); */
               // Find the correct baseline.
               for (n = 0; n < cycle_vis_quantities[k][l][m]->nbaselines; n++) {
                 if (cycle_vis_quantities[k][l][m]->baseline[n] ==
@@ -1050,12 +1055,14 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
         cpgmtxt("T", 0.5, cxpos, 0, antstring);
         cxpos += dxpos;
       }
+      // Then print the frequencies of the bands at the top right.
+      
     }
     cpgsci(1);
     for (j = 0; j < n_vis_lines; j++) {
       cpgsci(vis_lines[j]->pgplot_colour);
       // Plot the line in segments connected in time.
-      for (k = 0, connidx = 0; k < n_plot_lines[i][j]; k++) {
+      for (k = 0, connidx = 0; k < (n_plot_lines[i][j] - 1); k++) {
         if ((plot_lines[i][j][0][k + 1] >
              (plot_lines[i][j][0][k] + (1.5 * plot_lines[i][j][2][k])))) {
           // Disconnect.

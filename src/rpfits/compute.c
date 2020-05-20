@@ -343,7 +343,7 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
     ap_created = 1;
     *ampphase = prepare_ampphase();
   }
-  (*ampphase)->window = ifno;
+  (*ampphase)->window = ifnum;
   (void)strncpy((*ampphase)->window_name, scan_header_data->if_name[ifno][1], 8);
   (*ampphase)->options = options;
   // Get the number of channels in this window.

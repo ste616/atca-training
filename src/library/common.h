@@ -21,6 +21,7 @@
 #define MAXCHAN 18000
 #define MAXPOL  4
 #define MAXBIN  32
+#define VISBANDLEN 10
 
 /**
  * Some option flags.
@@ -148,8 +149,9 @@ struct vis_plotcontrols {
   float history_start;
   // The PGPLOT device number used.
   int pgplot_device;
-  // The bands to assign as IFs 1 and 2.
-  int visbands[2];
+  // The bands to assign as IFs.
+  int nvisbands;
+  char **visbands;
   // The cycle time.
   int cycletime;
 };
@@ -161,7 +163,7 @@ struct vis_line {
   int ant1;
   int ant2;
   // The IF.
-  int if_number;
+  char if_label[BUFSIZE];
   // Polarisation.
   int pol;
   // Label.
@@ -183,9 +185,9 @@ void init_spd_plotcontrols(struct spd_plotcontrols *plotcontrols,
 			   int xaxis_type, int yaxis_type, int pols,
 			   int pgplot_device);
 void init_vis_plotcontrols(struct vis_plotcontrols *plotcontrols,
-			   int xaxis_type, int paneltypes, int *visbands,
-			   int pgplot_device,
-			   struct panelspec *panelspec);
+                           int xaxis_type, int paneltypes, int nvisbands, char **visbands,
+                           int pgplot_device,
+                           struct panelspec *panelspec);
 void free_vis_plotcontrols(struct vis_plotcontrols *plotcontrols);
 void free_panelspec(struct panelspec *panelspec);
 void splitpanels(int nx, int ny, int pgplot_device, int abut,
@@ -200,7 +202,7 @@ void plotpanel_minmax(struct ampphase **plot_ampphase,
 		      float *plotmin_y, float *plotmax_y);
 int find_pol(struct ampphase ***cycle_ampphase, int npols, int ifnum, int poltype);
 void add_vis_line(struct vis_line ***vis_lines, int *n_vis_lines,
-		  int ant1, int ant2, int if_number, int pol);
+                  int ant1, int ant2, int ifnum, char *if_label, int pol);
 void vis_interpret_pol(char *pol, struct vis_product *vis_product);
 int vis_interpret_product(char *product, struct vis_product **vis_product);
 int find_if_name(struct scan_header_data *scan_header_data, char *name);
