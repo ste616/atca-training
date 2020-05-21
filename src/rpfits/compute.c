@@ -159,6 +159,10 @@ void free_ampphase(struct ampphase **ampphase) {
   FREE((*ampphase)->max_amplitude);
   FREE((*ampphase)->min_phase);
   FREE((*ampphase)->max_phase);
+
+  FREE((*ampphase)->options->min_tvchannel);
+  FREE((*ampphase)->options->max_tvchannel);
+  FREE((*ampphase)->options);
   
   FREE(*ampphase);
 }

@@ -1425,6 +1425,10 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
     }
   }
   FREE(polidx);
+  for (i = 0; i < panelspec->nx; i++) {
+    FREE(panel_plotted[i]);
+  }
+  FREE(panel_plotted);
   
 }
 

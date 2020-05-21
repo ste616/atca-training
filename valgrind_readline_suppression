@@ -778,3 +778,14 @@
    obj:/usr/lib/x86_64-linux-gnu/libreadline.so.8.0
    fun:main
 }
+{
+   <insert_a_suppression_name_here>
+   Memcheck:Leak
+   match-leak-kinds: reachable
+   fun:malloc
+   fun:xmalloc
+   fun:add_history
+   fun:interpret_command
+   fun:rl_callback_read_char
+   fun:main
+}
