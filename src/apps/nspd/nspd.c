@@ -165,7 +165,6 @@ static void sighandler(int sig) {
 #define ACTION_CHANGE_PLOTSURFACE  1<<2
 #define ACTION_NEW_DATA_RECEIVED   1<<3
 
-
 // Callback function called for each line when accept-line
 // executed, EOF seen, or EOF character read.
 static void interpret_command(char *line) {
@@ -192,6 +191,7 @@ static void interpret_command(char *line) {
   if (*line) {
     // Keep this history.
     add_history(line);
+    next_history();
 
     // Figure out what we're supposed to do.
     // We will split by spaces, but people might separate arguments with commas.
@@ -595,12 +595,16 @@ int main(int argc, char *argv[]) {
         // Refresh the plot next time through.
         action_required = ACTION_NEW_DATA_RECEIVED;
       }
+      // Free the socket buffer memory.
+      FREE(recv_buffer);
     }
     
   }
 
   // Remove our callbacks.
   rl_callback_handler_remove();
+  // And clear the history.
+  rl_clear_history();
   printf("\n\n  NSPD EXITS\n");
   
   // Release the plotting device.

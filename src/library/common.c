@@ -1479,13 +1479,14 @@ bool minmatch(char *ref, char *chk, int minlength) {
 
 int split_string(char *s, char *delim, char ***elements) {
   int i = 0;
-  char *token = NULL;
+  char *token = NULL, *saveptr = NULL;
 
   // Skip any leading delimiters.
   while (*s == *delim) {
     s++;
   }
-  while ((token = strtok_r(s, delim, &s))) {
+  while ((token = strtok_r(s, delim, &saveptr))) {
+    s = NULL;
     REALLOC(*elements, (i + 1));
     (*elements)[i] = token;
     i++;
