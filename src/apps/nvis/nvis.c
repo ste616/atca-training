@@ -206,6 +206,7 @@ static void interpret_command(char *line) {
         for (i = 0; i < vis_plotcontrols.nproducts; i++) {
           FREE(vis_plotcontrols.vis_products[i]);
         }
+        FREE(vis_plotcontrols.vis_products);
         vis_plotcontrols.nproducts = nproducts;
         vis_plotcontrols.vis_products = vis_products;
         action_required = ACTION_REFRESH_PLOT;
@@ -403,6 +404,11 @@ int main(int argc, char *argv[]) {
 
     if (action_required & ACTION_VISBANDS_CHANGED) {
       // TODO: Check that the visbands are actually present in the data.
+      // Free the previous memory first.
+      for (i = 0; i < vis_plotcontrols.nvisbands; i++) {
+        FREE(vis_plotcontrols.visbands[i]);
+      }
+      FREE(vis_plotcontrols.visbands);
       vis_plotcontrols.nvisbands = nvisbands;
       vis_plotcontrols.visbands = visband;
       action_required -= ACTION_VISBANDS_CHANGED;
@@ -479,18 +485,29 @@ int main(int argc, char *argv[]) {
         unpack_vis_data(&cmp, &vis_data);
         action_required = ACTION_VISBANDS_CHANGED;
       }
+      FREE(recv_buffer);
     }
   }
 
   // Remove our callbacks.
   rl_callback_handler_remove();
+  rl_clear_history();
   printf("\n\n NVIS EXITS\n");
 
   // Release the plotting device.
   release_vis_device(&vis_device_opened);
 
   // Release all the memory.
-  
+  free_vis_data(&vis_data);
+  free_vis_plotcontrols(&vis_plotcontrols);
+  for (i = 0; i < MAX_N_MESSAGES; i++) {
+    FREE(mesgout[i]);
+  }
+  FREE(mesgout);
+  for (i = 0; i < MAXVISBANDS; i++) {
+    FREE(visband[i]);
+  }
+  FREE(visband);
   
   /* // Let's print something to check. */
   /* printf("VIS data has %d cycles:\n", vis_data.nviscycles); */

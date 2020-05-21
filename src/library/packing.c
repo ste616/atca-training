@@ -479,6 +479,19 @@ void unpack_spectrum_data(cmp_ctx_t *cmp, struct spectrum_data *a) {
   }
 }
 
+void free_spectrum_data(struct spectrum_data *spectrum_data) {
+  int i, j;
+  for (i = 0; i < spectrum_data->num_ifs; i++) {
+    for (j = 0; j < spectrum_data->num_pols; j++) {
+      free_ampphase(&(spectrum_data->spectrum[i][j]));
+    }
+    FREE(spectrum_data->spectrum[i]);
+  }
+  FREE(spectrum_data->spectrum);
+  free_scan_header_data(spectrum_data->header_data);
+  FREE(spectrum_data->header_data);
+}
+
 void pack_vis_quantities(cmp_ctx_t *cmp, struct vis_quantities *a) {
   int i;
   
@@ -628,6 +641,27 @@ void unpack_vis_data(cmp_ctx_t *cmp, struct vis_data *a) {
       }
     }
   }
+}
+
+void free_vis_data(struct vis_data *vis_data) {
+  int i, j, k;
+  for (i = 0; i < vis_data->nviscycles; i++) {
+    for (j = 0; j < vis_data->num_ifs[i]; j++) {
+      for (k = 0; k < vis_data->num_pols[i][j]; k++) {
+        free_vis_quantities(&(vis_data->vis_quantities[i][j][k]));
+        //FREE(vis_data->vis_quantities[i][j][k]);
+      }
+      FREE(vis_data->vis_quantities[i][j]);
+    }
+    FREE(vis_data->vis_quantities[i]);
+    free_scan_header_data(vis_data->header_data[i]);
+    FREE(vis_data->header_data[i]);
+    FREE(vis_data->num_pols[i]);
+  }
+  FREE(vis_data->vis_quantities);
+  FREE(vis_data->header_data);
+  FREE(vis_data->num_ifs);
+  FREE(vis_data->num_pols);
 }
 
 void pack_scan_header_data(cmp_ctx_t *cmp, struct scan_header_data *a) {

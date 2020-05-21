@@ -237,6 +237,10 @@ void free_vis_plotcontrols(struct vis_plotcontrols *plotcontrols) {
   }
   FREE(plotcontrols->vis_products);
   FREE(plotcontrols->panel_type);
+  for (i = 0; i < plotcontrols->nvisbands; i++) {
+    FREE(plotcontrols->visbands[i]);
+  }
+  FREE(plotcontrols->visbands);
 }
 
 void free_panelspec(struct panelspec *panelspec) {
@@ -1083,7 +1087,7 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
   FREE(vis_lines);
   for (i = 0; i < plot_controls->num_panels; i++) {
     for (j = 0; j < n_vis_lines; j++) {
-      for (k = 0; k < 2; k++) {
+      for (k = 0; k < 3; k++) {
         FREE(plot_lines[i][j][k]);
       }
       FREE(plot_lines[i][j]);

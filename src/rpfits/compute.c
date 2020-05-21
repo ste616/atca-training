@@ -172,6 +172,10 @@ void free_ampphase(struct ampphase **ampphase) {
  */
 void free_vis_quantities(struct vis_quantities **vis_quantities) {
   int i;
+  FREE((*vis_quantities)->options->min_tvchannel);
+  FREE((*vis_quantities)->options->max_tvchannel);
+  FREE((*vis_quantities)->options);
+  
   for (i = 0; i < (*vis_quantities)->nbaselines; i++) {
     FREE((*vis_quantities)->amplitude[i]);
     FREE((*vis_quantities)->phase[i]);

@@ -427,19 +427,6 @@ void reconcile_spd_plotcontrols(struct spectrum_data *spectrum_data,
   
 }
 
-void free_spectrum_data(struct spectrum_data *spectrum_data) {
-  int i, j;
-  for (i = 0; i < spectrum_data->num_ifs; i++) {
-    for (j = 0; j < spectrum_data->num_pols; j++) {
-      free_ampphase(&(spectrum_data->spectrum[i][j]));
-    }
-    FREE(spectrum_data->spectrum[i]);
-  }
-  FREE(spectrum_data->spectrum);
-  free_scan_header_data(spectrum_data->header_data);
-  FREE(spectrum_data->header_data);
-}
-
 int main(int argc, char *argv[]) {
   struct arguments arguments;
   bool spd_device_opened = false;
