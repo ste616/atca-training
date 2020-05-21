@@ -389,8 +389,6 @@ static void interpret_command(char *line) {
   FREE(line);
 }
 
-#define STRUCTCOPY(s, d, p) d->p = s->p
-
 void reconcile_spd_plotcontrols(struct spectrum_data *spectrum_data,
 				struct spd_plotcontrols *user_plotcontrols,
 				struct spd_plotcontrols *data_plotcontrols) {

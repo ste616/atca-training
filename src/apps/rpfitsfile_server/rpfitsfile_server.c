@@ -185,6 +185,7 @@ void data_reader(int read_type, int n_rpfits_files,
   struct scan_header_data *sh = NULL;
   struct cycle_data *cycle_data = NULL;
   struct spectrum_data *temp_spectrum = NULL;
+  struct ampphase_options *local_ampphase_options = NULL;
 
   if (vis_data == NULL) {
     // Resist warnings.
@@ -353,10 +354,12 @@ void data_reader(int read_type, int n_rpfits_files,
                            temp_spectrum->num_pols);
                   }
                   for (idx_pol = 0; idx_pol < temp_spectrum->num_pols; idx_pol++) {
+                    MALLOC(local_ampphase_options, 1);
+                    copy_ampphase_options(local_ampphase_options, ampphase_options);
                     calcres = vis_ampphase(sh, cycle_data,
                                            &(temp_spectrum->spectrum[idx_if][idx_pol]),
                                            pols[idx_pol], sh->if_label[idx_if],
-                                           ampphase_options);
+                                           local_ampphase_options);
                     if (calcres < 0) {
                       fprintf(stderr, "CALCULATING AMP AND PHASE FAILED FOR IF %d POL %d, CODE %d\n",
                               sh->if_label[idx_if], pols[idx_pol], calcres);
@@ -365,9 +368,11 @@ void data_reader(int read_type, int n_rpfits_files,
                     /*            sh->if_label[idx_if], pols[idx_pol], cycle_mjd); */
                     }
                     if (read_type & COMPUTE_VIS_PRODUCTS) {
+                      MALLOC(local_ampphase_options, 1);
+                      copy_ampphase_options(local_ampphase_options, ampphase_options);
                       ampphase_average(temp_spectrum->spectrum[idx_if][idx_pol],
                                        &((*vis_data)->vis_quantities[(*vis_data)->nviscycles][idx_if][idx_pol]),
-                                       ampphase_options);
+                                       local_ampphase_options);
                       vis_cycled = true;
                     }
                   }
@@ -440,7 +445,7 @@ int main(int argc, char *argv[]) {
   int i, j, k, ri, rj, bytes_received, r;
   double mjd_grab;
   struct rpfits_file_information **info_rpfits_files = NULL;
-  struct ampphase_options ampphase_options;
+  struct ampphase_options *ampphase_options = NULL;
   struct spectrum_data *spectrum_data;
   struct vis_data *vis_data = NULL;
   FILE *fh = NULL;
@@ -464,13 +469,14 @@ int main(int argc, char *argv[]) {
   arguments.network_operation = false;
 
   // And the default for the calculator options.
-  ampphase_options.phase_in_degrees = true;
-  ampphase_options.delay_averaging = 1;
-  ampphase_options.num_ifs = 0;
-  ampphase_options.min_tvchannel = NULL;
-  ampphase_options.max_tvchannel = NULL;
-  ampphase_options.averaging_method = AVERAGETYPE_MEAN | AVERAGETYPE_SCALAR;
-  ampphase_options.include_flagged_data = 1;
+  MALLOC(ampphase_options, 1);
+  ampphase_options->phase_in_degrees = true;
+  ampphase_options->delay_averaging = 1;
+  ampphase_options->num_ifs = 0;
+  ampphase_options->min_tvchannel = NULL;
+  ampphase_options->max_tvchannel = NULL;
+  ampphase_options->averaging_method = AVERAGETYPE_MEAN | AVERAGETYPE_SCALAR;
+  ampphase_options->include_flagged_data = 1;
   
   // Parse the arguments.
   argp_parse(&argp, argc, argv, 0, 0, &arguments);
@@ -491,7 +497,7 @@ int main(int argc, char *argv[]) {
     info_rpfits_files[i] = new_rpfits_file();
     strncpy(info_rpfits_files[i]->filename, arguments.rpfits_files[i], RPSBUFSIZE);
   }
-  data_reader(READ_SCAN_METADATA, arguments.n_rpfits_files, 0.0, &ampphase_options,
+  data_reader(READ_SCAN_METADATA, arguments.n_rpfits_files, 0.0, ampphase_options,
               info_rpfits_files, &spectrum_data, &vis_data);
 
   // Print out the summary.
@@ -517,7 +523,7 @@ int main(int argc, char *argv[]) {
   mjd_grab = info_rpfits_files[ri]->scan_start_mjd[rj] + 10.0 / 86400.0;
   printf(" grabbing from random scan %d from file %d, MJD %.6f\n", rj, ri, mjd_grab);
   data_reader(GRAB_SPECTRUM | COMPUTE_VIS_PRODUCTS, arguments.n_rpfits_files, mjd_grab,
-              &ampphase_options, info_rpfits_files, &spectrum_data, &vis_data);
+              ampphase_options, info_rpfits_files, &spectrum_data, &vis_data);
   
   if (!arguments.network_operation) {
     // Save these spectra to a file after packing it.
@@ -684,10 +690,6 @@ int main(int argc, char *argv[]) {
   FREE(vis_data->vis_quantities);
   FREE(vis_data);
 
-  // Free the ampphase options.
-  FREE(ampphase_options.min_tvchannel);
-  FREE(ampphase_options.max_tvchannel);
-  
   // Free the spectrum memory.
   for (i = 0; i < spectrum_data->num_ifs; i++) {
     for (j = 0; j < spectrum_data->num_pols; j++) {
@@ -712,6 +714,10 @@ int main(int argc, char *argv[]) {
   FREE(info_rpfits_files);
   FREE(arguments.rpfits_files);
 
+  FREE(ampphase_options->min_tvchannel);
+  FREE(ampphase_options->max_tvchannel);
+  FREE(ampphase_options);
+  
   if (arguments.network_operation) {
     // Close our socket.
     printf("Closing listening socket...\n");

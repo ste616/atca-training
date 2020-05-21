@@ -235,6 +235,25 @@ struct ampphase_options ampphase_options_default(void) {
 }
 
 /**
+ * Copy one ampphase structure into another.
+ */
+void copy_ampphase_options(struct ampphase_options *dest,
+                           struct ampphase_options *src) {
+  int i;
+  STRUCTCOPY(src, dest, phase_in_degrees);
+  STRUCTCOPY(src, dest, delay_averaging);
+  STRUCTCOPY(src, dest, num_ifs);
+  MALLOC(dest->min_tvchannel, dest->num_ifs);
+  MALLOC(dest->max_tvchannel, dest->num_ifs);
+  for (i = 0; i < dest->num_ifs; i++) {
+    STRUCTCOPY(src, dest, min_tvchannel[i]);
+    STRUCTCOPY(src, dest, max_tvchannel[i]);
+  }
+  STRUCTCOPY(src, dest, averaging_method);
+  STRUCTCOPY(src, dest, include_flagged_data);
+}
+
+/**
  * Routine that computes the "default" tv channel range given
  * the number of channels present in an IF, the channel width,
  * and the centre frequency in MHz.
@@ -278,7 +297,7 @@ void default_tvchannels(int num_chan, float chan_width,
  * defaults which get recognised as not being set if windows are missing.
  */
 void add_tvchannels_to_options(struct ampphase_options *ampphase_options,
-			       int window, int min_tvchannel, int max_tvchannel) {
+                               int window, int min_tvchannel, int max_tvchannel) {
   int i, nwindow = window + 1;
   if (nwindow > ampphase_options->num_ifs) {
     // We have to reallocate the memory.
@@ -634,7 +653,7 @@ int ampphase_average(struct ampphase *ampphase,
 		       (1000 * ampphase->frequency[(ampphase->nchannels + 1) / 2]),
 		       &min_tvchannel, &max_tvchannel);
     add_tvchannels_to_options(options, ampphase->window,
-			      min_tvchannel, max_tvchannel);
+                              min_tvchannel, max_tvchannel);
   }
   //n_expected = (options->max_tvchannel - options->min_tvchannel) + 1;
   n_expected = (max_tvchannel - min_tvchannel) + 1;

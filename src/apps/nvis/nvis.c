@@ -62,7 +62,7 @@ struct arguments {
 
 // And some fun, totally necessary, global state variables.
 int action_required;
-int vis_device_number;
+int vis_device_number, data_selected_index;
 int xaxis_type, yaxis_type, nxpanels, nypanels, nvisbands;
 char **visband;
 //float describe_time;
@@ -159,10 +159,10 @@ static void sighandler(int sig) {
 static void interpret_command(char *line) {
   char **line_els = NULL, *cycomma = NULL, delim[] = " ";
   char duration[VISBUFSIZE], historystart[VISBUFSIZE];
-  int nels, i, j, k, array_change_spec, nproducts, pr;
-  float histlength;
+  int nels, i, j, k, array_change_spec, nproducts, pr, closeidx = -1;
+  float histlength, data_seconds = 0, delta_time = 0, close_time = 0;
   struct vis_product **vis_products = NULL, *tproduct = NULL;
-  bool products_selected;
+  bool products_selected, data_time_parsed = false;
 
   if ((line == NULL) || (strcasecmp(line, "exit") == 0) ||
       (strcasecmp(line, "quit") == 0)) {
@@ -258,8 +258,31 @@ static void interpret_command(char *line) {
     } else if (minmatch("data", line_els[0], 3)) {
       // Output a description of the data, at some time or for
       // the latest time.
-      // TODO: Interpret the time given by the user, if there
-      // is one.
+      data_time_parsed = false;
+      closeidx = -1;
+      if (nels == 2) {
+        // The second element should be the time.
+        data_time_parsed = string_to_seconds(line_els[1], &data_seconds);
+        if (data_time_parsed) {
+          // Find the data with the right time.
+          close_time = fabsf(vis_data.vis_quantities[0][0][0]->ut_seconds -
+                             data_seconds);
+          closeidx = 0;
+          for (i = 1; i < vis_data.nviscycles; i++) {
+            delta_time = fabsf(vis_data.vis_quantities[i][0][0]->ut_seconds -
+                               data_seconds);
+            if (delta_time < close_time) {
+              close_time = delta_time;
+              closeidx = i;
+            }
+          }
+        }
+      }
+      if ((closeidx >= 0) && (closeidx < vis_data.nviscycles)) {
+        // Change the data selection.
+        data_selected_index = closeidx;
+      }
+      
       action_required = ACTION_DESCRIBE_DATA;
     } else if (minmatch("calband", line_els[0], 4)) {
       // We can change which bands get plotted as aa/bb/ab and cc/dd/cd.
@@ -303,7 +326,7 @@ static void interpret_command(char *line) {
 int main(int argc, char *argv[]) {
   struct arguments arguments;
   struct vis_data vis_data;
-  int i, j, r, bytes_received, selidx, nmesg = 0;
+  int i, j, r, bytes_received, nmesg = 0;
   cmp_ctx_t cmp;
   cmp_mem_access_t mem;
   struct requests server_request;
@@ -400,6 +423,8 @@ int main(int argc, char *argv[]) {
     if (action_required & ACTION_NEW_DATA_RECEIVED) {
       action_required -= ACTION_NEW_DATA_RECEIVED;
       action_required |= ACTION_VISBANDS_CHANGED;
+      // Reset the selected index from the data.
+      data_selected_index = vis_data.nviscycles - 1;
     }
 
     if (action_required & ACTION_VISBANDS_CHANGED) {
@@ -419,21 +444,22 @@ int main(int argc, char *argv[]) {
 
     if (action_required & ACTION_DESCRIBE_DATA) {
       // Describe the data.
-      selidx = vis_data.nviscycles - 1;
-      described_ptr = vis_data.vis_quantities[selidx];
+      described_ptr = vis_data.vis_quantities[data_selected_index];
       seconds_to_hourlabel(described_ptr[0][0]->ut_seconds, htime);
       nmesg = 0;
       snprintf(mesgout[nmesg++], VISBUFSIZE, "DATA AT %s %s:\n", described_ptr[0][0]->obsdate, htime);
-      snprintf(mesgout[nmesg++], VISBUFSIZE, "  HAS %d IFS CYCLE TIME %d\n\r", vis_data.num_ifs[selidx],
-               vis_data.header_data[selidx]->cycle_time);
+      snprintf(mesgout[nmesg++], VISBUFSIZE, "  HAS %d IFS CYCLE TIME %d\n\r",
+               vis_data.num_ifs[data_selected_index],
+               vis_data.header_data[data_selected_index]->cycle_time);
       snprintf(mesgout[nmesg++], VISBUFSIZE, "  SOURCE %s OBSTYPE %s\n",
-               vis_data.header_data[selidx]->source_name,
-               vis_data.header_data[selidx]->obstype);
-      for (i = 0; i < vis_data.num_ifs[selidx]; i++) {
+               vis_data.header_data[data_selected_index]->source_name,
+               vis_data.header_data[data_selected_index]->obstype);
+      for (i = 0; i < vis_data.num_ifs[data_selected_index]; i++) {
         snprintf(mesgout[nmesg++], VISBUFSIZE, " IF %d: WINDOW %d NAMES: ", (i + 1),
-                 vis_data.header_data[selidx]->if_label[i]);
+                 vis_data.header_data[data_selected_index]->if_label[i]);
         for (j = 0; j < 3; j++) {
-          snprintf(mesgout[nmesg++], VISBUFSIZE, "%s ", vis_data.header_data[selidx]->if_name[i][j]);
+          snprintf(mesgout[nmesg++], VISBUFSIZE, "%s ",
+                   vis_data.header_data[data_selected_index]->if_name[i][j]);
         }
         snprintf(mesgout[nmesg++], VISBUFSIZE, "\n");
       }

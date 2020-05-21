@@ -48,3 +48,5 @@ while(0)
 
 #define ARRAY_APPEND(p, n, v) REALLOC(p, n); p[n - 1] = v
 
+#define STRUCTCOPY(s, d, p) d->p = s->p
+

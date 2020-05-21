@@ -1550,6 +1550,33 @@ void minutes_representation(float minutes, char *representation) {
   }
 }
 
+bool string_to_seconds(char *s, float *seconds) {
+  // Parse a string like 12:30:21 or 13:51 into the number of seconds
+  // since midnight.
+  float nels, tm, te;
+  char delim[] = ":", **tels = NULL, *eptr = NULL;
+  int i;
+
+  // Split by colons.
+  nels = split_string(s, delim, &tels);
+
+  if ((nels < 2) || (nels > 3)) {
+    // We can't do anything with this.
+    return false;
+  }
+  *seconds = 0;
+  for (i = 0, tm = 3600; i < nels; i++, tm /= 60) {
+    te = strtof(tels[i], &eptr);
+    if (eptr == tels[i]) {
+      // Conversion failed.
+      return false;
+    }
+    *seconds += te * tm;
+  }
+  
+  return true;
+}
+
 float string_to_minutes(char *s) {
   // Parse a string like 2.1m or 1.3h or 30s or 1h30m into the
   // number of minutes that string represents.
