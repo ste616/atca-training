@@ -184,6 +184,8 @@ int change_spd_plotflags(struct spd_plotcontrols *plotcontrols,
 void init_spd_plotcontrols(struct spd_plotcontrols *plotcontrols,
 			   int xaxis_type, int yaxis_type, int pols,
 			   int pgplot_device);
+void change_vis_plotcontrols_visbands(struct vis_plotcontrols *plotcontrols,
+                                      int nvisbands, char **visbands);
 void init_vis_plotcontrols(struct vis_plotcontrols *plotcontrols,
                            int xaxis_type, int paneltypes, int nvisbands, char **visbands,
                            int pgplot_device,

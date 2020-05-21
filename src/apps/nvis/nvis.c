@@ -404,13 +404,7 @@ int main(int argc, char *argv[]) {
 
     if (action_required & ACTION_VISBANDS_CHANGED) {
       // TODO: Check that the visbands are actually present in the data.
-      // Free the previous memory first.
-      for (i = 0; i < vis_plotcontrols.nvisbands; i++) {
-        FREE(vis_plotcontrols.visbands[i]);
-      }
-      FREE(vis_plotcontrols.visbands);
-      vis_plotcontrols.nvisbands = nvisbands;
-      vis_plotcontrols.visbands = visband;
+      change_vis_plotcontrols_visbands(&vis_plotcontrols, nvisbands, visband);
       action_required -= ACTION_VISBANDS_CHANGED;
       action_required |= ACTION_REFRESH_PLOT;
     }

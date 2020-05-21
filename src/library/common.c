@@ -175,6 +175,35 @@ void init_spd_plotcontrols(struct spd_plotcontrols *plotcontrols,
 
 #define NAVAILABLE_PANELS 3
 
+void change_vis_plotcontrols_visbands(struct vis_plotcontrols *plotcontrols,
+                                      int nvisbands, char **visbands) {
+  int i;
+  if (nvisbands <= 0) {
+    return;
+  }
+  // Free any memory we don't need any more.
+  if (nvisbands < plotcontrols->nvisbands) {
+    for (i = nvisbands; i < plotcontrols->nvisbands; i++) {
+      FREE(plotcontrols->visbands[i]);
+    }
+  }
+
+  // Allocate new memory if necessary.
+  if (nvisbands != plotcontrols->nvisbands) {
+    REALLOC(plotcontrols->visbands, nvisbands);
+    for (i = plotcontrols->nvisbands; i < nvisbands; i++) {
+      CALLOC(plotcontrols->visbands[i], VISBANDLEN);
+    }
+  }
+
+  // Copy the strings.
+  for (i = 0; i < nvisbands; i++) {
+    strncpy(plotcontrols->visbands[i], visbands[i], VISBANDLEN);
+  }
+  plotcontrols->nvisbands = nvisbands;
+}
+                             
+
 void init_vis_plotcontrols(struct vis_plotcontrols *plotcontrols,
                            int xaxis_type, int paneltypes, int nvisbands, char **visbands,
                            int pgplot_device,
@@ -218,7 +247,7 @@ void init_vis_plotcontrols(struct vis_plotcontrols *plotcontrols,
   plotcontrols->nvisbands = nvisbands;
   MALLOC(plotcontrols->visbands, nvisbands);
   for (i = 0; i < nvisbands; i++) {
-    MALLOC(plotcontrols->visbands[i], VISBANDLEN);
+    CALLOC(plotcontrols->visbands[i], VISBANDLEN);
     strncpy(plotcontrols->visbands[i], visbands[i], VISBANDLEN);
   }
 
