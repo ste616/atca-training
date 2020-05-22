@@ -325,7 +325,6 @@ static void interpret_command(char *line) {
 
 int main(int argc, char *argv[]) {
   struct arguments arguments;
-  struct vis_data vis_data;
   int i, j, r, bytes_received, nmesg = 0;
   cmp_ctx_t cmp;
   cmp_mem_access_t mem;
@@ -503,7 +502,7 @@ int main(int argc, char *argv[]) {
       // Check we're getting what we expect.
       if (server_response.response_type == RESPONSE_CURRENT_VISDATA) {
         unpack_vis_data(&cmp, &vis_data);
-        action_required = ACTION_VISBANDS_CHANGED;
+        action_required = ACTION_NEW_DATA_RECEIVED;
       }
       FREE(recv_buffer);
     }
