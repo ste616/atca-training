@@ -337,6 +337,7 @@ int main(int argc, char *argv[]) {
   bool vis_device_opened = false;
   size_t recv_buffer_length;
   struct vis_quantities ***described_ptr = NULL;
+  struct scan_header_data *described_hdr = NULL;
 
   // Allocate some memory.
   MALLOC(mesgout, MAX_N_MESSAGES);
@@ -444,21 +445,28 @@ int main(int argc, char *argv[]) {
     if (action_required & ACTION_DESCRIBE_DATA) {
       // Describe the data.
       described_ptr = vis_data.vis_quantities[data_selected_index];
+      described_hdr = vis_data.header_data[data_selected_index];
       seconds_to_hourlabel(described_ptr[0][0]->ut_seconds, htime);
       nmesg = 0;
       snprintf(mesgout[nmesg++], VISBUFSIZE, "DATA AT %s %s:\n", described_ptr[0][0]->obsdate, htime);
       snprintf(mesgout[nmesg++], VISBUFSIZE, "  HAS %d IFS CYCLE TIME %d\n\r",
                vis_data.num_ifs[data_selected_index],
-               vis_data.header_data[data_selected_index]->cycle_time);
+               described_hdr->cycle_time);
       snprintf(mesgout[nmesg++], VISBUFSIZE, "  SOURCE %s OBSTYPE %s\n",
-               vis_data.header_data[data_selected_index]->source_name,
-               vis_data.header_data[data_selected_index]->obstype);
+               described_hdr->source_name,
+               described_hdr->obstype);
       for (i = 0; i < vis_data.num_ifs[data_selected_index]; i++) {
-        snprintf(mesgout[nmesg++], VISBUFSIZE, " IF %d: WINDOW %d NAMES: ", (i + 1),
-                 vis_data.header_data[data_selected_index]->if_label[i]);
-        for (j = 0; j < 3; j++) {
-          snprintf(mesgout[nmesg++], VISBUFSIZE, "%s ",
-                   vis_data.header_data[data_selected_index]->if_name[i][j]);
+        snprintf(mesgout[nmesg++], VISBUFSIZE, " IF %d: CF %.2f MHz NCHAN %d BW %.0f MHz",
+                 (i + 1), described_hdr->if_centre_freq[0], described_hdr->if_num_channels[i],
+                 described_hdr->if_bandwidth[i]);
+        // Check if this is one of the calbands.
+        for (j = 0; j < nvisbands; j++) {
+          if (find_if_name(described_hdr, visband[j]) == (i + 1)) {
+            snprintf(mesgout[nmesg++], VISBUFSIZE, " (%c%c %c%c %c%c)",
+                     ('A' + (2 * j)), ('A' + (2 * j)),
+                     ('B' + (2 * j)), ('B' + (2 * j)),
+                     ('A' + (2 * j)), ('B' + (2 * j)));
+          }
         }
         snprintf(mesgout[nmesg++], VISBUFSIZE, "\n");
       }
