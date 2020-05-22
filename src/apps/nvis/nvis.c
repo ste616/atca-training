@@ -161,7 +161,9 @@ static void interpret_command(char *line) {
   char **line_els = NULL, *cycomma = NULL, delim[] = " ";
   char duration[VISBUFSIZE], historystart[VISBUFSIZE];
   int nels, i, j, k, array_change_spec, nproducts, pr, closeidx = -1;
+  int change_panel = PLOT_ALL_PANELS;
   float histlength, data_seconds = 0, delta_time = 0, close_time = 0;
+  float limit_min, limit_max;
   struct vis_product **vis_products = NULL, *tproduct = NULL;
   bool products_selected, data_time_parsed = false;
 
@@ -327,6 +329,41 @@ static void interpret_command(char *line) {
       printf(" Baseline sorting is in %s order\n",
              (sort_baselines ? "length" : "numerical"));
       action_required = ACTION_REFRESH_PLOT;
+    } else if (minmatch("scale", line_els[0], 3)) {
+      // Change the scaling of the plot panels.
+      if (nels == 1) {
+        // Reset the all the panels back to defaults.
+        change_vis_plotcontrols_limits(&vis_plotcontrols, PLOT_ALL_PANELS,
+                                       false, 0, 0);
+        action_required = ACTION_REFRESH_PLOT;
+      } else if (nels > 1) {
+        // Get the panel type from the second argument.
+        change_panel = PLOT_ALL_PANELS;
+        if (minmatch("amplitude", line_els[1], 1)) {
+          change_panel = PLOT_AMPLITUDE;
+        } else if (minmatch("phase", line_els[1], 1)) {
+          change_panel = PLOT_PHASE;
+        } else if (minmatch("delay", line_els[1], 1)) {
+          change_panel = PLOT_DELAY;
+        }
+        if (change_panel != PLOT_ALL_PANELS) {
+          if (nels == 2) {
+            // Reset just the named panel.
+            change_vis_plotcontrols_limits(&vis_plotcontrols, change_panel,
+                                           false, 0, 0);
+            action_required = ACTION_REFRESH_PLOT;
+          } else if (nels == 4) {
+            // We've been given limits.
+            if ((string_to_float(line_els[2], &limit_min)) &&
+                (string_to_float(line_els[3], &limit_max))) {
+              // The limits were successfully read.
+              change_vis_plotcontrols_limits(&vis_plotcontrols, change_panel,
+                                             true, limit_min, limit_max);
+              action_required = ACTION_REFRESH_PLOT;
+            }
+          }
+        }
+      }
     }
     
     FREE(line_els);

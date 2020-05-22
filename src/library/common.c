@@ -202,7 +202,25 @@ void change_vis_plotcontrols_visbands(struct vis_plotcontrols *plotcontrols,
   }
   plotcontrols->nvisbands = nvisbands;
 }
-                             
+
+void change_vis_plotcontrols_limits(struct vis_plotcontrols *plotcontrols,
+                                    int paneltype, bool use_limit,
+                                    float limit_min, float limit_max) {
+  int i;
+  // First, find the panel matching paneltype. If paneltype is -1, change
+  // all the panels.
+  for (i = 0; i < plotcontrols->num_panels; i++) {
+    if ((paneltype == PLOT_ALL_PANELS) ||
+        (plotcontrols->panel_type[i] == paneltype)) {
+      plotcontrols->use_panel_limits[i] = use_limit;
+      if (use_limit) {
+        // Change the limit settings.
+        plotcontrols->panel_limits_min[i] = limit_min;
+        plotcontrols->panel_limits_max[i] = limit_max;
+      }
+    }
+  }
+}
 
 void init_vis_plotcontrols(struct vis_plotcontrols *plotcontrols,
                            int xaxis_type, int paneltypes, int nvisbands, char **visbands,
@@ -234,6 +252,14 @@ void init_vis_plotcontrols(struct vis_plotcontrols *plotcontrols,
     }
   }
   plotcontrols->plot_options = xaxis_type | paneltypes;
+
+  // Initialise the axis limits.
+  MALLOC(plotcontrols->use_panel_limits, plotcontrols->num_panels);
+  MALLOC(plotcontrols->panel_limits_min, plotcontrols->num_panels);
+  MALLOC(plotcontrols->panel_limits_max, plotcontrols->num_panels);
+  for (i = 0; i < plotcontrols->num_panels; i++) {
+    plotcontrols->use_panel_limits[i] = false;
+  }
 
   // Keep the PGPLOT device.
   plotcontrols->pgplot_device = pgplot_device;
@@ -270,6 +296,9 @@ void free_vis_plotcontrols(struct vis_plotcontrols *plotcontrols) {
     FREE(plotcontrols->visbands[i]);
   }
   FREE(plotcontrols->visbands);
+  FREE(plotcontrols->use_panel_limits);
+  FREE(plotcontrols->panel_limits_min);
+  FREE(plotcontrols->panel_limits_max);
 }
 
 void free_panelspec(struct panelspec *panelspec) {
@@ -900,7 +929,7 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
     // Sort the lines into baseline length order.
     qsort(vis_lines, n_vis_lines, sizeof(struct vis_line *), cmpfunc_baseline_length);
   }
-  
+
   if (n_vis_lines > 16) {
     n_vis_lines = 16;
   }
@@ -1047,6 +1076,13 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
     if ((plot_controls->panel_type[i] == PLOT_AMPLITUDE) && (min_y < 0)) {
       // Amplitude cannot be below 0.
       min_y = 0;
+    }
+
+    // Finally, if the user has set the panel limits manually, use them
+    // instead.
+    if (plot_controls->use_panel_limits[i]) {
+      min_y = plot_controls->panel_limits_min[i];
+      max_y = plot_controls->panel_limits_max[i];
     }
     
     cpgswin(min_x, max_x, min_y, max_y);
@@ -1576,11 +1612,30 @@ void minutes_representation(float minutes, char *representation) {
   }
 }
 
+bool string_to_float(char *s, float *v) {
+  // This routine wraps around strtof to indicate if the parsing is
+  // successful.
+  bool succ;
+  char *eptr = NULL;
+  float tv;
+
+  tv = strtof(s, &eptr);
+  if (eptr == s) {
+    // Failure.
+    succ = false;
+  } else {
+    // Success.
+    succ = true;
+    *v = tv;
+  }
+  return succ;
+}
+
 bool string_to_seconds(char *s, float *seconds) {
   // Parse a string like 12:30:21 or 13:51 into the number of seconds
   // since midnight.
   float nels, tm, te;
-  char delim[] = ":", **tels = NULL, *eptr = NULL;
+  char delim[] = ":", **tels = NULL;
   int i;
 
   // Split by colons.
@@ -1592,12 +1647,11 @@ bool string_to_seconds(char *s, float *seconds) {
   }
   *seconds = 0;
   for (i = 0, tm = 3600; i < nels; i++, tm /= 60) {
-    te = strtof(tels[i], &eptr);
-    if (eptr == tels[i]) {
-      // Conversion failed.
+    if (string_to_float(tels[i], &te)) {
+      *seconds += te * tm;
+    } else {
       return false;
     }
-    *seconds += te * tm;
   }
   
   return true;
@@ -1610,7 +1664,7 @@ float string_to_minutes(char *s) {
   regex_t regex;
   regmatch_t matches[4];
   int reti;
-  char *cursor, numstr[100], *eptr = NULL;
+  char *cursor, numstr[100];
 
   reti = regcomp(&regex, "([0-9]+)([dhms])", REG_EXTENDED);
 
@@ -1622,8 +1676,7 @@ float string_to_minutes(char *s) {
   while (!(regexec(&regex, cursor, 4, matches, 0))) {
     strncpy(numstr, cursor + matches[1].rm_so,
             (1 + matches[1].rm_eo - matches[1].rm_so));
-    num = strtof(numstr, &eptr);
-    if (eptr != numstr) {
+    if (string_to_float(numstr, &num)) {
       // We got a conversion.
       switch ((cursor + matches[2].rm_so)[0]) {
       case 'd':

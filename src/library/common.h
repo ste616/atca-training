@@ -27,6 +27,7 @@
  * Some option flags.
  */
 #define DEFAULT                   -1
+#define PLOT_ALL_PANELS           -1
 #define PLOT_AMPLITUDE            1<<0
 #define PLOT_PHASE                1<<1
 #define PLOT_CHANNEL              1<<2
@@ -143,6 +144,10 @@ struct vis_plotcontrols {
   int num_panels;
   // And their type.
   int *panel_type;
+  // And any axis limits.
+  bool *use_panel_limits;
+  float *panel_limits_min;
+  float *panel_limits_max;
   // The maximum history to plot (minutes).
   float history_length;
   // The history start point (minutes).
@@ -186,6 +191,9 @@ void init_spd_plotcontrols(struct spd_plotcontrols *plotcontrols,
 			   int pgplot_device);
 void change_vis_plotcontrols_visbands(struct vis_plotcontrols *plotcontrols,
                                       int nvisbands, char **visbands);
+void change_vis_plotcontrols_limits(struct vis_plotcontrols *plotcontrols,
+                                    int paneltype, bool use_limits,
+                                    float limit_min, float limit_max);
 void init_vis_plotcontrols(struct vis_plotcontrols *plotcontrols,
                            int xaxis_type, int paneltypes, int nvisbands, char **visbands,
                            int pgplot_device,
@@ -225,6 +233,7 @@ void seconds_to_hourlabel(float seconds, char *hourlabel);
 bool minmatch(char *ref, char *chk, int minlength);
 int split_string(char *s, char *delim, char ***elements);
 void minutes_representation(float minutes, char *representation);
+bool string_to_float(char *s, float *v);
 bool string_to_seconds(char *s, float *seconds);
 float string_to_minutes(char *s);
 void readline_print_messages(int nmesg, char **mesg);
