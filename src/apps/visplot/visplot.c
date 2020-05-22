@@ -541,7 +541,7 @@ int main(int argc, char *argv[]) {
   // Make the vis plot now.
   vis_plotcontrols.cycletime = global_max_cycletime;
   make_vis_plot(cycle_vis_quantities, vis_num_cycles,
-                vis_cycle_num_ifs, arguments.npols,
+                vis_cycle_num_ifs, arguments.npols, false,
                 &vis_panelspec, &vis_plotcontrols, NULL);
   
   // Close all the PGPLOT devices.

@@ -617,8 +617,10 @@ void pol_to_vis_name(int pol, int if_num, char *vis_name) {
 }
 
 void add_vis_line(struct vis_line ***vis_lines, int *n_vis_lines,
-                  int ant1, int ant2, int ifnum, char *if_label, int pol) {
+                  int ant1, int ant2, int ifnum, char *if_label, int pol,
+                  struct scan_header_data *header_data) {
   struct vis_line *new_line = NULL;
+  double dx, dy, dz;
   char polname[8];
   // Add a potential vis line.
   *n_vis_lines += 1;
@@ -626,12 +628,16 @@ void add_vis_line(struct vis_line ***vis_lines, int *n_vis_lines,
   MALLOC(new_line, 1);
   new_line->ant1 = ant1;
   new_line->ant2 = ant2;
-  //new_line->if_number = if_number;
   strncpy(new_line->if_label, if_label, BUFSIZE);
   new_line->pol = pol;
   pol_to_vis_name(new_line->pol, ifnum, polname);
   snprintf(new_line->label, BUFSIZE, "%d%d%s",
 	   new_line->ant1, new_line->ant2, polname);
+  dx = header_data->ant_cartesian[ant2 - 1][0] - header_data->ant_cartesian[ant1 - 1][0];
+  dy = header_data->ant_cartesian[ant2 - 1][1] - header_data->ant_cartesian[ant1 - 1][1];
+  dz = header_data->ant_cartesian[ant2 - 1][2] - header_data->ant_cartesian[ant1 - 1][2];
+  new_line->baseline_length = (float)sqrt(dx * dx + dy * dy + dz * dz);
+
   (*vis_lines)[*n_vis_lines - 1] = new_line;
 }
 
@@ -777,8 +783,20 @@ float fracwidth(struct panelspec *panelspec,
   return (dlx / dx);
 }
 
+int cmpfunc_baseline_length(const void *a, const void *b) {
+  // This routine is responsible for sorting the vis_line structures
+  // in increasing baseline length.
+  double ba, bb;
+  ba = (*(struct vis_line**)a)->baseline_length;
+  bb = (*(struct vis_line**)b)->baseline_length;
+  if (ba < bb) return -1;
+  if (ba > bb) return 1;
+  return 0;
+}
+
 void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
                    int ncycles, int *cycle_numifs, int npols,
+                   bool sort_baselines,
                    struct panelspec *panelspec,
                    struct vis_plotcontrols *plot_controls,
                    struct scan_header_data **header_data) {
@@ -790,6 +808,7 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
   char xopts[BUFSIZE], yopts[BUFSIZE], panellabel[BUFSIZE], panelunits[BUFSIZE];
   char antstring[BUFSIZE];
   struct vis_line **vis_lines = NULL;
+  struct scan_header_data *vlh = NULL;
 
   // Work out how many antennas we will show.
   for (i = 1, nants = 0; i <= MAXANTS; i++) {
@@ -805,6 +824,9 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
   // Select the PGPLOT device.
   cpgslct(plot_controls->pgplot_device);
   cpgpage();
+
+  // Select a representative scan header.
+  vlh = header_data[ncycles - 1];
   
   // We make up to 16 lines per panel.
   // The first dimension will be the panel number.
@@ -833,21 +855,21 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
               if (plot_controls->vis_products[p]->pol_spec & PLOT_POL_XX) {
                 if (plot_controls->vis_products[p]->if_spec & VIS_PLOT_IF1) {
                   add_vis_line(&vis_lines, &n_vis_lines,
-                               i, j, 1, plot_controls->visbands[0], POL_XX);
+                               i, j, 1, plot_controls->visbands[0], POL_XX, vlh);
                 }
                 if (plot_controls->vis_products[p]->if_spec & VIS_PLOT_IF2) {
                   add_vis_line(&vis_lines, &n_vis_lines,
-                               i, j, 2, plot_controls->visbands[1], POL_XX);
+                               i, j, 2, plot_controls->visbands[1], POL_XX, vlh);
                 }
               }
               if (plot_controls->vis_products[p]->pol_spec & PLOT_POL_YY) {
                 if (plot_controls->vis_products[p]->if_spec & VIS_PLOT_IF1) {
                   add_vis_line(&vis_lines, &n_vis_lines,
-                               i, j, 1, plot_controls->visbands[0], POL_YY);
+                               i, j, 1, plot_controls->visbands[0], POL_YY, vlh);
                 }
                 if (plot_controls->vis_products[p]->if_spec & VIS_PLOT_IF2) {
                   add_vis_line(&vis_lines, &n_vis_lines,
-                               i, j, 2, plot_controls->visbands[1], POL_YY);
+                               i, j, 2, plot_controls->visbands[1], POL_YY, vlh);
                 }
               }
             } else {
@@ -855,11 +877,11 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
               if (plot_controls->vis_products[p]->pol_spec & PLOT_POL_XY) {
                 if (plot_controls->vis_products[p]->if_spec & VIS_PLOT_IF1) {
                   add_vis_line(&vis_lines, &n_vis_lines,
-                               i, j, 1, plot_controls->visbands[0], POL_XY);
+                               i, j, 1, plot_controls->visbands[0], POL_XY, vlh);
                 }
                 if (plot_controls->vis_products[p]->if_spec & VIS_PLOT_IF2) {
                   add_vis_line(&vis_lines, &n_vis_lines,
-                               i, j, 2, plot_controls->visbands[1], POL_XY);
+                               i, j, 2, plot_controls->visbands[1], POL_XY, vlh);
                 }
               }
             }
@@ -874,7 +896,11 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
     return;
   }
 
-  // Sort the lines; TODO, for now just take the first 16.
+  if (sort_baselines) {
+    // Sort the lines into baseline length order.
+    qsort(vis_lines, n_vis_lines, sizeof(struct vis_line *), cmpfunc_baseline_length);
+  }
+  
   if (n_vis_lines > 16) {
     n_vis_lines = 16;
   }

@@ -204,15 +204,18 @@ void plotpanel_minmax(struct ampphase **plot_ampphase,
 		      float *plotmin_y, float *plotmax_y);
 int find_pol(struct ampphase ***cycle_ampphase, int npols, int ifnum, int poltype);
 void add_vis_line(struct vis_line ***vis_lines, int *n_vis_lines,
-                  int ant1, int ant2, int ifnum, char *if_label, int pol);
+                  int ant1, int ant2, int ifnum, char *if_label, int pol,
+                  struct scan_header_data *scan_header_data);
 void vis_interpret_pol(char *pol, struct vis_product *vis_product);
 int vis_interpret_product(char *product, struct vis_product **vis_product);
 int find_if_name(struct scan_header_data *scan_header_data, char *name);
 float fracwidth(struct panelspec *panelspec,
 		float axis_min_x, float axis_max_x,
 		int x, int y, char *label);
+int cmpfunc_baseline_length(const void *a, const void *b);
 void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
                    int ncycles, int *cycle_numifs, int npols,
+                   bool sort_baselines,
                    struct panelspec *panelspec,
                    struct vis_plotcontrols *plot_controls,
                    struct scan_header_data **header_data);

@@ -65,7 +65,8 @@ int action_required;
 int vis_device_number, data_selected_index;
 int xaxis_type, yaxis_type, nxpanels, nypanels, nvisbands;
 char **visband;
-//float describe_time;
+// Whether to order the baselines in length order (true/false).
+bool sort_baselines;
 struct vis_plotcontrols vis_plotcontrols;
 struct panelspec vis_panelspec;
 struct vis_data vis_data;
@@ -309,6 +310,23 @@ static void interpret_command(char *line) {
         }
         printf("\n");
       }
+    } else if (minmatch("sort", line_els[0], 3)) {
+      // Change the baseline sorting method.
+      if (nels == 2) {
+        // User has specified on/off, hopefully.
+        if (minmatch("on", line_els[1], 2)) {
+          sort_baselines = true;
+        } else if (minmatch("off", line_els[1], 2)) {
+          sort_baselines = false;
+        }
+      } else if (nels == 1) {
+        // Toggle the state.
+        sort_baselines = !sort_baselines;
+      }
+      // Print the status.
+      printf(" Baseline sorting is in %s order\n",
+             (sort_baselines ? "length" : "numerical"));
+      action_required = ACTION_REFRESH_PLOT;
     }
     
     FREE(line_els);
@@ -437,7 +455,7 @@ int main(int argc, char *argv[]) {
     if (action_required & ACTION_REFRESH_PLOT) {
       // Let's make a plot.
       make_vis_plot(vis_data.vis_quantities, vis_data.nviscycles,
-                    vis_data.num_ifs, 4,
+                    vis_data.num_ifs, 4, sort_baselines,
                     &vis_panelspec, &vis_plotcontrols, vis_data.header_data);
       action_required -= ACTION_REFRESH_PLOT;
     }
