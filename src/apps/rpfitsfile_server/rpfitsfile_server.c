@@ -88,6 +88,12 @@ struct cache_vis_data {
 
 struct cache_vis_data cache_vis_data;
 
+struct client_vis_data {
+  int num_clients;
+  char **client_id;
+  struct vis_data **vis_data;
+};
+
 struct rpfits_file_information {
   char filename[RPSBUFSIZE];
   int n_scans;
@@ -473,6 +479,35 @@ static void sighandler(int sig) {
   }
 }
 
+void add_client_vis_data(struct client_vis_data *client_vis_data,
+                         char *client_id, struct vis_data *vis_data) {
+  // Store some vis data as identified by a client id.
+  int n = client_vis_data->num_clients + 1;
+  REALLOC(client_vis_data->client_id, n);
+  MALLOC(client_vis_data->client_id[n - 1], CLIENTIDLENGTH);
+  strncpy(client_vis_data->client_id[n - 1], client_id, CLIENTIDLENGTH);
+  REALLOC(client_vis_data->vis_data, n);
+  client_vis_data->vis_data[n - 1] = vis_data;
+  client_vis_data->num_clients = n;
+}
+
+struct vis_data* get_client_vis_data(struct client_vis_data *client_vis_data,
+                                     char *client_id) {
+  // Return vis data associated with the specified client_id, or
+  // the DEFAULT otherwise.
+  struct vis_data *default_vis_data = NULL;
+  int i;
+  for (i = 0; i < client_vis_data->num_clients; i++) {
+    if (strncmp(client_vis_data->client_id[i], client_id, CLIENTIDLENGTH) == 0) {
+      return(client_vis_data->vis_data[i]);
+    } else if (strncmp(client_vis_data->client_id[i], "DEFAULT", 7) == 0) {
+      default_vis_data = client_vis_data->vis_data[i];
+    }
+  }
+
+  return(default_vis_data);
+}
+
 int main(int argc, char *argv[]) {
   struct arguments arguments;
   int i, j, k, l, ri, rj, bytes_received, r;
@@ -494,6 +529,7 @@ int main(int argc, char *argv[]) {
   struct requests client_request;
   struct responses client_response;
   ssize_t bytes_sent;
+  struct client_vis_data client_vis_data;
   
   // Set the defaults for the arguments.
   arguments.n_rpfits_files = 0;
@@ -524,6 +560,11 @@ int main(int argc, char *argv[]) {
   cache_vis_data.num_cache_vis_data = 0;
   cache_vis_data.ampphase_options = NULL;
   cache_vis_data.vis_data = NULL;
+
+  // And initialise the clients.
+  client_vis_data.num_clients = 0;
+  client_vis_data.client_id = NULL;
+  client_vis_data.vis_data = NULL;
   
   // Set up our signal handler.
   signal(SIGINT, sighandler);
@@ -562,6 +603,8 @@ int main(int argc, char *argv[]) {
   printf(" grabbing from random scan %d from file %d, MJD %.6f\n", rj, ri, mjd_grab);
   data_reader(GRAB_SPECTRUM | COMPUTE_VIS_PRODUCTS, arguments.n_rpfits_files, mjd_grab,
               ampphase_options, info_rpfits_files, &spectrum_data, &vis_data);
+  // This first grab of the vis_data goes into the default client slot.
+  add_client_vis_data(&client_vis_data, "DEFAULT", vis_data);
   
   if (!arguments.network_operation) {
     // Save these spectra to a file after packing it.
@@ -697,7 +740,7 @@ int main(int argc, char *argv[]) {
               if (client_request.request_type == REQUEST_CURRENT_SPECTRUM) {
                 pack_spectrum_data(&cmp, spectrum_data);
               } else if (client_request.request_type == REQUEST_CURRENT_VISDATA) {
-                pack_vis_data(&cmp, vis_data);
+                pack_vis_data(&cmp, get_client_vis_data(&client_vis_data, "DEFAULT"));
               }
 
               // Send this data.
@@ -765,6 +808,13 @@ int main(int argc, char *argv[]) {
   FREE(ampphase_options->min_tvchannel);
   FREE(ampphase_options->max_tvchannel);
   FREE(ampphase_options);
+
+  // Free the clients.
+  for (i = 0; i < client_vis_data.num_clients; i++) {
+    FREE(client_vis_data.client_id[i]);
+  }
+  FREE(client_vis_data.client_id);
+  FREE(client_vis_data.vis_data);
   
   if (arguments.network_operation) {
     // Close our socket.

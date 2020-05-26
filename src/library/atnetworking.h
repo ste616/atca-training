@@ -10,6 +10,7 @@
 #include <sys/types.h>
 #include <stdbool.h>
 #include <string.h>
+#include <compute.h>
 
 #define ISVALIDSOCKET(s) ((s) >= 0)
 #define CLOSESOCKET(s) close(s)
@@ -26,6 +27,8 @@
 // The types of request that can be made.
 #define REQUEST_CURRENT_SPECTRUM     1
 #define REQUEST_CURRENT_VISDATA      2
+#define REQUEST_COMPUTE_VISDATA      3
+#define REQUEST_COMPUTED_VISDATA     4
 
 // This structure handles request headers.
 struct requests {
@@ -33,11 +36,15 @@ struct requests {
   int request_type;
   // The ID of the client.
   char client_id[CLIENTIDLENGTH];
+  // The options to use when computing vis data.
+  struct ampphase_options ampphase_options;
 };
 
 // The types of response that can be given.
 #define RESPONSE_CURRENT_SPECTRUM    1
 #define RESPONSE_CURRENT_VISDATA     2
+#define RESPONSE_VISDATA_COMPUTED    3
+#define RESPONSE_COMPUTED_VISDATA    4
 
 // This structure describes response headers.
 struct responses {
