@@ -802,3 +802,28 @@ int ampphase_average(struct ampphase *ampphase,
   
   return 0;
 }
+
+bool ampphase_options_match(struct ampphase_options *a,
+                            struct ampphase_options *b) {
+  // Check if two ampphase_options structures match.
+  bool match = false;
+  int i;
+
+  if ((a->phase_in_degrees == b->phase_in_degrees) &&
+      (a->delay_averaging == b->delay_averaging) &&
+      (a->num_ifs == b->num_ifs) &&
+      (a->averaging_method == b->averaging_method) &&
+      (a->include_flagged_data == b->include_flagged_data)) {
+    // Looks good so far, now check the tvchannels.
+    match = true;
+    for (i = 0; i < a->num_ifs; i++) {
+      if ((a->min_tvchannel[i] != b->min_tvchannel[i]) ||
+          (a->max_tvchannel[i] != b->max_tvchannel[i])) {
+        match = false;
+        break;
+      }
+    }
+  }
+  return match;
+}
+

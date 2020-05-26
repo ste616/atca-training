@@ -117,3 +117,27 @@ bool prepare_client_connection(char *server_name, int port_number,
   }
   return(true);
 }
+
+const char *get_type_string(int type, int id) {
+  // Get a string representation of the type of request or response,
+  // specified by type=TYPE_REQUEST or TYPE_RESPONSE, and
+  // id being one of the definitions in the header.
+  int max_request = 3, max_response = 3;
+  const char* const request_strings[] = { "",
+                                          "REQUEST_CURRENT_SPECTRUM",
+                                          "REQUEST_CURRENT_VISDATA"
+  };
+  const char* const response_strings[] = { "",
+                                           "RESPONSE_CURRENT_SPECTRUM",
+                                           "RESPONSE_CURRENT_VISDATA"
+  };
+
+  if ((type == TYPE_REQUEST) && (id >= 0) && (id < max_request)) {
+    return request_strings[id];
+  }
+  if ((type == TYPE_RESPONSE) && (id >= 0) && (id < max_response)) {
+    return response_strings[id];
+  }
+  return NULL;
+  
+}

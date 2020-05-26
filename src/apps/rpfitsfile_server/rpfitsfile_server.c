@@ -80,6 +80,14 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state) {
 
 static struct argp argp = { options, parse_opt, args_doc, doc };
 
+struct cache_vis_data {
+  int num_cache_vis_data;
+  struct ampphase_options **ampphase_options;
+  struct vis_data **vis_data;
+};
+
+struct cache_vis_data cache_vis_data;
+
 struct rpfits_file_information {
   char filename[RPSBUFSIZE];
   int n_scans;
@@ -180,7 +188,7 @@ void data_reader(int read_type, int n_rpfits_files,
   int i, res, n, calcres, curr_header, idx_if, idx_pol;
   int pols[4] = { POL_XX, POL_YY, POL_XY, POL_YX };
   bool open_file, keep_reading, header_free, read_cycles, keep_cycling;
-  bool cycle_free, spectrum_return, vis_cycled;
+  bool cycle_free, spectrum_return, vis_cycled, cache_hit_vis_data;
   double cycle_mjd, cycle_start, cycle_end, half_cycle;
   struct scan_header_data *sh = NULL;
   struct cycle_data *cycle_data = NULL;
@@ -193,16 +201,30 @@ void data_reader(int read_type, int n_rpfits_files,
   }
 
   // Reset counters if required.
+  cache_hit_vis_data = false;
   if (read_type & COMPUTE_VIS_PRODUCTS) {
-    if ((vis_data != NULL) && (*vis_data == NULL)) {
-      // Need to allocate some memory.
-      MALLOC(*vis_data, 1);
+    // Check whether we have a cached product for this.
+    for (i = 0; i < cache_vis_data.num_cache_vis_data; i++) {
+      if (ampphase_options_match(ampphase_options,
+                                 cache_vis_data.ampphase_options[i])) {
+        cache_hit_vis_data = true;
+        *vis_data = cache_vis_data.vis_data[i];
+        read_type -= COMPUTE_VIS_PRODUCTS;
+        break;
+      }
     }
-    (*vis_data)->nviscycles = 0;
-    (*vis_data)->header_data = NULL;
-    (*vis_data)->num_ifs = NULL;
-    (*vis_data)->num_pols = NULL;
-    (*vis_data)->vis_quantities = NULL;
+
+    if (cache_hit_vis_data == false) {
+      if ((vis_data != NULL) && (*vis_data == NULL)) {
+        // Need to allocate some memory.
+        MALLOC(*vis_data, 1);
+      }
+      (*vis_data)->nviscycles = 0;
+      (*vis_data)->header_data = NULL;
+      (*vis_data)->num_ifs = NULL;
+      (*vis_data)->num_pols = NULL;
+      (*vis_data)->vis_quantities = NULL;
+    }
   }
   
   for (i = 0; i < n_rpfits_files; i++) {
@@ -427,6 +449,17 @@ void data_reader(int read_type, int n_rpfits_files,
       return;
     }
   }
+
+  // Store the vis data in the cache if we need to.
+  if ((read_type & COMPUTE_VIS_PRODUCTS) && (!cache_hit_vis_data)) {
+    REALLOC(cache_vis_data.ampphase_options, (cache_vis_data.num_cache_vis_data + 1));
+    REALLOC(cache_vis_data.vis_data, (cache_vis_data.num_cache_vis_data + 1));
+    MALLOC(cache_vis_data.ampphase_options[cache_vis_data.num_cache_vis_data], 1);
+    copy_ampphase_options(cache_vis_data.ampphase_options[cache_vis_data.num_cache_vis_data],
+                          ampphase_options);
+    cache_vis_data.vis_data[cache_vis_data.num_cache_vis_data] = *vis_data;
+    cache_vis_data.num_cache_vis_data++;
+  }
 }
 
 #define RPSENDBUFSIZE 104857600
@@ -442,7 +475,7 @@ static void sighandler(int sig) {
 
 int main(int argc, char *argv[]) {
   struct arguments arguments;
-  int i, j, k, ri, rj, bytes_received, r;
+  int i, j, k, l, ri, rj, bytes_received, r;
   double mjd_grab;
   struct rpfits_file_information **info_rpfits_files = NULL;
   struct ampphase_options *ampphase_options = NULL;
@@ -487,6 +520,11 @@ int main(int argc, char *argv[]) {
     return(-1);
   }
 
+  // Reset our cache.
+  cache_vis_data.num_cache_vis_data = 0;
+  cache_vis_data.ampphase_options = NULL;
+  cache_vis_data.vis_data = NULL;
+  
   // Set up our signal handler.
   signal(SIGINT, sighandler);
   
@@ -637,7 +675,9 @@ int main(int argc, char *argv[]) {
             unpack_requests(&cmp, &client_request);
 
             // Do what we've been asked to do.
-            printf(" The request type is %d.\n", client_request.request_type);
+            printf(" %s from client %s.\n",
+                   get_type_string(TYPE_REQUEST, client_request.request_type),
+                   client_request.client_id);
             if ((client_request.request_type == REQUEST_CURRENT_SPECTRUM) ||
                 (client_request.request_type == REQUEST_CURRENT_VISDATA)) {
               // We're going to send the currently cached data to this socket.
@@ -671,24 +711,32 @@ int main(int argc, char *argv[]) {
       }
     }
   }
-  // Free the vis memory.
-  for (i = 0; i < vis_data->nviscycles; i++) {
-    for (j = 0; j < vis_data->num_ifs[i]; j++) {
-      for (k = 0; k < vis_data->num_pols[i][j]; k++) {
-        free_vis_quantities(&(vis_data->vis_quantities[i][j][k]));
+  // Free the vis cache.
+  for (l = 0; l < cache_vis_data.num_cache_vis_data; l++) {
+    vis_data = cache_vis_data.vis_data[l];
+    for (i = 0; i < vis_data->nviscycles; i++) {
+      for (j = 0; j < vis_data->num_ifs[i]; j++) {
+        for (k = 0; k < vis_data->num_pols[i][j]; k++) {
+          free_vis_quantities(&(vis_data->vis_quantities[i][j][k]));
+        }
+        FREE(vis_data->vis_quantities[i][j]);
       }
-      FREE(vis_data->vis_quantities[i][j]);
+      /* free_scan_header_data(vis_data->header_data[i]); */
+      /* FREE(vis_data->header_data[i]); */
+      FREE(vis_data->num_pols[i]);
+      FREE(vis_data->vis_quantities[i]);
     }
-    /* free_scan_header_data(vis_data->header_data[i]); */
-    /* FREE(vis_data->header_data[i]); */
-    FREE(vis_data->num_pols[i]);
-    FREE(vis_data->vis_quantities[i]);
+    FREE(vis_data->header_data);
+    FREE(vis_data->num_pols);
+    FREE(vis_data->num_ifs);
+    FREE(vis_data->vis_quantities);
+    FREE(vis_data);
+    FREE(cache_vis_data.ampphase_options[l]->min_tvchannel);
+    FREE(cache_vis_data.ampphase_options[l]->max_tvchannel);
+    FREE(cache_vis_data.ampphase_options[l]);
   }
-  FREE(vis_data->header_data);
-  FREE(vis_data->num_pols);
-  FREE(vis_data->num_ifs);
-  FREE(vis_data->vis_quantities);
-  FREE(vis_data);
+  FREE(cache_vis_data.vis_data);
+  FREE(cache_vis_data.ampphase_options);
 
   // Free the spectrum memory.
   for (i = 0; i < spectrum_data->num_ifs; i++) {

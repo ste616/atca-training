@@ -185,3 +185,5 @@ int cmpfunc_complex(const void *a, const void *b);
 int ampphase_average(struct ampphase *ampphase,
 		     struct vis_quantities **vis_quantities,
 		     struct ampphase_options *options);
+bool ampphase_options_match(struct ampphase_options *a,
+                            struct ampphase_options *b);

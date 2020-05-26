@@ -387,7 +387,7 @@ int main(int argc, char *argv[]) {
   struct responses server_response;
   SOCKET socket_peer, max_socket = -1;
   char *recv_buffer = NULL, send_buffer[VISBUFSIZE], htime[20];
-  char **mesgout = NULL;
+  char **mesgout = NULL, client_id[CLIENTIDLENGTH];
   fd_set watchset, reads;
   bool vis_device_opened = false;
   size_t recv_buffer_length;
@@ -408,7 +408,7 @@ int main(int argc, char *argv[]) {
       snprintf(visband[i], VISBANDLEN, "f%d", (i + 1));
     }
   }
-  
+
   // Set the default for the arguments.
   arguments.use_file = false;
   arguments.input_file[0] = 0;
@@ -424,6 +424,10 @@ int main(int argc, char *argv[]) {
   // Parse the arguments.
   argp_parse(&argp, argc, argv, 0, 0, &arguments);
 
+  // Generate our ID.
+  generate_client_id(client_id, CLIENTIDLENGTH);
+  printf("Client ID = %s\n", client_id);
+  
   // Handle window size changes.
   signal(SIGWINCH, sighandler);
   // And interrupts.
@@ -440,6 +444,7 @@ int main(int argc, char *argv[]) {
     }
     // Send a request for the currently available VIS data.
     server_request.request_type = REQUEST_CURRENT_VISDATA;
+    strncpy(server_request.client_id, client_id, CLIENTIDLENGTH);
     init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)VISBUFSIZE);
     pack_requests(&cmp, &server_request);
     send(socket_peer, send_buffer, cmp_mem_access_get_pos(&mem), 0);
@@ -590,14 +595,5 @@ int main(int argc, char *argv[]) {
     FREE(visband[i]);
   }
   FREE(visband);
-  
-  /* // Let's print something to check. */
-  /* printf("VIS data has %d cycles:\n", vis_data.nviscycles); */
-  /* for (i = 0; i < vis_data.nviscycles; i++) { */
-  /*   printf(" Cycle %03d: NUM IFS = %d\n", i, vis_data.num_ifs[i]); */
-  /*   for (j = 0; j < vis_data.num_ifs[i]; j++) { */
-  /*     printf("  IF %02d: NUM POLS = %d\n", j, vis_data.num_pols[i][j]); */
-  /*   } */
-  /* } */
 
 }

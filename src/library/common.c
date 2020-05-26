@@ -5,6 +5,7 @@
  * This library contains functions that are useful for many of the
  * applications.
  */
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
@@ -1725,4 +1726,16 @@ void readline_print_messages(int nmesg, char **mesg) {
   rl_redisplay();
 
   FREE(saved_line);
+}
+
+void generate_client_id(char *client_id, size_t maxlen) {
+  // Generate a client ID, which will be used to allow for tagging requests
+  // to the server for later fulfilment.
+  char *p = NULL;
+  size_t i;
+  srand(time(NULL));
+  for (p = client_id, i = 0; i < (maxlen - 1); p++, i++) {
+    *p = ' ' + (rand() % 94);
+  }
+  *p = 0;
 }

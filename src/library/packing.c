@@ -771,21 +771,31 @@ void unpack_scan_header_data(cmp_ctx_t *cmp, struct scan_header_data *a) {
 void pack_requests(cmp_ctx_t *cmp, struct requests *a) {
   // The request type.
   pack_write_sint(cmp, a->request_type);
+  // The ID of the client.
+  pack_write_string(cmp, a->client_id, CLIENTIDLENGTH);
 }
 
 void unpack_requests(cmp_ctx_t *cmp, struct requests *a) {
   // The request type
   pack_read_sint(cmp, &(a->request_type));
+  // The ID of the client.
+  pack_read_string(cmp, a->client_id, CLIENTIDLENGTH);
 }
 
 void pack_responses(cmp_ctx_t *cmp, struct responses *a) {
   // The response type.
   pack_write_sint(cmp, a->response_type);
+  // The ID of the client that requested the new data, or
+  // all 0s if it's just new data.
+  pack_write_string(cmp, a->client_id, CLIENTIDLENGTH);
 }
 
 void unpack_responses(cmp_ctx_t *cmp, struct responses *a) {
   // The response type.
   pack_read_sint(cmp, &(a->response_type));
+  // The ID of the client that requested the new data, or
+  // all 0s if it's just new data.
+  pack_read_string(cmp, a->client_id, CLIENTIDLENGTH);
 }
 
 void init_cmp_memory_buffer(cmp_ctx_t *cmp, cmp_mem_access_t *mem, void *buffer,

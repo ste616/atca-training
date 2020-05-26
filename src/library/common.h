@@ -237,3 +237,4 @@ bool string_to_float(char *s, float *v);
 bool string_to_seconds(char *s, float *seconds);
 float string_to_minutes(char *s);
 void readline_print_messages(int nmesg, char **mesg);
+void generate_client_id(char *client_id, size_t maxlen);
