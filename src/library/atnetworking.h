@@ -36,8 +36,6 @@ struct requests {
   int request_type;
   // The ID of the client.
   char client_id[CLIENTIDLENGTH];
-  // The options to use when computing vis data.
-  struct ampphase_options ampphase_options;
 };
 
 // The types of response that can be given.

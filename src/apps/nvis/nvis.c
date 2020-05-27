@@ -447,7 +447,7 @@ int main(int argc, char *argv[]) {
     strncpy(server_request.client_id, client_id, CLIENTIDLENGTH);
     init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)VISBUFSIZE);
     pack_requests(&cmp, &server_request);
-    send(socket_peer, send_buffer, cmp_mem_access_get_pos(&mem), 0);
+    socket_send_buffer(socket_peer, send_buffer, cmp_mem_access_get_pos(&mem));
   }
 
   // Open the plotting device.

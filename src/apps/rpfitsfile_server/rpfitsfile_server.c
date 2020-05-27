@@ -521,13 +521,14 @@ int main(int argc, char *argv[]) {
   cmp_mem_access_t mem;
   struct addrinfo hints, *bind_address;
   char port_string[RPSBUFSIZE], address_buffer[RPSBUFSIZE];
-  char read_buffer[RPSBUFSIZE], *send_buffer = NULL;
+  char *recv_buffer = NULL, *send_buffer = NULL;
   SOCKET socket_listen, max_socket, loop_i, socket_client;
   fd_set master, reads;
   struct sockaddr_storage client_address;
   socklen_t client_len;
   struct requests client_request;
   struct responses client_response;
+  size_t recv_buffer_length;
   ssize_t bytes_sent;
   struct client_vis_data client_vis_data;
   
@@ -704,17 +705,17 @@ int main(int argc, char *argv[]) {
             printf("New connection from %s\n", address_buffer);
           } else {
             // Get the requests structure.
-            bytes_received = recv(loop_i, read_buffer, RPSBUFSIZE, 0);
+            bytes_received = socket_recv_buffer(loop_i, &recv_buffer, &recv_buffer_length);
             if (bytes_received < 1) {
               printf("Closing connection, no data received.\n");
               // The connection failed.
               FD_CLR(loop_i, &master);
               CLOSESOCKET(loop_i);
+              FREE(recv_buffer);
               continue;
             }
             printf("Received %d bytes.\n", bytes_received);
-            init_cmp_memory_buffer(&cmp, &mem, read_buffer, (size_t)RPSBUFSIZE);
-            //cmp_init(&cmp, read_buffer, buffer_reader, buffer_skipper, buffer_writer);
+            init_cmp_memory_buffer(&cmp, &mem, recv_buffer, (size_t)RPSBUFSIZE);
             unpack_requests(&cmp, &client_request);
 
             // Do what we've been asked to do.
@@ -749,6 +750,7 @@ int main(int argc, char *argv[]) {
               // Free our memory.
               FREE(send_buffer);
             }
+            FREE(recv_buffer);
           }
         }
       }
