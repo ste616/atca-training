@@ -25,10 +25,11 @@
 #define TYPE_RESPONSE   2
 
 // The types of request that can be made.
-#define REQUEST_CURRENT_SPECTRUM     1
-#define REQUEST_CURRENT_VISDATA      2
-#define REQUEST_COMPUTE_VISDATA      3
-#define REQUEST_COMPUTED_VISDATA     4
+#define REQUEST_CURRENT_SPECTRUM       1
+#define REQUEST_CURRENT_VISDATA        2
+#define REQUEST_COMPUTE_VISDATA        3
+#define REQUEST_COMPUTED_VISDATA       4
+#define CHILDREQUEST_VISDATA_COMPUTED  5
 
 // This structure handles request headers.
 struct requests {
@@ -43,6 +44,7 @@ struct requests {
 #define RESPONSE_CURRENT_VISDATA     2
 #define RESPONSE_VISDATA_COMPUTED    3
 #define RESPONSE_COMPUTED_VISDATA    4
+#define RESPONSE_VISDATA_COMPUTING   5
 
 // This structure describes response headers.
 struct responses {
@@ -52,6 +54,8 @@ struct responses {
   // all 0s if it's just new data.
   char client_id[CLIENTIDLENGTH];
 };
+
+#define JUSTRESPONSESIZE (2 * sizeof(struct responses))
 
 ssize_t socket_send_buffer(SOCKET socket, char *buffer, size_t buffer_length);
 ssize_t socket_recv_buffer(SOCKET socket, char **buffer, size_t *buffer_length);

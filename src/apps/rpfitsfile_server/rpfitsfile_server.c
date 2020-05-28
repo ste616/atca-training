@@ -115,6 +115,52 @@ struct rpfits_file_information *new_rpfits_file(void) {
   return (rv);
 }
 
+struct client_sockets {
+  int num_sockets;
+  SOCKET *socket;
+  char **client_id;
+};
+
+SOCKET find_client(struct client_sockets *clients,
+                   char *client_id) {
+  int i;
+  for (i = 0; i < clients->num_sockets; i++) {
+    if (strncmp(clients->client_id[i], client_id, CLIENTIDLENGTH) == 0) {
+      return(clients->socket[i]);
+    }
+  }
+  return(-1);
+}
+
+void add_client(struct client_sockets *clients, char *client_id,
+                SOCKET socket) {
+  int n;
+  SOCKET check;
+  // Check if we already know about it.
+  check = find_client(clients, client_id);
+  if (!ISVALIDSOCKET(check)) {
+    // Add this.
+    n = clients->num_sockets + 1;
+    REALLOC(clients->socket, n);
+    clients->socket[n - 1] = socket;
+    
+    REALLOC(clients->client_id, n);
+    MALLOC(clients->client_id[n - 1], CLIENTIDLENGTH);
+    strncpy(clients->client_id[n - 1], client_id, CLIENTIDLENGTH);
+
+    clients->num_sockets = n;
+  }
+}
+
+void free_client_sockets(struct client_sockets *clients) {
+  int i;
+  for (i = 0; i < clients->num_sockets; i++) {
+    FREE(clients->client_id[i]);
+  }
+  FREE(clients->socket);
+  FREE(clients->client_id);
+}
+
 int leap(int year) {
   // Return 1 if the year is a leap year.
   return (((!(year % 4)) &&
@@ -185,6 +231,25 @@ double date2mjd(char *obsdate, float ut_seconds) {
   return 0;
 }
 
+void add_cache_vis_data(struct ampphase_options *options,
+                        struct vis_data *data) {
+  int i, n;
+  // Check that we don't already know about the data.
+  for (i = 0; i < cache_vis_data.num_cache_vis_data; i++) {
+    if (ampphase_options_match(options,
+                               cache_vis_data.ampphase_options[i])) {
+      return;
+    }
+  }
+  // If we get here, this is new data.
+  n = cache_vis_data.num_cache_vis_data + 1;
+  REALLOC(cache_vis_data.ampphase_options, n);
+  REALLOC(cache_vis_data.vis_data, n);
+  MALLOC(cache_vis_data.ampphase_options[n - 1], 1);
+  copy_ampphase_options(cache_vis_data.ampphase_options[n - 1], options);
+  cache_vis_data.vis_data[n - 1] = data;
+  cache_vis_data.num_cache_vis_data = n;
+}
 
 void data_reader(int read_type, int n_rpfits_files,
                  double mjd_required, struct ampphase_options *ampphase_options,
@@ -456,16 +521,6 @@ void data_reader(int read_type, int n_rpfits_files,
     }
   }
 
-  // Store the vis data in the cache if we need to.
-  if ((read_type & COMPUTE_VIS_PRODUCTS) && (!cache_hit_vis_data)) {
-    REALLOC(cache_vis_data.ampphase_options, (cache_vis_data.num_cache_vis_data + 1));
-    REALLOC(cache_vis_data.vis_data, (cache_vis_data.num_cache_vis_data + 1));
-    MALLOC(cache_vis_data.ampphase_options[cache_vis_data.num_cache_vis_data], 1);
-    copy_ampphase_options(cache_vis_data.ampphase_options[cache_vis_data.num_cache_vis_data],
-                          ampphase_options);
-    cache_vis_data.vis_data[cache_vis_data.num_cache_vis_data] = *vis_data;
-    cache_vis_data.num_cache_vis_data++;
-  }
 }
 
 #define RPSENDBUFSIZE 104857600
@@ -513,24 +568,27 @@ int main(int argc, char *argv[]) {
   int i, j, k, l, ri, rj, bytes_received, r;
   double mjd_grab;
   struct rpfits_file_information **info_rpfits_files = NULL;
-  struct ampphase_options *ampphase_options = NULL;
+  struct ampphase_options *ampphase_options = NULL, *client_options = NULL;
   struct spectrum_data *spectrum_data;
   struct vis_data *vis_data = NULL;
   FILE *fh = NULL;
-  cmp_ctx_t cmp;
-  cmp_mem_access_t mem;
+  cmp_ctx_t cmp, child_cmp;
+  cmp_mem_access_t mem, child_mem;
   struct addrinfo hints, *bind_address;
   char port_string[RPSBUFSIZE], address_buffer[RPSBUFSIZE];
-  char *recv_buffer = NULL, *send_buffer = NULL;
-  SOCKET socket_listen, max_socket, loop_i, socket_client;
+  char *recv_buffer = NULL, *send_buffer = NULL, *child_send_buffer = NULL;
+  SOCKET socket_listen, max_socket, loop_i, socket_client, child_socket;
+  SOCKET alert_socket;
   fd_set master, reads;
   struct sockaddr_storage client_address;
   socklen_t client_len;
-  struct requests client_request;
+  struct requests client_request, child_request;
   struct responses client_response;
   size_t recv_buffer_length;
   ssize_t bytes_sent;
   struct client_vis_data client_vis_data;
+  pid_t pid;
+  struct client_sockets clients;
   
   // Set the defaults for the arguments.
   arguments.n_rpfits_files = 0;
@@ -566,9 +624,14 @@ int main(int argc, char *argv[]) {
   client_vis_data.num_clients = 0;
   client_vis_data.client_id = NULL;
   client_vis_data.vis_data = NULL;
+  clients.num_sockets = 0;
+  clients.socket = NULL;
+  clients.client_id = NULL;
   
   // Set up our signal handler.
   signal(SIGINT, sighandler);
+  // Ignore the deaths of our children (they won't zombify).
+  signal(SIGCHLD, SIG_IGN);
   
   // Do a scan of each RPFITS file to get time information.
   MALLOC(info_rpfits_files, arguments.n_rpfits_files);
@@ -606,7 +669,7 @@ int main(int argc, char *argv[]) {
               ampphase_options, info_rpfits_files, &spectrum_data, &vis_data);
   // This first grab of the vis_data goes into the default client slot.
   add_client_vis_data(&client_vis_data, "DEFAULT", vis_data);
-  
+  add_cache_vis_data(ampphase_options, vis_data);
   if (!arguments.network_operation) {
     // Save these spectra to a file after packing it.
     printf("Writing SPD data output file...\n");
@@ -705,7 +768,9 @@ int main(int argc, char *argv[]) {
             printf("New connection from %s\n", address_buffer);
           } else {
             // Get the requests structure.
+            /* fprintf(stderr, "Obtaining requests structure from socket %d\n", loop_i); */
             bytes_received = socket_recv_buffer(loop_i, &recv_buffer, &recv_buffer_length);
+            /* fprintf(stderr, " got %d bytes\n", bytes_received); */
             if (bytes_received < 1) {
               printf("Closing connection, no data received.\n");
               // The connection failed.
@@ -722,8 +787,11 @@ int main(int argc, char *argv[]) {
             printf(" %s from client %s.\n",
                    get_type_string(TYPE_REQUEST, client_request.request_type),
                    client_request.client_id);
+            // Add this client to our list.
+            add_client(&clients, client_request.client_id, loop_i);
             if ((client_request.request_type == REQUEST_CURRENT_SPECTRUM) ||
-                (client_request.request_type == REQUEST_CURRENT_VISDATA)) {
+                (client_request.request_type == REQUEST_CURRENT_VISDATA) ||
+                (client_request.request_type == REQUEST_COMPUTED_VISDATA)) {
               // We're going to send the currently cached data to this socket.
               // Make the buffers the size we may need.
               MALLOC(send_buffer, RPSENDBUFSIZE);
@@ -733,7 +801,10 @@ int main(int argc, char *argv[]) {
                 client_response.response_type = RESPONSE_CURRENT_SPECTRUM;
               } else if (client_request.request_type == REQUEST_CURRENT_VISDATA) {
                 client_response.response_type = RESPONSE_CURRENT_VISDATA;
+              } else if (client_request.request_type == REQUEST_COMPUTED_VISDATA) {
+                client_response.response_type = RESPONSE_COMPUTED_VISDATA;
               }
+              strncpy(client_response.client_id, client_request.client_id, CLIENTIDLENGTH);
 
               // Now move to writing to the send buffer.
               init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)RPSENDBUFSIZE);
@@ -742,14 +813,89 @@ int main(int argc, char *argv[]) {
                 pack_spectrum_data(&cmp, spectrum_data);
               } else if (client_request.request_type == REQUEST_CURRENT_VISDATA) {
                 pack_vis_data(&cmp, get_client_vis_data(&client_vis_data, "DEFAULT"));
+              } else if (client_request.request_type == REQUEST_COMPUTED_VISDATA) {
+                pack_vis_data(&cmp, get_client_vis_data(&client_vis_data,
+                                                        client_request.client_id));
               }
 
               // Send this data.
               bytes_sent = socket_send_buffer(loop_i, send_buffer, cmp_mem_access_get_pos(&mem));
-              printf(" Sent %ld bytes\n", bytes_sent);
-              // Free our memory.
-              FREE(send_buffer);
+            } else if (client_request.request_type == REQUEST_COMPUTE_VISDATA) {
+              // We've been asked to recompute vis data with a different set of options.
+              // Get the options.
+              MALLOC(client_options, 1);
+              unpack_ampphase_options(&cmp, client_options);
+              // We're going to fork and compute in the background.
+              fork();
+              pid = getpid();
+              if (pid == 0) {
+                // We're the child.
+                // First, we need to close our sockets.
+                CLOSESOCKET(socket_listen);
+                CLOSESOCKET(loop_i);
+                // Now do the computation.
+                data_reader(COMPUTE_VIS_PRODUCTS, arguments.n_rpfits_files, mjd_grab,
+                            client_options, info_rpfits_files, &spectrum_data, &vis_data);
+                // We send the data back to our parent over the network.
+                if (prepare_client_connection("localhost", arguments.port_number,
+                                              &child_socket, false)) {
+                  // We have a connection.
+                  child_request.request_type = CHILDREQUEST_VISDATA_COMPUTED;
+                  strncpy(child_request.client_id, client_request.client_id, CLIENTIDLENGTH);
+                  MALLOC(child_send_buffer, RPSENDBUFSIZE);
+                  init_cmp_memory_buffer(&child_cmp, &child_mem, child_send_buffer,
+                                         (size_t)RPSENDBUFSIZE);
+                  pack_requests(&cmp, &child_request);
+                  pack_ampphase_options(&cmp, client_options);
+                  pack_vis_data(&cmp, vis_data);
+                  bytes_sent = socket_send_buffer(child_socket, child_send_buffer,
+                                                  cmp_mem_access_get_pos(&child_mem));
+                }
+                // Don't bother with the response.
+                CLOSESOCKET(child_socket);
+                // Clean up.
+                FREE(child_send_buffer);
+                FREE(client_options);
+                // Die.
+                exit(0);
+              } else {
+                FREE(client_options->min_tvchannel);
+                FREE(client_options->max_tvchannel);
+                FREE(client_options);
+                // Return a response saying that we are doing the computation.
+                MALLOC(send_buffer, JUSTRESPONSESIZE);
+                init_cmp_memory_buffer(&cmp, &mem, send_buffer, JUSTRESPONSESIZE);
+                client_response.response_type = RESPONSE_VISDATA_COMPUTING;
+                strncpy(client_response.client_id, client_request.client_id, CLIENTIDLENGTH);
+                pack_responses(&cmp, &client_response);
+                bytes_sent = socket_send_buffer(loop_i, send_buffer,
+                                                cmp_mem_access_get_pos(&mem));
+              }
+            } else if (client_request.request_type == CHILDREQUEST_VISDATA_COMPUTED) {
+              // We're getting vis data back from our child after the computation has
+              // finished.
+              unpack_ampphase_options(&cmp, ampphase_options);
+              unpack_vis_data(&cmp, vis_data);
+              // Add this data to our cache.
+              add_cache_vis_data(ampphase_options, vis_data);
+              add_client_vis_data(&client_vis_data, client_request.client_id, vis_data);
+              // Tell the client that their data is ready.
+              // Find the client's socket.
+              alert_socket = find_client(&clients, client_request.client_id);
+              if (ISVALIDSOCKET(alert_socket)) {
+                // Craft a response.
+                client_response.response_type = RESPONSE_VISDATA_COMPUTED;
+                strncpy(client_response.client_id, client_request.client_id, CLIENTIDLENGTH);
+                MALLOC(send_buffer, JUSTRESPONSESIZE);
+                init_cmp_memory_buffer(&cmp, &mem, send_buffer, JUSTRESPONSESIZE);
+                pack_responses(&cmp, &client_response);
+                bytes_sent = socket_send_buffer(alert_socket, send_buffer,
+                                                cmp_mem_access_get_pos(&mem));
+              }
             }
+            printf(" Sent %ld bytes\n", bytes_sent);
+            // Free our memory.
+            FREE(send_buffer);
             FREE(recv_buffer);
           }
         }
@@ -817,6 +963,7 @@ int main(int argc, char *argv[]) {
   }
   FREE(client_vis_data.client_id);
   FREE(client_vis_data.vis_data);
+  free_client_sockets(&clients);
   
   if (arguments.network_operation) {
     // Close our socket.

@@ -28,6 +28,8 @@ ssize_t socket_send_buffer(SOCKET socket, char *buffer, size_t buffer_length) {
   
   // Now send the buffer.
   bytes_sent = send(socket, buffer, buffer_length, 0);
+
+  // Check if it got blocked.
   
   return(bytes_sent);
 }
@@ -38,7 +40,9 @@ ssize_t socket_recv_buffer(SOCKET socket, char **buffer, size_t *buffer_length) 
   
   // Read the size of the data first.
   bytes_read = recv(socket, &bytes_to_read, sizeof(ssize_t), 0);
-  if (bytes_read < 0) {
+  /* fprintf(stderr, " recv says we got %ld bytes and will receive %ld bytes\n", */
+  /*         bytes_read, bytes_to_read); */
+  if (bytes_read <= 0) {
     // The socket was closed.
     fprintf(stderr, "Connection closed by peer.\n");
     return(bytes_read);
