@@ -172,18 +172,18 @@ struct ampphase_options ampphase_options_default(void);
 void copy_ampphase_options(struct ampphase_options *dest,
                            struct ampphase_options *src);
 void default_tvchannels(int num_chan, float chan_width,
-			float centre_freq, int *min_tvchannel,
-			int *max_tvchannel);
+                        float centre_freq, int *min_tvchannel,
+                        int *max_tvchannel);
 void add_tvchannels_to_options(struct ampphase_options *ampphase_options,
-			       int window, int min_tvchannel, int max_tvchannel);
+                               int window, int min_tvchannel, int max_tvchannel);
 int vis_ampphase(struct scan_header_data *scan_header_data,
-		 struct cycle_data *cycle_data,
-		 struct ampphase **ampphase, int pol, int ifno,
-		 struct ampphase_options *options);
+                 struct cycle_data *cycle_data,
+                 struct ampphase **ampphase, int pol, int ifno,
+                 struct ampphase_options *options);
 int cmpfunc_real(const void *a, const void *b);
 int cmpfunc_complex(const void *a, const void *b);
 int ampphase_average(struct ampphase *ampphase,
-		     struct vis_quantities **vis_quantities,
-		     struct ampphase_options *options);
+                     struct vis_quantities **vis_quantities,
+                     struct ampphase_options *options);
 bool ampphase_options_match(struct ampphase_options *a,
                             struct ampphase_options *b);

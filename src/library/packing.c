@@ -730,6 +730,7 @@ void unpack_scan_header_data(cmp_ctx_t *cmp, struct scan_header_data *a) {
   pack_readarray_float(cmp, a->num_ifs, a->if_bandwidth);
   MALLOC(a->if_num_channels, a->num_ifs);
   pack_readarray_sint(cmp, a->num_ifs, a->if_num_channels);
+  
   MALLOC(a->if_num_stokes, a->num_ifs);
   pack_readarray_sint(cmp, a->num_ifs, a->if_num_stokes);
   MALLOC(a->if_sideband, a->num_ifs);

@@ -70,6 +70,7 @@ bool sort_baselines;
 struct vis_plotcontrols vis_plotcontrols;
 struct panelspec vis_panelspec;
 struct vis_data vis_data;
+struct ampphase_options ampphase_options;
 
 static error_t parse_opt(int key, char *arg, struct argp_state *state) {
   struct arguments *arguments = state->input;
@@ -148,12 +149,14 @@ static void sighandler(int sig) {
 }
 
 // The action magic numbers.
-#define ACTION_REFRESH_PLOT        1<<0
-#define ACTION_QUIT                1<<1
-#define ACTION_CHANGE_PLOTSURFACE  1<<2
-#define ACTION_NEW_DATA_RECEIVED   1<<3
-#define ACTION_DESCRIBE_DATA       1<<4
-#define ACTION_VISBANDS_CHANGED    1<<5
+#define ACTION_REFRESH_PLOT              1<<0
+#define ACTION_QUIT                      1<<1
+#define ACTION_CHANGE_PLOTSURFACE        1<<2
+#define ACTION_NEW_DATA_RECEIVED         1<<3
+#define ACTION_DESCRIBE_DATA             1<<4
+#define ACTION_VISBANDS_CHANGED          1<<5
+#define ACTION_AMPPHASE_OPTIONS_CHANGED  1<<6
+#define ACTION_AMPPHASE_OPTIONS_PRINT    1<<7
 
 // Callback function called for each line when accept-line
 // executed, EOF seen, or EOF character read.
@@ -161,7 +164,7 @@ static void interpret_command(char *line) {
   char **line_els = NULL, *cycomma = NULL, delim[] = " ";
   char duration[VISBUFSIZE], historystart[VISBUFSIZE];
   int nels, i, j, k, array_change_spec, nproducts, pr, closeidx = -1;
-  int change_panel = PLOT_ALL_PANELS;
+  int change_panel = PLOT_ALL_PANELS, iarg;
   float histlength, data_seconds = 0, delta_time = 0, close_time = 0;
   float limit_min, limit_max;
   struct vis_product **vis_products = NULL, *tproduct = NULL;
@@ -364,6 +367,23 @@ static void interpret_command(char *line) {
           }
         }
       }
+    } else if (minmatch("print", line_els[0], 2)) {
+      // Output some bit of information.
+      if (nels > 1) {
+        if (minmatch("computation", line_els[1], 4)) {
+          // Print the options used during computation.
+          action_required = ACTION_AMPPHASE_OPTIONS_PRINT;
+        }
+      }
+    } else if (minmatch("delavg", line_els[0], 5)) {
+      // Change the delay averaging.
+      if (nels == 2) {
+        iarg = atoi(line_els[1]);
+        if (iarg >= 1) {
+          ampphase_options.delay_averaging = iarg;
+          action_required = ACTION_AMPPHASE_OPTIONS_CHANGED;
+        }
+      }
     }
     
     FREE(line_els);
@@ -380,7 +400,7 @@ static void interpret_command(char *line) {
 
 int main(int argc, char *argv[]) {
   struct arguments arguments;
-  int i, j, r, bytes_received, nmesg = 0;
+  int i, j, r, bytes_received, nmesg = 0, fidx = 0;
   cmp_ctx_t cmp;
   cmp_mem_access_t mem;
   struct requests server_request;
@@ -485,6 +505,17 @@ int main(int argc, char *argv[]) {
       action_required |= ACTION_VISBANDS_CHANGED;
       // Reset the selected index from the data.
       data_selected_index = vis_data.nviscycles - 1;
+      // And get the ampphase_options from this selected index.
+      fidx = vis_data.num_ifs[data_selected_index];
+      copy_ampphase_options(&ampphase_options,
+                            vis_data.vis_quantities[data_selected_index][fidx - 1][0]->options);
+      // We will need to fill in all the tvchannels though...
+      for (i = 1; i < fidx; i++) {
+        ampphase_options.min_tvchannel[i] =
+          vis_data.vis_quantities[data_selected_index][i - 1][0]->options->min_tvchannel[i];
+        ampphase_options.max_tvchannel[i] =
+          vis_data.vis_quantities[data_selected_index][i - 1][0]->options->max_tvchannel[i];
+      }
     }
 
     if (action_required & ACTION_VISBANDS_CHANGED) {
@@ -533,6 +564,47 @@ int main(int argc, char *argv[]) {
       readline_print_messages(nmesg, mesgout);
       action_required -= ACTION_DESCRIBE_DATA;
     }
+
+    if (action_required & ACTION_AMPPHASE_OPTIONS_PRINT) {
+      // Output the ampphase_options that were used for the
+      // computation of the data.
+      nmesg = 0;
+      snprintf(mesgout[nmesg++], VISBUFSIZE, "VIS DATA COMPUTED WITH OPTIONS:\n");
+      snprintf(mesgout[nmesg++], VISBUFSIZE, " PHASE UNITS: %s\n",
+               (ampphase_options.phase_in_degrees ? "degrees" : "radians"));
+      snprintf(mesgout[nmesg++], VISBUFSIZE, " DELAY AVERAGING: %d\n",
+               ampphase_options.delay_averaging);
+      snprintf(mesgout[nmesg++], VISBUFSIZE, " AVERAGING METHOD: ");
+      if (ampphase_options.averaging_method & AVERAGETYPE_VECTOR) {
+        snprintf(mesgout[nmesg++], VISBUFSIZE, "VECTOR ");
+      } else if (ampphase_options.averaging_method & AVERAGETYPE_SCALAR) {
+        snprintf(mesgout[nmesg++], VISBUFSIZE, "SCALAR ");
+      }
+      if (ampphase_options.averaging_method & AVERAGETYPE_MEAN) {
+        snprintf(mesgout[nmesg++], VISBUFSIZE, "MEAN");
+      } else if (ampphase_options.averaging_method & AVERAGETYPE_MEDIAN) {
+        snprintf(mesgout[nmesg++], VISBUFSIZE, "MEDIAN");
+      }
+      snprintf(mesgout[nmesg++], VISBUFSIZE, "\n BAND TVCHANNELS:\n");
+      for (i = 1; i < ampphase_options.num_ifs; i++) {
+        snprintf(mesgout[nmesg++], VISBUFSIZE, "  F%d: %d - %d\n", i,
+                 ampphase_options.min_tvchannel[i],
+                 ampphase_options.max_tvchannel[i]);
+      }
+      readline_print_messages(nmesg, mesgout);
+      action_required -= ACTION_AMPPHASE_OPTIONS_PRINT;
+    }
+    
+    if (action_required & ACTION_AMPPHASE_OPTIONS_CHANGED) {
+      // Send the new options to the server and ask for the
+      // vis data to be recomputed.
+      server_request.request_type = REQUEST_COMPUTE_VISDATA;
+      init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)VISBUFSIZE);
+      pack_requests(&cmp, &server_request);
+      pack_ampphase_options(&cmp, &ampphase_options);
+      socket_send_buffer(socket_peer, send_buffer, cmp_mem_access_get_pos(&mem));
+      action_required -= ACTION_AMPPHASE_OPTIONS_CHANGED;
+    }
     
     if (action_required & ACTION_QUIT) {
       break;
@@ -568,9 +640,19 @@ int main(int argc, char *argv[]) {
       init_cmp_memory_buffer(&cmp, &mem, recv_buffer, recv_buffer_length);
       unpack_responses(&cmp, &server_response);
       // Check we're getting what we expect.
-      if (server_response.response_type == RESPONSE_CURRENT_VISDATA) {
+      if ((server_response.response_type == RESPONSE_CURRENT_VISDATA) ||
+          ((server_response.response_type == RESPONSE_COMPUTED_VISDATA) &&
+           (strncmp(server_response.client_id, client_id, CLIENTIDLENGTH) == 0))) {
         unpack_vis_data(&cmp, &vis_data);
         action_required = ACTION_NEW_DATA_RECEIVED;
+      } else if ((server_response.response_type == RESPONSE_VISDATA_COMPUTED) &&
+                 (strncmp(server_response.client_id, client_id, CLIENTIDLENGTH) == 0)) {
+        // We're being told new data is available after we asked for a new
+        // computation. We request this new data.
+        server_request.request_type = REQUEST_COMPUTED_VISDATA;
+        init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)VISBUFSIZE);
+        pack_requests(&cmp, &server_request);
+        socket_send_buffer(socket_peer, send_buffer, cmp_mem_access_get_pos(&mem));
       }
       FREE(recv_buffer);
     }

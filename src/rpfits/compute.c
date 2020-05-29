@@ -275,13 +275,13 @@ void default_tvchannels(int num_chan, float chan_width,
     } else {
       // 1 Mhz continuum band.
       if (centre_freq == 2100) {
-	*min_tvchannel = 200;
-	*max_tvchannel = 900;
-	return;
+        *min_tvchannel = 200;
+        *max_tvchannel = 900;
+        return;
       } else {
-	*min_tvchannel = 513;
-	*max_tvchannel = 1537;
-	return;
+        *min_tvchannel = 513;
+        *max_tvchannel = 1537;
+        return;
       }
     }
   }
@@ -590,8 +590,8 @@ int cmpfunc_complex(const void *a, const void *b) {
  * calculations are made.
  */
 int ampphase_average(struct ampphase *ampphase,
-		     struct vis_quantities **vis_quantities,
-		     struct ampphase_options *options) {
+                     struct vis_quantities **vis_quantities,
+                     struct ampphase_options *options) {
   int n_points = 0, i, j, k, n_expected = 0, n_delavg_expected = 0;
   int *delavg_n = NULL, delavg_idx = 0, n_delay_points = 0;
   int min_tvchannel, max_tvchannel;
@@ -622,9 +622,11 @@ int ampphase_average(struct ampphase *ampphase,
     // Use the options from the ampphase.
     options = ampphase->options;
   }
-  (*vis_quantities)->options = options;
   
   // Allocate the necessary arrays.
+  /* fprintf(stderr, "[ampphase_average] allocating memory for %d baselines\n", */
+  /*         (*vis_quantities)->nbaselines); */
+  
   MALLOC((*vis_quantities)->amplitude, (*vis_quantities)->nbaselines);
   MALLOC((*vis_quantities)->phase, (*vis_quantities)->nbaselines);
   MALLOC((*vis_quantities)->delay, (*vis_quantities)->nbaselines);
@@ -635,6 +637,8 @@ int ampphase_average(struct ampphase *ampphase,
     (*vis_quantities)->nbins[i] = ampphase->nbins[i];
     (*vis_quantities)->baseline[i] = ampphase->baseline[i];
     (*vis_quantities)->flagged_bad[i] = 0;
+    /* fprintf(stderr, "[ampphase_average] allocating memory for %d bins\n", */
+    /*         (*vis_quantities)->nbins[i]); */
     MALLOC((*vis_quantities)->amplitude[i], (*vis_quantities)->nbins[i]);
     MALLOC((*vis_quantities)->phase[i], (*vis_quantities)->nbins[i]);
     MALLOC((*vis_quantities)->delay[i], (*vis_quantities)->nbins[i]);
@@ -649,32 +653,39 @@ int ampphase_average(struct ampphase *ampphase,
   } else {
     // Get the default values for this type of IF.
     default_tvchannels(ampphase->nchannels,
-		       (ampphase->frequency[1] - ampphase->frequency[0]) * 1000,
-		       (1000 * ampphase->frequency[(ampphase->nchannels + 1) / 2]),
-		       &min_tvchannel, &max_tvchannel);
+                       (ampphase->frequency[1] - ampphase->frequency[0]) * 1000,
+                       (1000 * ampphase->frequency[(ampphase->nchannels + 1) / 2]),
+                       &min_tvchannel, &max_tvchannel);
     add_tvchannels_to_options(options, ampphase->window,
                               min_tvchannel, max_tvchannel);
   }
+  (*vis_quantities)->options = options;
   //n_expected = (options->max_tvchannel - options->min_tvchannel) + 1;
   n_expected = (max_tvchannel - min_tvchannel) + 1;
+  /* fprintf(stderr, "[ampphase_average] allocating memory for %d samples\n", */
+  /*         n_expected); */
   MALLOC(median_array_amplitude, n_expected);
   MALLOC(median_array_phase, n_expected);
   MALLOC(median_complex, n_expected);
   MALLOC(array_frequency, n_expected);
   // Make some arrays for the delay-averaged phases and frequencies.
   n_delavg_expected = (int)ceilf(n_expected / options->delay_averaging);
+  if (n_delavg_expected < 1) n_delavg_expected = 1;
+  /* fprintf(stderr, "[ampphase_average] allocating memory for %d delay-averaged samples\n", */
+  /*         n_delavg_expected); */
   CALLOC(delavg_frequency, n_delavg_expected);
   CALLOC(delavg_phase, n_delavg_expected);
   CALLOC(delavg_raw, n_delavg_expected);
   CALLOC(delavg_n, n_delavg_expected);
   CALLOC(median_array_delay, (n_delavg_expected - 1));
   // Do the averaging loop.
+  /* fprintf(stderr, "[ampphase_averaging] starting averaging loop\n"); */
   for (i = 0; i < (*vis_quantities)->nbaselines; i++) {
     for (k = 0; k < (*vis_quantities)->nbins[i]; k++) {
       // Check if this quantity is flagged.
       if ((options->include_flagged_data == 0) &&
-	  (ampphase->flagged_bad[i][k] == 1)) {
-	(*vis_quantities)->flagged_bad[i] += 1;
+          (ampphase->flagged_bad[i][k] == 1)) {
+        (*vis_quantities)->flagged_bad[i] += 1;
       }
       // Reset our averaging counters.
       total_amplitude = 0;
@@ -682,110 +693,110 @@ int ampphase_average(struct ampphase *ampphase,
       total_complex = 0 + 0 * I;
       n_points = 0;
       for (j = 0; j < ampphase->f_nchannels[i][k]; j++) {
-	// Check for in range.
-	if ((ampphase->f_channel[i][k][j] >= min_tvchannel) &&
-	    (ampphase->f_channel[i][k][j] < max_tvchannel)) {
-	  total_amplitude += ampphase->f_amplitude[i][k][j];
-	  total_phase += ampphase->f_phase[i][k][j];
-	  total_complex += ampphase->f_raw[i][k][j];
-	  median_array_amplitude[n_points] = ampphase->f_amplitude[i][k][j];
-	  median_array_phase[n_points] = ampphase->f_phase[i][k][j];
-	  median_complex[n_points] = ampphase->f_raw[i][k][j];
-	  array_frequency[n_points] = ampphase->f_frequency[i][k][j];
-	  n_points++;
-	  delavg_idx =
-	    (int)(floorf(ampphase->f_channel[i][k][j] - min_tvchannel) /
-		  options->delay_averaging);
-	  delavg_frequency[delavg_idx] += ampphase->f_frequency[i][k][j];
-	  delavg_raw[delavg_idx] += ampphase->f_raw[i][k][j];
-	  delavg_n[delavg_idx] += 1;
-	}
+        // Check for in range.
+        if ((ampphase->f_channel[i][k][j] >= min_tvchannel) &&
+            (ampphase->f_channel[i][k][j] < max_tvchannel)) {
+          total_amplitude += ampphase->f_amplitude[i][k][j];
+          total_phase += ampphase->f_phase[i][k][j];
+          total_complex += ampphase->f_raw[i][k][j];
+          median_array_amplitude[n_points] = ampphase->f_amplitude[i][k][j];
+          median_array_phase[n_points] = ampphase->f_phase[i][k][j];
+          median_complex[n_points] = ampphase->f_raw[i][k][j];
+          array_frequency[n_points] = ampphase->f_frequency[i][k][j];
+          n_points++;
+          delavg_idx =
+            (int)(floorf(ampphase->f_channel[i][k][j] - min_tvchannel) /
+                  options->delay_averaging);
+          delavg_frequency[delavg_idx] += ampphase->f_frequency[i][k][j];
+          delavg_raw[delavg_idx] += ampphase->f_raw[i][k][j];
+          delavg_n[delavg_idx] += 1;
+        }
       }
       if (n_points > 0) {
-	// Calculate the delay. Begin by averaging and calculating
-	// the phase in each averaging bin.
-	for (j = 0; j < n_delavg_expected; j++) {
-	  if (delavg_n[j] > 0) {
-	    delavg_raw[j] /= (float)delavg_n[j];
-	    delavg_phase[j] = cargf(delavg_raw[j]);
-	    delavg_frequency[j] /= (float)delavg_n[j];
-	  }
-	}
-	// Now work out the delays calculated between each bin.
-	for (j = 1, n_delay_points = 0; j < n_delavg_expected; j++) {
-	  if ((delavg_n[j - 1] > 0) &&
-	      (delavg_n[j] > 0)) {
-	    delta_phase = delavg_phase[j] - delavg_phase[j - 1];
-	    if (options->phase_in_degrees) {
-	      // Change to radians.
-	      delta_phase *= (M_PI / 180);
-	    }
-	    delta_frequency = delavg_frequency[j] - delavg_frequency[j - 1];
-	    // This frequency is in MHz, change to Hz.
-	    delta_frequency *= 1E6;
-	    total_delay += delta_phase / delta_frequency;
-	    median_array_delay[n_delay_points] = delta_phase / delta_frequency;
-	    n_delay_points++;
-	  }
-	}
-
-	if (options->averaging_method & AVERAGETYPE_MEAN) {
-	  if (options->averaging_method & AVERAGETYPE_SCALAR) {
-	    (*vis_quantities)->amplitude[i][k] = total_amplitude / (float)n_points;
-	    (*vis_quantities)->phase[i][k] = total_phase / (float)n_points;
-	  } else if (options->averaging_method & AVERAGETYPE_VECTOR) {
-	    average_complex = total_complex / (float)n_points;
-	    (*vis_quantities)->amplitude[i][k] = cabsf(average_complex);
-	    (*vis_quantities)->phase[i][k] = cargf(average_complex);
-	  }
-	  // Calculate the final average delay, return in ns.
-	  (*vis_quantities)->delay[i][k] = (n_delay_points > 0) ?
-	    (1E9 * total_delay / (float)n_delay_points) : 0;
-	} else if (options->averaging_method & AVERAGETYPE_MEDIAN) {
-	  if (options->averaging_method & AVERAGETYPE_SCALAR) {
-	    qsort(median_array_amplitude, n_points, sizeof(float), cmpfunc_real);
-	    qsort(median_array_phase, n_points, sizeof(float), cmpfunc_real);
-	    if (n_points % 2) {
-	      // Odd number of points.
-	      (*vis_quantities)->amplitude[i][k] =
-		median_array_amplitude[(n_points + 1) / 2];
-	      (*vis_quantities)->phase[i][k] =
-		median_array_phase[(n_points + 1) / 2];
-	    } else {
-	      (*vis_quantities)->amplitude[i][k] =
-		(median_array_amplitude[n_points / 2] +
-		 median_array_amplitude[n_points / 2 + 1]) / 2;
-	      (*vis_quantities)->phase[i][k] =
-		(median_array_amplitude[n_points / 2] +
-		 median_array_amplitude[n_points / 2 + 1]) / 2;
-	    }
-	  } else if (options->averaging_method & AVERAGETYPE_VECTOR) {
-	    qsort(median_complex, n_points, sizeof(float complex), cmpfunc_complex);
-	    if (n_points % 2) {
-	      average_complex = median_complex[(n_points + 1) / 2];
-	    } else {
-	      average_complex =
-		(median_complex[n_points / 2] + median_complex[n_points / 2 + 1]) / 2;
-	    }
-	    (*vis_quantities)->amplitude[i][k] = cabsf(average_complex);
-	    (*vis_quantities)->phase[i][k] = cargf(average_complex);
-	  }
-	  // Calculate the final median delay, return in ns.
-	  if (n_delay_points == 0) {
-	    (*vis_quantities)->delay[i][k] = 0;
-	  } else {
-	    qsort(median_array_delay, n_delay_points, sizeof(float),
-		  cmpfunc_real);
-	    if (n_delay_points % 2) {
-	      (*vis_quantities)->delay[i][k] = 1E9 *
-		median_array_delay[(n_delay_points + 1) / 2];
-	    } else {
-	      (*vis_quantities)->delay[i][k] = 1E9 *
-		(median_array_delay[n_delay_points / 2] +
-		 median_array_delay[n_delay_points / 2 + 1]) / 2;
-	    }
-	  }
-	}
+        // Calculate the delay. Begin by averaging and calculating
+        // the phase in each averaging bin.
+        for (j = 0; j < n_delavg_expected; j++) {
+          if (delavg_n[j] > 0) {
+            delavg_raw[j] /= (float)delavg_n[j];
+            delavg_phase[j] = cargf(delavg_raw[j]);
+            delavg_frequency[j] /= (float)delavg_n[j];
+          }
+        }
+        // Now work out the delays calculated between each bin.
+        for (j = 1, n_delay_points = 0; j < n_delavg_expected; j++) {
+          if ((delavg_n[j - 1] > 0) &&
+              (delavg_n[j] > 0)) {
+            delta_phase = delavg_phase[j] - delavg_phase[j - 1];
+            if (options->phase_in_degrees) {
+              // Change to radians.
+              delta_phase *= (M_PI / 180);
+            }
+            delta_frequency = delavg_frequency[j] - delavg_frequency[j - 1];
+            // This frequency is in MHz, change to Hz.
+            delta_frequency *= 1E6;
+            total_delay += delta_phase / delta_frequency;
+            median_array_delay[n_delay_points] = delta_phase / delta_frequency;
+            n_delay_points++;
+          }
+        }
+        
+        if (options->averaging_method & AVERAGETYPE_MEAN) {
+          if (options->averaging_method & AVERAGETYPE_SCALAR) {
+            (*vis_quantities)->amplitude[i][k] = total_amplitude / (float)n_points;
+            (*vis_quantities)->phase[i][k] = total_phase / (float)n_points;
+          } else if (options->averaging_method & AVERAGETYPE_VECTOR) {
+            average_complex = total_complex / (float)n_points;
+            (*vis_quantities)->amplitude[i][k] = cabsf(average_complex);
+            (*vis_quantities)->phase[i][k] = cargf(average_complex);
+          }
+          // Calculate the final average delay, return in ns.
+          (*vis_quantities)->delay[i][k] = (n_delay_points > 0) ?
+            (1E9 * total_delay / (float)n_delay_points) : 0;
+        } else if (options->averaging_method & AVERAGETYPE_MEDIAN) {
+          if (options->averaging_method & AVERAGETYPE_SCALAR) {
+            qsort(median_array_amplitude, n_points, sizeof(float), cmpfunc_real);
+            qsort(median_array_phase, n_points, sizeof(float), cmpfunc_real);
+            if (n_points % 2) {
+              // Odd number of points.
+              (*vis_quantities)->amplitude[i][k] =
+                median_array_amplitude[(n_points + 1) / 2];
+              (*vis_quantities)->phase[i][k] =
+                median_array_phase[(n_points + 1) / 2];
+            } else {
+              (*vis_quantities)->amplitude[i][k] =
+                (median_array_amplitude[n_points / 2] +
+                 median_array_amplitude[n_points / 2 + 1]) / 2;
+              (*vis_quantities)->phase[i][k] =
+                (median_array_amplitude[n_points / 2] +
+                 median_array_amplitude[n_points / 2 + 1]) / 2;
+            }
+          } else if (options->averaging_method & AVERAGETYPE_VECTOR) {
+            qsort(median_complex, n_points, sizeof(float complex), cmpfunc_complex);
+            if (n_points % 2) {
+              average_complex = median_complex[(n_points + 1) / 2];
+            } else {
+              average_complex =
+                (median_complex[n_points / 2] + median_complex[n_points / 2 + 1]) / 2;
+            }
+            (*vis_quantities)->amplitude[i][k] = cabsf(average_complex);
+            (*vis_quantities)->phase[i][k] = cargf(average_complex);
+          }
+          // Calculate the final median delay, return in ns.
+          if (n_delay_points == 0) {
+            (*vis_quantities)->delay[i][k] = 0;
+          } else {
+            qsort(median_array_delay, n_delay_points, sizeof(float),
+                  cmpfunc_real);
+            if (n_delay_points % 2) {
+              (*vis_quantities)->delay[i][k] = 1E9 *
+                median_array_delay[(n_delay_points + 1) / 2];
+            } else {
+              (*vis_quantities)->delay[i][k] = 1E9 *
+                (median_array_delay[n_delay_points / 2] +
+                 median_array_delay[n_delay_points / 2 + 1]) / 2;
+            }
+          }
+        }
       }
     }
   }

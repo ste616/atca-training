@@ -275,6 +275,11 @@ void data_reader(int read_type, int n_rpfits_files,
   cache_hit_vis_data = false;
   if (read_type & COMPUTE_VIS_PRODUCTS) {
     // Check whether we have a cached product for this.
+    printf("[data_reader] checking for cached vis products...\n");
+    printf("[data_reader] %s delavg %d %d\n",
+           (ampphase_options->phase_in_degrees ? "degrees" : "radians"),
+           ampphase_options->delay_averaging, ampphase_options->averaging_method);
+
     for (i = 0; i < cache_vis_data.num_cache_vis_data; i++) {
       if (ampphase_options_match(ampphase_options,
                                  cache_vis_data.ampphase_options[i])) {
@@ -284,8 +289,8 @@ void data_reader(int read_type, int n_rpfits_files,
         break;
       }
     }
-
     if (cache_hit_vis_data == false) {
+      printf("[data_reader] no cache hit\n");
       if ((vis_data != NULL) && (*vis_data == NULL)) {
         // Need to allocate some memory.
         MALLOC(*vis_data, 1);
@@ -295,6 +300,8 @@ void data_reader(int read_type, int n_rpfits_files,
       (*vis_data)->num_ifs = NULL;
       (*vis_data)->num_pols = NULL;
       (*vis_data)->vis_quantities = NULL;
+    } else {
+      printf("[data_reader] found cache hit\n");
     }
   }
   
@@ -305,6 +312,8 @@ void data_reader(int read_type, int n_rpfits_files,
     if (read_type & READ_SCAN_METADATA) {
       open_file = true;
     }
+    // When we start storing things in memory later, we will need to alter
+    // this section.
     if (read_type & GRAB_SPECTRUM) {
       // Does this file encompass the time we want?
       half_cycle = (double)info_rpfits_files[i]->scan_headers[0]->cycle_time / (2.0 * 86400.0);
@@ -317,6 +326,10 @@ void data_reader(int read_type, int n_rpfits_files,
         /* 	       info_rpfits_files[i]->filename, mjd_required); */
       }
     }
+    if (read_type & COMPUTE_VIS_PRODUCTS) {
+      open_file = true;
+    }
+    
     if (!open_file) {
       continue;
     }
@@ -348,11 +361,11 @@ void data_reader(int read_type, int n_rpfits_files,
         header_free = false;
       }
       res = read_scan_header(sh);
+      /* printf("[data_reader] read scan header\n"); */
       if (sh->ut_seconds > 0) {
         curr_header += 1;
         if (read_type & READ_SCAN_METADATA) {
           // Keep track of the times covered by each scan.
-          //header_free = false;
           info_rpfits_files[i]->scan_start_mjd[n] =
             info_rpfits_files[i]->scan_end_mjd[n] = date2mjd(sh->obsdate, sh->ut_seconds);
           info_rpfits_files[i]->n_scans += 1;
@@ -381,9 +394,12 @@ void data_reader(int read_type, int n_rpfits_files,
           }
         }
         if (read_cycles && (res & READER_DATA_AVAILABLE)) {
+          /* printf("[data_reader] reading cycles from this scan...\n"); */
           keep_cycling = true;
           while (keep_cycling) {
+            /* fprintf(stderr, "[data_reader] preparing new cycle data...\n"); */
             cycle_data = prepare_new_cycle_data();
+            /* fprintf(stderr, "[data_reader] reading cycle data...\n"); */
             res = read_cycle_data(sh, cycle_data);
             cycle_free = true;
             if (!(res & READER_DATA_AVAILABLE)) {
@@ -414,10 +430,12 @@ void data_reader(int read_type, int n_rpfits_files,
                 // We need this cycle.
                 // Allocate all the memory we need.
                 /* printf("cycle found!\n"); */
+                /* fprintf(stderr, "[data_reader] making a temporary spectrum...\n"); */
                 MALLOC(temp_spectrum, 1);
                 // Prepare the spectrum data structure.
                 temp_spectrum->num_ifs = sh->num_ifs;
                 temp_spectrum->header_data = info_rpfits_files[i]->scan_headers[curr_header];
+                /* fprintf(stderr, "[data_reader] allocating some memory...\n"); */
                 MALLOC(temp_spectrum->spectrum, temp_spectrum->num_ifs);
                 if (read_type & COMPUTE_VIS_PRODUCTS) {
                   REALLOC((*vis_data)->vis_quantities,
@@ -449,6 +467,7 @@ void data_reader(int read_type, int n_rpfits_files,
                   for (idx_pol = 0; idx_pol < temp_spectrum->num_pols; idx_pol++) {
                     MALLOC(local_ampphase_options, 1);
                     copy_ampphase_options(local_ampphase_options, ampphase_options);
+                    /* fprintf(stderr, "[data_reader] calculating amp products\n"); */
                     calcres = vis_ampphase(sh, cycle_data,
                                            &(temp_spectrum->spectrum[idx_if][idx_pol]),
                                            pols[idx_pol], sh->if_label[idx_if],
@@ -463,9 +482,11 @@ void data_reader(int read_type, int n_rpfits_files,
                     if (read_type & COMPUTE_VIS_PRODUCTS) {
                       MALLOC(local_ampphase_options, 1);
                       copy_ampphase_options(local_ampphase_options, ampphase_options);
+                      /* fprintf(stderr, "[data_reader] calculating vis products\n"); */
                       ampphase_average(temp_spectrum->spectrum[idx_if][idx_pol],
                                        &((*vis_data)->vis_quantities[(*vis_data)->nviscycles][idx_if][idx_pol]),
                                        local_ampphase_options);
+                      /* fprintf(stderr, "[data_reader] calculated vis products\n"); */
                       vis_cycled = true;
                     }
                   }
@@ -570,7 +591,7 @@ int main(int argc, char *argv[]) {
   struct rpfits_file_information **info_rpfits_files = NULL;
   struct ampphase_options *ampphase_options = NULL, *client_options = NULL;
   struct spectrum_data *spectrum_data;
-  struct vis_data *vis_data = NULL;
+  struct vis_data *vis_data = NULL, *child_vis_data = NULL;
   FILE *fh = NULL;
   cmp_ctx_t cmp, child_cmp;
   cmp_mem_access_t mem, child_mem;
@@ -720,7 +741,6 @@ int main(int argc, char *argv[]) {
       fprintf(stderr, "listen() failed. (%d)\n", GETSOCKETERRNO());
       return(1);
     }
-    
 
     // Enter our main loop.
     FD_ZERO(&master);
@@ -768,9 +788,7 @@ int main(int argc, char *argv[]) {
             printf("New connection from %s\n", address_buffer);
           } else {
             // Get the requests structure.
-            /* fprintf(stderr, "Obtaining requests structure from socket %d\n", loop_i); */
             bytes_received = socket_recv_buffer(loop_i, &recv_buffer, &recv_buffer_length);
-            /* fprintf(stderr, " got %d bytes\n", bytes_received); */
             if (bytes_received < 1) {
               printf("Closing connection, no data received.\n");
               // The connection failed.
@@ -780,7 +798,7 @@ int main(int argc, char *argv[]) {
               continue;
             }
             printf("Received %d bytes.\n", bytes_received);
-            init_cmp_memory_buffer(&cmp, &mem, recv_buffer, (size_t)RPSBUFSIZE);
+            init_cmp_memory_buffer(&cmp, &mem, recv_buffer, recv_buffer_length);
             unpack_requests(&cmp, &client_request);
 
             // Do what we've been asked to do.
@@ -819,6 +837,9 @@ int main(int argc, char *argv[]) {
               }
 
               // Send this data.
+              printf(" %s to client %s.\n",
+                     get_type_string(TYPE_RESPONSE, client_response.response_type),
+                     client_request.client_id);
               bytes_sent = socket_send_buffer(loop_i, send_buffer, cmp_mem_access_get_pos(&mem));
             } else if (client_request.request_type == REQUEST_COMPUTE_VISDATA) {
               // We've been asked to recompute vis data with a different set of options.
@@ -826,16 +847,17 @@ int main(int argc, char *argv[]) {
               MALLOC(client_options, 1);
               unpack_ampphase_options(&cmp, client_options);
               // We're going to fork and compute in the background.
-              fork();
-              pid = getpid();
+              pid = fork();
               if (pid == 0) {
                 // We're the child.
                 // First, we need to close our sockets.
                 CLOSESOCKET(socket_listen);
                 CLOSESOCKET(loop_i);
                 // Now do the computation.
+                printf("CHILD STARTED! Computing data...\n");
+                
                 data_reader(COMPUTE_VIS_PRODUCTS, arguments.n_rpfits_files, mjd_grab,
-                            client_options, info_rpfits_files, &spectrum_data, &vis_data);
+                            client_options, info_rpfits_files, &spectrum_data, &child_vis_data);
                 // We send the data back to our parent over the network.
                 if (prepare_client_connection("localhost", arguments.port_number,
                                               &child_socket, false)) {
@@ -845,18 +867,22 @@ int main(int argc, char *argv[]) {
                   MALLOC(child_send_buffer, RPSENDBUFSIZE);
                   init_cmp_memory_buffer(&child_cmp, &child_mem, child_send_buffer,
                                          (size_t)RPSENDBUFSIZE);
-                  pack_requests(&cmp, &child_request);
-                  pack_ampphase_options(&cmp, client_options);
-                  pack_vis_data(&cmp, vis_data);
+                  pack_requests(&child_cmp, &child_request);
+                  pack_ampphase_options(&child_cmp, client_options);
+                  pack_vis_data(&child_cmp, child_vis_data);
+                  printf("[CHILD] %s for client %s.\n",
+                         get_type_string(TYPE_REQUEST, child_request.request_type),
+                         client_request.client_id);
                   bytes_sent = socket_send_buffer(child_socket, child_send_buffer,
                                                   cmp_mem_access_get_pos(&child_mem));
+                  FREE(child_send_buffer);
                 }
                 // Don't bother with the response.
                 CLOSESOCKET(child_socket);
                 // Clean up.
-                FREE(child_send_buffer);
                 FREE(client_options);
                 // Die.
+                printf("CHILD IS FINISHED!\n");
                 exit(0);
               } else {
                 FREE(client_options->min_tvchannel);
@@ -868,15 +894,21 @@ int main(int argc, char *argv[]) {
                 client_response.response_type = RESPONSE_VISDATA_COMPUTING;
                 strncpy(client_response.client_id, client_request.client_id, CLIENTIDLENGTH);
                 pack_responses(&cmp, &client_response);
+                printf(" %s to client %s.\n",
+                       get_type_string(TYPE_RESPONSE, client_response.response_type),
+                       client_request.client_id);
                 bytes_sent = socket_send_buffer(loop_i, send_buffer,
                                                 cmp_mem_access_get_pos(&mem));
               }
             } else if (client_request.request_type == CHILDREQUEST_VISDATA_COMPUTED) {
               // We're getting vis data back from our child after the computation has
               // finished.
+              fprintf(stderr, "[PARENT] unpacking ampphase options\n");
               unpack_ampphase_options(&cmp, ampphase_options);
+              fprintf(stderr, "[PARENT] unpacking vis data\n");
               unpack_vis_data(&cmp, vis_data);
               // Add this data to our cache.
+              fprintf(stderr, "[PARENT] adding data to cache\n");
               add_cache_vis_data(ampphase_options, vis_data);
               add_client_vis_data(&client_vis_data, client_request.client_id, vis_data);
               // Tell the client that their data is ready.
@@ -889,6 +921,9 @@ int main(int argc, char *argv[]) {
                 MALLOC(send_buffer, JUSTRESPONSESIZE);
                 init_cmp_memory_buffer(&cmp, &mem, send_buffer, JUSTRESPONSESIZE);
                 pack_responses(&cmp, &client_response);
+                printf(" %s to client %s.\n",
+                       get_type_string(TYPE_RESPONSE, client_response.response_type),
+                       client_request.client_id);
                 bytes_sent = socket_send_buffer(alert_socket, send_buffer,
                                                 cmp_mem_access_get_pos(&mem));
               }

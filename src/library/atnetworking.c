@@ -40,8 +40,6 @@ ssize_t socket_recv_buffer(SOCKET socket, char **buffer, size_t *buffer_length) 
   
   // Read the size of the data first.
   bytes_read = recv(socket, &bytes_to_read, sizeof(ssize_t), 0);
-  /* fprintf(stderr, " recv says we got %ld bytes and will receive %ld bytes\n", */
-  /*         bytes_read, bytes_to_read); */
   if (bytes_read <= 0) {
     // The socket was closed.
     fprintf(stderr, "Connection closed by peer.\n");
@@ -108,14 +106,20 @@ const char *get_type_string(int type, int id) {
   // Get a string representation of the type of request or response,
   // specified by type=TYPE_REQUEST or TYPE_RESPONSE, and
   // id being one of the definitions in the header.
-  int max_request = 3, max_response = 3;
+  int max_request = 6, max_response = 6;
   const char* const request_strings[] = { "",
                                           "REQUEST_CURRENT_SPECTRUM",
-                                          "REQUEST_CURRENT_VISDATA"
+                                          "REQUEST_CURRENT_VISDATA",
+                                          "REQUEST_COMPUTE_VISDATA",
+                                          "REQUEST_COMPUTED_VISDATA",
+                                          "CHILDREQUEST_VISDATA_COMPUTED"
   };
   const char* const response_strings[] = { "",
                                            "RESPONSE_CURRENT_SPECTRUM",
-                                           "RESPONSE_CURRENT_VISDATA"
+                                           "RESPONSE_CURRENT_VISDATA",
+                                           "RESPONSE_VISDATA_COMPUTED",
+                                           "RESPONSE_COMPUTED_VISDATA",
+                                           "RESPONSE_VISDATA_COMPUTING"
   };
 
   if ((type == TYPE_REQUEST) && (id >= 0) && (id < max_request)) {
