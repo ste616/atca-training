@@ -322,10 +322,10 @@ void add_tvchannels_to_options(struct ampphase_options *ampphase_options,
  * and which IF and bin.
  */
 int vis_ampphase(struct scan_header_data *scan_header_data,
-		 struct cycle_data *cycle_data,
-		 struct ampphase **ampphase,
-		 int pol, int ifnum,
-		 struct ampphase_options *options) {
+                 struct cycle_data *cycle_data,
+                 struct ampphase **ampphase,
+                 int pol, int ifnum,
+                 struct ampphase_options *options) {
   int ap_created = 0, reqpol = -1, i = 0, polnum = -1, bl = -1, bidx = -1;
   int j = 0, jflag = 0, vidx = -1, cidx = -1, ifno;
   float rcheck = 0, chanwidth, firstfreq, nhalfchan;
@@ -481,18 +481,18 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
       REALLOC((*ampphase)->f_phase[bidx], cycle_data->bin[i]);
       REALLOC((*ampphase)->f_raw[bidx], cycle_data->bin[i]);
       for (j = (*ampphase)->nbins[bidx]; j < cycle_data->bin[i]; j++) {
-	(*ampphase)->flagged_bad[bidx][j] = cycle_data->flag[i];
-	MALLOC((*ampphase)->weight[bidx][j], (*ampphase)->nchannels);
-	MALLOC((*ampphase)->amplitude[bidx][j], (*ampphase)->nchannels);
-	MALLOC((*ampphase)->phase[bidx][j], (*ampphase)->nchannels);
-	MALLOC((*ampphase)->raw[bidx][j], (*ampphase)->nchannels);
-	(*ampphase)->f_nchannels[bidx][j] = (*ampphase)->nchannels;
-	MALLOC((*ampphase)->f_channel[bidx][j], (*ampphase)->nchannels);
-	MALLOC((*ampphase)->f_frequency[bidx][j], (*ampphase)->nchannels);
-	MALLOC((*ampphase)->f_weight[bidx][j], (*ampphase)->nchannels);
-	MALLOC((*ampphase)->f_amplitude[bidx][j], (*ampphase)->nchannels);
-	MALLOC((*ampphase)->f_phase[bidx][j], (*ampphase)->nchannels);
-	MALLOC((*ampphase)->f_raw[bidx][j], (*ampphase)->nchannels);
+        (*ampphase)->flagged_bad[bidx][j] = cycle_data->flag[i];
+        MALLOC((*ampphase)->weight[bidx][j], (*ampphase)->nchannels);
+        MALLOC((*ampphase)->amplitude[bidx][j], (*ampphase)->nchannels);
+        MALLOC((*ampphase)->phase[bidx][j], (*ampphase)->nchannels);
+        MALLOC((*ampphase)->raw[bidx][j], (*ampphase)->nchannels);
+        (*ampphase)->f_nchannels[bidx][j] = (*ampphase)->nchannels;
+        MALLOC((*ampphase)->f_channel[bidx][j], (*ampphase)->nchannels);
+        MALLOC((*ampphase)->f_frequency[bidx][j], (*ampphase)->nchannels);
+        MALLOC((*ampphase)->f_weight[bidx][j], (*ampphase)->nchannels);
+        MALLOC((*ampphase)->f_amplitude[bidx][j], (*ampphase)->nchannels);
+        MALLOC((*ampphase)->f_phase[bidx][j], (*ampphase)->nchannels);
+        MALLOC((*ampphase)->f_raw[bidx][j], (*ampphase)->nchannels);
       }
       (*ampphase)->nbins[bidx] = cycle_data->bin[i];
     }
@@ -507,64 +507,64 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
       (*ampphase)->phase[bidx][cidx][j] = cargf(cycle_data->vis[i][vidx]);
       (*ampphase)->raw[bidx][cidx][j] = cycle_data->vis[i][vidx];
       if (options->phase_in_degrees == true) {
-	(*ampphase)->phase[bidx][cidx][j] *= (180 / M_PI);
+        (*ampphase)->phase[bidx][cidx][j] *= (180 / M_PI);
       }
       // Now assign the data to the arrays considering flagging.
       rcheck = crealf(cycle_data->vis[i][vidx]);
       if (rcheck != rcheck) {
-	// A bad channel.
-	(*ampphase)->f_nchannels[bidx][cidx] -= 1;
+        // A bad channel.
+        (*ampphase)->f_nchannels[bidx][cidx] -= 1;
       } else {
-	(*ampphase)->f_channel[bidx][cidx][jflag] = (*ampphase)->channel[j];
-	(*ampphase)->f_frequency[bidx][cidx][jflag] = (*ampphase)->frequency[j];
-	(*ampphase)->f_weight[bidx][cidx][jflag] =
-	  (*ampphase)->weight[bidx][cidx][j];
-	(*ampphase)->f_amplitude[bidx][cidx][jflag] =
-	  (*ampphase)->amplitude[bidx][cidx][j];
-	(*ampphase)->f_phase[bidx][cidx][jflag] =
-	  (*ampphase)->phase[bidx][cidx][j];
-	(*ampphase)->f_raw[bidx][cidx][jflag] =
-	  (*ampphase)->raw[bidx][cidx][j];
-	jflag++;
+        (*ampphase)->f_channel[bidx][cidx][jflag] = (*ampphase)->channel[j];
+        (*ampphase)->f_frequency[bidx][cidx][jflag] = (*ampphase)->frequency[j];
+        (*ampphase)->f_weight[bidx][cidx][jflag] =
+          (*ampphase)->weight[bidx][cidx][j];
+        (*ampphase)->f_amplitude[bidx][cidx][jflag] =
+          (*ampphase)->amplitude[bidx][cidx][j];
+        (*ampphase)->f_phase[bidx][cidx][jflag] =
+          (*ampphase)->phase[bidx][cidx][j];
+        (*ampphase)->f_raw[bidx][cidx][jflag] =
+          (*ampphase)->raw[bidx][cidx][j];
+        jflag++;
       }
-
+      
       // Continually assess limits.
       //if ((*ampphase)->weight[bidx][i] > 0) {
       if ((*ampphase)->amplitude[bidx][cidx][j] ==
-	  (*ampphase)->amplitude[bidx][cidx][j]) {
-	if ((*ampphase)->amplitude[bidx][cidx][j] <
-	    (*ampphase)->min_amplitude[bidx]) {
-	  (*ampphase)->min_amplitude[bidx] =
-	    (*ampphase)->amplitude[bidx][cidx][j];
-	  if ((*ampphase)->amplitude[bidx][cidx][j] <
-	      (*ampphase)->min_amplitude_global) {
-	    (*ampphase)->min_amplitude_global =
-	      (*ampphase)->amplitude[bidx][cidx][j];
-	  }
-	}
-	if ((*ampphase)->amplitude[bidx][cidx][j] >
-	    (*ampphase)->max_amplitude[bidx]) {
-	  (*ampphase)->max_amplitude[bidx] =
-	    (*ampphase)->amplitude[bidx][cidx][j];
-	  if ((*ampphase)->amplitude[bidx][cidx][j] >
-	      (*ampphase)->max_amplitude_global) {
-	    (*ampphase)->max_amplitude_global =
-	      (*ampphase)->amplitude[bidx][cidx][j];
-	  }
-	}
-	if ((*ampphase)->phase[bidx][cidx][j] <
-	    (*ampphase)->min_phase[bidx]) {
-	  (*ampphase)->min_phase[bidx] = (*ampphase)->phase[bidx][cidx][j];
-	  if ((*ampphase)->phase[bidx][cidx][j] < (*ampphase)->min_phase_global) {
-	    (*ampphase)->min_phase_global = (*ampphase)->phase[bidx][cidx][j];
-	  }
-	}
-	if ((*ampphase)->phase[bidx][cidx][j] > (*ampphase)->max_phase[bidx]) {
-	  (*ampphase)->max_phase[bidx] = (*ampphase)->phase[bidx][cidx][j];
-	  if ((*ampphase)->phase[bidx][cidx][j] > (*ampphase)->max_phase_global) {
-	    (*ampphase)->max_phase_global = (*ampphase)->phase[bidx][cidx][j];
-	  }
-	}
+          (*ampphase)->amplitude[bidx][cidx][j]) {
+        if ((*ampphase)->amplitude[bidx][cidx][j] <
+            (*ampphase)->min_amplitude[bidx]) {
+          (*ampphase)->min_amplitude[bidx] =
+            (*ampphase)->amplitude[bidx][cidx][j];
+          if ((*ampphase)->amplitude[bidx][cidx][j] <
+              (*ampphase)->min_amplitude_global) {
+            (*ampphase)->min_amplitude_global =
+              (*ampphase)->amplitude[bidx][cidx][j];
+          }
+        }
+        if ((*ampphase)->amplitude[bidx][cidx][j] >
+            (*ampphase)->max_amplitude[bidx]) {
+          (*ampphase)->max_amplitude[bidx] =
+            (*ampphase)->amplitude[bidx][cidx][j];
+          if ((*ampphase)->amplitude[bidx][cidx][j] >
+              (*ampphase)->max_amplitude_global) {
+            (*ampphase)->max_amplitude_global =
+              (*ampphase)->amplitude[bidx][cidx][j];
+          }
+        }
+        if ((*ampphase)->phase[bidx][cidx][j] <
+            (*ampphase)->min_phase[bidx]) {
+          (*ampphase)->min_phase[bidx] = (*ampphase)->phase[bidx][cidx][j];
+          if ((*ampphase)->phase[bidx][cidx][j] < (*ampphase)->min_phase_global) {
+            (*ampphase)->min_phase_global = (*ampphase)->phase[bidx][cidx][j];
+          }
+        }
+        if ((*ampphase)->phase[bidx][cidx][j] > (*ampphase)->max_phase[bidx]) {
+          (*ampphase)->max_phase[bidx] = (*ampphase)->phase[bidx][cidx][j];
+          if ((*ampphase)->phase[bidx][cidx][j] > (*ampphase)->max_phase_global) {
+            (*ampphase)->max_phase_global = (*ampphase)->phase[bidx][cidx][j];
+          }
+        }
       }
     }
     

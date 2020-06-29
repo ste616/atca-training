@@ -247,7 +247,9 @@ void add_cache_vis_data(struct ampphase_options *options,
   REALLOC(cache_vis_data.vis_data, n);
   MALLOC(cache_vis_data.ampphase_options[n - 1], 1);
   copy_ampphase_options(cache_vis_data.ampphase_options[n - 1], options);
-  cache_vis_data.vis_data[n - 1] = data;
+  MALLOC(cache_vis_data.vis_data[n - 1], 1);
+  copy_vis_data(cache_vis_data.vis_data[n - 1], data);
+  //cache_vis_data.vis_data[n - 1] = data;
   cache_vis_data.num_cache_vis_data = n;
 }
 
@@ -557,14 +559,33 @@ static void sighandler(int sig) {
 
 void add_client_vis_data(struct client_vis_data *client_vis_data,
                          char *client_id, struct vis_data *vis_data) {
+  int i, n;
+
+  // This is the position to add this client data, by default at the end.
+  n = client_vis_data->num_clients;
+  
+  // Check first to see if this client ID is already present.
+  for (i = 0; i < client_vis_data->num_clients; i++) {
+    if (strncmp(client_vis_data->client_id[i], client_id, CLIENTIDLENGTH) == 0) {
+      // We will replace this data.
+      n = i;
+      fprintf(stderr, "[add_client_vis_data] client data %s will be replaced at %d\n",
+              client_id, n);
+      break;
+    }
+  }
+  
   // Store some vis data as identified by a client id.
-  int n = client_vis_data->num_clients + 1;
-  REALLOC(client_vis_data->client_id, n);
-  MALLOC(client_vis_data->client_id[n - 1], CLIENTIDLENGTH);
-  strncpy(client_vis_data->client_id[n - 1], client_id, CLIENTIDLENGTH);
-  REALLOC(client_vis_data->vis_data, n);
-  client_vis_data->vis_data[n - 1] = vis_data;
-  client_vis_data->num_clients = n;
+  if (n >= client_vis_data->num_clients) {
+    fprintf(stderr, "[add_client_vis_data] making new client cache %s\n",
+            client_id);
+    REALLOC(client_vis_data->client_id, (n + 1));
+    MALLOC(client_vis_data->client_id[n], CLIENTIDLENGTH);
+    REALLOC(client_vis_data->vis_data, (n + 1));
+    client_vis_data->num_clients = (n + 1);
+  }
+  strncpy(client_vis_data->client_id[n], client_id, CLIENTIDLENGTH);
+  client_vis_data->vis_data[n] = vis_data;
 }
 
 struct vis_data* get_client_vis_data(struct client_vis_data *client_vis_data,
@@ -575,12 +596,14 @@ struct vis_data* get_client_vis_data(struct client_vis_data *client_vis_data,
   int i;
   for (i = 0; i < client_vis_data->num_clients; i++) {
     if (strncmp(client_vis_data->client_id[i], client_id, CLIENTIDLENGTH) == 0) {
+      fprintf(stderr, "[get_client_vis_data] found vis data for %s at %d\n",
+              client_id, i);
       return(client_vis_data->vis_data[i]);
     } else if (strncmp(client_vis_data->client_id[i], "DEFAULT", 7) == 0) {
       default_vis_data = client_vis_data->vis_data[i];
     }
   }
-
+  fprintf(stderr, "[get_client_vis_data] returning default data\n");
   return(default_vis_data);
 }
 

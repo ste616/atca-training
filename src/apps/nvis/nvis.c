@@ -637,6 +637,9 @@ int main(int argc, char *argv[]) {
         action_required = ACTION_QUIT;
         continue;
       }
+      nmesg = 1;
+      snprintf(mesgout[0], VISBUFSIZE, "Received %d bytes\n", bytes_received);
+      readline_print_messages(nmesg, mesgout);
       init_cmp_memory_buffer(&cmp, &mem, recv_buffer, recv_buffer_length);
       unpack_responses(&cmp, &server_response);
       // Check we're getting what we expect.

@@ -577,6 +577,26 @@ void unpack_vis_quantities(cmp_ctx_t *cmp, struct vis_quantities *a) {
   
 }
 
+void copy_vis_data(struct vis_data *dest,
+                   struct vis_data *src) {
+  // Copy one vis_data structure to another.
+  // The number of cycles contained here.
+  dest->nviscycles = src->nviscycles;
+
+  // The header data for each cycle.
+  dest->header_data = src->header_data;
+
+  // The number of IFs per cycle.
+  dest->num_ifs = src->num_ifs;
+
+  // The number of pols per cycle per IF.
+  dest->num_pols = src->num_pols;
+
+  // The vis_quantities structures.
+  dest->vis_quantities = src->vis_quantities;
+  
+}
+
 void pack_vis_data(cmp_ctx_t *cmp, struct vis_data *a) {
   int i, j, k;
   // The number of cycles contained here.
@@ -599,7 +619,7 @@ void pack_vis_data(cmp_ctx_t *cmp, struct vis_data *a) {
   for (i = 0; i < a->nviscycles; i++) {
     for (j = 0; j < a->num_ifs[i]; j++) {
       for (k = 0; k < a->num_pols[i][j]; k++) {
-	pack_vis_quantities(cmp, a->vis_quantities[i][j][k]);
+        pack_vis_quantities(cmp, a->vis_quantities[i][j][k]);
       }
     }
   }
