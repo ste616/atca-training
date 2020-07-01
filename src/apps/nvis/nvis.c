@@ -384,6 +384,42 @@ static void interpret_command(char *line) {
           action_required = ACTION_AMPPHASE_OPTIONS_CHANGED;
         }
       }
+    } else if (minmatch("tvmedian", line_els[0], 5)) {
+      // Change the averaging method.
+      if (nels == 2) {
+        if (strncmp(line_els[1], "on", 2) == 0) {
+          // Turn median averaging on.
+          if (ampphase_options.averaging_method & AVERAGETYPE_MEAN) {
+            ampphase_options.averaging_method -= AVERAGETYPE_MEAN;
+          }
+          ampphase_options.averaging_method |= AVERAGETYPE_MEDIAN;
+        } else if (strncmp(line_els[1], "off", 3) == 0) {
+          // Turn mean averaging on.
+          if (ampphase_options.averaging_method & AVERAGETYPE_MEDIAN) {
+            ampphase_options.averaging_method -= AVERAGETYPE_MEDIAN;
+          }
+          ampphase_options.averaging_method |= AVERAGETYPE_MEAN;
+        }
+        action_required = ACTION_AMPPHASE_OPTIONS_CHANGED;
+      } else {
+        // Output the averaging type.
+        printf(" Currently using averaging type: ");
+        if (ampphase_options.averaging_method & AVERAGETYPE_MEAN) {
+          printf("MEAN\n");
+        } else if (ampphase_options.averaging_method & AVERAGETYPE_MEDIAN) {
+          printf("MEDIAN\n");
+        } else {
+          printf("UNKNOWN!\n");
+        }
+      }
+    } else if (minmatch("onsource", line_els[0], 3)) {
+      // Change whether we display data while off-source.
+      if (ampphase_options.include_flagged_data == YES) {
+        ampphase_options.include_flagged_data = NO;
+      } else {
+        ampphase_options.include_flagged_data = YES;
+      }
+      action_required = ACTION_AMPPHASE_OPTIONS_CHANGED;
     }
     
     FREE(line_els);
