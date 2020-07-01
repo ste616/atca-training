@@ -161,6 +161,7 @@ void free_client_sockets(struct client_sockets *clients) {
   FREE(clients->client_id);
 }
 
+
 int leap(int year) {
   // Return 1 if the year is a leap year.
   return (((!(year % 4)) &&
@@ -610,6 +611,7 @@ struct vis_data* get_client_vis_data(struct client_vis_data *client_vis_data,
 int main(int argc, char *argv[]) {
   struct arguments arguments;
   int i, j, k, l, ri, rj, bytes_received, r;
+  bool pointer_found = false;
   double mjd_grab;
   struct rpfits_file_information **info_rpfits_files = NULL;
   struct ampphase_options *ampphase_options = NULL, *client_options = NULL;
@@ -903,6 +905,8 @@ int main(int argc, char *argv[]) {
                 // Don't bother with the response.
                 CLOSESOCKET(child_socket);
                 // Clean up.
+                FREE(client_options->min_tvchannel);
+                FREE(client_options->max_tvchannel);
                 FREE(client_options);
                 // Die.
                 printf("CHILD IS FINISHED!\n");
@@ -929,11 +933,15 @@ int main(int argc, char *argv[]) {
               fprintf(stderr, "[PARENT] unpacking ampphase options\n");
               unpack_ampphase_options(&cmp, ampphase_options);
               fprintf(stderr, "[PARENT] unpacking vis data\n");
+              // We need to free whatever is in vis_data already.
               unpack_vis_data(&cmp, vis_data);
               // Add this data to our cache.
               fprintf(stderr, "[PARENT] adding data to cache\n");
               add_cache_vis_data(ampphase_options, vis_data);
               add_client_vis_data(&client_vis_data, client_request.client_id, vis_data);
+              // Free the memory.
+              FREE(ampphase_options->min_tvchannel);
+              FREE(ampphase_options->max_tvchannel);
               // Tell the client that their data is ready.
               // Find the client's socket.
               alert_socket = find_client(&clients, client_request.client_id);
@@ -962,24 +970,31 @@ int main(int argc, char *argv[]) {
   }
   // Free the vis cache.
   for (l = 0; l < cache_vis_data.num_cache_vis_data; l++) {
-    vis_data = cache_vis_data.vis_data[l];
-    for (i = 0; i < vis_data->nviscycles; i++) {
-      for (j = 0; j < vis_data->num_ifs[i]; j++) {
-        for (k = 0; k < vis_data->num_pols[i][j]; k++) {
-          free_vis_quantities(&(vis_data->vis_quantities[i][j][k]));
+    // Check if the header needs to be freed. If one header structure
+    // is found to be allocated outside our RPFITS header cache, all of them
+    // will have been.
+    for (i = 0, pointer_found = false; i < arguments.n_rpfits_files; i++) {
+      for (j = 0; j < info_rpfits_files[i]->n_scans; j++) {
+        for (k = 0; k < cache_vis_data.vis_data[l]->nviscycles; k++) {
+          if (info_rpfits_files[i]->scan_headers[j] ==
+              cache_vis_data.vis_data[l]->header_data[k]) {
+            pointer_found = true;
+            break;
+          }
         }
-        FREE(vis_data->vis_quantities[i][j]);
+        if (pointer_found) break;
       }
-      /* free_scan_header_data(vis_data->header_data[i]); */
-      /* FREE(vis_data->header_data[i]); */
-      FREE(vis_data->num_pols[i]);
-      FREE(vis_data->vis_quantities[i]);
+      if (pointer_found) break;
     }
-    FREE(vis_data->header_data);
-    FREE(vis_data->num_pols);
-    FREE(vis_data->num_ifs);
-    FREE(vis_data->vis_quantities);
-    FREE(vis_data);
+    if (!pointer_found) {
+      // We have to free the memory.
+      for (i = 0; i < cache_vis_data.vis_data[l]->nviscycles; i++) {
+        free_scan_header_data(cache_vis_data.vis_data[l]->header_data[i]);
+        FREE(cache_vis_data.vis_data[l]->header_data[i]);
+      }
+    }
+    free_vis_data(cache_vis_data.vis_data[l]);
+    FREE(cache_vis_data.vis_data[l]);
     FREE(cache_vis_data.ampphase_options[l]->min_tvchannel);
     FREE(cache_vis_data.ampphase_options[l]->max_tvchannel);
     FREE(cache_vis_data.ampphase_options[l]);
@@ -1014,7 +1029,8 @@ int main(int argc, char *argv[]) {
   FREE(ampphase_options->min_tvchannel);
   FREE(ampphase_options->max_tvchannel);
   FREE(ampphase_options);
-
+  FREE(vis_data);
+  
   // Free the clients.
   for (i = 0; i < client_vis_data.num_clients; i++) {
     FREE(client_vis_data.client_id[i]);

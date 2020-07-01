@@ -674,8 +674,10 @@ void free_vis_data(struct vis_data *vis_data) {
       FREE(vis_data->vis_quantities[i][j]);
     }
     FREE(vis_data->vis_quantities[i]);
-    free_scan_header_data(vis_data->header_data[i]);
-    FREE(vis_data->header_data[i]);
+    // We don't free the header data, we assume that will be
+    // freed somewhere else.
+    /* free_scan_header_data(vis_data->header_data[i]); */
+    /* FREE(vis_data->header_data[i]); */
     FREE(vis_data->num_pols[i]);
   }
   FREE(vis_data->vis_quantities);
