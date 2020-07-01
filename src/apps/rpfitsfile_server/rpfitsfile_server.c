@@ -926,6 +926,7 @@ int main(int argc, char *argv[]) {
                        client_request.client_id);
                 bytes_sent = socket_send_buffer(loop_i, send_buffer,
                                                 cmp_mem_access_get_pos(&mem));
+                FREE(send_buffer);
               }
             } else if (client_request.request_type == CHILDREQUEST_VISDATA_COMPUTED) {
               // We're getting vis data back from our child after the computation has
@@ -957,7 +958,22 @@ int main(int argc, char *argv[]) {
                        client_request.client_id);
                 bytes_sent = socket_send_buffer(alert_socket, send_buffer,
                                                 cmp_mem_access_get_pos(&mem));
+                FREE(send_buffer);
               }
+            } else if (client_request.request_type == REQUEST_SERVERTYPE) {
+              // Tell the client we're a simulator.
+              client_response.response_type = RESPONSE_SERVERTYPE;
+              strncpy(client_response.client_id, client_request.client_id, CLIENTIDLENGTH);
+              MALLOC(send_buffer, JUSTRESPONSESIZE);
+              init_cmp_memory_buffer(&cmp, &mem, send_buffer, JUSTRESPONSESIZE);
+              pack_responses(&cmp, &client_response);
+              pack_write_sint(&cmp, SERVERTYPE_SIMULATOR);
+              printf(" %s to client %s.\n",
+                     get_type_string(TYPE_RESPONSE, client_response.response_type),
+                     client_request.client_id);
+              bytes_sent = socket_send_buffer(loop_i, send_buffer,
+                                              cmp_mem_access_get_pos(&mem));
+              FREE(send_buffer);
             }
             printf(" Sent %ld bytes\n", bytes_sent);
             // Free our memory.

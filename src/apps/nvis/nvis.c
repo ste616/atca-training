@@ -61,7 +61,7 @@ struct arguments {
 };
 
 // And some fun, totally necessary, global state variables.
-int action_required;
+int action_required, server_type;
 int vis_device_number, data_selected_index;
 int xaxis_type, yaxis_type, nxpanels, nypanels, nvisbands;
 char **visband;
@@ -157,6 +157,20 @@ static void sighandler(int sig) {
 #define ACTION_VISBANDS_CHANGED          1<<5
 #define ACTION_AMPPHASE_OPTIONS_CHANGED  1<<6
 #define ACTION_AMPPHASE_OPTIONS_PRINT    1<<7
+
+// Make a shortcut to stop action for those actions which can only be
+// done by a simulator.
+#define CHECKSIMULATOR                          \
+  do                                            \
+    {                                           \
+  if (server_type != SERVERTYPE_SIMULATOR)      \
+    {                                           \
+  FREE(line_els);                               \
+  FREE(line);                                   \
+  return;                                       \
+    }                                           \
+    }                                           \
+  while(0)
 
 // Callback function called for each line when accept-line
 // executed, EOF seen, or EOF character read.
@@ -376,6 +390,7 @@ static void interpret_command(char *line) {
         }
       }
     } else if (minmatch("delavg", line_els[0], 5)) {
+      CHECKSIMULATOR;
       // Change the delay averaging.
       if (nels == 2) {
         iarg = atoi(line_els[1]);
@@ -387,6 +402,7 @@ static void interpret_command(char *line) {
     } else if (minmatch("tvmedian", line_els[0], 5)) {
       // Change the averaging method.
       if (nels == 2) {
+        CHECKSIMULATOR;
         if (strncmp(line_els[1], "on", 2) == 0) {
           // Turn median averaging on.
           if (ampphase_options.averaging_method & AVERAGETYPE_MEAN) {
@@ -413,6 +429,7 @@ static void interpret_command(char *line) {
         }
       }
     } else if (minmatch("onsource", line_els[0], 3)) {
+      CHECKSIMULATOR;
       // Change whether we display data while off-source.
       if (ampphase_options.include_flagged_data == YES) {
         ampphase_options.include_flagged_data = NO;
@@ -498,9 +515,15 @@ int main(int argc, char *argv[]) {
                                    &socket_peer, false)) {
       return(1);
     }
+    // Ask what type of server we're connecting to.
+    server_request.request_type = REQUEST_SERVERTYPE;
+    strncpy(server_request.client_id, client_id, CLIENTIDLENGTH);
+    init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)VISBUFSIZE);
+    pack_requests(&cmp, &server_request);
+    socket_send_buffer(socket_peer, send_buffer, cmp_mem_access_get_pos(&mem));
+    
     // Send a request for the currently available VIS data.
     server_request.request_type = REQUEST_CURRENT_VISDATA;
-    strncpy(server_request.client_id, client_id, CLIENTIDLENGTH);
     init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)VISBUFSIZE);
     pack_requests(&cmp, &server_request);
     socket_send_buffer(socket_peer, send_buffer, cmp_mem_access_get_pos(&mem));
@@ -678,20 +701,29 @@ int main(int argc, char *argv[]) {
       readline_print_messages(nmesg, mesgout);
       init_cmp_memory_buffer(&cmp, &mem, recv_buffer, recv_buffer_length);
       unpack_responses(&cmp, &server_response);
+      // Ignore this if we somehow get a message not addressed to us.
+      if (strncmp(server_response.client_id, client_id, CLIENTIDLENGTH) != 0) {
+        continue;
+      }
       // Check we're getting what we expect.
       if ((server_response.response_type == RESPONSE_CURRENT_VISDATA) ||
-          ((server_response.response_type == RESPONSE_COMPUTED_VISDATA) &&
-           (strncmp(server_response.client_id, client_id, CLIENTIDLENGTH) == 0))) {
+          (server_response.response_type == RESPONSE_COMPUTED_VISDATA)) {
         unpack_vis_data(&cmp, &vis_data);
         action_required = ACTION_NEW_DATA_RECEIVED;
-      } else if ((server_response.response_type == RESPONSE_VISDATA_COMPUTED) &&
-                 (strncmp(server_response.client_id, client_id, CLIENTIDLENGTH) == 0)) {
+      } else if (server_response.response_type == RESPONSE_VISDATA_COMPUTED) {
         // We're being told new data is available after we asked for a new
         // computation. We request this new data.
         server_request.request_type = REQUEST_COMPUTED_VISDATA;
         init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)VISBUFSIZE);
         pack_requests(&cmp, &server_request);
         socket_send_buffer(socket_peer, send_buffer, cmp_mem_access_get_pos(&mem));
+      } else if (server_response.response_type == RESPONSE_SERVERTYPE) {
+        // We're being told what type of server we've connected to.
+        pack_read_sint(&cmp, &server_type);
+        nmesg = 1;
+        snprintf(mesgout[0], VISBUFSIZE, "Connected to %s server.\n",
+                 get_servertype_string(server_type));
+        readline_print_messages(nmesg, mesgout);
       }
       FREE(recv_buffer);
     }

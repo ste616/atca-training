@@ -21,6 +21,9 @@
 #define SOCKBUFSIZE 1024
 #define CLIENTIDLENGTH 20
 
+#define SERVERTYPE_SIMULATOR  1
+#define SERVERTYPE_CORRELATOR 2
+
 #define TYPE_REQUEST    1
 #define TYPE_RESPONSE   2
 
@@ -30,6 +33,7 @@
 #define REQUEST_COMPUTE_VISDATA        3
 #define REQUEST_COMPUTED_VISDATA       4
 #define CHILDREQUEST_VISDATA_COMPUTED  5
+#define REQUEST_SERVERTYPE             6
 
 // This structure handles request headers.
 struct requests {
@@ -45,6 +49,7 @@ struct requests {
 #define RESPONSE_VISDATA_COMPUTED    3
 #define RESPONSE_COMPUTED_VISDATA    4
 #define RESPONSE_VISDATA_COMPUTING   5
+#define RESPONSE_SERVERTYPE          6
 
 // This structure describes response headers.
 struct responses {
@@ -62,3 +67,4 @@ ssize_t socket_recv_buffer(SOCKET socket, char **buffer, size_t *buffer_length);
 bool prepare_client_connection(char *server_name, int port_number,
                                SOCKET *socket_peer, bool debugging);
 const char *get_type_string(int type, int id);
+const char *get_servertype_string(int type);
