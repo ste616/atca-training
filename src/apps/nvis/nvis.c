@@ -182,7 +182,7 @@ static void interpret_command(char *line) {
   float histlength, data_seconds = 0, delta_time = 0, close_time = 0;
   float limit_min, limit_max;
   struct vis_product **vis_products = NULL, *tproduct = NULL;
-  bool products_selected, data_time_parsed = false;
+  bool products_selected, data_time_parsed = false, product_usable;
 
   if ((line == NULL) || (strcasecmp(line, "exit") == 0) ||
       (strcasecmp(line, "quit") == 0)) {
@@ -214,9 +214,21 @@ static void interpret_command(char *line) {
         pr = vis_interpret_product(line_els[i], &tproduct);
         if (pr == 0) {
           // Successfully matched a product.
-          REALLOC(vis_products, ++nproducts);
-          vis_products[nproducts - 1] = tproduct;
-          products_selected = true;
+	  // Check if we can use this product.
+	  product_usable = false;
+	  for (j = 1; j <= nvisbands; j++) {
+	    if (tproduct->if_spec & (1<<(j - 1))) {
+	      product_usable = true;
+	      break;
+	    }
+	  }
+	  if (product_usable) {
+	    REALLOC(vis_products, ++nproducts);
+	    vis_products[nproducts - 1] = tproduct;
+	    products_selected = true;
+	  } else {
+	    FREE(tproduct);
+	  }
         } else {
           FREE(tproduct);
         }
