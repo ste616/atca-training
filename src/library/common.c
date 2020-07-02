@@ -832,11 +832,12 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
                    struct scan_header_data **header_data) {
   int nants = 0, i = 0, n_vis_lines = 0, j = 0, k = 0, p = 0;
   int singleant = 0, l = 0, m = 0, n = 0, connidx = 0;
-  int **n_plot_lines = NULL;
+  int **n_plot_lines = NULL, ipos = -1;
   float ****plot_lines = NULL, min_x, max_x, min_y, max_y;
-  float cxpos, dxpos, labtotalwidth, labspacing, dy;
+  float cxpos, dxpos, labtotalwidth, labspacing, dy, maxwidth, twidth;
+  float padlabel = 0.01, cch;
   char xopts[BUFSIZE], yopts[BUFSIZE], panellabel[BUFSIZE], panelunits[BUFSIZE];
-  char antstring[BUFSIZE];
+  char antstring[BUFSIZE], bandstring[BUFSIZE];
   struct vis_line **vis_lines = NULL;
   struct scan_header_data *vlh = NULL;
 
@@ -970,11 +971,7 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
   }
   // Adjust the time constraints based on the history specification.
   MAXASSIGN(min_x, (max_x - plot_controls->history_start * 60));
-  /* min_x = (min_x < (max_x - plot_controls->history_start * 60)) ? */
-  /*   (max_x - plot_controls->history_start * 60) : min_x; */
   MINASSIGN(max_x, (min_x + plot_controls->history_length * 60));
-  /* max_x = (max_x > (min_x + plot_controls->history_length * 60)) ? */
-  /*   (min_x + plot_controls->history_length * 60) : max_x; */
   
   // Always keep another 5% on the right side.
   max_x += (max_x - min_x) * 0.05;
@@ -1152,7 +1149,33 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
         cxpos += dxpos;
       }
       // Then print the frequencies of the bands at the top right.
-      
+      maxwidth = 0;
+      for (j = 0; j < plot_controls->nvisbands; j++) {
+	snprintf(bandstring, BUFSIZE, "%c%c,%c%c = %s",
+		 ('A' + (j * 2)), ('A' + (j * 2)),
+		 ('B' + (j * 2)), ('B' + (j * 2)),
+		 plot_controls->visbands[j]);
+	twidth = fracwidth(panelspec, min_x, max_x, 0, i, bandstring);
+	MAXASSIGN(maxwidth, twidth);
+	ipos = find_if_name(vlh, plot_controls->visbands[j]) - 1;
+	snprintf(bandstring, BUFSIZE, "%.0f", vlh->if_centre_freq[ipos]);
+	twidth = fracwidth(panelspec, min_x, max_x, 0, i, bandstring);
+	MAXASSIGN(maxwidth, twidth);
+      }
+
+      cxpos = 1 - (plot_controls->nvisbands * maxwidth + padlabel);
+      cpgqch(&cch);
+      for (j = 0; j < plot_controls->nvisbands; j++) {
+	ipos = find_if_name(vlh, plot_controls->visbands[j]) - 1;
+	snprintf(bandstring, BUFSIZE, "%.0f", vlh->if_centre_freq[ipos]);
+	cpgmtxt("T", 0.5, cxpos, 0, bandstring);
+	snprintf(bandstring, BUFSIZE, "%c%c,%c%c = %s",
+		 ('A' + (j * 2)), ('A' + (j * 2)),
+		 ('B' + (j * 2)), ('B' + (j * 2)),
+		 plot_controls->visbands[j]);
+	cpgmtxt("T", 0.5 + cch, cxpos, 0, bandstring);
+	cxpos += maxwidth + (padlabel / (plot_controls->nvisbands - 1));
+      }
     }
     cpgsci(1);
     for (j = 0; j < n_vis_lines; j++) {

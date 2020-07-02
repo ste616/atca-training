@@ -163,12 +163,12 @@ static void sighandler(int sig) {
 #define CHECKSIMULATOR                          \
   do                                            \
     {                                           \
-  if (server_type != SERVERTYPE_SIMULATOR)      \
-    {                                           \
-  FREE(line_els);                               \
-  FREE(line);                                   \
-  return;                                       \
-    }                                           \
+      if (server_type != SERVERTYPE_SIMULATOR)	\
+        {					\
+          FREE(line_els);			\
+	  FREE(line);				\
+	  return;				\
+	}					\
     }                                           \
   while(0)
 
@@ -607,7 +607,7 @@ int main(int argc, char *argv[]) {
                described_hdr->obstype);
       for (i = 0; i < vis_data.num_ifs[data_selected_index]; i++) {
         snprintf(mesgout[nmesg++], VISBUFSIZE, " IF %d: CF %.2f MHz NCHAN %d BW %.0f MHz",
-                 (i + 1), described_hdr->if_centre_freq[0], described_hdr->if_num_channels[i],
+                 (i + 1), described_hdr->if_centre_freq[i], described_hdr->if_num_channels[i],
                  described_hdr->if_bandwidth[i]);
         // Check if this is one of the calbands.
         for (j = 0; j < nvisbands; j++) {
