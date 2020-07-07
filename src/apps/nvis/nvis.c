@@ -64,6 +64,7 @@ struct arguments {
 int action_required, server_type;
 int vis_device_number, data_selected_index;
 int xaxis_type, yaxis_type, nxpanels, nypanels, nvisbands;
+int *visband_idx;
 char **visband;
 // Whether to order the baselines in length order (true/false).
 bool sort_baselines;
@@ -182,7 +183,7 @@ static void interpret_command(char *line) {
   float histlength, data_seconds = 0, delta_time = 0, close_time = 0;
   float limit_min, limit_max;
   struct vis_product **vis_products = NULL, *tproduct = NULL;
-  bool products_selected, data_time_parsed = false, product_usable;
+  bool products_selected, data_time_parsed = false, product_usable, succ = false;
 
   if ((line == NULL) || (strcasecmp(line, "exit") == 0) ||
       (strcasecmp(line, "quit") == 0)) {
@@ -407,38 +408,64 @@ static void interpret_command(char *line) {
       if (nels == 2) {
         iarg = atoi(line_els[1]);
         if (iarg >= 1) {
-          ampphase_options.delay_averaging = iarg;
+	  // Change the delay averaging for all the IFs.
+	  for (i = 0; i < ampphase_options.num_ifs; i++) {
+	    ampphase_options.delay_averaging[i] = iarg;
+	  }
           action_required = ACTION_AMPPHASE_OPTIONS_CHANGED;
         }
+      } else if (nels == 3) {
+	// Change the delay averaging for the two IFs in the calband.
+	succ = false;
+	for (i = 1; i < 3; i++) {
+	  iarg = atoi(line_els[i]);
+	  if (iarg >= 1) {
+	    ampphase_options.delay_averaging[visband_idx[i - 1]] = iarg;
+	    succ = true;
+	  }
+	}
+	if (succ) {
+	  action_required = ACTION_AMPPHASE_OPTIONS_CHANGED;
+	}
       }
     } else if (minmatch("tvmedian", line_els[0], 5)) {
       // Change the averaging method.
-      if (nels == 2) {
+      if ((nels == 2) || (nels == 3)) {
         CHECKSIMULATOR;
-        if (strncmp(line_els[1], "on", 2) == 0) {
-          // Turn median averaging on.
-          if (ampphase_options.averaging_method & AVERAGETYPE_MEAN) {
-            ampphase_options.averaging_method -= AVERAGETYPE_MEAN;
-          }
-          ampphase_options.averaging_method |= AVERAGETYPE_MEDIAN;
-        } else if (strncmp(line_els[1], "off", 3) == 0) {
-          // Turn mean averaging on.
-          if (ampphase_options.averaging_method & AVERAGETYPE_MEDIAN) {
-            ampphase_options.averaging_method -= AVERAGETYPE_MEDIAN;
-          }
-          ampphase_options.averaging_method |= AVERAGETYPE_MEAN;
-        }
-        action_required = ACTION_AMPPHASE_OPTIONS_CHANGED;
+	for (i = 0; i < nvisbands; i++) {
+	  if (nels == 2) {
+	    k = 1;
+	  } else {
+	    k = i + 1;
+	  }
+	  if (strncmp(line_els[k], "on", 2) == 0) {
+	    // Turn median averaging on.
+	    if (ampphase_options.averaging_method[visband_idx[i]] & AVERAGETYPE_MEAN) {
+	      ampphase_options.averaging_method[visband_idx[i]] -= AVERAGETYPE_MEAN;
+	    }
+	    ampphase_options.averaging_method[visband_idx[i]] |= AVERAGETYPE_MEDIAN;
+	  } else if (strncmp(line_els[k], "off", 3) == 0) {
+	    // Turn mean averaging on.
+	    if (ampphase_options.averaging_method[visband_idx[i]] & AVERAGETYPE_MEDIAN) {
+	      ampphase_options.averaging_method[visband_idx[i]] -= AVERAGETYPE_MEDIAN;
+	    }
+	    ampphase_options.averaging_method[visband_idx[i]] |= AVERAGETYPE_MEAN;
+	  }
+	}
+	action_required = ACTION_AMPPHASE_OPTIONS_CHANGED;
       } else {
         // Output the averaging type.
-        printf(" Currently using averaging type: ");
-        if (ampphase_options.averaging_method & AVERAGETYPE_MEAN) {
-          printf("MEAN\n");
-        } else if (ampphase_options.averaging_method & AVERAGETYPE_MEDIAN) {
-          printf("MEDIAN\n");
-        } else {
-          printf("UNKNOWN!\n");
-        }
+        printf(" Currently using averaging type:");
+	for (i = 0; i < nvisbands; i++) {
+	  if (ampphase_options.averaging_method[visband_idx[i]] & AVERAGETYPE_MEAN) {
+	    printf(" MEAN");
+	  } else if (ampphase_options.averaging_method[visband_idx[i]] & AVERAGETYPE_MEDIAN) {
+	    printf(" MEDIAN");
+	  } else {
+	    printf(" UNKNOWN!");
+	  }
+	}
+	printf("\n");
       }
     } else if (minmatch("onsource", line_els[0], 3)) {
       CHECKSIMULATOR;
@@ -486,11 +513,13 @@ int main(int argc, char *argv[]) {
   }
   nvisbands = (2 > MAXVISBANDS) ? MAXVISBANDS : 2;
   MALLOC(visband, MAXVISBANDS);
+  MALLOC(visband_idx, MAXVISBANDS);
   for (i = 0; i < MAXVISBANDS; i++) {
     MALLOC(visband[i], VISBANDLEN);
     // Set a default.
     if (i < nvisbands) {
       snprintf(visband[i], VISBANDLEN, "f%d", (i + 1));
+      visband_idx[i] = 0;
     }
   }
 
@@ -576,6 +605,7 @@ int main(int argc, char *argv[]) {
       action_required |= ACTION_VISBANDS_CHANGED;
       // Reset the selected index from the data.
       data_selected_index = vis_data.nviscycles - 1;
+      described_hdr = vis_data.header_data[data_selected_index];
       // And get the ampphase_options from this selected index.
       fidx = vis_data.num_ifs[data_selected_index];
       copy_ampphase_options(&ampphase_options,
@@ -592,6 +622,10 @@ int main(int argc, char *argv[]) {
     if (action_required & ACTION_VISBANDS_CHANGED) {
       // TODO: Check that the visbands are actually present in the data.
       change_vis_plotcontrols_visbands(&vis_plotcontrols, nvisbands, visband);
+      // Update the visband indices.
+      for (i = 0; i < nvisbands; i++) {
+	visband_idx[i] = find_if_name(described_hdr, visband[i]);
+      }
       action_required -= ACTION_VISBANDS_CHANGED;
       action_required |= ACTION_REFRESH_PLOT;
     }
@@ -610,7 +644,8 @@ int main(int argc, char *argv[]) {
       described_hdr = vis_data.header_data[data_selected_index];
       seconds_to_hourlabel(described_ptr[0][0]->ut_seconds, htime);
       nmesg = 0;
-      snprintf(mesgout[nmesg++], VISBUFSIZE, "DATA AT %s %s:\n", described_ptr[0][0]->obsdate, htime);
+      snprintf(mesgout[nmesg++], VISBUFSIZE, "DATA AT %s %s:\n",
+	       described_ptr[0][0]->obsdate, htime);
       snprintf(mesgout[nmesg++], VISBUFSIZE, "  HAS %d IFS CYCLE TIME %d\n\r",
                vis_data.num_ifs[data_selected_index],
                described_hdr->cycle_time);
@@ -643,22 +678,22 @@ int main(int argc, char *argv[]) {
       snprintf(mesgout[nmesg++], VISBUFSIZE, "VIS DATA COMPUTED WITH OPTIONS:\n");
       snprintf(mesgout[nmesg++], VISBUFSIZE, " PHASE UNITS: %s\n",
                (ampphase_options.phase_in_degrees ? "degrees" : "radians"));
-      snprintf(mesgout[nmesg++], VISBUFSIZE, " DELAY AVERAGING: %d\n",
-               ampphase_options.delay_averaging);
-      snprintf(mesgout[nmesg++], VISBUFSIZE, " AVERAGING METHOD: ");
-      if (ampphase_options.averaging_method & AVERAGETYPE_VECTOR) {
-        snprintf(mesgout[nmesg++], VISBUFSIZE, "VECTOR ");
-      } else if (ampphase_options.averaging_method & AVERAGETYPE_SCALAR) {
-        snprintf(mesgout[nmesg++], VISBUFSIZE, "SCALAR ");
-      }
-      if (ampphase_options.averaging_method & AVERAGETYPE_MEAN) {
-        snprintf(mesgout[nmesg++], VISBUFSIZE, "MEAN");
-      } else if (ampphase_options.averaging_method & AVERAGETYPE_MEDIAN) {
-        snprintf(mesgout[nmesg++], VISBUFSIZE, "MEDIAN");
-      }
-      snprintf(mesgout[nmesg++], VISBUFSIZE, "\n BAND TVCHANNELS:\n");
       for (i = 1; i < ampphase_options.num_ifs; i++) {
-        snprintf(mesgout[nmesg++], VISBUFSIZE, "  F%d: %d - %d\n", i,
+	snprintf(mesgout[nmesg++], VISBUFSIZE, " BAND F%d:\n", i);
+	snprintf(mesgout[nmesg++], VISBUFSIZE, "   DELAY AVERAGING: %d\n",
+		 ampphase_options.delay_averaging[i]);
+	snprintf(mesgout[nmesg++], VISBUFSIZE, "   AVERAGING METHOD: ");
+	if (ampphase_options.averaging_method[i] & AVERAGETYPE_VECTOR) {
+	  snprintf(mesgout[nmesg++], VISBUFSIZE, "VECTOR ");
+	} else if (ampphase_options.averaging_method[i] & AVERAGETYPE_SCALAR) {
+	  snprintf(mesgout[nmesg++], VISBUFSIZE, "SCALAR ");
+	}
+	if (ampphase_options.averaging_method[i] & AVERAGETYPE_MEAN) {
+	  snprintf(mesgout[nmesg++], VISBUFSIZE, "MEAN");
+	} else if (ampphase_options.averaging_method[i] & AVERAGETYPE_MEDIAN) {
+	  snprintf(mesgout[nmesg++], VISBUFSIZE, "MEDIAN");
+	}
+	snprintf(mesgout[nmesg++], VISBUFSIZE, "\n   TVCHANNELS: %d - %d\n",
                  ampphase_options.min_tvchannel[i],
                  ampphase_options.max_tvchannel[i]);
       }

@@ -49,20 +49,21 @@ struct ampphase_options {
   // Return phase in degrees (default is radians).
   bool phase_in_degrees;
 
-  // The delay averaging factor (default is 1).
-  int delay_averaging;
-
+  // Whether to include flagged data in vis outputs.
+  int include_flagged_data;
+  
   // The "tv" channels can be set independently for
   // all the IFs.
   int num_ifs;
   int *min_tvchannel;
   int *max_tvchannel;
+
+  // The delay averaging factor (default is 1).
+  int *delay_averaging;
   
   // The method to do the averaging (default is mean).
-  int averaging_method;
+  int *averaging_method;
 
-  // Whether to include flagged data in vis outputs.
-  int include_flagged_data;
 };
 
 /**

@@ -223,13 +223,15 @@ int polarisation_number(char *polstring) {
 struct ampphase_options ampphase_options_default(void) {
   struct ampphase_options options;
 
-  options.phase_in_degrees = false;
-  options.delay_averaging = 1;
+  options.phase_in_degrees = true;
+  options.include_flagged_data = 0;
   options.num_ifs = 0;
   options.min_tvchannel = NULL;
   options.max_tvchannel = NULL;
-  options.averaging_method = AVERAGETYPE_MEAN | AVERAGETYPE_VECTOR;
-  options.include_flagged_data = 0;
+  //options.delay_averaging = 1;
+  options.delay_averaging = NULL;
+  //options.averaging_method = AVERAGETYPE_MEAN | AVERAGETYPE_VECTOR;
+  options.averaging_method = NULL;
 
   return options;
 }
@@ -241,16 +243,18 @@ void copy_ampphase_options(struct ampphase_options *dest,
                            struct ampphase_options *src) {
   int i;
   STRUCTCOPY(src, dest, phase_in_degrees);
-  STRUCTCOPY(src, dest, delay_averaging);
+  STRUCTCOPY(src, dest, include_flagged_data);
   STRUCTCOPY(src, dest, num_ifs);
   MALLOC(dest->min_tvchannel, dest->num_ifs);
   MALLOC(dest->max_tvchannel, dest->num_ifs);
+  MALLOC(dest->delay_averaging, dest->num_ifs);
+  MALLOC(dest->averaging_method, dest->num_ifs);
   for (i = 0; i < dest->num_ifs; i++) {
     STRUCTCOPY(src, dest, min_tvchannel[i]);
     STRUCTCOPY(src, dest, max_tvchannel[i]);
+    STRUCTCOPY(src, dest, delay_averaging[i]);
+    STRUCTCOPY(src, dest, averaging_method[i]);
   }
-  STRUCTCOPY(src, dest, averaging_method);
-  STRUCTCOPY(src, dest, include_flagged_data);
 }
 
 /**
@@ -306,6 +310,21 @@ void add_tvchannels_to_options(struct ampphase_options *ampphase_options,
     for (i = ampphase_options->num_ifs; i < nwindow; i++) {
       ampphase_options->min_tvchannel[i] = -1;
       ampphase_options->max_tvchannel[i] = -1;
+    }
+    // Copy the other IF-specific options.
+    REALLOC(ampphase_options->delay_averaging, nwindow);
+    REALLOC(ampphase_options->averaging_method, nwindow);
+    for (i = ampphase_options->num_ifs; i < nwindow; i++) {
+      if (i == 0) {
+	// First go!
+	ampphase_options->delay_averaging[i] = 1;
+	ampphase_options->averaging_method[i] = AVERAGETYPE_MEAN | AVERAGETYPE_SCALAR;
+      } else {
+	ampphase_options->delay_averaging[i] =
+	  ampphase_options->delay_averaging[i - 1];
+	ampphase_options->averaging_method[i] =
+	  ampphase_options->averaging_method[i - 1];
+      }
     }
     ampphase_options->num_ifs = nwindow;
   }
@@ -669,7 +688,8 @@ int ampphase_average(struct ampphase *ampphase,
   MALLOC(median_complex, n_expected);
   MALLOC(array_frequency, n_expected);
   // Make some arrays for the delay-averaged phases and frequencies.
-  n_delavg_expected = (int)ceilf(n_expected / options->delay_averaging);
+  n_delavg_expected = (int)ceilf(n_expected /
+				 options->delay_averaging[ampphase->window]);
   if (n_delavg_expected < 1) n_delavg_expected = 1;
   /* fprintf(stderr, "[ampphase_average] allocating memory for %d delay-averaged samples\n", */
   /*         n_delavg_expected); */
@@ -706,7 +726,7 @@ int ampphase_average(struct ampphase *ampphase,
           n_points++;
           delavg_idx =
             (int)(floorf(ampphase->f_channel[i][k][j] - min_tvchannel) /
-                  options->delay_averaging);
+                  options->delay_averaging[ampphase->window]);
           delavg_frequency[delavg_idx] += ampphase->f_frequency[i][k][j];
           delavg_raw[delavg_idx] += ampphase->f_raw[i][k][j];
           delavg_n[delavg_idx] += 1;
@@ -740,11 +760,11 @@ int ampphase_average(struct ampphase *ampphase,
           }
         }
         
-        if (options->averaging_method & AVERAGETYPE_MEAN) {
-          if (options->averaging_method & AVERAGETYPE_SCALAR) {
+        if (options->averaging_method[ampphase->window] & AVERAGETYPE_MEAN) {
+          if (options->averaging_method[ampphase->window] & AVERAGETYPE_SCALAR) {
             (*vis_quantities)->amplitude[i][k] = total_amplitude / (float)n_points;
             (*vis_quantities)->phase[i][k] = total_phase / (float)n_points;
-          } else if (options->averaging_method & AVERAGETYPE_VECTOR) {
+          } else if (options->averaging_method[ampphase->window] & AVERAGETYPE_VECTOR) {
             average_complex = total_complex / (float)n_points;
             (*vis_quantities)->amplitude[i][k] = cabsf(average_complex);
             (*vis_quantities)->phase[i][k] = cargf(average_complex);
@@ -752,8 +772,8 @@ int ampphase_average(struct ampphase *ampphase,
           // Calculate the final average delay, return in ns.
           (*vis_quantities)->delay[i][k] = (n_delay_points > 0) ?
             (1E9 * total_delay / (float)n_delay_points) : 0;
-        } else if (options->averaging_method & AVERAGETYPE_MEDIAN) {
-          if (options->averaging_method & AVERAGETYPE_SCALAR) {
+        } else if (options->averaging_method[ampphase->window] & AVERAGETYPE_MEDIAN) {
+          if (options->averaging_method[ampphase->window] & AVERAGETYPE_SCALAR) {
             qsort(median_array_amplitude, n_points, sizeof(float), cmpfunc_real);
             qsort(median_array_phase, n_points, sizeof(float), cmpfunc_real);
             if (n_points % 2) {
@@ -770,7 +790,7 @@ int ampphase_average(struct ampphase *ampphase,
                 (median_array_amplitude[n_points / 2] +
                  median_array_amplitude[n_points / 2 + 1]) / 2;
             }
-          } else if (options->averaging_method & AVERAGETYPE_VECTOR) {
+          } else if (options->averaging_method[ampphase->window] & AVERAGETYPE_VECTOR) {
             qsort(median_complex, n_points, sizeof(float complex), cmpfunc_complex);
             if (n_points % 2) {
               average_complex = median_complex[(n_points + 1) / 2];
@@ -821,15 +841,15 @@ bool ampphase_options_match(struct ampphase_options *a,
   int i;
 
   if ((a->phase_in_degrees == b->phase_in_degrees) &&
-      (a->delay_averaging == b->delay_averaging) &&
-      (a->num_ifs == b->num_ifs) &&
-      (a->averaging_method == b->averaging_method) &&
-      (a->include_flagged_data == b->include_flagged_data)) {
+      (a->include_flagged_data == b->include_flagged_data) &&
+      (a->num_ifs == b->num_ifs)) {
     // Looks good so far, now check the tvchannels.
     match = true;
     for (i = 0; i < a->num_ifs; i++) {
       if ((a->min_tvchannel[i] != b->min_tvchannel[i]) ||
-          (a->max_tvchannel[i] != b->max_tvchannel[i])) {
+          (a->max_tvchannel[i] != b->max_tvchannel[i]) ||
+	  (a->delay_averaging[i] != b->delay_averaging[i]) ||
+	  (a->averaging_method[i] != b->averaging_method[i])) {
         match = false;
         break;
       }

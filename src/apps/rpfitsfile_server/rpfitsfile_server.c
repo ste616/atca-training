@@ -279,9 +279,9 @@ void data_reader(int read_type, int n_rpfits_files,
   if (read_type & COMPUTE_VIS_PRODUCTS) {
     // Check whether we have a cached product for this.
     printf("[data_reader] checking for cached vis products...\n");
-    printf("[data_reader] %s delavg %d %d\n",
-           (ampphase_options->phase_in_degrees ? "degrees" : "radians"),
-           ampphase_options->delay_averaging, ampphase_options->averaging_method);
+    /* printf("[data_reader] %s delavg %d %d\n", */
+    /*        (ampphase_options->phase_in_degrees ? "degrees" : "radians"), */
+    /*        ampphase_options->delay_averaging, ampphase_options->averaging_method); */
 
     for (i = 0; i < cache_vis_data.num_cache_vis_data; i++) {
       if (ampphase_options_match(ampphase_options,
@@ -645,11 +645,11 @@ int main(int argc, char *argv[]) {
   // And the default for the calculator options.
   MALLOC(ampphase_options, 1);
   ampphase_options->phase_in_degrees = true;
-  ampphase_options->delay_averaging = 1;
+  ampphase_options->delay_averaging = NULL;
   ampphase_options->num_ifs = 0;
   ampphase_options->min_tvchannel = NULL;
   ampphase_options->max_tvchannel = NULL;
-  ampphase_options->averaging_method = AVERAGETYPE_MEAN | AVERAGETYPE_SCALAR;
+  ampphase_options->averaging_method = NULL;
   ampphase_options->include_flagged_data = 1;
   
   // Parse the arguments.
