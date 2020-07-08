@@ -250,7 +250,6 @@ void add_cache_vis_data(struct ampphase_options *options,
   copy_ampphase_options(cache_vis_data.ampphase_options[n - 1], options);
   MALLOC(cache_vis_data.vis_data[n - 1], 1);
   copy_vis_data(cache_vis_data.vis_data[n - 1], data);
-  //cache_vis_data.vis_data[n - 1] = data;
   cache_vis_data.num_cache_vis_data = n;
 }
 
@@ -489,6 +488,10 @@ void data_reader(int read_type, int n_rpfits_files,
                       ampphase_average(temp_spectrum->spectrum[idx_if][idx_pol],
                                        &((*vis_data)->vis_quantities[(*vis_data)->nviscycles][idx_if][idx_pol]),
                                        local_ampphase_options);
+		      // Copy the ampphase_options back.
+		      copy_ampphase_options(ampphase_options, local_ampphase_options);
+		      /* free_ampphase_options(local_ampphase_options); */
+		      /* FREE(local_ampphase_options); */
                       /* fprintf(stderr, "[data_reader] calculated vis products\n"); */
                       vis_cycled = true;
                     }
@@ -583,10 +586,11 @@ void add_client_vis_data(struct client_vis_data *client_vis_data,
     REALLOC(client_vis_data->client_id, (n + 1));
     MALLOC(client_vis_data->client_id[n], CLIENTIDLENGTH);
     REALLOC(client_vis_data->vis_data, (n + 1));
+    MALLOC(client_vis_data->vis_data[n], 1);
     client_vis_data->num_clients = (n + 1);
   }
   strncpy(client_vis_data->client_id[n], client_id, CLIENTIDLENGTH);
-  client_vis_data->vis_data[n] = vis_data;
+  copy_vis_data(client_vis_data->vis_data[n], vis_data);
 }
 
 struct vis_data* get_client_vis_data(struct client_vis_data *client_vis_data,

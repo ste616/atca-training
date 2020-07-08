@@ -172,6 +172,7 @@ int polarisation_number(char *polstring);
 struct ampphase_options ampphase_options_default(void);
 void copy_ampphase_options(struct ampphase_options *dest,
                            struct ampphase_options *src);
+void free_ampphase_options(struct ampphase_options *options);
 void default_tvchannels(int num_chan, float chan_width,
                         float centre_freq, int *min_tvchannel,
                         int *max_tvchannel);

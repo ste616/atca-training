@@ -258,6 +258,16 @@ void copy_ampphase_options(struct ampphase_options *dest,
 }
 
 /**
+ * Free an ampphase_options structure.
+ */
+void free_ampphase_options(struct ampphase_options *options) {
+  FREE(options->min_tvchannel);
+  FREE(options->max_tvchannel);
+  FREE(options->delay_averaging);
+  FREE(options->averaging_method);
+}
+
+/**
  * Routine that computes the "default" tv channel range given
  * the number of channels present in an IF, the channel width,
  * and the centre frequency in MHz.
