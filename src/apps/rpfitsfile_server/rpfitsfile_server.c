@@ -247,6 +247,7 @@ void add_cache_vis_data(struct ampphase_options *options,
   REALLOC(cache_vis_data.ampphase_options, n);
   REALLOC(cache_vis_data.vis_data, n);
   MALLOC(cache_vis_data.ampphase_options[n - 1], 1);
+  set_default_ampphase_options(cache_vis_data.ampphase_options[n - 1]);
   copy_ampphase_options(cache_vis_data.ampphase_options[n - 1], options);
   MALLOC(cache_vis_data.vis_data[n - 1], 1);
   copy_vis_data(cache_vis_data.vis_data[n - 1], data);
@@ -468,6 +469,7 @@ void data_reader(int read_type, int n_rpfits_files,
                   }
                   for (idx_pol = 0; idx_pol < temp_spectrum->num_pols; idx_pol++) {
                     MALLOC(local_ampphase_options, 1);
+		    set_default_ampphase_options(local_ampphase_options);
                     copy_ampphase_options(local_ampphase_options, ampphase_options);
                     /* fprintf(stderr, "[data_reader] calculating amp products\n"); */
                     calcres = vis_ampphase(sh, cycle_data,
@@ -483,6 +485,7 @@ void data_reader(int read_type, int n_rpfits_files,
                     }
                     if (read_type & COMPUTE_VIS_PRODUCTS) {
                       MALLOC(local_ampphase_options, 1);
+		      set_default_ampphase_options(local_ampphase_options);
                       copy_ampphase_options(local_ampphase_options, ampphase_options);
                       /* fprintf(stderr, "[data_reader] calculating vis products\n"); */
                       ampphase_average(temp_spectrum->spectrum[idx_if][idx_pol],
@@ -490,8 +493,6 @@ void data_reader(int read_type, int n_rpfits_files,
                                        local_ampphase_options);
 		      // Copy the ampphase_options back.
 		      copy_ampphase_options(ampphase_options, local_ampphase_options);
-		      /* free_ampphase_options(local_ampphase_options); */
-		      /* FREE(local_ampphase_options); */
                       /* fprintf(stderr, "[data_reader] calculated vis products\n"); */
                       vis_cycled = true;
                     }
@@ -648,13 +649,7 @@ int main(int argc, char *argv[]) {
 
   // And the default for the calculator options.
   MALLOC(ampphase_options, 1);
-  ampphase_options->phase_in_degrees = true;
-  ampphase_options->delay_averaging = NULL;
-  ampphase_options->num_ifs = 0;
-  ampphase_options->min_tvchannel = NULL;
-  ampphase_options->max_tvchannel = NULL;
-  ampphase_options->averaging_method = NULL;
-  ampphase_options->include_flagged_data = 1;
+  set_default_ampphase_options(ampphase_options);
   
   // Parse the arguments.
   argp_parse(&argp, argc, argv, 0, 0, &arguments);
@@ -909,15 +904,13 @@ int main(int argc, char *argv[]) {
                 // Don't bother with the response.
                 CLOSESOCKET(child_socket);
                 // Clean up.
-                FREE(client_options->min_tvchannel);
-                FREE(client_options->max_tvchannel);
+		free_ampphase_options(client_options);
                 FREE(client_options);
                 // Die.
                 printf("CHILD IS FINISHED!\n");
                 exit(0);
               } else {
-                FREE(client_options->min_tvchannel);
-                FREE(client_options->max_tvchannel);
+		free_ampphase_options(client_options);
                 FREE(client_options);
                 // Return a response saying that we are doing the computation.
                 MALLOC(send_buffer, JUSTRESPONSESIZE);
@@ -936,6 +929,8 @@ int main(int argc, char *argv[]) {
               // We're getting vis data back from our child after the computation has
               // finished.
               fprintf(stderr, "[PARENT] unpacking ampphase options\n");
+	      // Free the current ampphase options.
+	      free_ampphase_options(ampphase_options);
               unpack_ampphase_options(&cmp, ampphase_options);
               fprintf(stderr, "[PARENT] unpacking vis data\n");
               // We need to free whatever is in vis_data already.
@@ -944,9 +939,7 @@ int main(int argc, char *argv[]) {
               fprintf(stderr, "[PARENT] adding data to cache\n");
               add_cache_vis_data(ampphase_options, vis_data);
               add_client_vis_data(&client_vis_data, client_request.client_id, vis_data);
-              // Free the memory.
-              FREE(ampphase_options->min_tvchannel);
-              FREE(ampphase_options->max_tvchannel);
+
               // Tell the client that their data is ready.
               // Find the client's socket.
               alert_socket = find_client(&clients, client_request.client_id);
@@ -1015,9 +1008,9 @@ int main(int argc, char *argv[]) {
     }
     free_vis_data(cache_vis_data.vis_data[l]);
     FREE(cache_vis_data.vis_data[l]);
-    FREE(cache_vis_data.ampphase_options[l]->min_tvchannel);
-    FREE(cache_vis_data.ampphase_options[l]->max_tvchannel);
+    free_ampphase_options(cache_vis_data.ampphase_options[l]);
     FREE(cache_vis_data.ampphase_options[l]);
+
   }
   FREE(cache_vis_data.vis_data);
   FREE(cache_vis_data.ampphase_options);
@@ -1046,14 +1039,14 @@ int main(int argc, char *argv[]) {
   FREE(info_rpfits_files);
   FREE(arguments.rpfits_files);
 
-  FREE(ampphase_options->min_tvchannel);
-  FREE(ampphase_options->max_tvchannel);
+  free_ampphase_options(ampphase_options);
   FREE(ampphase_options);
   FREE(vis_data);
   
   // Free the clients.
   for (i = 0; i < client_vis_data.num_clients; i++) {
     FREE(client_vis_data.client_id[i]);
+    FREE(client_vis_data.vis_data[i]);
   }
   FREE(client_vis_data.client_id);
   FREE(client_vis_data.vis_data);

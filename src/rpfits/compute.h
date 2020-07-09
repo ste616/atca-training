@@ -170,6 +170,7 @@ void free_ampphase(struct ampphase **ampphase);
 void free_vis_quantities(struct vis_quantities **vis_quantities);
 int polarisation_number(char *polstring);
 struct ampphase_options ampphase_options_default(void);
+void set_default_ampphase_options(struct ampphase_options *options);
 void copy_ampphase_options(struct ampphase_options *dest,
                            struct ampphase_options *src);
 void free_ampphase_options(struct ampphase_options *options);

@@ -160,8 +160,7 @@ void free_ampphase(struct ampphase **ampphase) {
   FREE((*ampphase)->min_phase);
   FREE((*ampphase)->max_phase);
 
-  FREE((*ampphase)->options->min_tvchannel);
-  FREE((*ampphase)->options->max_tvchannel);
+  free_ampphase_options((*ampphase)->options);
   FREE((*ampphase)->options);
   
   FREE(*ampphase);
@@ -172,8 +171,9 @@ void free_ampphase(struct ampphase **ampphase) {
  */
 void free_vis_quantities(struct vis_quantities **vis_quantities) {
   int i;
-  FREE((*vis_quantities)->options->min_tvchannel);
-  FREE((*vis_quantities)->options->max_tvchannel);
+  /* FREE((*vis_quantities)->options->min_tvchannel); */
+  /* FREE((*vis_quantities)->options->max_tvchannel); */
+  free_ampphase_options((*vis_quantities)->options);
   FREE((*vis_quantities)->options);
   
   for (i = 0; i < (*vis_quantities)->nbaselines; i++) {
@@ -237,6 +237,20 @@ struct ampphase_options ampphase_options_default(void) {
 }
 
 /**
+ * Set default options in an already existing ampphase_options
+ * structure.
+ */
+void set_default_ampphase_options(struct ampphase_options *options) {
+  options->phase_in_degrees = true;
+  options->include_flagged_data = 0;
+  options->num_ifs = 0;
+  options->min_tvchannel = NULL;
+  options->max_tvchannel = NULL;
+  options->delay_averaging = NULL;
+  options->averaging_method = NULL;
+}
+
+/**
  * Copy one ampphase structure into another.
  */
 void copy_ampphase_options(struct ampphase_options *dest,
@@ -245,10 +259,10 @@ void copy_ampphase_options(struct ampphase_options *dest,
   STRUCTCOPY(src, dest, phase_in_degrees);
   STRUCTCOPY(src, dest, include_flagged_data);
   STRUCTCOPY(src, dest, num_ifs);
-  MALLOC(dest->min_tvchannel, dest->num_ifs);
-  MALLOC(dest->max_tvchannel, dest->num_ifs);
-  MALLOC(dest->delay_averaging, dest->num_ifs);
-  MALLOC(dest->averaging_method, dest->num_ifs);
+  REALLOC(dest->min_tvchannel, dest->num_ifs);
+  REALLOC(dest->max_tvchannel, dest->num_ifs);
+  REALLOC(dest->delay_averaging, dest->num_ifs);
+  REALLOC(dest->averaging_method, dest->num_ifs);
   for (i = 0; i < dest->num_ifs; i++) {
     STRUCTCOPY(src, dest, min_tvchannel[i]);
     STRUCTCOPY(src, dest, max_tvchannel[i]);
