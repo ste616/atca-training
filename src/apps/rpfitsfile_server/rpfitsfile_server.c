@@ -232,14 +232,14 @@ double date2mjd(char *obsdate, float ut_seconds) {
   return 0;
 }
 
-void add_cache_vis_data(struct ampphase_options *options,
+bool add_cache_vis_data(struct ampphase_options *options,
                         struct vis_data *data) {
   int i, n;
   // Check that we don't already know about the data.
   for (i = 0; i < cache_vis_data.num_cache_vis_data; i++) {
     if (ampphase_options_match(options,
                                cache_vis_data.ampphase_options[i])) {
-      return;
+      return false;
     }
   }
   // If we get here, this is new data.
@@ -252,6 +252,22 @@ void add_cache_vis_data(struct ampphase_options *options,
   MALLOC(cache_vis_data.vis_data[n - 1], 1);
   copy_vis_data(cache_vis_data.vis_data[n - 1], data);
   cache_vis_data.num_cache_vis_data = n;
+
+  return true;
+}
+
+bool get_cache_vis_data(struct ampphase_options *options,
+			struct vis_data **data) {
+  int i;
+  for (i = 0; i < cache_vis_data.num_cache_vis_data; i++) {
+    if (ampphase_options_match(options,
+			       cache_vis_data.ampphase_options[i])) {
+      *data = cache_vis_data.vis_data[i];
+      return true;
+    }
+  }
+
+  return false;
 }
 
 void data_reader(int read_type, int n_rpfits_files,
@@ -283,15 +299,16 @@ void data_reader(int read_type, int n_rpfits_files,
     /*        (ampphase_options->phase_in_degrees ? "degrees" : "radians"), */
     /*        ampphase_options->delay_averaging, ampphase_options->averaging_method); */
 
-    for (i = 0; i < cache_vis_data.num_cache_vis_data; i++) {
-      if (ampphase_options_match(ampphase_options,
-                                 cache_vis_data.ampphase_options[i])) {
-        cache_hit_vis_data = true;
-        *vis_data = cache_vis_data.vis_data[i];
-        read_type -= COMPUTE_VIS_PRODUCTS;
-        break;
-      }
-    }
+    cache_hit_vis_data = get_cache_vis_data(ampphase_options, vis_data);
+    /* for (i = 0; i < cache_vis_data.num_cache_vis_data; i++) { */
+    /*   if (ampphase_options_match(ampphase_options, */
+    /*                              cache_vis_data.ampphase_options[i])) { */
+    /*     cache_hit_vis_data = true; */
+    /*     *vis_data = cache_vis_data.vis_data[i]; */
+    /*     read_type -= COMPUTE_VIS_PRODUCTS; */
+    /*     break; */
+    /*   } */
+    /* } */
     if (cache_hit_vis_data == false) {
       printf("[data_reader] no cache hit\n");
       if ((vis_data != NULL) && (*vis_data == NULL)) {
@@ -305,6 +322,7 @@ void data_reader(int read_type, int n_rpfits_files,
       (*vis_data)->vis_quantities = NULL;
     } else {
       printf("[data_reader] found cache hit\n");
+      read_type -= COMPUTE_VIS_PRODUCTS;
     }
   }
   
@@ -616,7 +634,7 @@ struct vis_data* get_client_vis_data(struct client_vis_data *client_vis_data,
 int main(int argc, char *argv[]) {
   struct arguments arguments;
   int i, j, k, l, ri, rj, bytes_received, r;
-  bool pointer_found = false;
+  bool pointer_found = false, cache_updated = false;
   double mjd_grab;
   struct rpfits_file_information **info_rpfits_files = NULL;
   struct ampphase_options *ampphase_options = NULL, *client_options = NULL;
@@ -714,7 +732,7 @@ int main(int argc, char *argv[]) {
               ampphase_options, info_rpfits_files, &spectrum_data, &vis_data);
   // This first grab of the vis_data goes into the default client slot.
   add_client_vis_data(&client_vis_data, "DEFAULT", vis_data);
-  add_cache_vis_data(ampphase_options, vis_data);
+  cache_updated = add_cache_vis_data(ampphase_options, vis_data);
   if (!arguments.network_operation) {
     // Save these spectra to a file after packing it.
     printf("Writing SPD data output file...\n");
@@ -932,12 +950,25 @@ int main(int argc, char *argv[]) {
 	      // Free the current ampphase options.
 	      free_ampphase_options(ampphase_options);
               unpack_ampphase_options(&cmp, ampphase_options);
+
               fprintf(stderr, "[PARENT] unpacking vis data\n");
-              // We need to free whatever is in vis_data already.
               unpack_vis_data(&cmp, vis_data);
+
               // Add this data to our cache.
               fprintf(stderr, "[PARENT] adding data to cache\n");
-              add_cache_vis_data(ampphase_options, vis_data);
+              cache_updated = add_cache_vis_data(ampphase_options, vis_data);
+	      if (cache_updated == false) {
+		// The unpacked data can be freed.
+		// This includes the header data.
+		for (i = 0; i < vis_data->nviscycles; i++) {
+		  free_scan_header_data(vis_data->header_data[i]);
+		  FREE(vis_data->header_data[i]);
+		}
+		free_vis_data(vis_data);
+		// Now get the cached vis data so we don't repeatedly store
+		// new data into the client slot.
+		get_cache_vis_data(ampphase_options, &vis_data);
+	      }
               add_client_vis_data(&client_vis_data, client_request.client_id, vis_data);
 
               // Tell the client that their data is ready.
@@ -1001,6 +1032,7 @@ int main(int argc, char *argv[]) {
     }
     if (!pointer_found) {
       // We have to free the memory.
+      printf("Freeing headers from cache entry %d\n", l);
       for (i = 0; i < cache_vis_data.vis_data[l]->nviscycles; i++) {
         free_scan_header_data(cache_vis_data.vis_data[l]->header_data[i]);
         FREE(cache_vis_data.vis_data[l]->header_data[i]);
@@ -1041,7 +1073,8 @@ int main(int argc, char *argv[]) {
 
   free_ampphase_options(ampphase_options);
   FREE(ampphase_options);
-  FREE(vis_data);
+  // This doesn't need freeing because it should be in the cache.
+  //FREE(vis_data);
   
   // Free the clients.
   for (i = 0; i < client_vis_data.num_clients; i++) {
