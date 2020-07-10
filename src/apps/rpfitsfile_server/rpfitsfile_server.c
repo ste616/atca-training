@@ -262,6 +262,8 @@ bool get_cache_vis_data(struct ampphase_options *options,
   for (i = 0; i < cache_vis_data.num_cache_vis_data; i++) {
     if (ampphase_options_match(options,
 			       cache_vis_data.ampphase_options[i])) {
+      // This will leak memory unless we free it first.
+      FREE(*data);
       *data = cache_vis_data.vis_data[i];
       return true;
     }
