@@ -915,7 +915,6 @@ int main(int argc, char *argv[]) {
     }
     if (!pointer_found) {
       // We have to free the memory.
-      printf("Freeing headers from cache entry %d\n", l);
       for (i = 0; i < cache_vis_data.vis_data[l]->nviscycles; i++) {
         free_scan_header_data(cache_vis_data.vis_data[l]->header_data[i]);
         FREE(cache_vis_data.vis_data[l]->header_data[i]);
@@ -969,7 +968,7 @@ int main(int argc, char *argv[]) {
   
   if (arguments.network_operation) {
     // Close our socket.
-    printf("Closing listening socket...\n");
+    printf("\n\nClosing listening socket...\n");
     CLOSESOCKET(socket_listen);
   }
 
