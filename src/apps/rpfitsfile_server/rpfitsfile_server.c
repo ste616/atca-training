@@ -262,9 +262,13 @@ bool get_cache_vis_data(struct ampphase_options *options,
   for (i = 0; i < cache_vis_data.num_cache_vis_data; i++) {
     if (ampphase_options_match(options,
 			       cache_vis_data.ampphase_options[i])) {
-      // This will leak memory unless we free it first.
-      FREE(*data);
-      *data = cache_vis_data.vis_data[i];
+      //*data = cache_vis_data.vis_data[i];
+      if (*data == NULL ) {
+	// Occurs in the child computer usually.
+	*data = cache_vis_data.vis_data[i];
+      } else {
+	copy_vis_data(*data, cache_vis_data.vis_data[i]);
+      }
       return true;
     }
   }
@@ -1076,7 +1080,7 @@ int main(int argc, char *argv[]) {
   free_ampphase_options(ampphase_options);
   FREE(ampphase_options);
   // This doesn't need freeing because it should be in the cache.
-  //FREE(vis_data);
+  FREE(vis_data);
   
   // Free the clients.
   for (i = 0; i < client_vis_data.num_clients; i++) {
