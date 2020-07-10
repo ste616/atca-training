@@ -60,6 +60,14 @@ struct responses {
   char client_id[CLIENTIDLENGTH];
 };
 
+// This structure is for when a server needs to keep track
+// of which client is asking for what.
+struct client_sockets {
+  int num_sockets;
+  SOCKET *socket;
+  char **client_id;
+};
+
 #define JUSTRESPONSESIZE (2 * sizeof(struct responses))
 
 ssize_t socket_send_buffer(SOCKET socket, char *buffer, size_t buffer_length);
@@ -68,3 +76,7 @@ bool prepare_client_connection(char *server_name, int port_number,
                                SOCKET *socket_peer, bool debugging);
 const char *get_type_string(int type, int id);
 const char *get_servertype_string(int type);
+SOCKET find_client(struct client_sockets *clients, char *client_id);
+void add_client(struct client_sockets *clients, char *client_id,
+		SOCKET socket);
+void free_client_sockets(struct client_sockets *clients);

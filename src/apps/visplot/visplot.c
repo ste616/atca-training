@@ -16,6 +16,7 @@
 #include "memory.h"
 #include "cpgplot.h"
 #include "common.h"
+#include "plotting.h"
 
 const char *argp_program_version = "visplot 1.0";
 const char *argp_program_bug_address = "<Jamie.Stevens@csiro.au>";

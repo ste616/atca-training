@@ -115,122 +115,9 @@ struct rpfits_file_information *new_rpfits_file(void) {
   return (rv);
 }
 
-struct client_sockets {
-  int num_sockets;
-  SOCKET *socket;
-  char **client_id;
-};
-
-SOCKET find_client(struct client_sockets *clients,
-                   char *client_id) {
-  int i;
-  for (i = 0; i < clients->num_sockets; i++) {
-    if (strncmp(clients->client_id[i], client_id, CLIENTIDLENGTH) == 0) {
-      return(clients->socket[i]);
-    }
-  }
-  return(-1);
-}
-
-void add_client(struct client_sockets *clients, char *client_id,
-                SOCKET socket) {
-  int n;
-  SOCKET check;
-  // Check if we already know about it.
-  check = find_client(clients, client_id);
-  if (!ISVALIDSOCKET(check)) {
-    // Add this.
-    n = clients->num_sockets + 1;
-    REALLOC(clients->socket, n);
-    clients->socket[n - 1] = socket;
-    
-    REALLOC(clients->client_id, n);
-    MALLOC(clients->client_id[n - 1], CLIENTIDLENGTH);
-    strncpy(clients->client_id[n - 1], client_id, CLIENTIDLENGTH);
-
-    clients->num_sockets = n;
-  }
-}
-
-void free_client_sockets(struct client_sockets *clients) {
-  int i;
-  for (i = 0; i < clients->num_sockets; i++) {
-    FREE(clients->client_id[i]);
-  }
-  FREE(clients->socket);
-  FREE(clients->client_id);
-}
 
 
-int leap(int year) {
-  // Return 1 if the year is a leap year.
-  return (((!(year % 4)) &&
-	   (year % 100)) ||
-	  (!(year % 400)));
-}
 
-int dayOK(int day, int month, int year) {
-  int ndays = 31;
-  if ((month == 4) || (month == 6) ||
-      (month == 9) || (month == 11)) {
-    ndays = 30;
-  } else if (month == 2) {
-    ndays = 28;
-    if (leap(year)) {
-      ndays = 29;
-    }
-  }
-
-  if ((day < 1) || (day > ndays)) {
-    return 0;
-  }
-  return 1;
-}
-
-double cal2mjd(int day, int month, int year, float ut_seconds) {
-  // Converts a calendar date (Universal Time) into modified
-  // Julian day number.
-  // day = day of the month (1 - 31)
-  // month = month of the year (1 - 12)
-  // year = year (full)
-  // ut_seconds = number of seconds passed on the specified date
-  // Returns the MJD
-  int m, y, c, x1, x2, x3;
-  
-  if ((month < 1) || (month > 12)) {
-    return 0;
-  }
-
-  if (!dayOK(day, month, year)) {
-    return 0;
-  }
-
-  if (month <= 2) {
-    m = month + 9;
-    y = year - 1;
-  } else {
-    m = month - 3;
-    y = year;
-  }
-
-  c = (int)((float)y / 100);
-  y -= c * 100;
-  x1 = (int)(146097.0 * (float)c / 4.0);
-  x2 = (int)(1461.0 * (float)y / 4.0);
-  x3 = (int)((153.0 * (float)m + 2.0) / 5.0);
-  return ((float)(x1 + x2 + x3 + day - 678882) + (ut_seconds/ 86400.0));
-}
-
-double date2mjd(char *obsdate, float ut_seconds) {
-  // Parse the RPFITS obsdate.
-  int year, month, day;
-
-  if (sscanf(obsdate, "%4d-%02d-%02d", &year, &month, &day) == 3) {
-    return cal2mjd(day, month, year, ut_seconds);
-  }
-
-  return 0;
-}
 
 bool add_cache_vis_data(struct ampphase_options *options,
                         struct vis_data *data) {
@@ -262,7 +149,6 @@ bool get_cache_vis_data(struct ampphase_options *options,
   for (i = 0; i < cache_vis_data.num_cache_vis_data; i++) {
     if (ampphase_options_match(options,
 			       cache_vis_data.ampphase_options[i])) {
-      //*data = cache_vis_data.vis_data[i];
       if (*data == NULL ) {
 	// Occurs in the child computer usually.
 	*data = cache_vis_data.vis_data[i];
@@ -306,15 +192,6 @@ void data_reader(int read_type, int n_rpfits_files,
     /*        ampphase_options->delay_averaging, ampphase_options->averaging_method); */
 
     cache_hit_vis_data = get_cache_vis_data(ampphase_options, vis_data);
-    /* for (i = 0; i < cache_vis_data.num_cache_vis_data; i++) { */
-    /*   if (ampphase_options_match(ampphase_options, */
-    /*                              cache_vis_data.ampphase_options[i])) { */
-    /*     cache_hit_vis_data = true; */
-    /*     *vis_data = cache_vis_data.vis_data[i]; */
-    /*     read_type -= COMPUTE_VIS_PRODUCTS; */
-    /*     break; */
-    /*   } */
-    /* } */
     if (cache_hit_vis_data == false) {
       printf("[data_reader] no cache hit\n");
       if ((vis_data != NULL) && (*vis_data == NULL)) {
@@ -1079,7 +956,6 @@ int main(int argc, char *argv[]) {
 
   free_ampphase_options(ampphase_options);
   FREE(ampphase_options);
-  // This doesn't need freeing because it should be in the cache.
   FREE(vis_data);
   
   // Free the clients.

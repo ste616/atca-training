@@ -2,7 +2,7 @@ cmake_minimum_required (VERSION 3.5)
 project (ATCATraining LANGUAGES C Fortran)
 set(CMAKE_BUILD_TYPE Debug)
 
-add_library(applib STATIC src/library/common.c src/library/packing.c extern/cmp/cmp.c src/library/atnetworking.c extern/cmp_mem_access/cmp_mem_access.c)
+add_library(applib STATIC src/library/common.c src/library/packing.c extern/cmp/cmp.c src/library/atnetworking.c src/library/plotting.c src/library/atreadline.c extern/cmp_mem_access/cmp_mem_access.c)
 target_include_directories(applib PUBLIC src/library src/rpfits src/include extern/cmp extern/cmp_mem_access)
 target_compile_options(applib PRIVATE -Werror -Wall -Wextra)
 

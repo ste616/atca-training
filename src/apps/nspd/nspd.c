@@ -26,7 +26,10 @@
 #include "packing.h"
 #include "cpgplot.h"
 #include "common.h"
+#include "plotting.h"
 #include "atnetworking.h"
+#include "atreadline.h"
+
 
 const char *argp_program_version = "nspd 1.0";
 const char *argp_program_bug_address = "<Jamie.Stevens@csiro.au>";

@@ -144,3 +144,43 @@ const char *get_servertype_string(int type) {
     return "UNKNOWN!";
   }
 }
+
+SOCKET find_client(struct client_sockets *clients,
+                   char *client_id) {
+  int i;
+  for (i = 0; i < clients->num_sockets; i++) {
+    if (strncmp(clients->client_id[i], client_id, CLIENTIDLENGTH) == 0) {
+      return(clients->socket[i]);
+    }
+  }
+  return(-1);
+}
+
+void add_client(struct client_sockets *clients, char *client_id,
+                SOCKET socket) {
+  int n;
+  SOCKET check;
+  // Check if we already know about it.
+  check = find_client(clients, client_id);
+  if (!ISVALIDSOCKET(check)) {
+    // Add this.
+    n = clients->num_sockets + 1;
+    REALLOC(clients->socket, n);
+    clients->socket[n - 1] = socket;
+    
+    REALLOC(clients->client_id, n);
+    MALLOC(clients->client_id[n - 1], CLIENTIDLENGTH);
+    strncpy(clients->client_id[n - 1], client_id, CLIENTIDLENGTH);
+
+    clients->num_sockets = n;
+  }
+}
+
+void free_client_sockets(struct client_sockets *clients) {
+  int i;
+  for (i = 0; i < clients->num_sockets; i++) {
+    FREE(clients->client_id[i]);
+  }
+  FREE(clients->socket);
+  FREE(clients->client_id);
+}
