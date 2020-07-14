@@ -579,6 +579,22 @@ void unpack_vis_quantities(cmp_ctx_t *cmp, struct vis_quantities *a) {
   
 }
 
+void copy_spectrum_data(struct spectrum_data *dest,
+			struct spectrum_data *src) {
+  // Copy one spd_data structure to another.
+  // The spectrum header.
+  dest->header_data = src->header_data;
+
+  // The number of IFs in this spectra set.
+  dest->num_ifs = src->num_ifs;
+
+  // The number of polarisations.
+  dest->num_pols = src->num_pols;
+
+  // The ampphase structures.
+  dest->spectrum = src->spectrum;
+}
+
 void copy_vis_data(struct vis_data *dest,
                    struct vis_data *src) {
   // Copy one vis_data structure to another.

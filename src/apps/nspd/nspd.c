@@ -64,7 +64,7 @@ struct arguments {
 };
 
 // And some fun, totally necessary, global state variables.
-int action_required;
+int action_required, server_type;
 int spd_device_number;
 int xaxis_type, yaxis_type, plot_pols, yaxis_scaling, nxpanels, nypanels;
 struct spd_plotcontrols spd_plotcontrols;
@@ -167,6 +167,22 @@ static void sighandler(int sig) {
 #define ACTION_QUIT                1<<1
 #define ACTION_CHANGE_PLOTSURFACE  1<<2
 #define ACTION_NEW_DATA_RECEIVED   1<<3
+#define ACTION_CYCLE_FORWARD       1<<4
+#define ACTION_CYCLE_BACKWARD      1<<5
+
+// Make a shortcut to stop action for those actions which can only be
+// done by a simulator.
+#define CHECKSIMULATOR				\
+  do						\
+    {						\
+      if (server_type != SERVERTYPE_SIMULATOR)	\
+	{					\
+	  FREE(line_els);			\
+	  FREE(line);				\
+	  return;				\
+	}					\
+    }						\
+  while(0)
 
 // Callback function called for each line when accept-line
 // executed, EOF seen, or EOF character read.
@@ -384,6 +400,14 @@ static void interpret_command(char *line) {
           action_required = ACTION_CHANGE_PLOTSURFACE;
         }
       }
+    } else if (minmatch("forward", line_els[0], 4)) {
+      // Move forward one cycle in time.
+      CHECKSIMULATOR;
+      action_required |= ACTION_CYCLE_FORWARD;
+    } else if (minmatch("backward", line_els[0], 4)) {
+      // Move backward one cycle in time.
+      CHECKSIMULATOR;
+      action_required |= ACTION_CYCLE_BACKWARD;
     }
     FREE(line_els);
   }
@@ -433,17 +457,23 @@ int main(int argc, char *argv[]) {
   bool spd_device_opened = false;
   struct spd_plotcontrols spd_alteredcontrols;
   fd_set watchset, reads;
-  int r, bytes_received, max_socket = -1;
+  int i, r, bytes_received, max_socket = -1, nmesg = 0;
   size_t recv_buffer_length;
   struct requests server_request;
   struct responses server_response;
-  /* struct addrinfo hints, *peer_address; */
-  /* char address_buffer[SPDBUFSIZE], service_buffer[SPDBUFSIZE]; */
-  char send_buffer[SPDBUFSIZE];
-  char *recv_buffer = NULL;
+  char send_buffer[SPDBUFSIZE], client_id[CLIENTIDLENGTH];
+  char *recv_buffer = NULL, **mesgout = NULL;
   SOCKET socket_peer;
   cmp_ctx_t cmp;
   cmp_mem_access_t mem;
+  double earliest_mjd, latest_mjd, mjd_cycletime, mjd_request;
+  struct ampphase_options ampphase_options;
+
+  // Allocate some memory.
+  MALLOC(mesgout, MAX_N_MESSAGES);
+  for (i = 0; i < MAX_N_MESSAGES; i++) {
+    CALLOC(mesgout[i], SPDBUFSIZE);
+  }
   
   // Set the default for the arguments.
   arguments.use_file = false;
@@ -457,10 +487,23 @@ int main(int argc, char *argv[]) {
   // And defaults for some of the parameters.
   nxpanels = 5;
   nypanels = 5;
+
+  // We display phase in degrees by default.
+  ampphase_options.phase_in_degrees = YES;
+  ampphase_options.include_flagged_data = NO;
+  ampphase_options.num_ifs = 0; // Doesn't matter.
+  ampphase_options.min_tvchannel = NULL;
+  ampphase_options.max_tvchannel = NULL;
+  ampphase_options.delay_averaging = NULL;
+  ampphase_options.averaging_method = NULL;
   
   // Parse the arguments.
   argp_parse(&argp, argc, argv, 0, 0, &arguments);
 
+  // Generate our ID.
+  generate_client_id(client_id, CLIENTIDLENGTH);
+  printf("client ID = %s\n", client_id);
+  
   // Handle window size changes.
   signal(SIGWINCH, sighandler);
 
@@ -473,6 +516,12 @@ int main(int argc, char *argv[]) {
                                    &socket_peer, arguments.debugging_output)) {
       return(1);
     }
+    // Ask what type of server we're connecting to.
+    server_request.request_type = REQUEST_SERVERTYPE;
+    strncpy(server_request.client_id, client_id, CLIENTIDLENGTH);
+    init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)SPDBUFSIZE);
+    pack_requests(&cmp, &server_request);
+    socket_send_buffer(socket_peer, send_buffer, cmp_mem_access_get_pos(&mem));
     // Send a request for the currently available spectrum.
     server_request.request_type = REQUEST_CURRENT_SPECTRUM;
     init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)SPDBUFSIZE);
@@ -537,6 +586,30 @@ int main(int argc, char *argv[]) {
       action_required -= ACTION_REFRESH_PLOT;
     }
 
+    if ((action_required & ACTION_CYCLE_FORWARD) ||
+	(action_required & ACTION_CYCLE_BACKWARD)) {
+      // Ask for different data.
+      // First, work out the time for the request.
+      mjd_request = date2mjd(spectrum_data.header_data->obsdate,
+			     spectrum_data.header_data->ut_seconds);
+      if (action_required & ACTION_CYCLE_FORWARD) {
+	mjd_request += mjd_cycletime;
+	action_required -= ACTION_CYCLE_FORWARD;
+      } else if (action_required & ACTION_CYCLE_BACKWARD) {
+	mjd_request -= mjd_cycletime;
+	action_required -= ACTION_CYCLE_BACKWARD;
+      }
+      // We could check this against the known range here, but for now
+      // let's just request the data (the server also has range checking).
+      server_request.request_type = REQUEST_SPECTRUM_MJD;
+      init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)SPDBUFSIZE);
+      pack_requests(&cmp, &server_request);
+      pack_write_double(&cmp, mjd_request);
+      // We have to send along the ampphase options as well.
+      pack_ampphase_options(&cmp, &ampphase_options);
+      socket_send_buffer(socket_peer, send_buffer, cmp_mem_access_get_pos(&mem));
+    }
+    
     if (action_required & ACTION_QUIT) {
       break;
     }
@@ -580,10 +653,47 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Response is type %d\n", server_response.response_type);
       }
       // Check we're getting what we expect.
-      if (server_response.response_type == RESPONSE_CURRENT_SPECTRUM) {
+      if ((server_response.response_type == RESPONSE_CURRENT_SPECTRUM) ||
+	  (server_response.response_type == RESPONSE_LOADED_SPECTRUM)) {
         unpack_spectrum_data(&cmp, &spectrum_data);
         // Refresh the plot next time through.
         action_required = ACTION_NEW_DATA_RECEIVED;
+      } else if (server_response.response_type == RESPONSE_SERVERTYPE) {
+	// We're being told what type of server we've connected to.
+	pack_read_sint(&cmp, &server_type);
+	nmesg = 1;
+	snprintf(mesgout[0], SPDBUFSIZE, "Connected to %s server.\n",
+		 get_servertype_string(server_type));
+	readline_print_messages(nmesg, mesgout);
+	if (server_type == SERVERTYPE_SIMULATOR) {
+	  // Send a request for the time information.
+	  server_request.request_type = REQUEST_TIMERANGE;
+	  init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)SPDBUFSIZE);
+	  pack_requests(&cmp, &server_request);
+	  socket_send_buffer(socket_peer, send_buffer, cmp_mem_access_get_pos(&mem));
+	}
+      } else if (server_response.response_type == RESPONSE_TIMERANGE) {
+	// Just store these values for later use.
+	pack_read_double(&cmp, &mjd_cycletime);
+	pack_read_double(&cmp, &earliest_mjd);
+	pack_read_double(&cmp, &latest_mjd);
+	nmesg = 3;
+	snprintf(mesgout[0], SPDBUFSIZE, " Server earliest MJD %.8f\n", earliest_mjd);
+	snprintf(mesgout[1], SPDBUFSIZE, " Server   latest MJD %.8f\n", latest_mjd);
+	snprintf(mesgout[2], SPDBUFSIZE, " Data cycle time %.1f sec\n",
+		 (mjd_cycletime * 86400.0));
+	readline_print_messages(nmesg, mesgout);
+      } else if (server_response.response_type == RESPONSE_SPECTRUM_OUTSIDERANGE) {
+	// We couldn't get a new spectrum.
+	nmesg = 1;
+	snprintf(mesgout[0], SPDBUFSIZE, " SERVER UNABLE TO SUPPLY SPECTRUM\n");
+	readline_print_messages(nmesg, mesgout);
+      } else if (server_response.response_type == RESPONSE_SPECTRUM_LOADED) {
+	// Our new spectrum is ready, so we request it.
+	server_request.request_type = REQUEST_MJD_SPECTRUM;
+	init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)SPDBUFSIZE);
+	pack_requests(&cmp, &server_request);
+	socket_send_buffer(socket_peer, send_buffer, cmp_mem_access_get_pos(&mem));
       }
       // Free the socket buffer memory.
       FREE(recv_buffer);
@@ -602,5 +712,9 @@ int main(int argc, char *argv[]) {
 
   // Release all the memory.
   free_spectrum_data(&spectrum_data);
+  for (i = 0; i < MAX_N_MESSAGES; i++) {
+    FREE(mesgout[i]);
+  }
+  FREE(mesgout);
   
 }

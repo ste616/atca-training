@@ -106,14 +106,18 @@ const char *get_type_string(int type, int id) {
   // Get a string representation of the type of request or response,
   // specified by type=TYPE_REQUEST or TYPE_RESPONSE, and
   // id being one of the definitions in the header.
-  int max_request = 7, max_response = 7;
+  int max_request = 11, max_response = 12;
   const char* const request_strings[] = { "",
                                           "REQUEST_CURRENT_SPECTRUM",
                                           "REQUEST_CURRENT_VISDATA",
                                           "REQUEST_COMPUTE_VISDATA",
                                           "REQUEST_COMPUTED_VISDATA",
                                           "CHILDREQUEST_VISDATA_COMPUTED",
-                                          "REQUEST_SERVERTYPE"
+                                          "REQUEST_SERVERTYPE",
+					  "REQUEST_SPECTRUM_MJD",
+					  "REQUEST_MJD_SPECTRUM",
+					  "CHILDREQUEST_SPECTRUM_MJD",
+					  "REQUEST_TIMERANGE"
   };
   const char* const response_strings[] = { "",
                                            "RESPONSE_CURRENT_SPECTRUM",
@@ -121,7 +125,12 @@ const char *get_type_string(int type, int id) {
                                            "RESPONSE_VISDATA_COMPUTED",
                                            "RESPONSE_COMPUTED_VISDATA",
                                            "RESPONSE_VISDATA_COMPUTING",
-                                           "RESPONSE_SERVERTYPE"
+                                           "RESPONSE_SERVERTYPE",
+					   "RESPONSE_SPECTRUM_LOADING",
+					   "RESPONSE_SPECTRUM_LOADED",
+					   "RESPONSE_LOADED_SPECTRUM",
+					   "RESPONSE_SPECTRUM_OUTSIDERANGE",
+					   "RESPONSE_TIMERANGE"
   };
 
   if ((type == TYPE_REQUEST) && (id >= 0) && (id < max_request)) {

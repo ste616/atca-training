@@ -94,6 +94,20 @@ struct client_vis_data {
   struct vis_data **vis_data;
 };
 
+struct cache_spd_data {
+  int num_cache_spd_data;
+  struct ampphase_options **ampphase_options;
+  struct spectrum_data **spectrum_data;
+};
+
+struct cache_spd_data cache_spd_data;
+
+struct client_spd_data {
+  int num_clients;
+  char **client_id;
+  struct spectrum_data **spectrum_data;
+};
+
 struct rpfits_file_information {
   char filename[RPSBUFSIZE];
   int n_scans;
@@ -115,9 +129,29 @@ struct rpfits_file_information *new_rpfits_file(void) {
   return (rv);
 }
 
-
-
-
+bool add_cache_spd_data(struct ampphase_options *options,
+			struct spectrum_data *data) {
+  int i, n;
+  // Check that we don't already know about the data.
+  for (i = 0; i < cache_spd_data.num_cache_spd_data; i++) {
+    if ((strncmp(cache_spd_data.spectrum_data[i]->header_data->obsdate,
+		 data->header_data->obsdate, OBSDATE_LENGTH) == 0) &&
+	(cache_spd_data.spectrum_data[i]->header_data->ut_seconds ==
+	 data->header_data->ut_seconds) &&
+	(options->phase_in_degrees ==
+	 cache_spd_data.ampphase_options[i]->phase_in_degrees)) {
+      return false;
+    }
+  }
+  // If we get here, this is new data.
+  n = cache_spd_data.num_cache_spd_data + 1;
+  REALLOC(cache_spd_data.spectrum_data, n);
+  MALLOC(cache_spd_data.spectrum_data[n - 1], 1);
+  copy_spectrum_data(cache_spd_data.spectrum_data[n - 1], data);
+  cache_spd_data.num_cache_spd_data = n;
+  
+  return true;
+}
 
 bool add_cache_vis_data(struct ampphase_options *options,
                         struct vis_data *data) {
@@ -143,13 +177,38 @@ bool add_cache_vis_data(struct ampphase_options *options,
   return true;
 }
 
+bool get_cache_spd_data(struct ampphase_options *options,
+			double mjd, double tol,
+			struct spectrum_data **data) {
+  int i;
+  double tmjd;
+  for (i = 0; i < cache_spd_data.num_cache_spd_data; i++) {
+    // Calculate MJD of this cache entry.
+    tmjd = date2mjd(cache_spd_data.spectrum_data[i]->header_data->obsdate,
+		    cache_spd_data.spectrum_data[i]->header_data->ut_seconds);
+    if ((fabs(mjd - tmjd) <= tol) &&
+	(options->phase_in_degrees ==
+	 cache_spd_data.ampphase_options[i]->phase_in_degrees)) {
+      if (*data == NULL) {
+	// Occurs in the child computer usually.
+	*data = cache_spd_data.spectrum_data[i];
+      } else {
+	copy_spectrum_data(*data, cache_spd_data.spectrum_data[i]);
+      }
+      return true;
+    }
+  }
+  
+  return false;
+}
+
 bool get_cache_vis_data(struct ampphase_options *options,
 			struct vis_data **data) {
   int i;
   for (i = 0; i < cache_vis_data.num_cache_vis_data; i++) {
     if (ampphase_options_match(options,
 			       cache_vis_data.ampphase_options[i])) {
-      if (*data == NULL ) {
+      if (*data == NULL) {
 	// Occurs in the child computer usually.
 	*data = cache_vis_data.vis_data[i];
       } else {
@@ -171,6 +230,7 @@ void data_reader(int read_type, int n_rpfits_files,
   int pols[4] = { POL_XX, POL_YY, POL_XY, POL_YX };
   bool open_file, keep_reading, header_free, read_cycles, keep_cycling;
   bool cycle_free, spectrum_return, vis_cycled, cache_hit_vis_data;
+  bool cache_hit_spectrum_data;
   double cycle_mjd, cycle_start, cycle_end, half_cycle;
   struct scan_header_data *sh = NULL;
   struct cycle_data *cycle_data = NULL;
@@ -206,6 +266,17 @@ void data_reader(int read_type, int n_rpfits_files,
     } else {
       printf("[data_reader] found cache hit\n");
       read_type -= COMPUTE_VIS_PRODUCTS;
+    }
+  }
+
+  cache_hit_spectrum_data = false;
+  if (read_type & GRAB_SPECTRUM) {
+    // Check whether we have a cached product for this.
+    half_cycle = (double)info_rpfits_files[0]->scan_headers[0]->cycle_time / (2.0 * 86400.0);
+    cache_hit_spectrum_data = get_cache_spd_data(ampphase_options, mjd_required,
+						 half_cycle, spectrum_data);
+    if (cache_hit_spectrum_data == true) {
+      read_type -= GRAB_SPECTRUM;
     }
   }
   
@@ -495,6 +566,38 @@ void add_client_vis_data(struct client_vis_data *client_vis_data,
   copy_vis_data(client_vis_data->vis_data[n], vis_data);
 }
 
+void add_client_spd_data(struct client_spd_data *client_spd_data,
+			 char *client_id, struct spectrum_data *spectrum_data) {
+  int i, n;
+
+  // This is the positions to add this client data, by default at the end,
+  n = client_spd_data->num_clients;
+
+  // Check first to see if this client ID is already present.
+  for (i = 0; i < client_spd_data->num_clients; i++) {
+    if (strncmp(client_spd_data->client_id[i], client_id, CLIENTIDLENGTH) == 0) {
+      // We will replace this data.
+      n = i;
+      fprintf(stderr, "[add_client_spd_data] client data %s will be replaced at %d\n",
+	      client_id, n);
+      break;
+    }
+  }
+
+  // Store some spd data as identified by a client id.
+  if (n >= client_spd_data->num_clients) {
+    fprintf(stderr, "[add_client_vis_data] making new client cache %s\n",
+	    client_id);
+    REALLOC(client_spd_data->client_id, (n + 1));
+    MALLOC(client_spd_data->client_id[n], CLIENTIDLENGTH);
+    REALLOC(client_spd_data->spectrum_data, (n + 1));
+    MALLOC(client_spd_data->spectrum_data[n], 1);
+    client_spd_data->num_clients = (n + 1);
+  }
+  strncpy(client_spd_data->client_id[n], client_id, CLIENTIDLENGTH);
+  copy_spectrum_data(client_spd_data->spectrum_data[n], spectrum_data);
+}
+
 struct vis_data* get_client_vis_data(struct client_vis_data *client_vis_data,
                                      char *client_id) {
   // Return vis data associated with the specified client_id, or
@@ -514,14 +617,34 @@ struct vis_data* get_client_vis_data(struct client_vis_data *client_vis_data,
   return(default_vis_data);
 }
 
+struct spectrum_data* get_client_spd_data(struct client_spd_data *client_spd_data,
+					  char *client_id) {
+  // Return spd data associated with the specified client_id, or
+  // the DEFAULT otherwise.
+  struct spectrum_data *default_spectrum_data = NULL;
+  int i;
+  for (i = 0; i < client_spd_data->num_clients; i++) {
+    if (strncmp(client_spd_data->client_id[i], client_id, CLIENTIDLENGTH) == 0) {
+      fprintf(stderr, "[get_client_spd_data] found spectrum data for %s at %d\n",
+	      client_id, i);
+      return(client_spd_data->spectrum_data[i]);
+    } else if (strncmp(client_spd_data->client_id[i], "DEFAULT", 7) == 0) {
+      default_spectrum_data = client_spd_data->spectrum_data[i];
+    }
+  }
+  fprintf(stderr, "[get_client_spd_data] returning default data\n");
+  return(default_spectrum_data);
+}
+
 int main(int argc, char *argv[]) {
   struct arguments arguments;
   int i, j, k, l, ri, rj, bytes_received, r;
-  bool pointer_found = false, cache_updated = false;
-  double mjd_grab;
+  bool pointer_found = false, vis_cache_updated = false;
+  bool spd_cache_updated = false, outside_mjd_range = false;
+  double mjd_grab, earliest_mjd, latest_mjd, mjd_cycletime;
   struct rpfits_file_information **info_rpfits_files = NULL;
   struct ampphase_options *ampphase_options = NULL, *client_options = NULL;
-  struct spectrum_data *spectrum_data;
+  struct spectrum_data *spectrum_data, *child_spectrum_data = NULL;
   struct vis_data *vis_data = NULL, *child_vis_data = NULL;
   FILE *fh = NULL;
   cmp_ctx_t cmp, child_cmp;
@@ -539,6 +662,7 @@ int main(int argc, char *argv[]) {
   size_t recv_buffer_length;
   ssize_t bytes_sent;
   struct client_vis_data client_vis_data;
+  struct client_spd_data client_spd_data;
   pid_t pid;
   struct client_sockets clients;
   
@@ -565,11 +689,16 @@ int main(int argc, char *argv[]) {
   cache_vis_data.num_cache_vis_data = 0;
   cache_vis_data.ampphase_options = NULL;
   cache_vis_data.vis_data = NULL;
+  cache_spd_data.num_cache_spd_data = 0;
+  cache_spd_data.spectrum_data = NULL;
 
   // And initialise the clients.
   client_vis_data.num_clients = 0;
   client_vis_data.client_id = NULL;
   client_vis_data.vis_data = NULL;
+  client_spd_data.num_clients = 0;
+  client_spd_data.client_id = NULL;
+  client_spd_data.spectrum_data = NULL;
   clients.num_sockets = 0;
   clients.socket = NULL;
   clients.client_id = NULL;
@@ -588,7 +717,20 @@ int main(int argc, char *argv[]) {
   }
   data_reader(READ_SCAN_METADATA, arguments.n_rpfits_files, 0.0, ampphase_options,
               info_rpfits_files, &spectrum_data, &vis_data);
-
+  // We can now work out which time range we cover and the cycle time.
+  for (i = 0; i < arguments.n_rpfits_files; i++) {
+    for (j = 0; j < info_rpfits_files[i]->n_scans; j++) {
+      if ((i == 0) && (j == 0)) {
+	mjd_cycletime = (double)info_rpfits_files[i]->scan_headers[j]->cycle_time / 86400.0;
+	earliest_mjd = info_rpfits_files[i]->scan_start_mjd[j] - (mjd_cycletime / 2.0);
+	latest_mjd = info_rpfits_files[i]->scan_end_mjd[j] + (mjd_cycletime / 2.0);
+      } else {
+	MINASSIGN(earliest_mjd, info_rpfits_files[i]->scan_start_mjd[j] - (mjd_cycletime / 2.0));
+	MAXASSIGN(latest_mjd, info_rpfits_files[i]->scan_end_mjd[j] + (mjd_cycletime / 2.0));
+      }
+    }
+  }
+  
   // Print out the summary.
   for (i = 0; i < arguments.n_rpfits_files; i++) {
     printf("RPFITS FILE: %s (%d scans):\n",
@@ -615,7 +757,10 @@ int main(int argc, char *argv[]) {
               ampphase_options, info_rpfits_files, &spectrum_data, &vis_data);
   // This first grab of the vis_data goes into the default client slot.
   add_client_vis_data(&client_vis_data, "DEFAULT", vis_data);
-  cache_updated = add_cache_vis_data(ampphase_options, vis_data);
+  vis_cache_updated = add_cache_vis_data(ampphase_options, vis_data);
+  // Same with the spectrum_data.
+  add_client_spd_data(&client_spd_data, "DEFAULT", spectrum_data);
+  spd_cache_updated = add_cache_spd_data(ampphase_options, spectrum_data);
   if (!arguments.network_operation) {
     // Save these spectra to a file after packing it.
     printf("Writing SPD data output file...\n");
@@ -733,6 +878,7 @@ int main(int argc, char *argv[]) {
             // Add this client to our list.
             add_client(&clients, client_request.client_id, loop_i);
             if ((client_request.request_type == REQUEST_CURRENT_SPECTRUM) ||
+		(client_request.request_type == REQUEST_MJD_SPECTRUM) ||
                 (client_request.request_type == REQUEST_CURRENT_VISDATA) ||
                 (client_request.request_type == REQUEST_COMPUTED_VISDATA)) {
               // We're going to send the currently cached data to this socket.
@@ -742,6 +888,8 @@ int main(int argc, char *argv[]) {
               // Set up the response.
               if (client_request.request_type == REQUEST_CURRENT_SPECTRUM) {
                 client_response.response_type = RESPONSE_CURRENT_SPECTRUM;
+	      } else if (client_request.request_type == REQUEST_MJD_SPECTRUM) {
+		client_response.response_type = RESPONSE_LOADED_SPECTRUM;
               } else if (client_request.request_type == REQUEST_CURRENT_VISDATA) {
                 client_response.response_type = RESPONSE_CURRENT_VISDATA;
               } else if (client_request.request_type == REQUEST_COMPUTED_VISDATA) {
@@ -753,7 +901,10 @@ int main(int argc, char *argv[]) {
               init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)RPSENDBUFSIZE);
               pack_responses(&cmp, &client_response);
               if (client_request.request_type == REQUEST_CURRENT_SPECTRUM) {
-                pack_spectrum_data(&cmp, spectrum_data);
+                pack_spectrum_data(&cmp, get_client_spd_data(&client_spd_data, "DEFAULT"));
+	      } else if (client_request.request_type == REQUEST_MJD_SPECTRUM) {
+		pack_spectrum_data(&cmp, get_client_spd_data(&client_spd_data,
+							     client_request.client_id));
               } else if (client_request.request_type == REQUEST_CURRENT_VISDATA) {
                 pack_vis_data(&cmp, get_client_vis_data(&client_vis_data, "DEFAULT"));
               } else if (client_request.request_type == REQUEST_COMPUTED_VISDATA) {
@@ -839,8 +990,8 @@ int main(int argc, char *argv[]) {
 
               // Add this data to our cache.
               fprintf(stderr, "[PARENT] adding data to cache\n");
-              cache_updated = add_cache_vis_data(ampphase_options, vis_data);
-	      if (cache_updated == false) {
+              vis_cache_updated = add_cache_vis_data(ampphase_options, vis_data);
+	      if (vis_cache_updated == false) {
 		// The unpacked data can be freed.
 		// This includes the header data.
 		for (i = 0; i < vis_data->nviscycles; i++) {
@@ -885,7 +1036,142 @@ int main(int argc, char *argv[]) {
               bytes_sent = socket_send_buffer(loop_i, send_buffer,
                                               cmp_mem_access_get_pos(&mem));
               FREE(send_buffer);
-            }
+            } else if (client_request.request_type == REQUEST_SPECTRUM_MJD) {
+	      // This is asking us to grab a spectrum within some tolerance of
+	      // a specified MJD.
+	      // We unpack a double, being the MJD.
+	      pack_read_double(&cmp, &mjd_grab);
+	      // Get the options.
+	      MALLOC(client_options, 1);
+	      unpack_ampphase_options(&cmp, client_options);
+	      // Check that this MJD is within the range we know about.
+	      outside_mjd_range = false;
+	      if ((mjd_grab < earliest_mjd) || (mjd_grab > latest_mjd)) {
+		outside_mjd_range = true;
+	      }
+	      if (outside_mjd_range == false) {
+		// We're going to fork and compute in the background.
+		pid = fork();
+	      } else {
+		pid = 1;
+	      }
+	      if (pid == 0) {
+		// We're the child.
+		// First, we need to close our sockets.
+		CLOSESOCKET(socket_listen);
+		CLOSESOCKET(loop_i);
+		// Now grab the spectrum.
+		printf("CHILD STARTED! Grabbing spectrum...\n");
+
+		data_reader(GRAB_SPECTRUM, arguments.n_rpfits_files, mjd_grab,
+			    client_options, info_rpfits_files, &child_spectrum_data, NULL);
+		// We send the data back to our parent over the network.
+		if (prepare_client_connection("localhost", arguments.port_number,
+					      &child_socket, false)) {
+		  // We have a connection.
+		  child_request.request_type = CHILDREQUEST_SPECTRUM_MJD;
+		  strncpy(child_request.client_id, client_request.client_id, CLIENTIDLENGTH);
+		  MALLOC(child_send_buffer, RPSENDBUFSIZE);
+		  init_cmp_memory_buffer(&child_cmp, &child_mem, child_send_buffer,
+					 (size_t)RPSENDBUFSIZE);
+		  pack_requests(&child_cmp, &child_request);
+		  pack_write_double(&child_cmp, mjd_grab);
+		  pack_ampphase_options(&child_cmp, client_options);
+		  pack_spectrum_data(&child_cmp, child_spectrum_data);
+		  printf("[CHILD] %s for client %s.\n",
+			 get_type_string(TYPE_REQUEST, child_request.request_type),
+			 client_request.client_id);
+		  bytes_sent = socket_send_buffer(child_socket, child_send_buffer,
+						  cmp_mem_access_get_pos(&child_mem));
+		  FREE(child_send_buffer);
+		}
+		// Don't bother with the response.
+		CLOSESOCKET(child_socket);
+		// Clean up.
+		free_ampphase_options(client_options);
+		FREE(client_options);
+		// Die.
+		printf("CHILD IS FINISHED!\n");
+		exit(0);
+	      } else {
+		free_ampphase_options(client_options);
+		FREE(client_options);
+		// Return a response saying that we are doing the grab.
+		MALLOC(send_buffer, JUSTRESPONSESIZE);
+		init_cmp_memory_buffer(&cmp, &mem, send_buffer, JUSTRESPONSESIZE);
+		if (outside_mjd_range == false) {
+		  client_response.response_type = RESPONSE_SPECTRUM_LOADING;
+		} else {
+		  client_response.response_type = RESPONSE_SPECTRUM_OUTSIDERANGE;
+		}
+		strncpy(client_response.client_id, client_request.client_id, CLIENTIDLENGTH);
+		pack_responses(&cmp, &client_response);
+		printf(" %s to client %s.\n",
+		       get_type_string(TYPE_RESPONSE, client_response.response_type),
+		       client_response.client_id);
+		bytes_sent = socket_send_buffer(loop_i, send_buffer,
+						cmp_mem_access_get_pos(&mem));
+		FREE(send_buffer);
+	      }
+	    } else if (client_request.request_type == CHILDREQUEST_SPECTRUM_MJD) {
+	      // We're getting a spectrum back from our child after it was grabbed.
+	      // Free the current ampphase options.
+	      free_ampphase_options(ampphase_options);
+	      pack_read_double(&cmp, &mjd_grab);
+	      unpack_ampphase_options(&cmp, ampphase_options);
+	      unpack_spectrum_data(&cmp, spectrum_data);
+
+	      // Add this data to our cache.
+	      spd_cache_updated = add_cache_spd_data(ampphase_options, spectrum_data);
+	      if (spd_cache_updated == false) {
+		// The unpacked data can be freed.
+		free_scan_header_data(spectrum_data->header_data);
+		FREE(spectrum_data->header_data);
+		free_spectrum_data(spectrum_data);
+		// Now get the cached spectrum data.
+		get_cache_spd_data(ampphase_options, mjd_grab, (mjd_cycletime / 2.0),
+				   &spectrum_data);
+	      }
+	      add_client_spd_data(&client_spd_data, client_request.client_id, spectrum_data);
+
+	      // Tell the client that their data is ready.
+	      // Find the client's socket.
+	      alert_socket = find_client(&clients, client_request.client_id);
+	      if (ISVALIDSOCKET(alert_socket)) {
+		// Craft a response.
+		client_response.response_type = RESPONSE_SPECTRUM_LOADED;
+		strncpy(client_response.client_id, client_request.client_id, CLIENTIDLENGTH);
+		MALLOC(send_buffer, JUSTRESPONSESIZE);
+		init_cmp_memory_buffer(&cmp, &mem, send_buffer, JUSTRESPONSESIZE);
+		pack_responses(&cmp, &client_response);
+		printf(" %s to client %s.\n",
+		       get_type_string(TYPE_RESPONSE, client_response.response_type),
+		       client_request.client_id);
+		bytes_sent = socket_send_buffer(alert_socket, send_buffer,
+						cmp_mem_access_get_pos(&mem));
+		FREE(send_buffer);
+	      }
+	    } else if (client_request.request_type == REQUEST_TIMERANGE) {
+	      // Something wants to know the time information like min/max
+	      // MJD and the cycle time.
+	      // Craft the response.
+	      client_response.response_type = RESPONSE_TIMERANGE;
+	      strncpy(client_response.client_id, client_request.client_id, CLIENTIDLENGTH);
+	      MALLOC(send_buffer, JUSTRESPONSESIZE);
+	      init_cmp_memory_buffer(&cmp, &mem, send_buffer, JUSTRESPONSESIZE);
+	      pack_responses(&cmp, &client_response);
+	      // We first write the cycle time in days.
+	      pack_write_double(&cmp, mjd_cycletime);
+	      // The the earliest time we handle, then the latest.
+	      pack_write_double(&cmp, earliest_mjd);
+	      pack_write_double(&cmp, latest_mjd);
+	      printf(" %s to client %s.\n",
+		     get_type_string(TYPE_RESPONSE, client_response.response_type),
+		     client_response.client_id);
+	      bytes_sent = socket_send_buffer(loop_i, send_buffer,
+					      cmp_mem_access_get_pos(&mem));
+	      FREE(send_buffer);
+	    }
             printf(" Sent %ld bytes\n", bytes_sent);
             // Free our memory.
             FREE(send_buffer);
@@ -928,15 +1214,40 @@ int main(int argc, char *argv[]) {
   }
   FREE(cache_vis_data.vis_data);
   FREE(cache_vis_data.ampphase_options);
-
-  // Free the spectrum memory.
-  for (i = 0; i < spectrum_data->num_ifs; i++) {
-    for (j = 0; j < spectrum_data->num_pols; j++) {
-      free_ampphase(&(spectrum_data->spectrum[i][j]));
+  // Do the same for the spectrum cache.
+  for (l = 0; l < cache_spd_data.num_cache_spd_data; l++) {
+    for (i = 0, pointer_found = false; i < arguments.n_rpfits_files; i++) {
+      for (j = 0; j < info_rpfits_files[i]->n_scans; j++) {
+	if (info_rpfits_files[i]->scan_headers[j] ==
+	    cache_spd_data.spectrum_data[l]->header_data) {
+	  pointer_found = true;
+	  break;
+	}
+	if (pointer_found) break;
+      }
+      if (pointer_found) break;
     }
-    FREE(spectrum_data->spectrum[i]);
+    if (!pointer_found) {
+      // We have to free the memory.
+      free_scan_header_data(cache_spd_data.spectrum_data[l]->header_data);
+      FREE(cache_spd_data.spectrum_data[l]->header_data);
+    }
+    free_spectrum_data(cache_spd_data.spectrum_data[l]);
+    FREE(cache_spd_data.spectrum_data[l]);
+    free_ampphase_options(cache_spd_data.ampphase_options[l]);
+    FREE(cache_spd_data.ampphase_options[l]);
   }
-  FREE(spectrum_data->spectrum);
+  FREE(cache_spd_data.spectrum_data);
+  FREE(cache_spd_data.ampphase_options);
+  
+  // Free the spectrum memory.
+  /* for (i = 0; i < spectrum_data->num_ifs; i++) { */
+  /*   for (j = 0; j < spectrum_data->num_pols; j++) { */
+  /*     free_ampphase(&(spectrum_data->spectrum[i][j])); */
+  /*   } */
+  /*   FREE(spectrum_data->spectrum[i]); */
+  /* } */
+  /* FREE(spectrum_data->spectrum); */
   FREE(spectrum_data);
 
   // We're finished, free all our memory.
@@ -964,6 +1275,12 @@ int main(int argc, char *argv[]) {
   }
   FREE(client_vis_data.client_id);
   FREE(client_vis_data.vis_data);
+  for (i = 0; i < client_spd_data.num_clients; i++) {
+    FREE(client_spd_data.client_id[i]);
+    FREE(client_spd_data.spectrum_data[i]);
+  }
+  FREE(client_spd_data.client_id);
+  FREE(client_spd_data.spectrum_data);
   free_client_sockets(&clients);
   
   if (arguments.network_operation) {

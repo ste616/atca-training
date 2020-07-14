@@ -487,10 +487,6 @@ static void interpret_command(char *line) {
   FREE(line);
 }
 
-// This is the maximum number of messages that can be passed to
-// the readline message routine (simply because we have a statically allocated
-// array to shove the messages in).
-#define MAX_N_MESSAGES 100
 
 int main(int argc, char *argv[]) {
   struct arguments arguments;

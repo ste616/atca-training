@@ -89,6 +89,7 @@ void unpack_spectrum_data(cmp_ctx_t *cmp, struct spectrum_data *a);
 void free_spectrum_data(struct spectrum_data *spectrum_data);
 void pack_vis_quantities(cmp_ctx_t *cmp, struct vis_quantities *a);
 void unpack_vis_quantities(cmp_ctx_t *cmp, struct vis_quantities *a);
+void copy_spectrum_data(struct spectrum_data *dest, struct spectrum_data *src);
 void copy_vis_data(struct vis_data *dest, struct vis_data *src);
 void pack_vis_data(cmp_ctx_t *cmp, struct vis_data *a);
 void unpack_vis_data(cmp_ctx_t *cmp, struct vis_data *a);

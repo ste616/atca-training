@@ -28,12 +28,16 @@
 #define TYPE_RESPONSE   2
 
 // The types of request that can be made.
-#define REQUEST_CURRENT_SPECTRUM       1
-#define REQUEST_CURRENT_VISDATA        2
-#define REQUEST_COMPUTE_VISDATA        3
-#define REQUEST_COMPUTED_VISDATA       4
-#define CHILDREQUEST_VISDATA_COMPUTED  5
-#define REQUEST_SERVERTYPE             6
+#define REQUEST_CURRENT_SPECTRUM        1
+#define REQUEST_CURRENT_VISDATA         2
+#define REQUEST_COMPUTE_VISDATA         3
+#define REQUEST_COMPUTED_VISDATA        4
+#define CHILDREQUEST_VISDATA_COMPUTED   5
+#define REQUEST_SERVERTYPE              6
+#define REQUEST_SPECTRUM_MJD            7
+#define REQUEST_MJD_SPECTRUM            8
+#define CHILDREQUEST_SPECTRUM_MJD       9
+#define REQUEST_TIMERANGE              10
 
 // This structure handles request headers.
 struct requests {
@@ -44,12 +48,17 @@ struct requests {
 };
 
 // The types of response that can be given.
-#define RESPONSE_CURRENT_SPECTRUM    1
-#define RESPONSE_CURRENT_VISDATA     2
-#define RESPONSE_VISDATA_COMPUTED    3
-#define RESPONSE_COMPUTED_VISDATA    4
-#define RESPONSE_VISDATA_COMPUTING   5
-#define RESPONSE_SERVERTYPE          6
+#define RESPONSE_CURRENT_SPECTRUM        1
+#define RESPONSE_CURRENT_VISDATA         2
+#define RESPONSE_VISDATA_COMPUTED        3
+#define RESPONSE_COMPUTED_VISDATA        4
+#define RESPONSE_VISDATA_COMPUTING       5
+#define RESPONSE_SERVERTYPE              6
+#define RESPONSE_SPECTRUM_LOADING        7
+#define RESPONSE_SPECTRUM_LOADED         8
+#define RESPONSE_LOADED_SPECTRUM         9
+#define RESPONSE_SPECTRUM_OUTSIDERANGE  10
+#define RESPONSE_TIMERANGE              11
 
 // This structure describes response headers.
 struct responses {
@@ -68,7 +77,7 @@ struct client_sockets {
   char **client_id;
 };
 
-#define JUSTRESPONSESIZE (2 * sizeof(struct responses))
+#define JUSTRESPONSESIZE (10 * sizeof(struct responses))
 
 ssize_t socket_send_buffer(SOCKET socket, char *buffer, size_t buffer_length);
 ssize_t socket_recv_buffer(SOCKET socket, char **buffer, size_t *buffer_length);
