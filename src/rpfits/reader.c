@@ -344,7 +344,8 @@ struct cycle_data* scan_add_cycle(struct scan_data *scan_data) {
  */
 void free_scan_header_data(struct scan_header_data *scan_header_data) {
   int i, j;
-  if ((scan_header_data->if_num_stokes == NULL) ||
+  if ((scan_header_data == NULL) ||
+      (scan_header_data->if_num_stokes == NULL) ||
       (scan_header_data->ant_name == NULL) ||
       (scan_header_data->ant_cartesian == NULL)) {
     // Probably wasn't actually allocated, just formatted as the struct.

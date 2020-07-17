@@ -114,6 +114,8 @@ struct rpfits_file_information {
   struct scan_header_data **scan_headers;
   double *scan_start_mjd;
   double *scan_end_mjd;
+  int *n_cycles;
+  double **cycle_mjd;
 };
 
 struct rpfits_file_information *new_rpfits_file(void) {
@@ -125,6 +127,8 @@ struct rpfits_file_information *new_rpfits_file(void) {
   rv->filename[0] = 0;
   rv->scan_start_mjd = NULL;
   rv->scan_end_mjd = NULL;
+  rv->n_cycles = NULL;
+  rv->cycle_mjd = NULL;
 
   return (rv);
 }
@@ -132,19 +136,31 @@ struct rpfits_file_information *new_rpfits_file(void) {
 bool add_cache_spd_data(struct ampphase_options *options,
 			struct spectrum_data *data) {
   int i, n;
+  fprintf(stderr, "[add_cache_spd_data] trying to cache data at %s %.1f %d\n",
+	  data->header_data->obsdate, data->spectrum[0][0]->ut_seconds,
+	  options->phase_in_degrees);
   // Check that we don't already know about the data.
   for (i = 0; i < cache_spd_data.num_cache_spd_data; i++) {
+    fprintf(stderr, "[add_cache_spd_data] checking cache entry %d %s %.1f %d\n",
+	    i, cache_spd_data.spectrum_data[i]->header_data->obsdate,
+	    cache_spd_data.spectrum_data[i]->spectrum[0][0]->ut_seconds,
+	    cache_spd_data.ampphase_options[i]->phase_in_degrees);
     if ((strncmp(cache_spd_data.spectrum_data[i]->header_data->obsdate,
 		 data->header_data->obsdate, OBSDATE_LENGTH) == 0) &&
-	(cache_spd_data.spectrum_data[i]->header_data->ut_seconds ==
-	 data->header_data->ut_seconds) &&
+	(cache_spd_data.spectrum_data[i]->spectrum[0][0]->ut_seconds ==
+	 data->spectrum[0][0]->ut_seconds) &&
 	(options->phase_in_degrees ==
 	 cache_spd_data.ampphase_options[i]->phase_in_degrees)) {
+      fprintf(stderr, "[add_cache_spd_data] match found!\n");
       return false;
     }
   }
   // If we get here, this is new data.
   n = cache_spd_data.num_cache_spd_data + 1;
+  REALLOC(cache_spd_data.ampphase_options, n);
+  MALLOC(cache_spd_data.ampphase_options[n - 1], 1);
+  set_default_ampphase_options(cache_spd_data.ampphase_options[n - 1]);
+  copy_ampphase_options(cache_spd_data.ampphase_options[n - 1], options);
   REALLOC(cache_spd_data.spectrum_data, n);
   MALLOC(cache_spd_data.spectrum_data[n - 1], 1);
   copy_spectrum_data(cache_spd_data.spectrum_data[n - 1], data);
@@ -185,10 +201,14 @@ bool get_cache_spd_data(struct ampphase_options *options,
   for (i = 0; i < cache_spd_data.num_cache_spd_data; i++) {
     // Calculate MJD of this cache entry.
     tmjd = date2mjd(cache_spd_data.spectrum_data[i]->header_data->obsdate,
-		    cache_spd_data.spectrum_data[i]->header_data->ut_seconds);
+		    cache_spd_data.spectrum_data[i]->spectrum[0][0]->ut_seconds);
     if ((fabs(mjd - tmjd) <= tol) &&
 	(options->phase_in_degrees ==
 	 cache_spd_data.ampphase_options[i]->phase_in_degrees)) {
+      fprintf(stderr, "[get_cache_spd_data] cache hit %s %.1f %d\n",
+	      cache_spd_data.spectrum_data[i]->header_data->obsdate,
+	      cache_spd_data.spectrum_data[i]->spectrum[0][0]->ut_seconds,
+	      cache_spd_data.ampphase_options[i]->phase_in_degrees);
       if (*data == NULL) {
 	// Occurs in the child computer usually.
 	*data = cache_spd_data.spectrum_data[i];
@@ -324,6 +344,8 @@ void data_reader(int read_type, int n_rpfits_files,
         REALLOC(info_rpfits_files[i]->scan_headers, (n + 1));
         REALLOC(info_rpfits_files[i]->scan_start_mjd, (n + 1));
         REALLOC(info_rpfits_files[i]->scan_end_mjd, (n + 1));
+	REALLOC(info_rpfits_files[i]->n_cycles, (n + 1));
+	REALLOC(info_rpfits_files[i]->cycle_mjd, (n + 1));
       }
       // We always need to read the scan headers to move through
       // the file, but where we direct the information changes.
@@ -343,6 +365,8 @@ void data_reader(int read_type, int n_rpfits_files,
           // Keep track of the times covered by each scan.
           info_rpfits_files[i]->scan_start_mjd[n] =
             info_rpfits_files[i]->scan_end_mjd[n] = date2mjd(sh->obsdate, sh->ut_seconds);
+	  info_rpfits_files[i]->n_cycles[n] = 0;
+	  info_rpfits_files[i]->cycle_mjd[n] = NULL;
           info_rpfits_files[i]->n_scans += 1;
         }
         // HERE WILL GO THE LOGIC TO WORK OUT IF WE NEED TO READ
@@ -385,6 +409,10 @@ void data_reader(int read_type, int n_rpfits_files,
             cycle_mjd = date2mjd(sh->obsdate, cycle_data->ut_seconds);
             if (read_type & READ_SCAN_METADATA) {
               info_rpfits_files[i]->scan_end_mjd[n] = cycle_mjd;
+	      info_rpfits_files[i]->n_cycles[n] += 1;
+	      REALLOC(info_rpfits_files[i]->cycle_mjd[n], info_rpfits_files[i]->n_cycles[n]);
+	      info_rpfits_files[i]->cycle_mjd[n][info_rpfits_files[i]->n_cycles[n] - 1] =
+		cycle_mjd;
             }
             if ((read_type & GRAB_SPECTRUM) ||
                 (read_type & COMPUTE_VIS_PRODUCTS)) {
@@ -394,10 +422,11 @@ void data_reader(int read_type, int n_rpfits_files,
               // MJD is within half a cycle time of this cycle's time.
               cycle_start = cycle_mjd - ((double)sh->cycle_time / (2 * 86400.0));
               cycle_end = cycle_mjd + ((double)sh->cycle_time / (2 * 86400.0));
-              /* printf("%.6f / %.6f / %.6f\n", cycle_start, mjd_required, cycle_end); */
+              printf("%.6f / %.6f / %.6f  (%.6f)\n", cycle_start, cycle_mjd, cycle_end,
+		     mjd_required);
               if ((read_type & GRAB_SPECTRUM) &&
                   (mjd_required >= cycle_start) &&
-                  (mjd_required <= cycle_end)) {
+                  (mjd_required < cycle_end)) {
                 spectrum_return = true;
               }
               if ((read_type & COMPUTE_VIS_PRODUCTS) ||
@@ -489,6 +518,7 @@ void data_reader(int read_type, int n_rpfits_files,
                 }
                 if (!(read_type & COMPUTE_VIS_PRODUCTS)) {
                   // We don't need to search any more.
+		  fprintf(stderr, "  NO MORE SEARCHING!\n");
                   keep_cycling = false;
                   keep_reading = false;
                 }
@@ -638,10 +668,11 @@ struct spectrum_data* get_client_spd_data(struct client_spd_data *client_spd_dat
 
 int main(int argc, char *argv[]) {
   struct arguments arguments;
-  int i, j, k, l, ri, rj, bytes_received, r;
+  int i, j, k, l, ri, rj, bytes_received, r, n_cycle_mjd = 0;
   bool pointer_found = false, vis_cache_updated = false;
   bool spd_cache_updated = false, outside_mjd_range = false;
   double mjd_grab, earliest_mjd, latest_mjd, mjd_cycletime;
+  double *all_cycle_mjd = NULL;
   struct rpfits_file_information **info_rpfits_files = NULL;
   struct ampphase_options *ampphase_options = NULL, *client_options = NULL;
   struct spectrum_data *spectrum_data, *child_spectrum_data = NULL;
@@ -659,7 +690,7 @@ int main(int argc, char *argv[]) {
   socklen_t client_len;
   struct requests client_request, child_request;
   struct responses client_response;
-  size_t recv_buffer_length;
+  size_t recv_buffer_length, comp_buffer_length;
   ssize_t bytes_sent;
   struct client_vis_data client_vis_data;
   struct client_spd_data client_spd_data;
@@ -690,6 +721,7 @@ int main(int argc, char *argv[]) {
   cache_vis_data.ampphase_options = NULL;
   cache_vis_data.vis_data = NULL;
   cache_spd_data.num_cache_spd_data = 0;
+  cache_spd_data.ampphase_options = NULL;
   cache_spd_data.spectrum_data = NULL;
 
   // And initialise the clients.
@@ -732,15 +764,24 @@ int main(int argc, char *argv[]) {
   }
   
   // Print out the summary.
+  n_cycle_mjd = 0;
+  all_cycle_mjd = NULL;
   for (i = 0; i < arguments.n_rpfits_files; i++) {
     printf("RPFITS FILE: %s (%d scans):\n",
            info_rpfits_files[i]->filename, info_rpfits_files[i]->n_scans);
     for (j = 0; j < info_rpfits_files[i]->n_scans; j++) {
-      printf("  scan %d (%s, %s) MJD range %.6f -> %.6f\n", (j + 1),
+      printf("  scan %d (%s, %s) MJD range %.6f -> %.6f (%d c)\n", (j + 1),
              info_rpfits_files[i]->scan_headers[j]->source_name,
              info_rpfits_files[i]->scan_headers[j]->obstype,
              info_rpfits_files[i]->scan_start_mjd[j],
-             info_rpfits_files[i]->scan_end_mjd[j]);
+             info_rpfits_files[i]->scan_end_mjd[j],
+	     info_rpfits_files[i]->n_cycles[j]);
+      for (k = 0; k < info_rpfits_files[i]->n_cycles[j]; k++) {
+	n_cycle_mjd++;
+	REALLOC(all_cycle_mjd, n_cycle_mjd);
+	all_cycle_mjd[n_cycle_mjd - 1] = info_rpfits_files[i]->cycle_mjd[j][k];
+      	/* printf("    cycle %d: MJD %.8f\n", (k + 1), info_rpfits_files[i]->cycle_mjd[j][k]); */
+      }
     }
     printf("\n");
   }
@@ -1041,6 +1082,7 @@ int main(int argc, char *argv[]) {
 	      // a specified MJD.
 	      // We unpack a double, being the MJD.
 	      pack_read_double(&cmp, &mjd_grab);
+	      printf(" Client has requested data at MJD %.8f\n", mjd_grab);
 	      // Get the options.
 	      MALLOC(client_options, 1);
 	      unpack_ampphase_options(&cmp, client_options);
@@ -1075,6 +1117,12 @@ int main(int argc, char *argv[]) {
 		  init_cmp_memory_buffer(&child_cmp, &child_mem, child_send_buffer,
 					 (size_t)RPSENDBUFSIZE);
 		  pack_requests(&child_cmp, &child_request);
+		  mjd_grab = date2mjd(child_spectrum_data->header_data->obsdate,
+				      child_spectrum_data->header_data->ut_seconds);
+		  fprintf(stderr, "[CHILD] sending grab %s %.1f %.8f\n",
+			  child_spectrum_data->header_data->obsdate,
+			  child_spectrum_data->header_data->ut_seconds,
+			  mjd_grab);
 		  pack_write_double(&child_cmp, mjd_grab);
 		  pack_ampphase_options(&child_cmp, client_options);
 		  pack_spectrum_data(&child_cmp, child_spectrum_data);
@@ -1119,6 +1167,8 @@ int main(int argc, char *argv[]) {
 	      free_ampphase_options(ampphase_options);
 	      pack_read_double(&cmp, &mjd_grab);
 	      unpack_ampphase_options(&cmp, ampphase_options);
+	      fprintf(stderr, " getting data from child for MJD %.8f, deg %d\n",
+		      mjd_grab, ampphase_options->phase_in_degrees);
 	      unpack_spectrum_data(&cmp, spectrum_data);
 
 	      // Add this data to our cache.
@@ -1129,9 +1179,11 @@ int main(int argc, char *argv[]) {
 		FREE(spectrum_data->header_data);
 		free_spectrum_data(spectrum_data);
 		// Now get the cached spectrum data.
+		fprintf(stderr, " matched data so grabbing cached data\n");
 		get_cache_spd_data(ampphase_options, mjd_grab, (mjd_cycletime / 2.0),
 				   &spectrum_data);
 	      }
+	      fprintf(stderr, " associating data with client %s\n", client_request.client_id);
 	      add_client_spd_data(&client_spd_data, client_request.client_id, spectrum_data);
 
 	      // Tell the client that their data is ready.
@@ -1139,6 +1191,7 @@ int main(int argc, char *argv[]) {
 	      alert_socket = find_client(&clients, client_request.client_id);
 	      if (ISVALIDSOCKET(alert_socket)) {
 		// Craft a response.
+		fprintf(stderr, " alerting client %s\n", client_request.client_id);
 		client_response.response_type = RESPONSE_SPECTRUM_LOADED;
 		strncpy(client_response.client_id, client_request.client_id, CLIENTIDLENGTH);
 		MALLOC(send_buffer, JUSTRESPONSESIZE);
@@ -1165,6 +1218,23 @@ int main(int argc, char *argv[]) {
 	      // The the earliest time we handle, then the latest.
 	      pack_write_double(&cmp, earliest_mjd);
 	      pack_write_double(&cmp, latest_mjd);
+	      printf(" %s to client %s.\n",
+		     get_type_string(TYPE_RESPONSE, client_response.response_type),
+		     client_response.client_id);
+	      bytes_sent = socket_send_buffer(loop_i, send_buffer,
+					      cmp_mem_access_get_pos(&mem));
+	      FREE(send_buffer);
+	    } else if (client_request.request_type == REQUEST_CYCLE_TIMES) {
+	      // We give back a list of all the cycle MJDs we know about so that
+	      // they can select from them exactly.
+	      client_response.response_type = RESPONSE_CYCLE_TIMES;
+	      strncpy(client_response.client_id, client_request.client_id, CLIENTIDLENGTH);
+	      comp_buffer_length = JUSTRESPONSESIZE + n_cycle_mjd * sizeof(double);
+	      MALLOC(send_buffer, comp_buffer_length);
+	      init_cmp_memory_buffer(&cmp, &mem, send_buffer, comp_buffer_length);
+	      pack_responses(&cmp, &client_response);
+	      pack_write_sint(&cmp, n_cycle_mjd);
+	      pack_writearray_double(&cmp, n_cycle_mjd, all_cycle_mjd);
 	      printf(" %s to client %s.\n",
 		     get_type_string(TYPE_RESPONSE, client_response.response_type),
 		     client_response.client_id);
@@ -1255,10 +1325,13 @@ int main(int argc, char *argv[]) {
     for (j = 0; j < info_rpfits_files[i]->n_scans; j++) {
       free_scan_header_data(info_rpfits_files[i]->scan_headers[j]);
       FREE(info_rpfits_files[i]->scan_headers[j]);
+      FREE(info_rpfits_files[i]->cycle_mjd[j]);
     }
     FREE(info_rpfits_files[i]->scan_headers);
     FREE(info_rpfits_files[i]->scan_start_mjd);
     FREE(info_rpfits_files[i]->scan_end_mjd);
+    FREE(info_rpfits_files[i]->n_cycles);
+    FREE(info_rpfits_files[i]->cycle_mjd);
     FREE(info_rpfits_files[i]);
   }
   FREE(info_rpfits_files);
@@ -1267,6 +1340,8 @@ int main(int argc, char *argv[]) {
   free_ampphase_options(ampphase_options);
   FREE(ampphase_options);
   FREE(vis_data);
+
+  FREE(all_cycle_mjd);
   
   // Free the clients.
   for (i = 0; i < client_vis_data.num_clients; i++) {

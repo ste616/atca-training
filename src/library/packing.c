@@ -490,8 +490,10 @@ void free_spectrum_data(struct spectrum_data *spectrum_data) {
     FREE(spectrum_data->spectrum[i]);
   }
   FREE(spectrum_data->spectrum);
-  free_scan_header_data(spectrum_data->header_data);
-  FREE(spectrum_data->header_data);
+  /* if (spectrum_data->header_data != NULL) { */
+  /*   free_scan_header_data(spectrum_data->header_data); */
+  /*   FREE(spectrum_data->header_data); */
+  /* } */
 }
 
 void pack_vis_quantities(cmp_ctx_t *cmp, struct vis_quantities *a) {

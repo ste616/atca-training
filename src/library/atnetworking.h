@@ -38,6 +38,7 @@
 #define REQUEST_MJD_SPECTRUM            8
 #define CHILDREQUEST_SPECTRUM_MJD       9
 #define REQUEST_TIMERANGE              10
+#define REQUEST_CYCLE_TIMES            11
 
 // This structure handles request headers.
 struct requests {
@@ -59,6 +60,7 @@ struct requests {
 #define RESPONSE_LOADED_SPECTRUM         9
 #define RESPONSE_SPECTRUM_OUTSIDERANGE  10
 #define RESPONSE_TIMERANGE              11
+#define RESPONSE_CYCLE_TIMES            12
 
 // This structure describes response headers.
 struct responses {

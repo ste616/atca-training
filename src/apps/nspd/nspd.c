@@ -454,10 +454,10 @@ void reconcile_spd_plotcontrols(struct spectrum_data *spectrum_data,
 
 int main(int argc, char *argv[]) {
   struct arguments arguments;
-  bool spd_device_opened = false;
+  bool spd_device_opened = false, action_proceed = false;
   struct spd_plotcontrols spd_alteredcontrols;
   fd_set watchset, reads;
-  int i, r, bytes_received, max_socket = -1, nmesg = 0;
+  int i, r, bytes_received, max_socket = -1, nmesg = 0, n_cycles = 0;
   size_t recv_buffer_length;
   struct requests server_request;
   struct responses server_response;
@@ -466,7 +466,8 @@ int main(int argc, char *argv[]) {
   SOCKET socket_peer;
   cmp_ctx_t cmp;
   cmp_mem_access_t mem;
-  double earliest_mjd, latest_mjd, mjd_cycletime, mjd_request;
+  double earliest_mjd, latest_mjd, mjd_cycletime, mjd_request, cmjd;
+  double *all_cycle_mjd = NULL;
   struct ampphase_options ampphase_options;
 
   // Allocate some memory.
@@ -554,7 +555,9 @@ int main(int argc, char *argv[]) {
   init_spd_plotcontrols(&spd_plotcontrols, xaxis_type, yaxis_type | yaxis_scaling,
                         plot_pols, spd_device_number);
   // The number of pols is set by the data though, not the selection.
-  action_required = ACTION_NEW_DATA_RECEIVED;
+  //action_required = ACTION_NEW_DATA_RECEIVED;
+  //action_required = ACTION_CHANGE_PLOT_SURFACE;
+  action_required = 0;
   while(true) {
     reads = watchset;
     if (action_required & ACTION_NEW_DATA_RECEIVED) {
@@ -562,6 +565,14 @@ int main(int argc, char *argv[]) {
       spd_plotcontrols.npols = spectrum_data.num_pols;
       action_required -= ACTION_NEW_DATA_RECEIVED;
       action_required |= ACTION_CHANGE_PLOTSURFACE;
+      // Work out the MJD.
+      if (spectrum_data.header_data != NULL) {
+	cmjd = date2mjd(spectrum_data.header_data->obsdate,
+			spectrum_data.spectrum[0][0]->ut_seconds);
+	nmesg = 1;
+	snprintf(mesgout[0], SPDBUFSIZE, " Data has MJD %.8f\n", cmjd);
+	readline_print_messages(nmesg, mesgout);
+      }
     }
     
     if (action_required & ACTION_CHANGE_PLOTSURFACE) {
@@ -589,25 +600,44 @@ int main(int argc, char *argv[]) {
     if ((action_required & ACTION_CYCLE_FORWARD) ||
 	(action_required & ACTION_CYCLE_BACKWARD)) {
       // Ask for different data.
-      // First, work out the time for the request.
-      mjd_request = date2mjd(spectrum_data.header_data->obsdate,
-			     spectrum_data.header_data->ut_seconds);
+      // First, work out which cycle we're currently looking at.
+      for (i = 0, action_proceed = false; i < n_cycles; i++) {
+	if ((cmjd >= (all_cycle_mjd[i] - mjd_cycletime / 2.0)) &&
+	    (cmjd < (all_cycle_mjd[i] + mjd_cycletime / 2.0))) {
+	  // Now select the MJD from the appropriate cycle.
+	  if ((action_required & ACTION_CYCLE_FORWARD) &&
+	      (i < (n_cycles -1))) {
+	    mjd_request = all_cycle_mjd[i + 1];
+	    action_proceed = true;
+	    break;
+	  } else if ((action_required & ACTION_CYCLE_BACKWARD) &&
+		     (i > 0)) {
+	    mjd_request = all_cycle_mjd[i - 1];
+	    action_proceed = true;
+	    break;
+	  }
+	}
+      }
+      // Don't do it again, no matter what.
       if (action_required & ACTION_CYCLE_FORWARD) {
-	mjd_request += mjd_cycletime;
 	action_required -= ACTION_CYCLE_FORWARD;
       } else if (action_required & ACTION_CYCLE_BACKWARD) {
-	mjd_request -= mjd_cycletime;
 	action_required -= ACTION_CYCLE_BACKWARD;
       }
-      // We could check this against the known range here, but for now
-      // let's just request the data (the server also has range checking).
-      server_request.request_type = REQUEST_SPECTRUM_MJD;
-      init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)SPDBUFSIZE);
-      pack_requests(&cmp, &server_request);
-      pack_write_double(&cmp, mjd_request);
-      // We have to send along the ampphase options as well.
-      pack_ampphase_options(&cmp, &ampphase_options);
-      socket_send_buffer(socket_peer, send_buffer, cmp_mem_access_get_pos(&mem));
+      if (action_proceed) {
+	// We could check this against the known range here, but for now
+	// let's just request the data (the server also has range checking).
+	server_request.request_type = REQUEST_SPECTRUM_MJD;
+	init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)SPDBUFSIZE);
+	pack_requests(&cmp, &server_request);
+	nmesg = 1;
+	snprintf(mesgout[0], SPDBUFSIZE, " Requesting data at MJD %.8f\n", mjd_request);
+	readline_print_messages(nmesg, mesgout);
+	pack_write_double(&cmp, mjd_request);
+	// We have to send along the ampphase options as well.
+	pack_ampphase_options(&cmp, &ampphase_options);
+	socket_send_buffer(socket_peer, send_buffer, cmp_mem_access_get_pos(&mem));
+      }
     }
     
     if (action_required & ACTION_QUIT) {
@@ -671,6 +701,10 @@ int main(int argc, char *argv[]) {
 	  init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)SPDBUFSIZE);
 	  pack_requests(&cmp, &server_request);
 	  socket_send_buffer(socket_peer, send_buffer, cmp_mem_access_get_pos(&mem));
+	  server_request.request_type = REQUEST_CYCLE_TIMES;
+	  init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)SPDBUFSIZE);
+	  pack_requests(&cmp, &server_request);
+	  socket_send_buffer(socket_peer, send_buffer, cmp_mem_access_get_pos(&mem));
 	}
       } else if (server_response.response_type == RESPONSE_TIMERANGE) {
 	// Just store these values for later use.
@@ -694,6 +728,15 @@ int main(int argc, char *argv[]) {
 	init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)SPDBUFSIZE);
 	pack_requests(&cmp, &server_request);
 	socket_send_buffer(socket_peer, send_buffer, cmp_mem_access_get_pos(&mem));
+      } else if (server_response.response_type == RESPONSE_CYCLE_TIMES) {
+	// All the cycles the server knows about.
+	pack_read_sint(&cmp, &n_cycles);
+	REALLOC(all_cycle_mjd, n_cycles);
+	pack_readarray_double(&cmp, n_cycles, all_cycle_mjd);
+	nmesg = 1;
+	snprintf(mesgout[0], SPDBUFSIZE, " Received information about %d cycles.\n",
+		 n_cycles);
+	readline_print_messages(nmesg, mesgout);
       }
       // Free the socket buffer memory.
       FREE(recv_buffer);
