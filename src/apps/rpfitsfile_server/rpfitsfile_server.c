@@ -198,10 +198,15 @@ bool get_cache_spd_data(struct ampphase_options *options,
 			struct spectrum_data **data) {
   int i;
   double tmjd;
+  fprintf(stderr, "[get_cache_spd_data] looking for MJD %.8f within %.8f, %d\n",
+	  mjd, tol, options->phase_in_degrees);
   for (i = 0; i < cache_spd_data.num_cache_spd_data; i++) {
     // Calculate MJD of this cache entry.
     tmjd = date2mjd(cache_spd_data.spectrum_data[i]->header_data->obsdate,
 		    cache_spd_data.spectrum_data[i]->spectrum[0][0]->ut_seconds);
+    fprintf(stderr, "[get_cache_spd_data] cache entry %d MJD %.8f %d %d\n",
+	    i, tmjd, (fabs(mjd - tmjd) <= tol),
+	    cache_spd_data.ampphase_options[i]->phase_in_degrees);
     if ((fabs(mjd - tmjd) <= tol) &&
 	(options->phase_in_degrees ==
 	 cache_spd_data.ampphase_options[i]->phase_in_degrees)) {
@@ -1118,10 +1123,10 @@ int main(int argc, char *argv[]) {
 					 (size_t)RPSENDBUFSIZE);
 		  pack_requests(&child_cmp, &child_request);
 		  mjd_grab = date2mjd(child_spectrum_data->header_data->obsdate,
-				      child_spectrum_data->header_data->ut_seconds);
+				      child_spectrum_data->spectrum[0][0]->ut_seconds);
 		  fprintf(stderr, "[CHILD] sending grab %s %.1f %.8f\n",
 			  child_spectrum_data->header_data->obsdate,
-			  child_spectrum_data->header_data->ut_seconds,
+			  child_spectrum_data->spectrum[0][0]->ut_seconds,
 			  mjd_grab);
 		  pack_write_double(&child_cmp, mjd_grab);
 		  pack_ampphase_options(&child_cmp, client_options);
