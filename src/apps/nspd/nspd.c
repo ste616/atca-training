@@ -169,6 +169,7 @@ static void sighandler(int sig) {
 #define ACTION_NEW_DATA_RECEIVED   1<<3
 #define ACTION_CYCLE_FORWARD       1<<4
 #define ACTION_CYCLE_BACKWARD      1<<5
+#define ACTION_LIST_CYCLES         1<<6
 
 // Make a shortcut to stop action for those actions which can only be
 // done by a simulator.
@@ -408,6 +409,10 @@ static void interpret_command(char *line) {
       // Move backward one cycle in time.
       CHECKSIMULATOR;
       action_required |= ACTION_CYCLE_BACKWARD;
+    } else if (minmatch("list", line_els[0], 3)) {
+      // List all the cycle times we know about from the server.
+      CHECKSIMULATOR;
+      action_required |= ACTION_LIST_CYCLES;
     }
     FREE(line_els);
   }
@@ -458,11 +463,13 @@ int main(int argc, char *argv[]) {
   struct spd_plotcontrols spd_alteredcontrols;
   fd_set watchset, reads;
   int i, r, bytes_received, max_socket = -1, nmesg = 0, n_cycles = 0;
+  int nlistlines = 0, mjd_year, mjd_month, mjd_day;
+  float mjd_utseconds;
   size_t recv_buffer_length;
   struct requests server_request;
   struct responses server_response;
   char send_buffer[SPDBUFSIZE], client_id[CLIENTIDLENGTH];
-  char *recv_buffer = NULL, **mesgout = NULL;
+  char *recv_buffer = NULL, **mesgout = NULL, tstring[20];
   SOCKET socket_peer;
   cmp_ctx_t cmp;
   cmp_mem_access_t mem;
@@ -638,6 +645,35 @@ int main(int argc, char *argv[]) {
 	pack_ampphase_options(&cmp, &ampphase_options);
 	socket_send_buffer(socket_peer, send_buffer, cmp_mem_access_get_pos(&mem));
       }
+    }
+
+    if (action_required & ACTION_LIST_CYCLES) {
+      // List all the cycles we've been told about by the server.
+      for (i = 0, nmesg = 0, nlistlines = 2; i < n_cycles; i++) {
+	if ((i > 0) && (nlistlines == -1) &&
+	    ((all_cycle_mjd[i] - all_cycle_mjd[i - 1]) > (2 * mjd_cycletime))) {
+	  // We go back and print out the last two cycles and then the first
+	  // two new cycles.
+	  i -= 2;
+	  nlistlines = 4;
+	} else if ((i == (n_cycles - 2)) && (nlistlines == -1)) {
+	  // Print out the last two cycles.
+	  nlistlines = 2;
+	}
+	if (nlistlines > 0) {
+	  mjd2cal(all_cycle_mjd[i], &mjd_year, &mjd_month, &mjd_day, &mjd_utseconds);
+	  seconds_to_hourlabel((mjd_utseconds * 86400), tstring);
+	  snprintf(mesgout[nmesg++], SPDBUFSIZE, " CYCLE %d: %4d-%02d-%02d %s\n",
+		   (i + 1), mjd_year, mjd_month, mjd_day, tstring);
+	  nlistlines--;
+	} else if (nlistlines == 0) {
+	  snprintf(mesgout[nmesg++], SPDBUFSIZE, " ....\n");
+	  nlistlines--;
+	}
+      }
+      readline_print_messages(nmesg, mesgout);
+      
+      action_required -= ACTION_LIST_CYCLES;
     }
     
     if (action_required & ACTION_QUIT) {

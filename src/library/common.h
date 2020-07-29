@@ -51,3 +51,4 @@ int leap(int year);
 int dayOK(int day, int month, int year);
 double cal2mjd(int day, int month, int year, float ut_seconds);
 double date2mjd(char *obsdate, float ut_seconds);
+void mjd2cal(double mjd, int *year, int *month, int *day, float *ut_seconds);

@@ -327,3 +327,23 @@ double date2mjd(char *obsdate, float ut_seconds) {
 
   return 0;
 }
+
+void mjd2cal(double mjd, int *year, int *month, int *day, float *ut_seconds) {
+  // Converts an MJD into a calendar date (Universal Time).
+  long j, c, y, m;
+  
+  *ut_seconds = (float)(mjd - floor(mjd));
+
+  mjd -= (mjd - floor(mjd));
+  j = (long)mjd + 2400001 + 68569;
+  c = 4 * j / 146097;
+  j -= (146097 * c + 3) / 4;
+  y = 4000 * (j + 1) / 1461001;
+  j = j - 1461 * y / 4 + 31;
+  m = 80 * j / 2447;
+  *day = (int)(j - 2447 * m / 80);
+  j = m / 11;
+  // We put month in the range 1 - 12.
+  *month = (int)(m + 1 - (12 * j)) + 1;
+  *year = (int)(100 * (c - 49) + y + j);
+}

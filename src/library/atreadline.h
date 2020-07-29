@@ -11,6 +11,6 @@
 // This is the maximum number of messages that can be passed to
 // the readline message routine (simply because we have a statically allocated
 // array to shove the messages in).
-#define MAX_N_MESSAGES 100
+#define MAX_N_MESSAGES 1000
 
 void readline_print_messages(int nmesg, char **mesg);
