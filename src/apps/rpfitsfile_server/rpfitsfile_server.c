@@ -44,6 +44,9 @@ static struct argp_option options[] = {
                                          "Switch to operate as a network data server " },
                                        { "port", 'p', "PORTNUM", 0,
                                          "The port number to listen on" },
+				       { "testing", 't', "TESTFILE", 0,
+					 "Operate as a testing server with instructions given "
+					 "in this file" },
   { 0 }
 };
 
@@ -53,6 +56,8 @@ struct arguments {
   char **rpfits_files;
   int port_number;
   bool network_operation;
+  bool testing_operation;
+  char testing_instructions_file[RPSBUFSIZE];
 };
 
 static error_t parse_opt(int key, char *arg, struct argp_state *state) {
@@ -64,6 +69,10 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state) {
     break;
   case 'p':
     arguments->port_number = atoi(arg);
+    break;
+  case 't':
+    arguments->testing_operation = true;
+    strncpy(arguments->testing_instructions_file, arg, RPSBUFSIZE);
     break;
   case ARGP_KEY_ARG:
     arguments->n_rpfits_files += 1;
@@ -707,6 +716,8 @@ int main(int argc, char *argv[]) {
   arguments.rpfits_files = NULL;
   arguments.port_number = 8880;
   arguments.network_operation = false;
+  arguments.testing_operation = false;
+  arguments.testing_instructions_file[0] = 0;
 
   // And the default for the calculator options.
   MALLOC(ampphase_options, 1);
@@ -1069,13 +1080,18 @@ int main(int argc, char *argv[]) {
                 FREE(send_buffer);
               }
             } else if (client_request.request_type == REQUEST_SERVERTYPE) {
-              // Tell the client we're a simulator.
+              // Tell the client we're a simulator or a tester, depending on how
+	      // we were started.
               client_response.response_type = RESPONSE_SERVERTYPE;
               strncpy(client_response.client_id, client_request.client_id, CLIENTIDLENGTH);
               MALLOC(send_buffer, JUSTRESPONSESIZE);
               init_cmp_memory_buffer(&cmp, &mem, send_buffer, JUSTRESPONSESIZE);
               pack_responses(&cmp, &client_response);
-              pack_write_sint(&cmp, SERVERTYPE_SIMULATOR);
+	      if (arguments.testing_operation) {
+		pack_write_sint(&cmp, SERVERTYPE_TESTING);
+	      } else {
+		pack_write_sint(&cmp, SERVERTYPE_SIMULATOR);
+	      }
               printf(" %s to client %s.\n",
                      get_type_string(TYPE_RESPONSE, client_response.response_type),
                      client_request.client_id);

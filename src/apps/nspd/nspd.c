@@ -442,7 +442,7 @@ static void interpret_command(char *line) {
 	}
 	mjd_request = mjdr_base + (double)mjdr_seconds / 86400.0;
 	action_required |= ACTION_TIME_REQUEST;
-	fprintf(stderr, " PARSED REQUESTED TIME AS %.8f\n", mjd_request);
+	/* fprintf(stderr, " PARSED REQUESTED TIME AS %.8f\n", mjd_request); */
       }
     }
     FREE(line_els);
