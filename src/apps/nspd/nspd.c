@@ -67,6 +67,7 @@ struct arguments {
 int action_required, server_type;
 int spd_device_number;
 int xaxis_type, yaxis_type, plot_pols, yaxis_scaling, nxpanels, nypanels;
+double mjd_request, mjd_base;
 struct spd_plotcontrols spd_plotcontrols;
 struct panelspec spd_panelspec;
 struct spectrum_data spectrum_data;
@@ -170,6 +171,7 @@ static void sighandler(int sig) {
 #define ACTION_CYCLE_FORWARD       1<<4
 #define ACTION_CYCLE_BACKWARD      1<<5
 #define ACTION_LIST_CYCLES         1<<6
+#define ACTION_TIME_REQUEST        1<<7
 
 // Make a shortcut to stop action for those actions which can only be
 // done by a simulator.
@@ -194,7 +196,9 @@ static void interpret_command(char *line) {
   int if_num_spec[MAXIFS], yaxis_change_type, array_change_spec;
   int flag_change, flag_change_mode, change_nxpanels, change_nypanels;
   bool pols_selected = false, if_selected = false, range_valid = false;
-  float range_limit_low, range_limit_high, range_swap;
+  bool mjdr_timeparsed;
+  float range_limit_low, range_limit_high, range_swap, mjdr_seconds;
+  double mjdr_base;
   
   if ((line == NULL) || (strcasecmp(line, "exit") == 0) ||
       (strcasecmp(line, "quit") == 0)) {
@@ -413,6 +417,33 @@ static void interpret_command(char *line) {
       // List all the cycle times we know about from the server.
       CHECKSIMULATOR;
       action_required |= ACTION_LIST_CYCLES;
+    } else if (minmatch("get", line_els[0], 3)) {
+      // Get something.
+      if (minmatch("time", line_els[1], 3)) {
+	// The user wants to request a time in the format [yyyy-mm-dd] HH:MM:SS.
+	if (nels == 4) {
+	  // Both date and time are given.
+	  mjdr_base = date2mjd(line_els[2], 0);
+	  if (mjdr_base == 0) {
+	    // The date wasn't specified correctly.
+	    fprintf(stderr, " DATE SPECIFIED INCORRECTLY, MUST BE YYYY-MM-DD\n");
+	    return;
+	  }
+	} else if (nels == 3) {
+	  // Just the time is given. So we reference it to the date of the
+	  // first scan.
+	  mjdr_base = mjd_base;
+	}
+	// Scan the time now.
+	mjdr_timeparsed = string_to_seconds(line_els[nels - 1], &mjdr_seconds);
+	if (mjdr_timeparsed == false) {
+	  fprintf(stderr, " TIME SPECIFIED INCORRECTLY, MUST BE HH:MM[:SS]\n");
+	  return;
+	}
+	mjd_request = mjdr_base + (double)mjdr_seconds / 86400.0;
+	action_required |= ACTION_TIME_REQUEST;
+	fprintf(stderr, " PARSED REQUESTED TIME AS %.8f\n", mjd_request);
+      }
     }
     FREE(line_els);
   }
@@ -463,7 +494,7 @@ int main(int argc, char *argv[]) {
   struct spd_plotcontrols spd_alteredcontrols;
   fd_set watchset, reads;
   int i, r, bytes_received, max_socket = -1, nmesg = 0, n_cycles = 0;
-  int nlistlines = 0, mjd_year, mjd_month, mjd_day;
+  int nlistlines = 0, mjd_year, mjd_month, mjd_day, min_dmjd_idx = -1;
   float mjd_utseconds;
   size_t recv_buffer_length;
   struct requests server_request;
@@ -473,7 +504,7 @@ int main(int argc, char *argv[]) {
   SOCKET socket_peer;
   cmp_ctx_t cmp;
   cmp_mem_access_t mem;
-  double earliest_mjd, latest_mjd, mjd_cycletime, mjd_request, cmjd;
+  double earliest_mjd, latest_mjd, mjd_cycletime, cmjd, min_dmjd, dmjd;
   double *all_cycle_mjd = NULL;
   struct ampphase_options ampphase_options;
 
@@ -605,31 +636,65 @@ int main(int argc, char *argv[]) {
     }
 
     if ((action_required & ACTION_CYCLE_FORWARD) ||
-	(action_required & ACTION_CYCLE_BACKWARD)) {
+	(action_required & ACTION_CYCLE_BACKWARD) ||
+	(action_required & ACTION_TIME_REQUEST)) {
       // Ask for different data.
-      // First, work out which cycle we're currently looking at.
-      for (i = 0, action_proceed = false; i < n_cycles; i++) {
-	if ((cmjd >= (all_cycle_mjd[i] - mjd_cycletime / 2.0)) &&
-	    (cmjd < (all_cycle_mjd[i] + mjd_cycletime / 2.0))) {
-	  // Now select the MJD from the appropriate cycle.
-	  if ((action_required & ACTION_CYCLE_FORWARD) &&
-	      (i < (n_cycles -1))) {
-	    mjd_request = all_cycle_mjd[i + 1];
-	    action_proceed = true;
-	    break;
-	  } else if ((action_required & ACTION_CYCLE_BACKWARD) &&
-		     (i > 0)) {
-	    mjd_request = all_cycle_mjd[i - 1];
-	    action_proceed = true;
-	    break;
+      if ((action_required & ACTION_CYCLE_FORWARD) ||
+	  (action_required & ACTION_CYCLE_BACKWARD)) {
+	// First, work out which cycle we're currently looking at.
+	for (i = 0, action_proceed = false; i < n_cycles; i++) {
+	  if ((cmjd >= (all_cycle_mjd[i] - mjd_cycletime / 2.0)) &&
+	      (cmjd < (all_cycle_mjd[i] + mjd_cycletime / 2.0))) {
+	    // Now select the MJD from the appropriate cycle.
+	    if ((action_required & ACTION_CYCLE_FORWARD) &&
+		(i < (n_cycles -1))) {
+	      mjd_request = all_cycle_mjd[i + 1];
+	      action_proceed = true;
+	      break;
+	    } else if ((action_required & ACTION_CYCLE_BACKWARD) &&
+		       (i > 0)) {
+	      mjd_request = all_cycle_mjd[i - 1];
+	      action_proceed = true;
+	      break;
+	    }
 	  }
 	}
-      }
-      // Don't do it again, no matter what.
-      if (action_required & ACTION_CYCLE_FORWARD) {
-	action_required -= ACTION_CYCLE_FORWARD;
-      } else if (action_required & ACTION_CYCLE_BACKWARD) {
-	action_required -= ACTION_CYCLE_BACKWARD;
+	// Don't do it again, no matter what.
+	if (action_required & ACTION_CYCLE_FORWARD) {
+	  action_required -= ACTION_CYCLE_FORWARD;
+	} else if (action_required & ACTION_CYCLE_BACKWARD) {
+	  action_required -= ACTION_CYCLE_BACKWARD;
+	}
+      } else if (action_required & ACTION_TIME_REQUEST) {
+	// Check that it isn't outside the range.
+	nmesg = 0;
+	action_proceed = false;
+	if (mjd_request < (earliest_mjd - 2 * mjd_cycletime)) {
+	  snprintf(mesgout[nmesg++], SPDBUFSIZE, " REQUESTED MJD %.8f IS TOO EARLY\n",
+		   mjd_request);
+	} else if (mjd_request > (latest_mjd + 2 * mjd_cycletime)) {
+	  snprintf(mesgout[nmesg++], SPDBUFSIZE, " REQUESTED MJD %.8f IS TOO LATE\n",
+		   mjd_request);
+	} else {
+	  // Try to find the nearest cycle.
+	  min_dmjd = fabs(mjd_request - all_cycle_mjd[0]);
+	  min_dmjd_idx = 0;
+	  for (i = 1; i < n_cycles; i++) {
+	    dmjd = fabs(mjd_request - all_cycle_mjd[i]);
+	    if (dmjd < min_dmjd) {
+	      min_dmjd = dmjd;
+	      min_dmjd_idx = i;
+	    }
+	  }
+	  if (min_dmjd < (2 * mjd_cycletime)) {
+	    action_proceed = true;
+	    mjd_request = all_cycle_mjd[min_dmjd_idx];
+	  }
+	}
+	action_required -= ACTION_TIME_REQUEST;
+	if (nmesg > 0) {
+	  readline_print_messages(nmesg, mesgout);
+	}
       }
       if (action_proceed) {
 	// We could check this against the known range here, but for now
@@ -753,6 +818,7 @@ int main(int argc, char *argv[]) {
 	snprintf(mesgout[2], SPDBUFSIZE, " Data cycle time %.1f sec\n",
 		 (mjd_cycletime * 86400.0));
 	readline_print_messages(nmesg, mesgout);
+	mjd_base = floor(earliest_mjd);
       } else if (server_response.response_type == RESPONSE_SPECTRUM_OUTSIDERANGE) {
 	// We couldn't get a new spectrum.
 	nmesg = 1;

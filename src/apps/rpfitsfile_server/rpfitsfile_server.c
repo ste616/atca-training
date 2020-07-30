@@ -427,8 +427,8 @@ void data_reader(int read_type, int n_rpfits_files,
               // MJD is within half a cycle time of this cycle's time.
               cycle_start = cycle_mjd - ((double)sh->cycle_time / (2 * 86400.0));
               cycle_end = cycle_mjd + ((double)sh->cycle_time / (2 * 86400.0));
-              printf("%.6f / %.6f / %.6f  (%.6f)\n", cycle_start, cycle_mjd, cycle_end,
-		     mjd_required);
+              /* printf("%.6f / %.6f / %.6f  (%.6f)\n", cycle_start, cycle_mjd, cycle_end, */
+	      /* 	     mjd_required); */
               if ((read_type & GRAB_SPECTRUM) &&
                   (mjd_required >= cycle_start) &&
                   (mjd_required < cycle_end)) {
