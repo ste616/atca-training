@@ -106,7 +106,7 @@ const char *get_type_string(int type, int id) {
   // Get a string representation of the type of request or response,
   // specified by type=TYPE_REQUEST or TYPE_RESPONSE, and
   // id being one of the definitions in the header.
-  int max_request = 12, max_response = 13;
+  int max_request = 13, max_response = 14;
   const char* const request_strings[] = { "",
                                           "REQUEST_CURRENT_SPECTRUM",
                                           "REQUEST_CURRENT_VISDATA",
@@ -118,7 +118,8 @@ const char *get_type_string(int type, int id) {
 					  "REQUEST_MJD_SPECTRUM",
 					  "CHILDREQUEST_SPECTRUM_MJD",
 					  "REQUEST_TIMERANGE",
-					  "REQUEST_CYCLE_TIMES"
+					  "REQUEST_CYCLE_TIMES",
+					  "REQUEST_RESPONSE_USER_ID"
   };
   const char* const response_strings[] = { "",
                                            "RESPONSE_CURRENT_SPECTRUM",
@@ -132,7 +133,8 @@ const char *get_type_string(int type, int id) {
 					   "RESPONSE_LOADED_SPECTRUM",
 					   "RESPONSE_SPECTRUM_OUTSIDERANGE",
 					   "RESPONSE_TIMERANGE",
-					   "RESPONSE_CYCLE_TIMES"
+					   "RESPONSE_CYCLE_TIMES",
+					   "RESPONSE_REQUEST_USER_ID"
   };
 
   if ((type == TYPE_REQUEST) && (id >= 0) && (id < max_request)) {
@@ -151,6 +153,8 @@ const char *get_servertype_string(int type) {
     return "SIMULATOR";
   } else if (type == SERVERTYPE_CORRELATOR) {
     return "CORRELATOR";
+  } else if (type == SERVERTYPE_TESTING) {
+    return "EXAMINATION";
   } else {
     return "UNKNOWN!";
   }

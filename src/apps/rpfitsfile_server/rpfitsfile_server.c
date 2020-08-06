@@ -1097,6 +1097,17 @@ int main(int argc, char *argv[]) {
                      client_request.client_id);
               bytes_sent = socket_send_buffer(loop_i, send_buffer,
                                               cmp_mem_access_get_pos(&mem));
+	      if (arguments.testing_operation) {
+		// Also request the user name.
+		init_cmp_memory_buffer(&cmp, &mem, send_buffer, JUSTRESPONSESIZE);
+		client_response.response_type = RESPONSE_REQUEST_USER_ID;
+		pack_responses(&cmp, &client_response);
+		printf(" %s to client %s.\n",
+		       get_type_string(TYPE_RESPONSE, client_response.response_type),
+		       client_request.client_id);
+		bytes_sent = socket_send_buffer(loop_i, send_buffer,
+						cmp_mem_access_get_pos(&mem));
+	      }
               FREE(send_buffer);
             } else if (client_request.request_type == REQUEST_SPECTRUM_MJD) {
 	      // This is asking us to grab a spectrum within some tolerance of

@@ -140,6 +140,7 @@ void release_vis_device(bool *device_opened) {
 
 bool sigwinch_received, sigint_received;
 const char *prompt = "NVIS> ";
+const char *uprompt = "USERNAME> ";
 
 // Handle SIGWINCH and window size changes when readline is
 // not active and reading a character.
@@ -160,6 +161,7 @@ static void sighandler(int sig) {
 #define ACTION_VISBANDS_CHANGED          1<<5
 #define ACTION_AMPPHASE_OPTIONS_CHANGED  1<<6
 #define ACTION_AMPPHASE_OPTIONS_PRINT    1<<7
+#define ACTION_USERNAME_OBTAINED         1<<8
 
 // Make a shortcut to stop action for those actions which can only be
 // done by a simulator.
@@ -174,6 +176,41 @@ static void sighandler(int sig) {
 	}					\
     }                                           \
   while(0)
+
+// Callback function called when the username prompt is displayed.
+#define USERNAME_SIZE 10
+char username[USERNAME_SIZE];
+int username_tries;
+static void interpret_username(char *line) {
+  bool username_accepted = false, checkline = true;
+
+  if (line == NULL) {
+    printf("\n");
+    checkline = false;
+  }
+  
+  if (checkline && (*line)) {
+    if (strlen(line) > 5) {
+      // This is an acceptable username.
+      strncpy(username, line, USERNAME_SIZE);
+      action_required = ACTION_USERNAME_OBTAINED;
+    }
+  } else {
+    printf("\n");
+  }
+  if (!username_accepted) {
+    fprintf(stderr, " USERNAME NOT ACCEPTABLE\n");
+    username_tries++;
+  }
+
+  if (username_tries > 5) {
+    // This isn't working.
+    fprintf(stderr, " TOO MANY INVALID USERNAME ATTEMPTS\n");
+    action_required = ACTION_QUIT;
+  }
+
+  FREE(line);
+}
 
 // Callback function called for each line when accept-line
 // executed, EOF seen, or EOF character read.
@@ -709,6 +746,17 @@ int main(int argc, char *argv[]) {
       socket_send_buffer(socket_peer, send_buffer, cmp_mem_access_get_pos(&mem));
       action_required -= ACTION_AMPPHASE_OPTIONS_CHANGED;
     }
+
+    if (action_required & ACTION_USERNAME_OBTAINED) {
+      // Change our prompt back.
+      rl_callback_handler_remove();
+      rl_callback_handler_install(prompt, interpret_command);
+      // Print a message.
+      nmesg = 1;
+      snprintf(mesgout[0], VISBUFSIZE, "Thankyou and hello %s\n", username);
+      readline_print_messages(nmesg, mesgout);
+      action_required -= ACTION_USERNAME_OBTAINED;
+    }
     
     if (action_required & ACTION_QUIT) {
       break;
@@ -769,6 +817,17 @@ int main(int argc, char *argv[]) {
         snprintf(mesgout[0], VISBUFSIZE, "Connected to %s server.\n",
                  get_servertype_string(server_type));
         readline_print_messages(nmesg, mesgout);
+      } else if (server_response.response_type == RESPONSE_REQUEST_USER_ID) {
+	// The server wants us to find out who the user is.
+	// We want to change the prompt first.
+	rl_callback_handler_remove();
+	rl_callback_handler_install(uprompt, interpret_username);
+	username_tries = 0;
+	// Print a message.
+	nmesg = 1;
+	snprintf(mesgout[0], VISBUFSIZE, "PLEASE INPUT ATNF USER NAME\n");
+	// Change the prompt.
+	readline_print_messages(nmesg, mesgout);
       }
       FREE(recv_buffer);
     }
