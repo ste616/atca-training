@@ -194,10 +194,10 @@ static void interpret_username(char *line) {
       // This is an acceptable username.
       strncpy(username, line, USERNAME_SIZE);
       action_required = ACTION_USERNAME_OBTAINED;
+      username_accepted = true;
     }
-  } else {
-    printf("\n");
   }
+  
   if (!username_accepted) {
     fprintf(stderr, " USERNAME NOT ACCEPTABLE\n");
     username_tries++;
@@ -753,8 +753,15 @@ int main(int argc, char *argv[]) {
       rl_callback_handler_install(prompt, interpret_command);
       // Print a message.
       nmesg = 1;
-      snprintf(mesgout[0], VISBUFSIZE, "Thankyou and hello %s\n", username);
+      snprintf(mesgout[0], VISBUFSIZE, " Thankyou and hello %s\n", username);
       readline_print_messages(nmesg, mesgout);
+
+      // Send the username back to the server.
+      server_request.request_type = REQUEST_RESPONSE_USER_ID;
+      init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)VISBUFSIZE);
+      pack_requests(&cmp, &server_request);
+      pack_write_string(&cmp, username, USERNAME_SIZE);
+      socket_send_buffer(socket_peer, send_buffer, cmp_mem_access_get_pos(&mem));
       action_required -= ACTION_USERNAME_OBTAINED;
     }
     
