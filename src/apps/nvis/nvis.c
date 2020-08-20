@@ -659,7 +659,7 @@ int main(int argc, char *argv[]) {
       change_vis_plotcontrols_visbands(&vis_plotcontrols, nvisbands, visband);
       // Update the visband indices.
       for (i = 0; i < nvisbands; i++) {
-	visband_idx[i] = find_if_name(described_hdr, visband[i]);
+        visband_idx[i] = find_if_name(described_hdr, visband[i]);
       }
       action_required -= ACTION_VISBANDS_CHANGED;
       action_required |= ACTION_REFRESH_PLOT;
@@ -714,21 +714,21 @@ int main(int argc, char *argv[]) {
       snprintf(mesgout[nmesg++], VISBUFSIZE, " PHASE UNITS: %s\n",
                (ampphase_options.phase_in_degrees ? "degrees" : "radians"));
       for (i = 1; i < ampphase_options.num_ifs; i++) {
-	snprintf(mesgout[nmesg++], VISBUFSIZE, " BAND F%d:\n", i);
-	snprintf(mesgout[nmesg++], VISBUFSIZE, "   DELAY AVERAGING: %d\n",
-		 ampphase_options.delay_averaging[i]);
-	snprintf(mesgout[nmesg++], VISBUFSIZE, "   AVERAGING METHOD: ");
-	if (ampphase_options.averaging_method[i] & AVERAGETYPE_VECTOR) {
-	  snprintf(mesgout[nmesg++], VISBUFSIZE, "VECTOR ");
-	} else if (ampphase_options.averaging_method[i] & AVERAGETYPE_SCALAR) {
-	  snprintf(mesgout[nmesg++], VISBUFSIZE, "SCALAR ");
-	}
-	if (ampphase_options.averaging_method[i] & AVERAGETYPE_MEAN) {
-	  snprintf(mesgout[nmesg++], VISBUFSIZE, "MEAN");
-	} else if (ampphase_options.averaging_method[i] & AVERAGETYPE_MEDIAN) {
-	  snprintf(mesgout[nmesg++], VISBUFSIZE, "MEDIAN");
-	}
-	snprintf(mesgout[nmesg++], VISBUFSIZE, "\n   TVCHANNELS: %d - %d\n",
+        snprintf(mesgout[nmesg++], VISBUFSIZE, " BAND F%d:\n", i);
+        snprintf(mesgout[nmesg++], VISBUFSIZE, "   DELAY AVERAGING: %d\n",
+                 ampphase_options.delay_averaging[i]);
+        snprintf(mesgout[nmesg++], VISBUFSIZE, "   AVERAGING METHOD: ");
+        if (ampphase_options.averaging_method[i] & AVERAGETYPE_VECTOR) {
+          snprintf(mesgout[nmesg++], VISBUFSIZE, "VECTOR ");
+        } else if (ampphase_options.averaging_method[i] & AVERAGETYPE_SCALAR) {
+          snprintf(mesgout[nmesg++], VISBUFSIZE, "SCALAR ");
+        }
+        if (ampphase_options.averaging_method[i] & AVERAGETYPE_MEAN) {
+          snprintf(mesgout[nmesg++], VISBUFSIZE, "MEAN");
+        } else if (ampphase_options.averaging_method[i] & AVERAGETYPE_MEDIAN) {
+          snprintf(mesgout[nmesg++], VISBUFSIZE, "MEDIAN");
+        }
+        snprintf(mesgout[nmesg++], VISBUFSIZE, "\n   TVCHANNELS: %d - %d\n",
                  ampphase_options.min_tvchannel[i],
                  ampphase_options.max_tvchannel[i]);
       }
@@ -825,16 +825,16 @@ int main(int argc, char *argv[]) {
                  get_servertype_string(server_type));
         readline_print_messages(nmesg, mesgout);
       } else if (server_response.response_type == RESPONSE_REQUEST_USER_ID) {
-	// The server wants us to find out who the user is.
-	// We want to change the prompt first.
-	rl_callback_handler_remove();
-	rl_callback_handler_install(uprompt, interpret_username);
-	username_tries = 0;
-	// Print a message.
-	nmesg = 1;
-	snprintf(mesgout[0], VISBUFSIZE, "PLEASE INPUT ATNF USER NAME\n");
-	// Change the prompt.
-	readline_print_messages(nmesg, mesgout);
+        // The server wants us to find out who the user is.
+        // We want to change the prompt first.
+        rl_callback_handler_remove();
+        rl_callback_handler_install(uprompt, interpret_username);
+        username_tries = 0;
+        // Print a message.
+        nmesg = 1;
+        snprintf(mesgout[0], VISBUFSIZE, "PLEASE INPUT ATNF USER NAME\n");
+        // Change the prompt.
+        readline_print_messages(nmesg, mesgout);
       }
       FREE(recv_buffer);
     }

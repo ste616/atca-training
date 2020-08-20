@@ -347,3 +347,17 @@ void mjd2cal(double mjd, int *year, int *month, int *day, float *ut_seconds) {
   *month = (int)(m + 1 - (12 * j)) + 1;
   *year = (int)(100 * (c - 49) + y + j);
 }
+
+void stringappend(char **dest, const char *src) {
+  // We resize dest to make it just long enough to add src to it.
+  size_t l1 = 0, l2 = 0;
+
+  if (*dest != NULL) {
+    // Get the current size.
+    l1 = strlen(*dest);
+  }
+
+  l2 = strlen(src);
+  REALLOC(*dest, (l1 + l2 + 2));
+  strncat(*dest, src, l2);
+}

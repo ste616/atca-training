@@ -23,6 +23,9 @@
 #define MAXBIN  32
 #define VISBANDLEN 10
 
+#define TESTTYPE_MULTIPLE_CHOICE 1
+#define TESTTYPE_FREE_RESPONSE   2
+
 #define MINASSIGN(a, b) a = (b < a) ? b : a
 #define MAXASSIGN(a, b) a = (b > a) ? b : a
 
@@ -52,3 +55,4 @@ int dayOK(int day, int month, int year);
 double cal2mjd(int day, int month, int year, float ut_seconds);
 double date2mjd(char *obsdate, float ut_seconds);
 void mjd2cal(double mjd, int *year, int *month, int *day, float *ut_seconds);
+void stringappend(char **dest, const char *src);
