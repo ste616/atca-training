@@ -65,6 +65,18 @@ struct scan_header_data {
   double **ant_cartesian;
 };
 
+/* Indexing for the metadata arrays. */
+#define CAL_XX 0
+#define CAL_YY 1
+
+/* Some integer values for the syscal data. */
+#define SYSCAL_FLAGGED_GOOD 1
+#define SYSCAL_FLAGGED_BAD  0
+#define SYSCAL_TSYS_APPLIED     1
+#define SYSCAL_TSYS_NOT_APPLIED 0
+#define SYSCAL_VALID   0
+#define SYSCAL_INVALID 1
+
 /**
  * This structure holds all the cycle data.
  */
@@ -86,10 +98,36 @@ struct cycle_data {
   int *vis_size;
   float complex **vis;
   float **wgt;
-  // Metadata.
+  // Labelling.
   int *bin;
   int *if_no;
   char **source;
+  // Metadata.
+  int num_cal_ifs;
+  int num_cal_ants;
+  int *cal_ifs;
+  int *cal_ants;
+  // This is indexed [IF][ANT][POL]
+  float ***tsys;
+  int ***tsys_applied;
+  // These are indexed [IF][ANT].
+  float **xyphase;
+  float **xyamp;
+  float **parangle;
+  float **tracking_error_max;
+  float **tracking_error_rms;
+  int **flagging;
+  // Weather metadata.
+  float temperature;
+  float air_pressure;
+  float humidity;
+  float wind_speed;
+  float wind_direction;
+  float rain_gauge;
+  int weather_valid;
+  float seemon_phase;
+  float seemon_rms;
+  int seemon_valid;
 };
 
 /**

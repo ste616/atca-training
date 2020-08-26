@@ -304,6 +304,20 @@ struct cycle_data* prepare_new_cycle_data(void) {
   cycle_data->bin = NULL;
   cycle_data->if_no = NULL;
   cycle_data->source = NULL;
+  cycle_data->num_cal_ifs = 0;
+  cycle_data->num_cal_ants = 0;
+  cycle_data->cal_ifs = NULL;
+  cycle_data->cal_ants = NULL;
+  cycle_data->tsys = NULL;
+  cycle_data->tsys_applied = NULL;
+  cycle_data->xyphase = NULL;
+  cycle_data->xyamp = NULL;
+  cycle_data->parangle = NULL;
+  cycle_data->tracking_error_max = NULL;
+  cycle_data->tracking_error_rms = NULL;
+  cycle_data->flagging = NULL;
+  cycle_data->weather_valid = SYSCAL_INVALID;
+  cycle_data->seemon_valid = SYSCAL_INVALID;
 
   // Zero the all_baselines array.
   memset(cycle_data->all_baselines, 0, sizeof(cycle_data->all_baselines));
@@ -431,10 +445,10 @@ void free_scan_data(struct scan_data *scan_data) {
  * This routine reads in a full cycle's worth of data.
  */
 int read_cycle_data(struct scan_header_data *scan_header_data,
-		    struct cycle_data *cycle_data) {
+                    struct cycle_data *cycle_data) {
   int this_jstat = JSTAT_READDATA, read_data = 1, rpfits_result = 0;
   int flag, bin, if_no, sourceno, vis_size = 0, rv = READER_HEADER_AVAILABLE;
-  int baseline, ant1, ant2, i, bidx = 1;
+  int baseline, ant1, ant2, i, j, bidx = 1, sif;
   float *vis = NULL, *wgt = NULL, ut, last_ut = -1, u, v, w;
   float complex *cvis = NULL;
 
@@ -468,24 +482,24 @@ int read_cycle_data(struct scan_header_data *scan_header_data,
       FREE(vis);
       FREE(wgt);
       if (this_jstat == JSTAT_ILLEGALDATA) {
-	/* printf("got illegal data, %d\n", fg_.n_fg); */
-	continue;
+        /* printf("got illegal data, %d\n", fg_.n_fg); */
+        continue;
       }
       // Stop reading.
       read_data = 0;
       if (this_jstat == JSTAT_ENDOFFILE) {
-	/* printf("reached end of file\n"); */
-	rv = READER_EXHAUSTED;
+        /* printf("reached end of file\n"); */
+        rv = READER_EXHAUSTED;
       } else if (this_jstat == JSTAT_FGTABLE) {
-	// We've hit the end of this data.
-	/* printf("reached a new header\n"); */
-	/* printf("READER: while reading data, hit a FG table with %d entries\n", */
-	/*        fg_.n_fg); */
-	rv = READER_HEADER_AVAILABLE;
+        // We've hit the end of this data.
+        /* printf("reached a new header\n"); */
+        /* printf("READER: while reading data, hit a FG table with %d entries\n", */
+        /*        fg_.n_fg); */
+        rv = READER_HEADER_AVAILABLE;
       } else if (this_jstat == JSTAT_HEADERNOTDATA) {
-	/* printf("READER: while reading data, hit a header with %d entries\n", */
-	/*        fg_.n_fg); */
-	
+        /* printf("READER: while reading data, hit a header with %d entries\n", */
+        /*        fg_.n_fg); */
+        
       }
     } else if (rpfits_result == 0) {
       fprintf(stderr, "While reading data, rpfitsin encountered an error\n");
@@ -498,43 +512,104 @@ int read_cycle_data(struct scan_header_data *scan_header_data,
       /* 	     if_no, sourceno, flag, bin); */
       // Check for a time change. The time has to change by at least 0.5
       // otherwise it's not really a cycle change.
-      if ((baseline == -1) && (ut > (last_ut + 0.5))) {
-	// We've gone to a new cycle.
-	/* printf("stopping because new cycle!\n"); */
-	rv = READER_HEADER_AVAILABLE | READER_DATA_AVAILABLE;
-	read_data = 0;
-	FREE(wgt);
+      /* if ((baseline == -1) && (ut > (last_ut + 0.5))) { */
+      if (baseline == -1) {
+        // This is the syscal data group.
+        // The number of IFs is determined by how many times we see this table.
+        cycle_data->num_cal_ifs = cycle_data->num_cal_ifs + 1;
+        sif = cycle_data->num_cal_ifs - 1;
+        REALLOC(cycle_data->cal_ifs, cycle_data->num_cal_ifs);
+        cycle_data->cal_ifs[sif] = SYSCAL_IF(0, 0);
+        if (cycle_data->num_cal_ifs == 1) {
+          // We do a bunch of stuff only once.
+          // The number of antennas is given by the header.
+          // It will always be 1 less than the specified number since when it's
+          // 0 it's actually presenting the additional syscal record.
+          cycle_data->num_cal_ants = SYSCAL_NUM_ANTS - 1;
+          MALLOC(cycle_data->cal_ants, (SYSCAL_NUM_ANTS - 1));
+          // Let's deal with the additional syscal record now, which is
+          // just meteorological data.
+          if (SYSCAL_ADDITIONAL_CHECK == 0) {
+            // The syscal data is formatted as we expect.
+            cycle_data->temperature = SYSCAL_ADDITIONAL_TEMP;
+            cycle_data->air_pressure = SYSCAL_ADDITIONAL_AIRPRESS;
+            cycle_data->humidity = SYSCAL_ADDITIONAL_HUMI;
+            cycle_data->wind_speed = SYSCAL_ADDITIONAL_WINDSPEED;
+            cycle_data->wind_direction = SYSCAL_ADDITIONAL_WINDDIR;
+            cycle_data->rain_gauge = SYSCAL_ADDITIONAL_RAIN;
+            cycle_data->weather_valid = SYSCAL_ADDITIONAL_WEATHERFLAG;
+            cycle_data->seemon_phase = SYSCAL_ADDITIONAL_SEEMON_PHASE;
+            cycle_data->seemon_rms = SYSCAL_ADDITIONAL_SEEMON_RMS;
+            cycle_data->seemon_valid = SYSCAL_ADDITIONAL_SEEMON_FLAG;
+            printf("temp = %.1f pressure = %.1f seemon rms = %.1f\n",
+                   cycle_data->temperature, cycle_data->air_pressure, cycle_data->seemon_rms);
+          }
+        }
+        // Do some array allocation.
+        REALLOC(cycle_data->tsys, cycle_data->num_cal_ifs);
+        REALLOC(cycle_data->tsys_applied, cycle_data->num_cal_ifs);
+        MALLOC(cycle_data->tsys[sif], cycle_data->num_cal_ants);
+        MALLOC(cycle_data->tsys_applied[sif], cycle_data->num_cal_ants);
+        for (i = 0; i < cycle_data->num_cal_ants; i++) {
+          MALLOC(cycle_data->tsys[sif][i], 2);
+          MALLOC(cycle_data->tsys_applied[sif][i], 2);
+          cycle_data->tsys[sif][i][CAL_XX] = SYSCAL_TSYS_X(i, 0);
+          cycle_data->tsys[sif][i][CAL_YY] = SYSCAL_TSYS_Y(i, 0);
+          cycle_data->tsys_applied[sif][i][CAL_XX] = SYSCAL_TSYS_X_APPLIED(i, 0);
+          cycle_data->tsys_applied[sif][i][CAL_YY] = SYSCAL_TSYS_Y_APPLIED(i, 0);
+        }
+        printf("Baseline is -1\n");
+        fprintf(stdout, "found SYSCAL group with %d ants %d IFs %d quantities for source %d\n",
+                sc_.sc_ant, sc_.sc_if, sc_.sc_q, sc_.sc_srcno);
+        for (i = 0; i < (sc_.sc_ant * sc_.sc_if * sc_.sc_q); i++) {
+          fprintf(stdout, "cal param %d: %.5f\n", i, sc_.sc_cal[i]);
+        }
+        for (i = 0; i < sc_.sc_ant; i++) {
+          for (j = 0; j < sc_.sc_if; j++) {
+            printf("index %d ANT %d IF %d XYphase = %.4f TSys X = %.4f Y = %.4f\n",
+                   SYSCAL_GRP(i, j),
+                   SYSCAL_ANT(i, j), SYSCAL_IF(i, j), SYSCAL_XYPHASE(i, j),
+                   SYSCAL_TSYS_X(i, j), SYSCAL_TSYS_Y(i, j));
+          }
+        }
+        if (ut > (last_ut + 0.5)) {
+          // We've gone to a new cycle.
+          printf("stopping because new cycle!\n");
+          rv = READER_HEADER_AVAILABLE | READER_DATA_AVAILABLE;
+          read_data = 0;
+          FREE(wgt);
+        }
       } else {
-	// Store this data.
-	cycle_data->num_points += 1;
-	base_to_ants(baseline, &ant1, &ant2);
-	if (cycle_data->all_baselines[baseline] == 0) {
-	  cycle_data->all_baselines[baseline] = bidx;
-	  bidx += 1;
-	}
-	ARRAY_APPEND(cycle_data->u, cycle_data->num_points, u);
-	ARRAY_APPEND(cycle_data->v, cycle_data->num_points, v);
-	ARRAY_APPEND(cycle_data->w, cycle_data->num_points, w);
-	ARRAY_APPEND(cycle_data->ant1, cycle_data->num_points, ant1);
-	ARRAY_APPEND(cycle_data->ant2, cycle_data->num_points, ant2);
-	ARRAY_APPEND(cycle_data->flag, cycle_data->num_points, flag);
-	ARRAY_APPEND(cycle_data->bin, cycle_data->num_points, bin);
-	ARRAY_APPEND(cycle_data->if_no, cycle_data->num_points, if_no);
-	ARRAY_APPEND(cycle_data->vis_size, cycle_data->num_points, vis_size);
-	// We have to do something special for the source name.
-	REALLOC(cycle_data->source, cycle_data->num_points);
-	MALLOC(cycle_data->source[cycle_data->num_points - 1], SOURCE_LENGTH);
-	string_copy(SOURCENAME(sourceno), SOURCE_LENGTH,
-		    cycle_data->source[cycle_data->num_points - 1]);
-	// Convert the vis array read into complex numbers.
-	MALLOC(cvis, vis_size);
-	for (i = 0; i < vis_size; i++) {
-	  cvis[i] = vis[i * 2] + vis[(i * 2) + 1] * I;
-	}
-	// Keep a pointer to the vis and weight data.
-	ARRAY_APPEND(cycle_data->vis, cycle_data->num_points, cvis);
-	// Weight is not used for CABB RPFITS, but we keep this here.
-	ARRAY_APPEND(cycle_data->wgt, cycle_data->num_points, wgt);
+        // Store this data.
+        cycle_data->num_points += 1;
+        base_to_ants(baseline, &ant1, &ant2);
+        if (cycle_data->all_baselines[baseline] == 0) {
+          cycle_data->all_baselines[baseline] = bidx;
+          bidx += 1;
+        }
+        ARRAY_APPEND(cycle_data->u, cycle_data->num_points, u);
+        ARRAY_APPEND(cycle_data->v, cycle_data->num_points, v);
+        ARRAY_APPEND(cycle_data->w, cycle_data->num_points, w);
+        ARRAY_APPEND(cycle_data->ant1, cycle_data->num_points, ant1);
+        ARRAY_APPEND(cycle_data->ant2, cycle_data->num_points, ant2);
+        ARRAY_APPEND(cycle_data->flag, cycle_data->num_points, flag);
+        ARRAY_APPEND(cycle_data->bin, cycle_data->num_points, bin);
+        ARRAY_APPEND(cycle_data->if_no, cycle_data->num_points, if_no);
+        ARRAY_APPEND(cycle_data->vis_size, cycle_data->num_points, vis_size);
+        // We have to do something special for the source name.
+        REALLOC(cycle_data->source, cycle_data->num_points);
+        MALLOC(cycle_data->source[cycle_data->num_points - 1], SOURCE_LENGTH);
+        string_copy(SOURCENAME(sourceno), SOURCE_LENGTH,
+                    cycle_data->source[cycle_data->num_points - 1]);
+        // Convert the vis array read into complex numbers.
+        MALLOC(cvis, vis_size);
+        for (i = 0; i < vis_size; i++) {
+          cvis[i] = vis[i * 2] + vis[(i * 2) + 1] * I;
+        }
+        // Keep a pointer to the vis and weight data.
+        ARRAY_APPEND(cycle_data->vis, cycle_data->num_points, cvis);
+        // Weight is not used for CABB RPFITS, but we keep this here.
+        ARRAY_APPEND(cycle_data->wgt, cycle_data->num_points, wgt);
       }
       FREE(vis);
     }

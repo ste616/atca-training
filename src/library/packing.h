@@ -37,6 +37,10 @@ struct spectrum_data {
 struct vis_data {
   // The number of cycles contained here.
   int nviscycles;
+  // The range of MJDs that were allowed when these data
+  // were compiled.
+  double mjd_low;
+  double mjd_high;
   // The header data for each cycle.
   struct scan_header_data **header_data;
   // The number of IFs per cycle.

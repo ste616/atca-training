@@ -169,11 +169,11 @@ static void sighandler(int sig) {
   do                                            \
     {                                           \
       if (server_type != SERVERTYPE_SIMULATOR)	\
-        {					\
-          FREE(line_els);			\
-	  FREE(line);				\
-	  return;				\
-	}					\
+        {                                       \
+          FREE(line_els);                       \
+          FREE(line);                           \
+          return;                               \
+        }                                       \
     }                                           \
   while(0)
 
@@ -447,64 +447,64 @@ static void interpret_command(char *line) {
       if (nels == 2) {
         iarg = atoi(line_els[1]);
         if (iarg >= 1) {
-	  // Change the delay averaging for all the IFs.
-	  for (i = 0; i < ampphase_options.num_ifs; i++) {
-	    ampphase_options.delay_averaging[i] = iarg;
-	  }
+          // Change the delay averaging for all the IFs.
+          for (i = 0; i < ampphase_options.num_ifs; i++) {
+            ampphase_options.delay_averaging[i] = iarg;
+          }
           action_required = ACTION_AMPPHASE_OPTIONS_CHANGED;
         }
       } else if (nels == 3) {
-	// Change the delay averaging for the two IFs in the calband.
-	succ = false;
-	for (i = 1; i < 3; i++) {
-	  iarg = atoi(line_els[i]);
-	  if (iarg >= 1) {
-	    ampphase_options.delay_averaging[visband_idx[i - 1]] = iarg;
-	    succ = true;
-	  }
-	}
-	if (succ) {
-	  action_required = ACTION_AMPPHASE_OPTIONS_CHANGED;
-	}
+        // Change the delay averaging for the two IFs in the calband.
+        succ = false;
+        for (i = 1; i < 3; i++) {
+          iarg = atoi(line_els[i]);
+          if (iarg >= 1) {
+            ampphase_options.delay_averaging[visband_idx[i - 1]] = iarg;
+            succ = true;
+          }
+        }
+        if (succ) {
+          action_required = ACTION_AMPPHASE_OPTIONS_CHANGED;
+        }
       }
     } else if (minmatch("tvmedian", line_els[0], 5)) {
       // Change the averaging method.
       if ((nels == 2) || (nels == 3)) {
         CHECKSIMULATOR;
-	for (i = 0; i < nvisbands; i++) {
-	  if (nels == 2) {
-	    k = 1;
-	  } else {
-	    k = i + 1;
-	  }
-	  if (strncmp(line_els[k], "on", 2) == 0) {
-	    // Turn median averaging on.
-	    if (ampphase_options.averaging_method[visband_idx[i]] & AVERAGETYPE_MEAN) {
-	      ampphase_options.averaging_method[visband_idx[i]] -= AVERAGETYPE_MEAN;
-	    }
-	    ampphase_options.averaging_method[visband_idx[i]] |= AVERAGETYPE_MEDIAN;
-	  } else if (strncmp(line_els[k], "off", 3) == 0) {
-	    // Turn mean averaging on.
-	    if (ampphase_options.averaging_method[visband_idx[i]] & AVERAGETYPE_MEDIAN) {
-	      ampphase_options.averaging_method[visband_idx[i]] -= AVERAGETYPE_MEDIAN;
-	    }
-	    ampphase_options.averaging_method[visband_idx[i]] |= AVERAGETYPE_MEAN;
-	  }
-	}
-	action_required = ACTION_AMPPHASE_OPTIONS_CHANGED;
+        for (i = 0; i < nvisbands; i++) {
+          if (nels == 2) {
+            k = 1;
+          } else {
+            k = i + 1;
+          }
+          if (strncmp(line_els[k], "on", 2) == 0) {
+            // Turn median averaging on.
+            if (ampphase_options.averaging_method[visband_idx[i]] & AVERAGETYPE_MEAN) {
+              ampphase_options.averaging_method[visband_idx[i]] -= AVERAGETYPE_MEAN;
+            }
+            ampphase_options.averaging_method[visband_idx[i]] |= AVERAGETYPE_MEDIAN;
+          } else if (strncmp(line_els[k], "off", 3) == 0) {
+            // Turn mean averaging on.
+            if (ampphase_options.averaging_method[visband_idx[i]] & AVERAGETYPE_MEDIAN) {
+              ampphase_options.averaging_method[visband_idx[i]] -= AVERAGETYPE_MEDIAN;
+            }
+            ampphase_options.averaging_method[visband_idx[i]] |= AVERAGETYPE_MEAN;
+          }
+        }
+        action_required = ACTION_AMPPHASE_OPTIONS_CHANGED;
       } else {
         // Output the averaging type.
         printf(" Currently using averaging type:");
-	for (i = 0; i < nvisbands; i++) {
-	  if (ampphase_options.averaging_method[visband_idx[i]] & AVERAGETYPE_MEAN) {
-	    printf(" MEAN");
-	  } else if (ampphase_options.averaging_method[visband_idx[i]] & AVERAGETYPE_MEDIAN) {
-	    printf(" MEDIAN");
-	  } else {
-	    printf(" UNKNOWN!");
-	  }
-	}
-	printf("\n");
+        for (i = 0; i < nvisbands; i++) {
+          if (ampphase_options.averaging_method[visband_idx[i]] & AVERAGETYPE_MEAN) {
+            printf(" MEAN");
+          } else if (ampphase_options.averaging_method[visband_idx[i]] & AVERAGETYPE_MEDIAN) {
+            printf(" MEDIAN");
+          } else {
+            printf(" UNKNOWN!");
+          }
+        }
+        printf("\n");
       }
     } else if (minmatch("onsource", line_els[0], 3)) {
       CHECKSIMULATOR;

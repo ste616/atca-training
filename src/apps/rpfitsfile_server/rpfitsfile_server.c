@@ -453,6 +453,8 @@ void data_reader(int read_type, int n_rpfits_files,
         MALLOC(*vis_data, 1);
       }
       (*vis_data)->nviscycles = 0;
+      (*vis_data)->mjd_low = mjd_low;
+      (*vis_data)->mjd_high = mjd_high;
       (*vis_data)->header_data = NULL;
       (*vis_data)->num_ifs = NULL;
       (*vis_data)->num_pols = NULL;
