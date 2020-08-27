@@ -104,6 +104,10 @@ void pack_requests(cmp_ctx_t *cmp, struct requests *a);
 void unpack_requests(cmp_ctx_t *cmp, struct requests *a);
 void pack_responses(cmp_ctx_t *cmp, struct responses *a);
 void unpack_responses(cmp_ctx_t *cmp, struct responses *a);
+void pack_metinfo(cmp_ctx_t *cmp, struct metinfo *a);
+void unpack_metinfo(cmp_ctx_t *cmp, struct metinfo *a);
+void pack_syscal_data(cmp_ctx_t *cmp, struct syscal_data *a);
+void unpack_syscal_data(cmp_ctx_t *cmp, struct syscal_data *a);
 void init_cmp_memory_buffer(cmp_ctx_t *cmp, cmp_mem_access_t *mem, void *buffer,
                             size_t buffer_len);
 

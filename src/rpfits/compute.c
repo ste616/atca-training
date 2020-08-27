@@ -282,6 +282,122 @@ void free_ampphase_options(struct ampphase_options *options) {
 }
 
 /**
+ * Copy one metinfo structure into another.
+ */
+void copy_metinfo_data(struct metinfo *dest,
+		       struct metinfo *src) {
+  strncpy(dest->obsdate, src->obsdate, OBSDATE_LENGTH);
+  STRUCTCOPY(src, dest, ut_seconds);
+  STRUCTCOPY(src, dest, temperature);
+  STRUCTCOPY(src, dest, air_pressure);
+  STRUCTCOPY(src, dest, humidity);
+  STRUCTCOPY(src, dest, wind_speed);
+  STRUCTCOPY(src, dest, wind_direction);
+  STRUCTCOPY(src, dest, rain_gauge);
+  STRUCTCOPY(src, dest, weather_valid);
+  STRUCTCOPY(src, dest, seemon_phase);
+  STRUCTCOPY(src, dest, seemon_rms);
+  STRUCTCOPY(src, dest, seemon_valid);
+}
+
+/**
+ * Copy one syscal_data structure into another.
+ */
+void copy_syscal_data(struct syscal_data *dest,
+		      struct syscal_data *src) {
+  int i, j, k;
+  strncpy(dest->obsdate, src->obsdate, OBSDATE_LENGTH);
+  STRUCTCOPY(src, dest, utseconds);
+  STRUCTCOPY(src, dest, num_ifs);
+  STRUCTCOPY(src, dest, num_ants);
+  STRUCTCOPY(src, dest, num_pols);
+  REALLOC(dest->if_num, dest->num_ifs);
+  for (i = 0; i < dest->num_ifs; i++) {
+    STRUCTCOPY(src, dest, if_num[i]);
+  }
+  REALLOC(dest->ant_num, dest->num_ants);
+  for (i = 0; i < dest->num_ants; i++) {
+    STRUCTCOPY(src, dest, ant_num[i]);
+  }
+  REALLOC(dest->pol, dest->num_pols);
+  for (i = 0; i < dest->num_pols; i++) {
+    STRUCTCOPY(src, dest, pol[i]);
+  }
+  REALLOC(dest->parangle, dest->num_ants);
+  REALLOC(dest->tracking_error_max, dest->num_ants);
+  REALLOC(dest->tracking_error_rms, dest->num_ants);
+  REALLOC(dest->flagging, dest->num_ants);
+  REALLOC(dest->xyphase, dest->num_ants);
+  REALLOC(dest->xyamp, dest->num_ants);
+  REALLOC(dest->online_tsys, dest->num_ants);
+  REALLOC(dest->online_tsys_applied, dest->num_ants);
+  REALLOC(dest->computed_tsys, dest->num_ants);
+  REALLOC(dest->computed_tsys_applied, dest->num_ants);
+  for (i = 0; i < dest->num_ants; i++) {
+    STRUCTCOPY(src, dest, parangle[i]);
+    STRUCTCOPY(src, dest, tracking_error_max[i]);
+    STRUCTCOPY(src, dest, tracking_error_rms[i]);
+    STRUCTCOPY(src, dest, flagging[i]);
+    MALLOC(dest->xyphase[i], dest->num_ifs);
+    MALLOC(dest->xyamp[i], dest->num_ifs);
+    MALLOC(dest->online_tsys[i], dest->num_ifs);
+    MALLOC(dest->online_tsys_applied[i], dest->num_ifs);
+    MALLOC(dest->computed_tsys[i], dest->num_ifs);
+    MALLOC(dest->computed_tsys_applied[i], dest->num_ifs);
+    for (j = 0; j < dest->num_ifs; j++) {
+      STRUCTCOPY(src, dest, xyphase[i][j]);
+      STRUCTCOPY(src, dest, xyamp[i][j]);
+      MALLOC(dest->online_tsys[i][j], dest->num_pols);
+      MALLOC(dest->online_tsys_applied[i][j], dest->num_pols);
+      MALLOC(dest->computed_tsys[i][j], dest->num_pols);
+      MALLOC(dest->computed_tsys_applied[i][j], dest->num_pols);
+      for (k = 0; k < dest->num_pols; k++) {
+	STRUCTCOPY(src, dest, online_tsys[i][j][k]);
+	STRUCTCOPY(src, dest, online_tsys_applied[i][j][k]);
+	STRUCTCOPY(src, dest, computed_tsys[i][j][k]);
+	STRUCTCOPY(src, dest, computed_tsys_applied[i][j][k]);
+      }
+    }
+  }
+}
+
+/**
+ * Free a syscal_data structure.
+ */
+void free_syscal_data(struct syscal_data *syscal_data) {
+  int i, j;
+  FREE(syscal_data->if_num);
+  FREE(syscal_data->ant_num);
+  FREE(syscal_data->pol);
+  FREE(syscal_data->parangle);
+  FREE(syscal_data->tracking_error_max);
+  FREE(syscal_data->tracking_error_rms);
+  FREE(syscal_data->flagging);
+  for (i = 0; i < syscal_data->num_ants; i++) {
+    FREE(syscal_data->xyphase[i]);
+    FREE(syscal_data->xyamp[i]);
+  }
+  FREE(syscal_data->xyphase);
+  FREE(syscal_data->xyamp);
+  for (i = 0; i < syscal_data->num_ants; i++) {
+    for (j = 0; j < syscal_data->num_ifs; j++) {
+      FREE(syscal_data->online_tsys[i][j]);
+      FREE(syscal_data->online_tsys_applied[i][j]);
+      FREE(syscal_data->computed_tsys[i][j]);
+      FREE(syscal_data->computed_tsys_applied[i][j]);
+    }
+    FREE(syscal_data->online_tsys[i]);
+    FREE(syscal_data->online_tsys_applied[i]);
+    FREE(syscal_data->computed_tsys[i]);
+    FREE(syscal_data->computed_tsys_applied[i]);
+  }
+  FREE(syscal_data->online_tsys);
+  FREE(syscal_data->online_tsys_applied);
+  FREE(syscal_data->computed_tsys);
+  FREE(syscal_data->computed_tsys_applied);
+}
+
+/**
  * Routine that computes the "default" tv channel range given
  * the number of channels present in an IF, the channel width,
  * and the centre frequency in MHz.
@@ -370,7 +486,8 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
                  int pol, int ifnum,
                  struct ampphase_options *options) {
   int ap_created = 0, reqpol = -1, i = 0, polnum = -1, bl = -1, bidx = -1;
-  int j = 0, jflag = 0, vidx = -1, cidx = -1, ifno;
+  int j = 0, jflag = 0, vidx = -1, cidx = -1, ifno, syscal_if_idx = -1;
+  int syscal_pol_idx = -1;
   float rcheck = 0, chanwidth, firstfreq, nhalfchan;
   struct ampphase_options default_options;
 
@@ -423,6 +540,88 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
   strncpy((*ampphase)->obsdate, scan_header_data->obsdate, OBSDATE_LENGTH);
   (*ampphase)->ut_seconds = cycle_data->ut_seconds;
   strncpy((*ampphase)->scantype, scan_header_data->obstype, OBSTYPE_LENGTH);
+
+  // Deal with the syscal_data structure if necessary. We only copy over the
+  // information for the selected pol and IF, and we don't copy the Tsys unless
+  // we've been given XX or YY as the requested pol.
+  MALLOC((*ampphase)->syscal_data, 1);
+  strncpy((*ampphase)->syscal_data->obsdate, (*ampphase)->obsdate, OBSDATE_LENGTH);
+  (*ampphase)->syscal_data->utseconds = (*ampphase)->ut_seconds;
+  // Locate this IF number in the data.
+  for (i = 0; i < cycle_data->num_cal_ifs; i++) {
+    if (cycle_data->cal_ifs[i] == ifnum) {
+      syscal_if_idx = i;
+      break;
+    }
+  }
+  if (syscal_if_idx >= 0) {
+    (*ampphase)->syscal_data->num_ifs = 1;
+    MALLOC((*ampphase)->syscal_data->if_num, 1);
+    (*ampphase)->syscal_data->if_num[0] = ifnum;
+  } else {
+    (*ampphase)->syscal_data->num_ifs = 0;
+    (*ampphase)->syscal_data->if_num = NULL;
+  }
+  // Check for a usable pol.
+  if ((polarisation_number(scan_header_data->if_stokes_names[ifno][reqpol]) == POL_XX) ||
+      (polarisation_number(scan_header_data->if_stokes_names[ifno][reqpol]) == POL_YY)) {
+    (*ampphase)->syscal_data->num_pols = 1;
+    MALLOC((*ampphase)->syscal_data->pol, 1);
+    (*ampphase)->syscal_data->pol[0] = pol;
+    if (pol == POL_XX) {
+      syscal_pol_idx = CAL_XX;
+    } else if (pol == POL_YY) {
+      syscal_pol_idx = CAL_YY;
+    }
+  } else {
+    (*ampphase)->syscal_data->num_pols = 0;
+    (*ampphase)->syscal_data->pol = NULL;
+  }
+  // Allocate all the antennas in the original table.
+  (*ampphase)->syscal_data->num_ants = cycle_data->num_cal_ants;
+  MALLOC((*ampphase)->syscal_data->ant_num, (*ampphase)->syscal_data->num_ants);
+  MALLOC((*ampphase)->syscal_data->parangle, (*ampphase)->syscal_data->num_ants);
+  MALLOC((*ampphase)->syscal_data->tracking_error_max,
+	 (*ampphase)->syscal_data->num_ants);
+  MALLOC((*ampphase)->syscal_data->tracking_error_rms,
+	 (*ampphase)->syscal_data->num_ants);
+  MALLOC((*ampphase)->syscal_data->flagging,
+	 (*ampphase)->syscal_data->num_ants);
+  for (i = 0; i < (*ampphase)->syscal_data->num_ants; i++) {
+    // Copy the antenna-based parameters now. These should have been stored
+    // identically for all IFs in the SYSCAL table so we just take it from the
+    // first IF.
+    (*ampphase)->syscal_data->ant_num[i] = cycle_data->cal_ants[i];
+    (*ampphase)->syscal_data->parangle[i] = cycle_data->parangle[0][i];
+    (*ampphase)->syscal_data->tracking_error_max[i] = cycle_data->tracking_error_max[0][i];
+    (*ampphase)->syscal_data->tracking_error_rms[i] = cycle_data->tracking_error_rms[0][i];
+    (*ampphase)->syscal_data->flagging[i] = cycle_data->flagging[0][i];
+  }
+  if (syscal_if_idx >= 0) {
+    MALLOC((*ampphase)->syscal_data->xyphase,
+	   (*ampphase)->syscal_data->num_ants);
+    MALLOC((*ampphase)->syscal_data->xyamp,
+	   (*ampphase)->syscal_data->num_ants);
+    for (i = 0; i < (*ampphase)->syscal_data->num_ants; i++) {
+      MALLOC((*ampphase)->syscal_data->xyphase[i], 1);
+      (*ampphase)->syscal_data->xyphase[i][0] =
+	cycle_data->xyphase[syscal_if_idx][i];
+      MALLOC((*ampphase)->syscal_data->xyamp[i], 1);
+      (*ampphase)->syscal_data->xyamp[i][0] =
+	cycle_data->xyamp[syscal_if_idx][i];
+    }
+    if (syscal_pol_idx >= 0) {
+      MALLOC((*ampphase)->syscal_data->online_tsys,
+	     (*ampphase)->syscal_data->num_ants);
+      for (i = 0; i < (*ampphase)->syscal_data->num_ants; i++) {
+	MALLOC((*ampphase)->syscal_data->online_tsys[i], 1);
+	MALLOC((*ampphase)->syscal_data->online_tsys[i][0], 1);
+	(*ampphase)->syscal_data->online_tsys[i][0][0] =
+	  cycle_data->tsys[syscal_if_idx][i][syscal_pol_idx];
+      }
+    }
+  }
+  
   
   // Allocate the necessary arrays.
   MALLOC((*ampphase)->channel, (*ampphase)->nchannels);
@@ -613,6 +812,22 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
     
   }
 
+  // Fill the metinfo structure.
+  strncpy((*ampphase)->metinfo.obsdate, (*ampphase)->obsdate, OBSDATE_LENGTH);
+  (*ampphase)->metinfo.ut_seconds = (*ampphase)->ut_seconds;
+  (*ampphase)->metinfo.temperature = cycle_data->temperature;
+  (*ampphase)->metinfo.air_pressure = cycle_data->air_pressure;
+  (*ampphase)->metinfo.humidity = cycle_data->humidity;
+  (*ampphase)->metinfo.wind_speed = cycle_data->wind_speed;
+  (*ampphase)->metinfo.wind_direction = cycle_data->wind_direction;
+  (*ampphase)->metinfo.rain_gauge = cycle_data->rain_gauge;
+  (*ampphase)->metinfo.weather_valid = (cycle_data->weather_valid == SYSCAL_VALID);
+  (*ampphase)->metinfo.seemon_phase = cycle_data->seemon_phase;
+  (*ampphase)->metinfo.seemon_rms = cycle_data->seemon_rms;
+  (*ampphase)->metinfo.seemon_valid = (cycle_data->seemon_valid == SYSCAL_VALID);
+
+  
+  
   return 0;
 }
 

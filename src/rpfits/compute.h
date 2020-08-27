@@ -67,6 +67,64 @@ struct ampphase_options {
 };
 
 /**
+ * Structure to hold meteorological information.
+ */
+struct metinfo {
+  // Labelling.
+  char obsdate[OBSDATE_LENGTH];
+  float ut_seconds;
+
+  // Quantities from the weather station.
+  float temperature;
+  float air_pressure;
+  float humidity;
+  float wind_speed;
+  float wind_direction;
+  float rain_gauge;
+  bool weather_valid;
+
+  // Quantities from the seeing monitor.
+  float seemon_phase;
+  float seemon_rms;
+  bool seemon_valid;
+};
+
+/**
+ * Structure to hold system calibration data.
+ */
+struct syscal_data {
+  // Labelling.
+  char obsdate[OBSDATE_LENGTH];
+  float utseconds;
+
+  // Array sizes.
+  int num_ifs;
+  int num_ants;
+  int num_pols;
+
+  // Array descriptors.
+  int *if_num;
+  int *ant_num;
+  int *pol;
+
+  // Parameters that only depend on antenna.
+  float *parangle;
+  float *tracking_error_max;
+  float *tracking_error_rms;
+  int *flagging;
+
+  // Parameters that vary for each antenna and IF.
+  float **xyphase;
+  float **xyamp;
+
+  // The system temperatures (varies by antenna, IF and pol).
+  float ***online_tsys;
+  int ***online_tsys_applied;
+  float ***computed_tsys;
+  int ***computed_tsys_applied;
+};
+
+/**
  * Structure to hold amplitude and phase quantities.
  */
 struct ampphase {
@@ -125,6 +183,8 @@ struct ampphase {
   float *min_phase;
   float *max_phase;
   struct ampphase_options *options;
+  struct metinfo metinfo;
+  struct syscal_data *syscal_data;
 };
 
 /**
@@ -174,6 +234,11 @@ void set_default_ampphase_options(struct ampphase_options *options);
 void copy_ampphase_options(struct ampphase_options *dest,
                            struct ampphase_options *src);
 void free_ampphase_options(struct ampphase_options *options);
+void copy_metinfo_data(struct metinfo *dest,
+		       struct metinfo *src);
+void copy_syscal_data(struct syscal_data *dest,
+		      struct syscal_data *src);
+void free_syscal_data(struct syscal_data *syscal_data);
 void default_tvchannels(int num_chan, float chan_width,
                         float centre_freq, int *min_tvchannel,
                         int *max_tvchannel);

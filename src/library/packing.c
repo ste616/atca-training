@@ -325,6 +325,8 @@ void pack_ampphase(cmp_ctx_t *cmp, struct ampphase *a) {
   pack_writearray_float(cmp, a->nbaselines, a->max_phase);
 
   pack_ampphase_options(cmp, a->options);
+  pack_metinfo(cmp, &(a->metinfo));
+  pack_syscal_data(cmp, a->syscal_data);
 }
 
 void unpack_ampphase(cmp_ctx_t *cmp, struct ampphase *a) {
@@ -437,7 +439,9 @@ void unpack_ampphase(cmp_ctx_t *cmp, struct ampphase *a) {
 
   MALLOC(a->options, 1);
   unpack_ampphase_options(cmp, a->options);
-  
+  unpack_metinfo(cmp, &(a->metinfo));
+  MALLOC(a->syscal_data, 1);
+  unpack_syscal_data(cmp, a->syscal_data);
 }
 
 void pack_spectrum_data(cmp_ctx_t *cmp, struct spectrum_data *a) {
@@ -849,6 +853,149 @@ void unpack_responses(cmp_ctx_t *cmp, struct responses *a) {
   // The ID of the client that requested the new data, or
   // all 0s if it's just new data.
   pack_read_string(cmp, a->client_id, CLIENTIDLENGTH);
+}
+
+void pack_metinfo(cmp_ctx_t *cmp, struct metinfo *a) {
+  // Labelling.
+  pack_write_string(cmp, a->obsdate, OBSDATE_LENGTH);
+  pack_write_float(cmp, a->ut_seconds);
+
+  // Quantities from the weather station.
+  pack_write_float(cmp, a->temperature);
+  pack_write_float(cmp, a->air_pressure);
+  pack_write_float(cmp, a->humidity);
+  pack_write_float(cmp, a->wind_speed);
+  pack_write_float(cmp, a->wind_direction);
+  pack_write_float(cmp, a->rain_gauge);
+  pack_write_bool(cmp, a->weather_valid);
+
+  // Quantities from the seeing monitor.
+  pack_write_float(cmp, a->seemon_phase);
+  pack_write_float(cmp, a->seemon_rms);
+  pack_write_bool(cmp, a->seemon_valid);
+}
+
+void unpack_metinfo(cmp_ctx_t *cmp, struct metinfo *a) {
+  // Labelling.
+  pack_read_string(cmp, a->obsdate, OBSDATE_LENGTH);
+  pack_read_float(cmp, &(a->ut_seconds));
+
+  // Quantities from the weather station.
+  pack_read_float(cmp, &(a->temperature));
+  pack_read_float(cmp, &(a->air_pressure));
+  pack_read_float(cmp, &(a->humidity));
+  pack_read_float(cmp, &(a->wind_speed));
+  pack_read_float(cmp, &(a->wind_direction));
+  pack_read_float(cmp, &(a->rain_gauge));
+  pack_read_bool(cmp, &(a->weather_valid));
+
+  // Quantities from the seeing monitor.
+  pack_read_float(cmp, &(a->seemon_phase));
+  pack_read_float(cmp, &(a->seemon_rms));
+  pack_read_bool(cmp, &(a->seemon_valid));
+}
+
+void pack_syscal_data(cmp_ctx_t *cmp, struct syscal_data *a) {
+  int i, j;
+  
+  // Labelling.
+  pack_write_string(cmp, a->obsdate, OBSDATE_LENGTH);
+  pack_write_float(cmp, a->utseconds);
+
+  // Array sizes.
+  pack_write_sint(cmp, a->num_ifs);
+  pack_write_sint(cmp, a->num_ants);
+  pack_write_sint(cmp, a->num_pols);
+
+  // Array descriptors.
+  pack_writearray_sint(cmp, a->num_ifs, a->if_num);
+  pack_writearray_sint(cmp, a->num_ants, a->ant_num);
+  pack_writearray_sint(cmp, a->num_pols, a->pol);
+
+  // Parameters that only depend on antenna.
+  pack_writearray_float(cmp, a->num_ants, a->parangle);
+  pack_writearray_float(cmp, a->num_ants, a->tracking_error_max);
+  pack_writearray_float(cmp, a->num_ants, a->tracking_error_rms);
+  pack_writearray_sint(cmp, a->num_ants, a->flagging);
+
+  // Parameters that vary for each antenna and IF.
+  for (i = 0; i < a->num_ants; i++) {
+    pack_writearray_float(cmp, a->num_ifs, a->xyphase[i]);
+    pack_writearray_float(cmp, a->num_ifs, a->xyamp[i]);
+  }
+
+  // The system temperatures (varies by antenna, IF and pol).
+  for (i = 0; i < a ->num_ants; i++) {
+    for (j = 0; j < a->num_ifs; j++) {
+      pack_writearray_float(cmp, a->num_pols, a->online_tsys[i][j]);
+      pack_writearray_sint(cmp, a->num_pols, a->online_tsys_applied[i][j]);
+      pack_writearray_float(cmp, a->num_pols, a->computed_tsys[i][j]);
+      pack_writearray_sint(cmp, a->num_pols, a->computed_tsys_applied[i][j]);
+    }
+  }
+}
+
+void unpack_syscal_data(cmp_ctx_t *cmp, struct syscal_data *a) {
+  int i, j;
+
+  // Labelling.
+  pack_read_string(cmp, a->obsdate, OBSDATE_LENGTH);
+  pack_read_float(cmp, &(a->utseconds));
+
+  // Array sizes.
+  pack_read_sint(cmp, &(a->num_ifs));
+  pack_read_sint(cmp, &(a->num_ants));
+  pack_read_sint(cmp, &(a->num_pols));
+
+  // Array descriptors.
+  MALLOC(a->if_num, a->num_ifs);
+  pack_readarray_sint(cmp, a->num_ifs, a->if_num);
+  MALLOC(a->ant_num, a->num_ants);
+  pack_readarray_sint(cmp, a->num_ants, a->ant_num);
+  MALLOC(a->pol, a->num_pols);
+  pack_readarray_sint(cmp, a->num_pols, a->pol);
+
+  // Parameters that only depend on antenna.
+  MALLOC(a->parangle, a->num_ants);
+  pack_readarray_float(cmp, a->num_ants, a->parangle);
+  MALLOC(a->tracking_error_max, a->num_ants);
+  pack_readarray_float(cmp, a->num_ants, a->tracking_error_max);
+  MALLOC(a->tracking_error_rms, a->num_ants);
+  pack_readarray_float(cmp, a->num_ants, a->tracking_error_rms);
+  MALLOC(a->flagging, a->num_ants);
+  pack_readarray_sint(cmp, a->num_ants, a->flagging);
+
+  // Parameters that vary for each antenna and IF.
+  MALLOC(a->xyphase, a->num_ants);
+  MALLOC(a->xyamp, a->num_ants);
+  for (i = 0; i < a->num_ants; i++) {
+    MALLOC(a->xyphase[i], a->num_ifs);
+    pack_readarray_float(cmp, a->num_ifs, a->xyphase[i]);
+    MALLOC(a->xyamp[i], a->num_ifs);
+    pack_readarray_float(cmp, a->num_ifs, a->xyamp[i]);
+  }
+
+  // The system temperatures (varies by antenna, IF and pol).
+  MALLOC(a->online_tsys, a->num_ants);
+  MALLOC(a->online_tsys_applied, a->num_ants);
+  MALLOC(a->computed_tsys, a->num_ants);
+  MALLOC(a->computed_tsys_applied, a->num_ants);
+  for (i = 0; i < a->num_ants; i++) {
+    MALLOC(a->online_tsys[i], a->num_ifs);
+    MALLOC(a->online_tsys_applied[i], a->num_ifs);
+    MALLOC(a->computed_tsys[i], a->num_ifs);
+    MALLOC(a->computed_tsys_applied[i], a->num_ifs);
+    for (j = 0; j < a->num_ifs; j++) {
+      MALLOC(a->online_tsys[i][j], a->num_pols);
+      pack_readarray_float(cmp, a->num_pols, a->online_tsys[i][j]);
+      MALLOC(a->online_tsys_applied[i][j], a->num_pols);
+      pack_readarray_sint(cmp, a->num_pols, a->online_tsys_applied[i][j]);
+      MALLOC(a->computed_tsys[i][j], a->num_pols);
+      pack_readarray_float(cmp, a->num_pols, a->computed_tsys[i][j]);
+      MALLOC(a->computed_tsys_applied[i][j], a->num_pols);
+      pack_readarray_sint(cmp, a->num_pols, a->computed_tsys_applied[i][j]);
+    }
+  }
 }
 
 void init_cmp_memory_buffer(cmp_ctx_t *cmp, cmp_mem_access_t *mem, void *buffer,

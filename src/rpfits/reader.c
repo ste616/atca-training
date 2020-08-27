@@ -589,6 +589,7 @@ int read_cycle_data(struct scan_header_data *scan_header_data,
 	MALLOC(cycle_data->tracking_error_rms[sif], cycle_data->num_cal_ants);
 	MALLOC(cycle_data->flagging[sif], cycle_data->num_cal_ants);
         for (i = 0; i < cycle_data->num_cal_ants; i++) {
+	  cycle_data->cal_ants[i] = SYSCAL_ANT(i, 0);
           MALLOC(cycle_data->tsys[sif][i], 2);
           MALLOC(cycle_data->tsys_applied[sif][i], 2);
           cycle_data->tsys[sif][i][CAL_XX] = SYSCAL_TSYS_X(i, 0);
