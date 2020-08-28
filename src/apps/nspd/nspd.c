@@ -285,8 +285,10 @@ static void interpret_command(char *line) {
       change_spd_plotcontrols(&spd_plotcontrols, &xaxis_type, NULL, NULL);
       action_required = ACTION_REFRESH_PLOT;
     } else if ((minmatch("phase", line_els[0], 1)) ||
-               (minmatch("amplitude", line_els[0], 1))) {
-      // We've been asked to show phase or amplitude.
+               (minmatch("amplitude", line_els[0], 1)) ||
+               (minmatch("real", line_els[0], 1)) ||
+               (minmatch("imaginary", line_els[0], 1))) {
+      // We've been asked to show phase, amplitude, real or imaginary.
       // Have we been given y-range limits?
       if (nels == 3) {
         // Try to interpret the limits.
@@ -319,6 +321,12 @@ static void interpret_command(char *line) {
         yaxis_change_type = yaxis_type;
       } else if (minmatch("amplitude", line_els[0], 1)) {
         yaxis_type = PLOT_AMPLITUDE;
+        yaxis_change_type = yaxis_type | yaxis_scaling;
+      } else if (minmatch("real", line_els[0], 1)) {
+        yaxis_type = PLOT_REAL;
+        yaxis_change_type = yaxis_type | yaxis_scaling;
+      } else if (minmatch("imaginary", line_els[0], 1)) {
+        yaxis_type = PLOT_IMAG;
         yaxis_change_type = yaxis_type | yaxis_scaling;
       }
       change_spd_plotcontrols(&spd_plotcontrols, NULL, &yaxis_change_type, NULL);
@@ -420,29 +428,29 @@ static void interpret_command(char *line) {
     } else if (minmatch("get", line_els[0], 3)) {
       // Get something.
       if (minmatch("time", line_els[1], 3)) {
-	// The user wants to request a time in the format [yyyy-mm-dd] HH:MM:SS.
-	if (nels == 4) {
-	  // Both date and time are given.
-	  mjdr_base = date2mjd(line_els[2], 0);
-	  if (mjdr_base == 0) {
-	    // The date wasn't specified correctly.
-	    fprintf(stderr, " DATE SPECIFIED INCORRECTLY, MUST BE YYYY-MM-DD\n");
-	    return;
-	  }
-	} else if (nels == 3) {
-	  // Just the time is given. So we reference it to the date of the
-	  // first scan.
-	  mjdr_base = mjd_base;
-	}
-	// Scan the time now.
-	mjdr_timeparsed = string_to_seconds(line_els[nels - 1], &mjdr_seconds);
-	if (mjdr_timeparsed == false) {
-	  fprintf(stderr, " TIME SPECIFIED INCORRECTLY, MUST BE HH:MM[:SS]\n");
-	  return;
-	}
-	mjd_request = mjdr_base + (double)mjdr_seconds / 86400.0;
-	action_required |= ACTION_TIME_REQUEST;
-	/* fprintf(stderr, " PARSED REQUESTED TIME AS %.8f\n", mjd_request); */
+        // The user wants to request a time in the format [yyyy-mm-dd] HH:MM:SS.
+        if (nels == 4) {
+          // Both date and time are given.
+          mjdr_base = date2mjd(line_els[2], 0);
+          if (mjdr_base == 0) {
+            // The date wasn't specified correctly.
+            fprintf(stderr, " DATE SPECIFIED INCORRECTLY, MUST BE YYYY-MM-DD\n");
+            return;
+          }
+        } else if (nels == 3) {
+          // Just the time is given. So we reference it to the date of the
+          // first scan.
+          mjdr_base = mjd_base;
+        }
+        // Scan the time now.
+        mjdr_timeparsed = string_to_seconds(line_els[nels - 1], &mjdr_seconds);
+        if (mjdr_timeparsed == false) {
+          fprintf(stderr, " TIME SPECIFIED INCORRECTLY, MUST BE HH:MM[:SS]\n");
+          return;
+        }
+        mjd_request = mjdr_base + (double)mjdr_seconds / 86400.0;
+        action_required |= ACTION_TIME_REQUEST;
+        /* fprintf(stderr, " PARSED REQUESTED TIME AS %.8f\n", mjd_request); */
       }
     }
     FREE(line_els);
@@ -605,11 +613,11 @@ int main(int argc, char *argv[]) {
       action_required |= ACTION_CHANGE_PLOTSURFACE;
       // Work out the MJD.
       if (spectrum_data.header_data != NULL) {
-	cmjd = date2mjd(spectrum_data.header_data->obsdate,
-			spectrum_data.spectrum[0][0]->ut_seconds);
-	nmesg = 1;
-	snprintf(mesgout[0], SPDBUFSIZE, " Data has MJD %.8f\n", cmjd);
-	readline_print_messages(nmesg, mesgout);
+        cmjd = date2mjd(spectrum_data.header_data->obsdate,
+                        spectrum_data.spectrum[0][0]->ut_seconds);
+        nmesg = 1;
+        snprintf(mesgout[0], SPDBUFSIZE, " Data has MJD %.8f\n", cmjd);
+        readline_print_messages(nmesg, mesgout);
       }
     }
     
@@ -636,105 +644,105 @@ int main(int argc, char *argv[]) {
     }
 
     if ((action_required & ACTION_CYCLE_FORWARD) ||
-	(action_required & ACTION_CYCLE_BACKWARD) ||
-	(action_required & ACTION_TIME_REQUEST)) {
+        (action_required & ACTION_CYCLE_BACKWARD) ||
+        (action_required & ACTION_TIME_REQUEST)) {
       // Ask for different data.
       if ((action_required & ACTION_CYCLE_FORWARD) ||
-	  (action_required & ACTION_CYCLE_BACKWARD)) {
-	// First, work out which cycle we're currently looking at.
-	for (i = 0, action_proceed = false; i < n_cycles; i++) {
-	  if ((cmjd >= (all_cycle_mjd[i] - mjd_cycletime / 2.0)) &&
-	      (cmjd < (all_cycle_mjd[i] + mjd_cycletime / 2.0))) {
-	    // Now select the MJD from the appropriate cycle.
-	    if ((action_required & ACTION_CYCLE_FORWARD) &&
-		(i < (n_cycles -1))) {
-	      mjd_request = all_cycle_mjd[i + 1];
-	      action_proceed = true;
-	      break;
-	    } else if ((action_required & ACTION_CYCLE_BACKWARD) &&
-		       (i > 0)) {
-	      mjd_request = all_cycle_mjd[i - 1];
-	      action_proceed = true;
-	      break;
-	    }
-	  }
-	}
-	// Don't do it again, no matter what.
-	if (action_required & ACTION_CYCLE_FORWARD) {
-	  action_required -= ACTION_CYCLE_FORWARD;
-	} else if (action_required & ACTION_CYCLE_BACKWARD) {
-	  action_required -= ACTION_CYCLE_BACKWARD;
-	}
+          (action_required & ACTION_CYCLE_BACKWARD)) {
+        // First, work out which cycle we're currently looking at.
+        for (i = 0, action_proceed = false; i < n_cycles; i++) {
+          if ((cmjd >= (all_cycle_mjd[i] - mjd_cycletime / 2.0)) &&
+              (cmjd < (all_cycle_mjd[i] + mjd_cycletime / 2.0))) {
+            // Now select the MJD from the appropriate cycle.
+            if ((action_required & ACTION_CYCLE_FORWARD) &&
+                (i < (n_cycles -1))) {
+              mjd_request = all_cycle_mjd[i + 1];
+              action_proceed = true;
+              break;
+            } else if ((action_required & ACTION_CYCLE_BACKWARD) &&
+                       (i > 0)) {
+              mjd_request = all_cycle_mjd[i - 1];
+              action_proceed = true;
+              break;
+            }
+          }
+        }
+        // Don't do it again, no matter what.
+        if (action_required & ACTION_CYCLE_FORWARD) {
+          action_required -= ACTION_CYCLE_FORWARD;
+        } else if (action_required & ACTION_CYCLE_BACKWARD) {
+          action_required -= ACTION_CYCLE_BACKWARD;
+        }
       } else if (action_required & ACTION_TIME_REQUEST) {
-	// Check that it isn't outside the range.
-	nmesg = 0;
-	action_proceed = false;
-	if (mjd_request < (earliest_mjd - 2 * mjd_cycletime)) {
-	  snprintf(mesgout[nmesg++], SPDBUFSIZE, " REQUESTED MJD %.8f IS TOO EARLY\n",
-		   mjd_request);
-	} else if (mjd_request > (latest_mjd + 2 * mjd_cycletime)) {
-	  snprintf(mesgout[nmesg++], SPDBUFSIZE, " REQUESTED MJD %.8f IS TOO LATE\n",
-		   mjd_request);
-	} else {
-	  // Try to find the nearest cycle.
-	  min_dmjd = fabs(mjd_request - all_cycle_mjd[0]);
-	  min_dmjd_idx = 0;
-	  for (i = 1; i < n_cycles; i++) {
-	    dmjd = fabs(mjd_request - all_cycle_mjd[i]);
-	    if (dmjd < min_dmjd) {
-	      min_dmjd = dmjd;
-	      min_dmjd_idx = i;
-	    }
-	  }
-	  if (min_dmjd < (2 * mjd_cycletime)) {
-	    action_proceed = true;
-	    mjd_request = all_cycle_mjd[min_dmjd_idx];
-	  }
-	}
-	action_required -= ACTION_TIME_REQUEST;
-	if (nmesg > 0) {
-	  readline_print_messages(nmesg, mesgout);
-	}
+        // Check that it isn't outside the range.
+        nmesg = 0;
+        action_proceed = false;
+        if (mjd_request < (earliest_mjd - 2 * mjd_cycletime)) {
+          snprintf(mesgout[nmesg++], SPDBUFSIZE, " REQUESTED MJD %.8f IS TOO EARLY\n",
+                   mjd_request);
+        } else if (mjd_request > (latest_mjd + 2 * mjd_cycletime)) {
+          snprintf(mesgout[nmesg++], SPDBUFSIZE, " REQUESTED MJD %.8f IS TOO LATE\n",
+                   mjd_request);
+        } else {
+          // Try to find the nearest cycle.
+          min_dmjd = fabs(mjd_request - all_cycle_mjd[0]);
+          min_dmjd_idx = 0;
+          for (i = 1; i < n_cycles; i++) {
+            dmjd = fabs(mjd_request - all_cycle_mjd[i]);
+            if (dmjd < min_dmjd) {
+              min_dmjd = dmjd;
+              min_dmjd_idx = i;
+            }
+          }
+          if (min_dmjd < (2 * mjd_cycletime)) {
+            action_proceed = true;
+            mjd_request = all_cycle_mjd[min_dmjd_idx];
+          }
+        }
+        action_required -= ACTION_TIME_REQUEST;
+        if (nmesg > 0) {
+          readline_print_messages(nmesg, mesgout);
+        }
       }
       if (action_proceed) {
-	// We could check this against the known range here, but for now
-	// let's just request the data (the server also has range checking).
-	server_request.request_type = REQUEST_SPECTRUM_MJD;
-	init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)SPDBUFSIZE);
-	pack_requests(&cmp, &server_request);
-	nmesg = 1;
-	snprintf(mesgout[0], SPDBUFSIZE, " Requesting data at MJD %.8f\n", mjd_request);
-	readline_print_messages(nmesg, mesgout);
-	pack_write_double(&cmp, mjd_request);
-	// We have to send along the ampphase options as well.
-	pack_ampphase_options(&cmp, &ampphase_options);
-	socket_send_buffer(socket_peer, send_buffer, cmp_mem_access_get_pos(&mem));
+        // We could check this against the known range here, but for now
+        // let's just request the data (the server also has range checking).
+        server_request.request_type = REQUEST_SPECTRUM_MJD;
+        init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)SPDBUFSIZE);
+        pack_requests(&cmp, &server_request);
+        nmesg = 1;
+        snprintf(mesgout[0], SPDBUFSIZE, " Requesting data at MJD %.8f\n", mjd_request);
+        readline_print_messages(nmesg, mesgout);
+        pack_write_double(&cmp, mjd_request);
+        // We have to send along the ampphase options as well.
+        pack_ampphase_options(&cmp, &ampphase_options);
+        socket_send_buffer(socket_peer, send_buffer, cmp_mem_access_get_pos(&mem));
       }
     }
-
+    
     if (action_required & ACTION_LIST_CYCLES) {
       // List all the cycles we've been told about by the server.
       for (i = 0, nmesg = 0, nlistlines = 2; i < n_cycles; i++) {
-	if ((i > 0) && (nlistlines == -1) &&
-	    ((all_cycle_mjd[i] - all_cycle_mjd[i - 1]) > (2 * mjd_cycletime))) {
-	  // We go back and print out the last two cycles and then the first
-	  // two new cycles.
-	  i -= 2;
-	  nlistlines = 4;
-	} else if ((i == (n_cycles - 2)) && (nlistlines == -1)) {
-	  // Print out the last two cycles.
-	  nlistlines = 2;
-	}
-	if (nlistlines > 0) {
-	  mjd2cal(all_cycle_mjd[i], &mjd_year, &mjd_month, &mjd_day, &mjd_utseconds);
-	  seconds_to_hourlabel((mjd_utseconds * 86400), tstring);
-	  snprintf(mesgout[nmesg++], SPDBUFSIZE, " CYCLE %d: %4d-%02d-%02d %s\n",
-		   (i + 1), mjd_year, mjd_month, mjd_day, tstring);
-	  nlistlines--;
-	} else if (nlistlines == 0) {
-	  snprintf(mesgout[nmesg++], SPDBUFSIZE, " ....\n");
-	  nlistlines--;
-	}
+        if ((i > 0) && (nlistlines == -1) &&
+            ((all_cycle_mjd[i] - all_cycle_mjd[i - 1]) > (2 * mjd_cycletime))) {
+          // We go back and print out the last two cycles and then the first
+          // two new cycles.
+          i -= 2;
+          nlistlines = 4;
+        } else if ((i == (n_cycles - 2)) && (nlistlines == -1)) {
+          // Print out the last two cycles.
+          nlistlines = 2;
+        }
+        if (nlistlines > 0) {
+          mjd2cal(all_cycle_mjd[i], &mjd_year, &mjd_month, &mjd_day, &mjd_utseconds);
+          seconds_to_hourlabel((mjd_utseconds * 86400), tstring);
+          snprintf(mesgout[nmesg++], SPDBUFSIZE, " CYCLE %d: %4d-%02d-%02d %s\n",
+                   (i + 1), mjd_year, mjd_month, mjd_day, tstring);
+          nlistlines--;
+        } else if (nlistlines == 0) {
+          snprintf(mesgout[nmesg++], SPDBUFSIZE, " ....\n");
+          nlistlines--;
+        }
       }
       readline_print_messages(nmesg, mesgout);
       
@@ -744,7 +752,7 @@ int main(int argc, char *argv[]) {
     if (action_required & ACTION_QUIT) {
       break;
     }
-
+    
     // Have a look at our inputs.
     r = select((max_socket + 1), &reads, NULL, NULL, NULL);
     if ((r < 0) && (errno != EINTR)) {
@@ -785,60 +793,60 @@ int main(int argc, char *argv[]) {
       }
       // Check we're getting what we expect.
       if ((server_response.response_type == RESPONSE_CURRENT_SPECTRUM) ||
-	  (server_response.response_type == RESPONSE_LOADED_SPECTRUM)) {
+          (server_response.response_type == RESPONSE_LOADED_SPECTRUM)) {
         unpack_spectrum_data(&cmp, &spectrum_data);
         // Refresh the plot next time through.
         action_required = ACTION_NEW_DATA_RECEIVED;
       } else if (server_response.response_type == RESPONSE_SERVERTYPE) {
-	// We're being told what type of server we've connected to.
-	pack_read_sint(&cmp, &server_type);
-	nmesg = 1;
-	snprintf(mesgout[0], SPDBUFSIZE, "Connected to %s server.\n",
-		 get_servertype_string(server_type));
-	readline_print_messages(nmesg, mesgout);
-	if (server_type == SERVERTYPE_SIMULATOR) {
-	  // Send a request for the time information.
-	  server_request.request_type = REQUEST_TIMERANGE;
-	  init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)SPDBUFSIZE);
-	  pack_requests(&cmp, &server_request);
-	  socket_send_buffer(socket_peer, send_buffer, cmp_mem_access_get_pos(&mem));
-	  server_request.request_type = REQUEST_CYCLE_TIMES;
-	  init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)SPDBUFSIZE);
-	  pack_requests(&cmp, &server_request);
-	  socket_send_buffer(socket_peer, send_buffer, cmp_mem_access_get_pos(&mem));
-	}
+        // We're being told what type of server we've connected to.
+        pack_read_sint(&cmp, &server_type);
+        nmesg = 1;
+        snprintf(mesgout[0], SPDBUFSIZE, "Connected to %s server.\n",
+                 get_servertype_string(server_type));
+        readline_print_messages(nmesg, mesgout);
+        if (server_type == SERVERTYPE_SIMULATOR) {
+          // Send a request for the time information.
+          server_request.request_type = REQUEST_TIMERANGE;
+          init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)SPDBUFSIZE);
+          pack_requests(&cmp, &server_request);
+          socket_send_buffer(socket_peer, send_buffer, cmp_mem_access_get_pos(&mem));
+          server_request.request_type = REQUEST_CYCLE_TIMES;
+          init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)SPDBUFSIZE);
+          pack_requests(&cmp, &server_request);
+          socket_send_buffer(socket_peer, send_buffer, cmp_mem_access_get_pos(&mem));
+        }
       } else if (server_response.response_type == RESPONSE_TIMERANGE) {
-	// Just store these values for later use.
-	pack_read_double(&cmp, &mjd_cycletime);
-	pack_read_double(&cmp, &earliest_mjd);
-	pack_read_double(&cmp, &latest_mjd);
-	nmesg = 3;
-	snprintf(mesgout[0], SPDBUFSIZE, " Server earliest MJD %.8f\n", earliest_mjd);
-	snprintf(mesgout[1], SPDBUFSIZE, " Server   latest MJD %.8f\n", latest_mjd);
-	snprintf(mesgout[2], SPDBUFSIZE, " Data cycle time %.1f sec\n",
-		 (mjd_cycletime * 86400.0));
-	readline_print_messages(nmesg, mesgout);
-	mjd_base = floor(earliest_mjd);
+        // Just store these values for later use.
+        pack_read_double(&cmp, &mjd_cycletime);
+        pack_read_double(&cmp, &earliest_mjd);
+        pack_read_double(&cmp, &latest_mjd);
+        nmesg = 3;
+        snprintf(mesgout[0], SPDBUFSIZE, " Server earliest MJD %.8f\n", earliest_mjd);
+        snprintf(mesgout[1], SPDBUFSIZE, " Server   latest MJD %.8f\n", latest_mjd);
+        snprintf(mesgout[2], SPDBUFSIZE, " Data cycle time %.1f sec\n",
+                 (mjd_cycletime * 86400.0));
+        readline_print_messages(nmesg, mesgout);
+        mjd_base = floor(earliest_mjd);
       } else if (server_response.response_type == RESPONSE_SPECTRUM_OUTSIDERANGE) {
-	// We couldn't get a new spectrum.
-	nmesg = 1;
-	snprintf(mesgout[0], SPDBUFSIZE, " SERVER UNABLE TO SUPPLY SPECTRUM\n");
-	readline_print_messages(nmesg, mesgout);
+        // We couldn't get a new spectrum.
+        nmesg = 1;
+        snprintf(mesgout[0], SPDBUFSIZE, " SERVER UNABLE TO SUPPLY SPECTRUM\n");
+        readline_print_messages(nmesg, mesgout);
       } else if (server_response.response_type == RESPONSE_SPECTRUM_LOADED) {
-	// Our new spectrum is ready, so we request it.
-	server_request.request_type = REQUEST_MJD_SPECTRUM;
-	init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)SPDBUFSIZE);
-	pack_requests(&cmp, &server_request);
-	socket_send_buffer(socket_peer, send_buffer, cmp_mem_access_get_pos(&mem));
+        // Our new spectrum is ready, so we request it.
+        server_request.request_type = REQUEST_MJD_SPECTRUM;
+        init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)SPDBUFSIZE);
+        pack_requests(&cmp, &server_request);
+        socket_send_buffer(socket_peer, send_buffer, cmp_mem_access_get_pos(&mem));
       } else if (server_response.response_type == RESPONSE_CYCLE_TIMES) {
-	// All the cycles the server knows about.
-	pack_read_sint(&cmp, &n_cycles);
-	REALLOC(all_cycle_mjd, n_cycles);
-	pack_readarray_double(&cmp, n_cycles, all_cycle_mjd);
-	nmesg = 1;
-	snprintf(mesgout[0], SPDBUFSIZE, " Received information about %d cycles.\n",
-		 n_cycles);
-	readline_print_messages(nmesg, mesgout);
+        // All the cycles the server knows about.
+        pack_read_sint(&cmp, &n_cycles);
+        REALLOC(all_cycle_mjd, n_cycles);
+        pack_readarray_double(&cmp, n_cycles, all_cycle_mjd);
+        nmesg = 1;
+        snprintf(mesgout[0], SPDBUFSIZE, " Received information about %d cycles.\n",
+                 n_cycles);
+        readline_print_messages(nmesg, mesgout);
       }
       // Free the socket buffer memory.
       FREE(recv_buffer);

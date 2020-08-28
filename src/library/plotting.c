@@ -64,6 +64,12 @@ void change_spd_plotcontrols(struct spd_plotcontrols *plotcontrols,
     if (plotcontrols->plot_options & PLOT_PHASE) {
       plotcontrols->plot_options -= PLOT_PHASE;
     }
+    if (plotcontrols->plot_options & PLOT_REAL) {
+      plotcontrols->plot_options -= PLOT_REAL;
+    }
+    if (plotcontrols->plot_options & PLOT_IMAG) {
+      plotcontrols->plot_options -= PLOT_IMAG;
+    }
     if (plotcontrols->plot_options & PLOT_AMPLITUDE_LINEAR) {
       plotcontrols->plot_options -= PLOT_AMPLITUDE_LINEAR;
     }
@@ -548,6 +554,16 @@ void plotpanel_minmax(struct ampphase **plot_ampphase,
                 plot_ampphase[polidx[i]]->min_phase[plot_baseline_idx]);
       MAXASSIGN(*plotmax_y,
                 plot_ampphase[polidx[i]]->max_phase[plot_baseline_idx]);
+    } else if (plot_controls->plot_options & PLOT_REAL) {
+      MINASSIGN(*plotmin_y,
+                plot_ampphase[polidx[i]]->min_real[plot_baseline_idx]);
+      MAXASSIGN(*plotmax_y,
+                plot_ampphase[polidx[i]]->max_real[plot_baseline_idx]);
+    } else if (plot_controls->plot_options & PLOT_IMAG) {
+      MINASSIGN(*plotmin_y,
+                plot_ampphase[polidx[i]]->min_imag[plot_baseline_idx]);
+      MAXASSIGN(*plotmax_y,
+                plot_ampphase[polidx[i]]->max_imag[plot_baseline_idx]);
     }
   }
   
@@ -1320,6 +1336,18 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
             }
           } else if (plot_controls->plot_options & PLOT_PHASE) {
             snprintf(ptype, BUFSIZE, "PHASE");
+          } else if (plot_controls->plot_options & PLOT_REAL) {
+            if (plot_controls->plot_options & PLOT_AMPLITUDE_LOG) {
+              snprintf(ptype, BUFSIZE, "LOG(dB) REAL");
+            } else {
+              snprintf(ptype, BUFSIZE, "REAL");
+            }
+          } else if (plot_controls->plot_options & PLOT_IMAG) {
+            if (plot_controls->plot_options & PLOT_AMPLITUDE_LOG) {
+              snprintf(ptype, BUFSIZE, "LOG(dB) IMAG");
+            } else {
+              snprintf(ptype, BUFSIZE, "IMAG");
+            }
           }
           if (ampphase_if[0]->window_name[0] == 'f') {
             snprintf(ftype, BUFSIZE, "FQ:%s", ampphase_if[0]->window_name + 1);
@@ -1413,9 +1441,13 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
                       plot_yvalues[ri] = 
                         ampphase_if[polidx[rp]]->f_amplitude[i][bi][rj];
                     }
-                  } else {
+                  } else if (plot_controls->plot_options & PLOT_PHASE) {
                     plot_yvalues[ri] =
                       ampphase_if[polidx[rp]]->f_phase[i][bi][rj];
+                  } else if (plot_controls->plot_options & PLOT_REAL) {
+                    plot_yvalues[ri] = crealf(ampphase_if[polidx[rp]]->f_raw[i][bi][rj]);
+                  } else if (plot_controls->plot_options & PLOT_IMAG) {
+                    plot_yvalues[ri] = cimagf(ampphase_if[polidx[rp]]->f_raw[i][bi][rj]);
                   }
                 } else {
                   if (plot_controls->plot_options & PLOT_FREQUENCY) {

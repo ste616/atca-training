@@ -182,6 +182,10 @@ struct ampphase {
   float *max_amplitude;
   float *min_phase;
   float *max_phase;
+  float *min_real;
+  float *max_real;
+  float *min_imag;
+  float *max_imag;
   struct ampphase_options *options;
   struct metinfo metinfo;
   struct syscal_data *syscal_data;

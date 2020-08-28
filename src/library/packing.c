@@ -323,7 +323,11 @@ void pack_ampphase(cmp_ctx_t *cmp, struct ampphase *a) {
   pack_writearray_float(cmp, a->nbaselines, a->max_amplitude);
   pack_writearray_float(cmp, a->nbaselines, a->min_phase);
   pack_writearray_float(cmp, a->nbaselines, a->max_phase);
-
+  pack_writearray_float(cmp, a->nbaselines, a->min_real);
+  pack_writearray_float(cmp, a->nbaselines, a->max_real);
+  pack_writearray_float(cmp, a->nbaselines, a->min_imag);
+  pack_writearray_float(cmp, a->nbaselines, a->max_imag);
+  
   pack_ampphase_options(cmp, a->options);
   pack_metinfo(cmp, &(a->metinfo));
   pack_syscal_data(cmp, a->syscal_data);
@@ -436,6 +440,14 @@ void unpack_ampphase(cmp_ctx_t *cmp, struct ampphase *a) {
   pack_readarray_float(cmp, a->nbaselines, a->min_phase);
   MALLOC(a->max_phase, a->nbaselines);
   pack_readarray_float(cmp, a->nbaselines, a->max_phase);
+  MALLOC(a->min_real, a->nbaselines);
+  pack_readarray_float(cmp, a->nbaselines, a->min_real);
+  MALLOC(a->max_real, a->nbaselines);
+  pack_readarray_float(cmp, a->nbaselines, a->max_real);
+  MALLOC(a->min_imag, a->nbaselines);
+  pack_readarray_float(cmp, a->nbaselines, a->min_imag);
+  MALLOC(a->max_imag, a->nbaselines);
+  pack_readarray_float(cmp, a->nbaselines, a->max_imag);
 
   MALLOC(a->options, 1);
   unpack_ampphase_options(cmp, a->options);
@@ -908,9 +920,13 @@ void pack_syscal_data(cmp_ctx_t *cmp, struct syscal_data *a) {
   pack_write_sint(cmp, a->num_pols);
 
   // Array descriptors.
-  pack_writearray_sint(cmp, a->num_ifs, a->if_num);
+  if (a->num_ifs > 0) {
+    pack_writearray_sint(cmp, a->num_ifs, a->if_num);
+  }
   pack_writearray_sint(cmp, a->num_ants, a->ant_num);
-  pack_writearray_sint(cmp, a->num_pols, a->pol);
+  if (a->num_pols > 0) {
+    pack_writearray_sint(cmp, a->num_pols, a->pol);
+  }
 
   // Parameters that only depend on antenna.
   pack_writearray_float(cmp, a->num_ants, a->parangle);
@@ -919,18 +935,22 @@ void pack_syscal_data(cmp_ctx_t *cmp, struct syscal_data *a) {
   pack_writearray_sint(cmp, a->num_ants, a->flagging);
 
   // Parameters that vary for each antenna and IF.
-  for (i = 0; i < a->num_ants; i++) {
-    pack_writearray_float(cmp, a->num_ifs, a->xyphase[i]);
-    pack_writearray_float(cmp, a->num_ifs, a->xyamp[i]);
+  if (a->num_ifs > 0) {
+    for (i = 0; i < a->num_ants; i++) {
+      pack_writearray_float(cmp, a->num_ifs, a->xyphase[i]);
+      pack_writearray_float(cmp, a->num_ifs, a->xyamp[i]);
+    }
   }
 
   // The system temperatures (varies by antenna, IF and pol).
-  for (i = 0; i < a ->num_ants; i++) {
-    for (j = 0; j < a->num_ifs; j++) {
-      pack_writearray_float(cmp, a->num_pols, a->online_tsys[i][j]);
-      pack_writearray_sint(cmp, a->num_pols, a->online_tsys_applied[i][j]);
-      pack_writearray_float(cmp, a->num_pols, a->computed_tsys[i][j]);
-      pack_writearray_sint(cmp, a->num_pols, a->computed_tsys_applied[i][j]);
+  if ((a->num_ifs > 0) && (a->num_pols > 0)) {
+    for (i = 0; i < a ->num_ants; i++) {
+      for (j = 0; j < a->num_ifs; j++) {
+        pack_writearray_float(cmp, a->num_pols, a->online_tsys[i][j]);
+        pack_writearray_sint(cmp, a->num_pols, a->online_tsys_applied[i][j]);
+        pack_writearray_float(cmp, a->num_pols, a->computed_tsys[i][j]);
+        pack_writearray_sint(cmp, a->num_pols, a->computed_tsys_applied[i][j]);
+      }
     }
   }
 }
@@ -948,12 +968,20 @@ void unpack_syscal_data(cmp_ctx_t *cmp, struct syscal_data *a) {
   pack_read_sint(cmp, &(a->num_pols));
 
   // Array descriptors.
-  MALLOC(a->if_num, a->num_ifs);
-  pack_readarray_sint(cmp, a->num_ifs, a->if_num);
+  if (a->num_ifs > 0) {
+    MALLOC(a->if_num, a->num_ifs);
+    pack_readarray_sint(cmp, a->num_ifs, a->if_num);
+  } else {
+    a->if_num = NULL;
+  }
   MALLOC(a->ant_num, a->num_ants);
   pack_readarray_sint(cmp, a->num_ants, a->ant_num);
-  MALLOC(a->pol, a->num_pols);
-  pack_readarray_sint(cmp, a->num_pols, a->pol);
+  if (a->num_pols > 0) {
+    MALLOC(a->pol, a->num_pols);
+    pack_readarray_sint(cmp, a->num_pols, a->pol);
+  } else {
+    a->pol = NULL;
+  }
 
   // Parameters that only depend on antenna.
   MALLOC(a->parangle, a->num_ants);
@@ -966,36 +994,49 @@ void unpack_syscal_data(cmp_ctx_t *cmp, struct syscal_data *a) {
   pack_readarray_sint(cmp, a->num_ants, a->flagging);
 
   // Parameters that vary for each antenna and IF.
-  MALLOC(a->xyphase, a->num_ants);
-  MALLOC(a->xyamp, a->num_ants);
-  for (i = 0; i < a->num_ants; i++) {
-    MALLOC(a->xyphase[i], a->num_ifs);
-    pack_readarray_float(cmp, a->num_ifs, a->xyphase[i]);
-    MALLOC(a->xyamp[i], a->num_ifs);
-    pack_readarray_float(cmp, a->num_ifs, a->xyamp[i]);
+  if (a->num_ifs > 0) {
+    MALLOC(a->xyphase, a->num_ants);
+    MALLOC(a->xyamp, a->num_ants);
+    for (i = 0; i < a->num_ants; i++) {
+      MALLOC(a->xyphase[i], a->num_ifs);
+      pack_readarray_float(cmp, a->num_ifs, a->xyphase[i]);
+      MALLOC(a->xyamp[i], a->num_ifs);
+      pack_readarray_float(cmp, a->num_ifs, a->xyamp[i]);
+    }
+  } else {
+    a->xyphase = NULL;
+    a->xyamp = NULL;
   }
 
   // The system temperatures (varies by antenna, IF and pol).
-  MALLOC(a->online_tsys, a->num_ants);
-  MALLOC(a->online_tsys_applied, a->num_ants);
-  MALLOC(a->computed_tsys, a->num_ants);
-  MALLOC(a->computed_tsys_applied, a->num_ants);
-  for (i = 0; i < a->num_ants; i++) {
-    MALLOC(a->online_tsys[i], a->num_ifs);
-    MALLOC(a->online_tsys_applied[i], a->num_ifs);
-    MALLOC(a->computed_tsys[i], a->num_ifs);
-    MALLOC(a->computed_tsys_applied[i], a->num_ifs);
-    for (j = 0; j < a->num_ifs; j++) {
-      MALLOC(a->online_tsys[i][j], a->num_pols);
-      pack_readarray_float(cmp, a->num_pols, a->online_tsys[i][j]);
-      MALLOC(a->online_tsys_applied[i][j], a->num_pols);
-      pack_readarray_sint(cmp, a->num_pols, a->online_tsys_applied[i][j]);
-      MALLOC(a->computed_tsys[i][j], a->num_pols);
-      pack_readarray_float(cmp, a->num_pols, a->computed_tsys[i][j]);
-      MALLOC(a->computed_tsys_applied[i][j], a->num_pols);
-      pack_readarray_sint(cmp, a->num_pols, a->computed_tsys_applied[i][j]);
+  if ((a->num_ifs > 0) && (a->num_pols > 0)) {
+    MALLOC(a->online_tsys, a->num_ants);
+    MALLOC(a->online_tsys_applied, a->num_ants);
+    MALLOC(a->computed_tsys, a->num_ants);
+    MALLOC(a->computed_tsys_applied, a->num_ants);
+    for (i = 0; i < a->num_ants; i++) {
+      MALLOC(a->online_tsys[i], a->num_ifs);
+      MALLOC(a->online_tsys_applied[i], a->num_ifs);
+      MALLOC(a->computed_tsys[i], a->num_ifs);
+      MALLOC(a->computed_tsys_applied[i], a->num_ifs);
+      for (j = 0; j < a->num_ifs; j++) {
+        MALLOC(a->online_tsys[i][j], a->num_pols);
+        pack_readarray_float(cmp, a->num_pols, a->online_tsys[i][j]);
+        MALLOC(a->online_tsys_applied[i][j], a->num_pols);
+        pack_readarray_sint(cmp, a->num_pols, a->online_tsys_applied[i][j]);
+        MALLOC(a->computed_tsys[i][j], a->num_pols);
+        pack_readarray_float(cmp, a->num_pols, a->computed_tsys[i][j]);
+        MALLOC(a->computed_tsys_applied[i][j], a->num_pols);
+        pack_readarray_sint(cmp, a->num_pols, a->computed_tsys_applied[i][j]);
+      }
     }
+  } else {
+    a->online_tsys = NULL;
+    a->online_tsys_applied = NULL;
+    a->computed_tsys = NULL;
+    a->computed_tsys_applied = NULL;
   }
+    
 }
 
 void init_cmp_memory_buffer(cmp_ctx_t *cmp, cmp_mem_access_t *mem, void *buffer,

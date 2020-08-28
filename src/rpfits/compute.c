@@ -159,9 +159,14 @@ void free_ampphase(struct ampphase **ampphase) {
   FREE((*ampphase)->max_amplitude);
   FREE((*ampphase)->min_phase);
   FREE((*ampphase)->max_phase);
-
+  FREE((*ampphase)->min_real);
+  FREE((*ampphase)->max_real);
+  FREE((*ampphase)->min_imag);
+  FREE((*ampphase)->max_imag);
+  
   free_ampphase_options((*ampphase)->options);
   FREE((*ampphase)->options);
+  free_syscal_data((*ampphase)->syscal_data);
   
   FREE(*ampphase);
 }
@@ -582,11 +587,11 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
   MALLOC((*ampphase)->syscal_data->ant_num, (*ampphase)->syscal_data->num_ants);
   MALLOC((*ampphase)->syscal_data->parangle, (*ampphase)->syscal_data->num_ants);
   MALLOC((*ampphase)->syscal_data->tracking_error_max,
-	 (*ampphase)->syscal_data->num_ants);
+         (*ampphase)->syscal_data->num_ants);
   MALLOC((*ampphase)->syscal_data->tracking_error_rms,
-	 (*ampphase)->syscal_data->num_ants);
+         (*ampphase)->syscal_data->num_ants);
   MALLOC((*ampphase)->syscal_data->flagging,
-	 (*ampphase)->syscal_data->num_ants);
+         (*ampphase)->syscal_data->num_ants);
   for (i = 0; i < (*ampphase)->syscal_data->num_ants; i++) {
     // Copy the antenna-based parameters now. These should have been stored
     // identically for all IFs in the SYSCAL table so we just take it from the
@@ -599,25 +604,39 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
   }
   if (syscal_if_idx >= 0) {
     MALLOC((*ampphase)->syscal_data->xyphase,
-	   (*ampphase)->syscal_data->num_ants);
+           (*ampphase)->syscal_data->num_ants);
     MALLOC((*ampphase)->syscal_data->xyamp,
-	   (*ampphase)->syscal_data->num_ants);
+           (*ampphase)->syscal_data->num_ants);
     for (i = 0; i < (*ampphase)->syscal_data->num_ants; i++) {
       MALLOC((*ampphase)->syscal_data->xyphase[i], 1);
       (*ampphase)->syscal_data->xyphase[i][0] =
-	cycle_data->xyphase[syscal_if_idx][i];
+        cycle_data->xyphase[syscal_if_idx][i];
       MALLOC((*ampphase)->syscal_data->xyamp[i], 1);
       (*ampphase)->syscal_data->xyamp[i][0] =
-	cycle_data->xyamp[syscal_if_idx][i];
+        cycle_data->xyamp[syscal_if_idx][i];
     }
     if (syscal_pol_idx >= 0) {
       MALLOC((*ampphase)->syscal_data->online_tsys,
-	     (*ampphase)->syscal_data->num_ants);
+             (*ampphase)->syscal_data->num_ants);
+      MALLOC((*ampphase)->syscal_data->online_tsys_applied,
+             (*ampphase)->syscal_data->num_ants);
+      MALLOC((*ampphase)->syscal_data->computed_tsys,
+             (*ampphase)->syscal_data->num_ants);
+      MALLOC((*ampphase)->syscal_data->computed_tsys_applied,
+             (*ampphase)->syscal_data->num_ants);
       for (i = 0; i < (*ampphase)->syscal_data->num_ants; i++) {
-	MALLOC((*ampphase)->syscal_data->online_tsys[i], 1);
-	MALLOC((*ampphase)->syscal_data->online_tsys[i][0], 1);
-	(*ampphase)->syscal_data->online_tsys[i][0][0] =
-	  cycle_data->tsys[syscal_if_idx][i][syscal_pol_idx];
+        MALLOC((*ampphase)->syscal_data->online_tsys[i], 1);
+        MALLOC((*ampphase)->syscal_data->online_tsys[i][0], 1);
+        (*ampphase)->syscal_data->online_tsys[i][0][0] =
+          cycle_data->tsys[syscal_if_idx][i][syscal_pol_idx];
+        MALLOC((*ampphase)->syscal_data->online_tsys_applied[i], 1);
+        MALLOC((*ampphase)->syscal_data->online_tsys_applied[i][0], 1);
+        (*ampphase)->syscal_data->online_tsys_applied[i][0][0] =
+          cycle_data->tsys[syscal_if_idx][i][syscal_pol_idx];
+        MALLOC((*ampphase)->syscal_data->computed_tsys[i], 1);
+        CALLOC((*ampphase)->syscal_data->computed_tsys[i][0], 1);
+        MALLOC((*ampphase)->syscal_data->computed_tsys_applied[i], 1);
+        CALLOC((*ampphase)->syscal_data->computed_tsys_applied[i][0], 1);
       }
     }
   }
@@ -638,6 +657,10 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
   MALLOC((*ampphase)->max_amplitude, (*ampphase)->nbaselines);
   MALLOC((*ampphase)->min_phase, (*ampphase)->nbaselines);
   MALLOC((*ampphase)->max_phase, (*ampphase)->nbaselines);
+  MALLOC((*ampphase)->min_real, (*ampphase)->nbaselines);
+  MALLOC((*ampphase)->max_real, (*ampphase)->nbaselines);
+  MALLOC((*ampphase)->min_imag, (*ampphase)->nbaselines);
+  MALLOC((*ampphase)->max_imag, (*ampphase)->nbaselines);
   MALLOC((*ampphase)->f_nchannels, (*ampphase)->nbaselines);
   MALLOC((*ampphase)->f_channel, (*ampphase)->nbaselines);
   MALLOC((*ampphase)->f_frequency, (*ampphase)->nbaselines);
@@ -806,6 +829,18 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
           if ((*ampphase)->phase[bidx][cidx][j] > (*ampphase)->max_phase_global) {
             (*ampphase)->max_phase_global = (*ampphase)->phase[bidx][cidx][j];
           }
+        }
+        if (crealf((*ampphase)->raw[bidx][cidx][j]) < (*ampphase)->min_real[bidx]) {
+          (*ampphase)->min_real[bidx] = crealf((*ampphase)->raw[bidx][cidx][j]);
+        }
+        if (crealf((*ampphase)->raw[bidx][cidx][j]) > (*ampphase)->max_real[bidx]) {
+          (*ampphase)->max_real[bidx] = crealf((*ampphase)->raw[bidx][cidx][j]);
+        }
+        if (cimagf((*ampphase)->raw[bidx][cidx][j]) < (*ampphase)->min_imag[bidx]) {
+          (*ampphase)->min_imag[bidx] = cimagf((*ampphase)->raw[bidx][cidx][j]);
+        }
+        if (cimagf((*ampphase)->raw[bidx][cidx][j]) > (*ampphase)->max_imag[bidx]) {
+          (*ampphase)->max_imag[bidx] = cimagf((*ampphase)->raw[bidx][cidx][j]);
         }
       }
     }

@@ -27,6 +27,8 @@
 #define PLOT_CONSISTENT_YRANGE    1<<10
 #define PLOT_DELAY                1<<11
 #define PLOT_TIME                 1<<12
+#define PLOT_REAL                 1<<13
+#define PLOT_IMAG                 1<<14
 
 #define PLOT_FLAG_POL_XX             1<<1
 #define PLOT_FLAG_POL_YY             1<<2

@@ -573,36 +573,36 @@ int read_cycle_data(struct scan_header_data *scan_header_data,
         // Do some array allocation.
         REALLOC(cycle_data->tsys, cycle_data->num_cal_ifs);
         REALLOC(cycle_data->tsys_applied, cycle_data->num_cal_ifs);
-	REALLOC(cycle_data->xyphase, cycle_data->num_cal_ifs);
-	REALLOC(cycle_data->xyamp, cycle_data->num_cal_ifs);
-	REALLOC(cycle_data->parangle, cycle_data->num_cal_ifs);
-	REALLOC(cycle_data->tracking_error_max, cycle_data->num_cal_ifs);
-	REALLOC(cycle_data->tracking_error_rms, cycle_data->num_cal_ifs);
-	REALLOC(cycle_data->flagging, cycle_data->num_cal_ifs);
-	
+        REALLOC(cycle_data->xyphase, cycle_data->num_cal_ifs);
+        REALLOC(cycle_data->xyamp, cycle_data->num_cal_ifs);
+        REALLOC(cycle_data->parangle, cycle_data->num_cal_ifs);
+        REALLOC(cycle_data->tracking_error_max, cycle_data->num_cal_ifs);
+        REALLOC(cycle_data->tracking_error_rms, cycle_data->num_cal_ifs);
+        REALLOC(cycle_data->flagging, cycle_data->num_cal_ifs);
+        
         MALLOC(cycle_data->tsys[sif], cycle_data->num_cal_ants);
         MALLOC(cycle_data->tsys_applied[sif], cycle_data->num_cal_ants);
-	MALLOC(cycle_data->xyphase[sif], cycle_data->num_cal_ants);
-	MALLOC(cycle_data->xyamp[sif], cycle_data->num_cal_ants);
-	MALLOC(cycle_data->parangle[sif], cycle_data->num_cal_ants);
-	MALLOC(cycle_data->tracking_error_max[sif], cycle_data->num_cal_ants);
-	MALLOC(cycle_data->tracking_error_rms[sif], cycle_data->num_cal_ants);
-	MALLOC(cycle_data->flagging[sif], cycle_data->num_cal_ants);
+        MALLOC(cycle_data->xyphase[sif], cycle_data->num_cal_ants);
+        MALLOC(cycle_data->xyamp[sif], cycle_data->num_cal_ants);
+        MALLOC(cycle_data->parangle[sif], cycle_data->num_cal_ants);
+        MALLOC(cycle_data->tracking_error_max[sif], cycle_data->num_cal_ants);
+        MALLOC(cycle_data->tracking_error_rms[sif], cycle_data->num_cal_ants);
+        MALLOC(cycle_data->flagging[sif], cycle_data->num_cal_ants);
         for (i = 0; i < cycle_data->num_cal_ants; i++) {
-	  cycle_data->cal_ants[i] = SYSCAL_ANT(i, 0);
+          cycle_data->cal_ants[i] = SYSCAL_ANT(i, 0);
           MALLOC(cycle_data->tsys[sif][i], 2);
           MALLOC(cycle_data->tsys_applied[sif][i], 2);
           cycle_data->tsys[sif][i][CAL_XX] = SYSCAL_TSYS_X(i, 0);
           cycle_data->tsys[sif][i][CAL_YY] = SYSCAL_TSYS_Y(i, 0);
           cycle_data->tsys_applied[sif][i][CAL_XX] = SYSCAL_TSYS_X_APPLIED(i, 0);
           cycle_data->tsys_applied[sif][i][CAL_YY] = SYSCAL_TSYS_Y_APPLIED(i, 0);
-
-	  cycle_data->xyphase[sif][i] = SYSCAL_XYPHASE(i, 0);
-	  cycle_data->xyamp[sif][i] = SYSCAL_XYAMP(i, 0);
-	  cycle_data->parangle[sif][i] = SYSCAL_PARANGLE(i, 0);
-	  cycle_data->tracking_error_max[sif][i] = SYSCAL_TRACKERR_MAX(i, 0);
-	  cycle_data->tracking_error_rms[sif][i] = SYSCAL_TRACKERR_RMS(i, 0);
-	  cycle_data->flagging[sif][i] = SYSCAL_FLAG_BAD(i, 0);
+          
+          cycle_data->xyphase[sif][i] = SYSCAL_XYPHASE(i, 0);
+          cycle_data->xyamp[sif][i] = SYSCAL_XYAMP(i, 0);
+          cycle_data->parangle[sif][i] = SYSCAL_PARANGLE(i, 0);
+          cycle_data->tracking_error_max[sif][i] = SYSCAL_TRACKERR_MAX(i, 0);
+          cycle_data->tracking_error_rms[sif][i] = SYSCAL_TRACKERR_RMS(i, 0);
+          cycle_data->flagging[sif][i] = SYSCAL_FLAG_BAD(i, 0);
         }
         /* printf("Baseline is -1\n"); */
         /* fprintf(stdout, "found SYSCAL group with %d ants %d IFs %d quantities for source %d\n", */
@@ -624,7 +624,7 @@ int read_cycle_data(struct scan_header_data *scan_header_data,
           rv = READER_HEADER_AVAILABLE | READER_DATA_AVAILABLE;
           read_data = 0;
         }
-	FREE(wgt);
+        FREE(wgt);
       } else {
         // Store this data.
         cycle_data->num_points += 1;
