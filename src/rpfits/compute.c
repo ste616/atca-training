@@ -172,6 +172,7 @@ void free_ampphase(struct ampphase **ampphase) {
   free_ampphase_options((*ampphase)->options);
   FREE((*ampphase)->options);
   free_syscal_data((*ampphase)->syscal_data);
+  FREE((*ampphase)->syscal_data);
   
   FREE(*ampphase);
 }
@@ -697,6 +698,10 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
     (*ampphase)->max_amplitude[i] = -INFINITY;
     (*ampphase)->min_phase[i] = INFINITY;
     (*ampphase)->max_phase[i] = -INFINITY;
+    (*ampphase)->min_real[i] = INFINITY;
+    (*ampphase)->max_real[i] = -INFINITY;
+    (*ampphase)->min_imag[i] = INFINITY;
+    (*ampphase)->max_imag[i] = -INFINITY;
     (*ampphase)->baseline[i] = 0;
     (*ampphase)->f_nchannels[i] = NULL;
     (*ampphase)->f_channel[i] = NULL;
