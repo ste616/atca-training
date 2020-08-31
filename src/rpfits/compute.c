@@ -62,12 +62,17 @@ struct ampphase* prepare_ampphase(void) {
   ampphase->max_amplitude = NULL;
   ampphase->min_phase = NULL;
   ampphase->max_phase = NULL;
+  ampphase->min_real = NULL;
+  ampphase->max_real = NULL;
+  ampphase->min_imag = NULL;
+  ampphase->max_imag = NULL;
 
   ampphase->min_amplitude_global = INFINITY;
   ampphase->max_amplitude_global = -INFINITY;
   ampphase->min_phase_global = INFINITY;
   ampphase->max_phase_global = -INFINITY;
   ampphase->options = NULL;
+  ampphase->syscal_data = NULL;
   
   return(ampphase);
 }
@@ -378,28 +383,32 @@ void free_syscal_data(struct syscal_data *syscal_data) {
   FREE(syscal_data->tracking_error_max);
   FREE(syscal_data->tracking_error_rms);
   FREE(syscal_data->flagging);
-  for (i = 0; i < syscal_data->num_ants; i++) {
-    FREE(syscal_data->xyphase[i]);
-    FREE(syscal_data->xyamp[i]);
-  }
-  FREE(syscal_data->xyphase);
-  FREE(syscal_data->xyamp);
-  for (i = 0; i < syscal_data->num_ants; i++) {
-    for (j = 0; j < syscal_data->num_ifs; j++) {
-      FREE(syscal_data->online_tsys[i][j]);
-      FREE(syscal_data->online_tsys_applied[i][j]);
-      FREE(syscal_data->computed_tsys[i][j]);
-      FREE(syscal_data->computed_tsys_applied[i][j]);
+  if (syscal_data->xyphase != NULL) {
+    for (i = 0; i < syscal_data->num_ants; i++) {
+      FREE(syscal_data->xyphase[i]);
+      FREE(syscal_data->xyamp[i]);
     }
-    FREE(syscal_data->online_tsys[i]);
-    FREE(syscal_data->online_tsys_applied[i]);
-    FREE(syscal_data->computed_tsys[i]);
-    FREE(syscal_data->computed_tsys_applied[i]);
+    FREE(syscal_data->xyphase);
+    FREE(syscal_data->xyamp);
   }
-  FREE(syscal_data->online_tsys);
-  FREE(syscal_data->online_tsys_applied);
-  FREE(syscal_data->computed_tsys);
-  FREE(syscal_data->computed_tsys_applied);
+  if (syscal_data->online_tsys != NULL) {
+    for (i = 0; i < syscal_data->num_ants; i++) {
+      for (j = 0; j < syscal_data->num_ifs; j++) {
+        FREE(syscal_data->online_tsys[i][j]);
+        FREE(syscal_data->online_tsys_applied[i][j]);
+        FREE(syscal_data->computed_tsys[i][j]);
+        FREE(syscal_data->computed_tsys_applied[i][j]);
+      }
+      FREE(syscal_data->online_tsys[i]);
+      FREE(syscal_data->online_tsys_applied[i]);
+      FREE(syscal_data->computed_tsys[i]);
+      FREE(syscal_data->computed_tsys_applied[i]);
+    }
+    FREE(syscal_data->online_tsys);
+    FREE(syscal_data->online_tsys_applied);
+    FREE(syscal_data->computed_tsys);
+    FREE(syscal_data->computed_tsys_applied);
+  }
 }
 
 /**
@@ -549,7 +558,7 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
   // Deal with the syscal_data structure if necessary. We only copy over the
   // information for the selected pol and IF, and we don't copy the Tsys unless
   // we've been given XX or YY as the requested pol.
-  MALLOC((*ampphase)->syscal_data, 1);
+  CALLOC((*ampphase)->syscal_data, 1);
   strncpy((*ampphase)->syscal_data->obsdate, (*ampphase)->obsdate, OBSDATE_LENGTH);
   (*ampphase)->syscal_data->utseconds = (*ampphase)->ut_seconds;
   // Locate this IF number in the data.
@@ -616,29 +625,37 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
         cycle_data->xyamp[syscal_if_idx][i];
     }
     if (syscal_pol_idx >= 0) {
-      MALLOC((*ampphase)->syscal_data->online_tsys,
+      CALLOC((*ampphase)->syscal_data->online_tsys,
              (*ampphase)->syscal_data->num_ants);
-      MALLOC((*ampphase)->syscal_data->online_tsys_applied,
+      CALLOC((*ampphase)->syscal_data->online_tsys_applied,
              (*ampphase)->syscal_data->num_ants);
-      MALLOC((*ampphase)->syscal_data->computed_tsys,
+      CALLOC((*ampphase)->syscal_data->computed_tsys,
              (*ampphase)->syscal_data->num_ants);
-      MALLOC((*ampphase)->syscal_data->computed_tsys_applied,
+      CALLOC((*ampphase)->syscal_data->computed_tsys_applied,
              (*ampphase)->syscal_data->num_ants);
       for (i = 0; i < (*ampphase)->syscal_data->num_ants; i++) {
-        MALLOC((*ampphase)->syscal_data->online_tsys[i], 1);
-        MALLOC((*ampphase)->syscal_data->online_tsys[i][0], 1);
+        CALLOC((*ampphase)->syscal_data->online_tsys[i], 1);
+        CALLOC((*ampphase)->syscal_data->online_tsys[i][0], 1);
         (*ampphase)->syscal_data->online_tsys[i][0][0] =
           cycle_data->tsys[syscal_if_idx][i][syscal_pol_idx];
-        MALLOC((*ampphase)->syscal_data->online_tsys_applied[i], 1);
-        MALLOC((*ampphase)->syscal_data->online_tsys_applied[i][0], 1);
+        CALLOC((*ampphase)->syscal_data->online_tsys_applied[i], 1);
+        CALLOC((*ampphase)->syscal_data->online_tsys_applied[i][0], 1);
         (*ampphase)->syscal_data->online_tsys_applied[i][0][0] =
           cycle_data->tsys[syscal_if_idx][i][syscal_pol_idx];
-        MALLOC((*ampphase)->syscal_data->computed_tsys[i], 1);
+        CALLOC((*ampphase)->syscal_data->computed_tsys[i], 1);
         CALLOC((*ampphase)->syscal_data->computed_tsys[i][0], 1);
-        MALLOC((*ampphase)->syscal_data->computed_tsys_applied[i], 1);
+        CALLOC((*ampphase)->syscal_data->computed_tsys_applied[i], 1);
         CALLOC((*ampphase)->syscal_data->computed_tsys_applied[i][0], 1);
       }
+    } else {
+      (*ampphase)->syscal_data->online_tsys = NULL;
+      (*ampphase)->syscal_data->online_tsys_applied = NULL;
+      (*ampphase)->syscal_data->computed_tsys = NULL;
+      (*ampphase)->syscal_data->computed_tsys_applied = NULL;
     }
+  } else {
+    (*ampphase)->syscal_data->xyphase = NULL;
+    (*ampphase)->syscal_data->xyamp = NULL;
   }
   
   
