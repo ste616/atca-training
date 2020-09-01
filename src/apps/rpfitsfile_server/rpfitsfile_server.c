@@ -786,7 +786,7 @@ void add_client_vis_data(struct client_vis_data *client_vis_data,
     REALLOC(client_vis_data->client_id, (n + 1));
     MALLOC(client_vis_data->client_id[n], CLIENTIDLENGTH);
     REALLOC(client_vis_data->vis_data, (n + 1));
-    MALLOC(client_vis_data->vis_data[n], 1);
+    CALLOC(client_vis_data->vis_data[n], 1);
     client_vis_data->num_clients = (n + 1);
   }
   strncpy(client_vis_data->client_id[n], client_id, CLIENTIDLENGTH);
@@ -1149,7 +1149,7 @@ int main(int argc, char *argv[]) {
                 (client_request.request_type == REQUEST_COMPUTED_VISDATA)) {
               // We're going to send the currently cached data to this socket.
               // Make the buffers the size we may need.
-              MALLOC(send_buffer, RPSENDBUFSIZE);
+              CALLOC(send_buffer, RPSENDBUFSIZE);
               
               // Set up the response.
               if (client_request.request_type == REQUEST_CURRENT_SPECTRUM) {
