@@ -1194,13 +1194,13 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
                    struct spd_plotcontrols *plot_controls,
                    struct scan_header_data *scan_header_data,
                    bool all_data_present) {
-  int i, j, ant1, ant2, nants = 0, px, py, iauto = 0, icross = 0, isauto = NO;
+  int i, j, k, ant1, ant2, nants = 0, px, py, iauto = 0, icross = 0, isauto = NO;
   int npols = 0, *polidx = NULL, poli, num_ifs = 0, panels_per_if = 0;
   int idxif, ni, ri, rj, rp, bi, bn, pc, inverted = NO, plot_started = NO;
   float **panel_plotted = NULL, information_x_pos = 0.01, information_text_width;
   float information_text_height, xaxis_min, xaxis_max, yaxis_min, yaxis_max, theight;
   float ylog_min, ylog_max, pollab_height, pollab_xlen, pollab_ylen, pollab_padding;
-  float *plot_xvalues = NULL, *plot_yvalues = NULL;
+  float *plot_xvalues = NULL, *plot_yvalues = NULL, tsys[2][2];
   char ptitle[BIGBUFSIZE], ptype[BUFSIZE], ftype[BUFSIZE], poltitle[BUFSIZE];
   char information_text[BUFSIZE];
   struct ampphase **ampphase_if = NULL;
@@ -1359,6 +1359,10 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
             }
             information_text[j] = 0;
             cpgptxt(information_x_pos, 0.5, 0, 0, information_text);
+            cpglen(4, information_text, &information_text_width, &information_text_height);
+            information_x_pos += information_text_width + 0.02;
+            // The system temperatures.
+            
           }
           changepanel(px, py, panelspec);
           // Set the title for the plot.

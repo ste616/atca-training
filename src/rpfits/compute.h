@@ -228,6 +228,38 @@ struct vis_quantities {
   float max_delay;
 };
 
+// This structure wraps around all the ampphase structures and
+// will allow for easy transport.
+struct spectrum_data {
+  // The spectrum header.
+  struct scan_header_data *header_data;
+  // The number of IFs in this spectra set.
+  int num_ifs;
+  // The number of polarisations.
+  int num_pols;
+  // The ampphase structures.
+  struct ampphase ***spectrum;
+};
+
+// This structure wraps around all the vis_quantities structures
+// and will allow for easy transport.
+struct vis_data {
+  // The number of cycles contained here.
+  int nviscycles;
+  // The range of MJDs that were allowed when these data
+  // were compiled.
+  double mjd_low;
+  double mjd_high;
+  // The header data for each cycle.
+  struct scan_header_data **header_data;
+  // The number of IFs per cycle.
+  int *num_ifs;
+  // The number of pols per cycle per IF.
+  int **num_pols;
+  // The vis_quantities structures.
+  struct vis_quantities ****vis_quantities;
+};
+
 struct ampphase* prepare_ampphase(void);
 struct vis_quantities* prepare_vis_quantities(void);
 void free_ampphase(struct ampphase **ampphase);
