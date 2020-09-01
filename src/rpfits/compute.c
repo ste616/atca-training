@@ -882,8 +882,6 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
   (*ampphase)->metinfo.seemon_phase = cycle_data->seemon_phase;
   (*ampphase)->metinfo.seemon_rms = cycle_data->seemon_rms;
   (*ampphase)->metinfo.seemon_valid = (cycle_data->seemon_valid == SYSCAL_VALID);
-
-  
   
   return 0;
 }

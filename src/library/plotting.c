@@ -540,6 +540,12 @@ void plotpanel_minmax(struct ampphase **plot_ampphase,
   } else if (plot_controls->plot_options & PLOT_PHASE) {
     *plotmin_y = plot_ampphase[polidx[0]]->min_phase[plot_baseline_idx];
     *plotmax_y = plot_ampphase[polidx[0]]->max_phase[plot_baseline_idx];
+  } else if (plot_controls->plot_options & PLOT_REAL) {
+    *plotmin_y = plot_ampphase[polidx[0]]->min_real[plot_baseline_idx];
+    *plotmax_y = plot_ampphase[polidx[0]]->max_real[plot_baseline_idx];
+  } else if (plot_controls->plot_options & PLOT_IMAG) {
+    *plotmin_y = plot_ampphase[polidx[0]]->min_imag[plot_baseline_idx];
+    *plotmax_y = plot_ampphase[polidx[0]]->max_imag[plot_baseline_idx];
   }
 
   // Account for all the other polarisations.
@@ -596,6 +602,16 @@ void plotpanel_minmax(struct ampphase **plot_ampphase,
                       plot_ampphase[polidx[j]]->min_phase[i]);
             MAXASSIGN(*plotmax_y,
                       plot_ampphase[polidx[j]]->max_phase[i]);
+          } else if (plot_controls->plot_options & PLOT_REAL) {
+            MINASSIGN(*plotmin_y,
+                      plot_ampphase[polidx[j]]->min_real[i]);
+            MAXASSIGN(*plotmax_y,
+                      plot_ampphase[polidx[j]]->max_real[i]);
+          } else if (plot_controls->plot_options & PLOT_IMAG) {
+            MINASSIGN(*plotmin_y,
+                      plot_ampphase[polidx[j]]->min_imag[i]);
+            MAXASSIGN(*plotmax_y,
+                      plot_ampphase[polidx[j]]->max_imag[i]);
           }
         }
       }
@@ -1464,6 +1480,10 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
                     }
                   } else if (plot_controls->plot_options & PLOT_PHASE) {
                     plot_yvalues[ri] = ampphase_if[polidx[rp]]->f_phase[i][bi][ri];
+                  } else if (plot_controls->plot_options & PLOT_REAL) {
+                    plot_yvalues[ri] = crealf(ampphase_if[polidx[rp]]->f_raw[i][bi][ri]);
+                  } else if (plot_controls->plot_options & PLOT_IMAG) {
+                    plot_yvalues[ri] = cimagf(ampphase_if[polidx[rp]]->f_raw[i][bi][ri]);
                   }
                 }
               }
