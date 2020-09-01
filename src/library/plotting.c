@@ -1191,8 +1191,10 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
 }
 
 void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspec,
-                   struct spd_plotcontrols *plot_controls, bool all_data_present) {
-  int i, ant1, ant2, nants = 0, px, py, iauto = 0, icross = 0, isauto = NO;
+                   struct spd_plotcontrols *plot_controls,
+                   struct scan_header_data *scan_header_data,
+                   bool all_data_present) {
+  int i, j, ant1, ant2, nants = 0, px, py, iauto = 0, icross = 0, isauto = NO;
   int npols = 0, *polidx = NULL, poli, num_ifs = 0, panels_per_if = 0;
   int idxif, ni, ri, rj, rp, bi, bn, pc, inverted = NO, plot_started = NO;
   float **panel_plotted = NULL, information_x_pos = 0.01, information_text_width;
@@ -1341,6 +1343,22 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
             cpgptxt(information_x_pos, 0.5, 0, 0, information_text);
             cpglen(4, information_text, &information_text_width, &information_text_height);
             information_x_pos += information_text_width + 0.02;
+            // The name of the source.
+            cpgptxt(information_x_pos, 0.5, 0, 0, scan_header_data->source_name);
+            cpglen(4, scan_header_data->source_name, &information_text_width,
+                   &information_text_height);
+            information_x_pos += information_text_width + 0.02;
+            // Antennas on source.
+            information_text[0] = 0;
+            for (j = 0; j < cycle_ampphase[0][0]->syscal_data->num_ants; j++) {
+              if (cycle_ampphase[0][0]->syscal_data->flagging[j] & 1) {
+                information_text[j] = '-';
+              } else {
+                information_text[j] = '0' + cycle_ampphase[0][0]->syscal_data->ant_num[j];
+              }
+            }
+            information_text[j] = 0;
+            cpgptxt(information_x_pos, 0.5, 0, 0, information_text);
           }
           changepanel(px, py, panelspec);
           // Set the title for the plot.

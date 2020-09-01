@@ -639,7 +639,8 @@ int main(int argc, char *argv[]) {
       }
       // First, ensure the plotter doesn't try to do something it can't.
       reconcile_spd_plotcontrols(&spectrum_data, &spd_plotcontrols, &spd_alteredcontrols);
-      make_spd_plot(spectrum_data.spectrum, &spd_panelspec, &spd_alteredcontrols, true);
+      make_spd_plot(spectrum_data.spectrum, &spd_panelspec, &spd_alteredcontrols,
+                    spectrum_data.header_data, true);
       action_required -= ACTION_REFRESH_PLOT;
     }
 
