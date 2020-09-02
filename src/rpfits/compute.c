@@ -1152,3 +1152,126 @@ bool ampphase_options_match(struct ampphase_options *a,
   return match;
 }
 
+void spectrum_data_compile_system_temperatures(struct spectrum_data *spectrum_data,
+                                               struct syscal_data **syscal_data) {
+  // Go through a spectrum_data structure and find all the system temperatures.
+  int i, j, k, l, m, n, kk, ll, mm, high_if;
+  struct syscal_data *tsys_data = NULL;
+
+  if (spectrum_data == NULL) {
+    return;
+  }
+
+  if (spectrum_data->spectrum == NULL) {
+    return;
+  }
+
+  CALLOC(*syscal_data, 1);
+  // We always assume 6 antennas.
+  (*syscal_data)->num_ants = 6;
+  CALLOC((*syscal_data)->ant_num, (*syscal_data)->num_ants);
+  // Fill with the antennas in order.
+  for (i = 1; i <= (*syscal_data)->num_ants; i++) {
+    (*syscal_data)->ant_num[i - 1] = i;
+  }
+  // We only ever measure Tsys in the normal pols.
+  (*syscal_data)->num_pols = 2;
+  CALLOC((*syscal_data)->pol, (*syscal_data)->num_pols);
+  (*syscal_data)->pol[CAL_XX] = POL_XX;
+  (*syscal_data)->pol[CAL_YY] = POL_YY;
+  // We set a maximum number of IFs (for future needs, for CABB it's only 2).
+  (*syscal_data)->num_ifs = 10;
+  CALLOC((*syscal_data)->if_num, (*syscal_data)->num_ifs);
+  for (i = 0; i < (*syscal_data)->num_ifs; i++) {
+    (*syscal_data)->if_num[i] = i + 1;
+  }
+  // Initialise the Tsys arrays with a non-specified indicator.
+  CALLOC((*syscal_data)->online_tsys, (*syscal_data)->num_ants);
+  CALLOC((*syscal_data)->online_tsys_applied, (*syscal_data)->num_ants);
+  CALLOC((*syscal_data)->computed_tsys, (*syscal_data)->num_ants);
+  CALLOC((*syscal_data)->computed_tsys_applied, (*syscal_data)->num_ants);
+  for (i = 0; i < (*syscal_data)->num_ants; i++) {
+    CALLOC((*syscal_data)->online_tsys[i], (*syscal_data)->num_ifs);
+    CALLOC((*syscal_data)->online_tsys_applied[i], (*syscal_data)->num_ifs);
+    CALLOC((*syscal_data)->computed_tsys[i], (*syscal_data)->num_ifs);
+    CALLOC((*syscal_data)->computed_tsys_applied[i], (*syscal_data)->num_ifs);
+    for (j = 0; j < (*syscal_data)->num_ifs; j++) {
+      CALLOC((*syscal_data)->online_tsys[i][j], (*syscal_data)->num_pols);
+      CALLOC((*syscal_data)->online_tsys_applied[i][j], (*syscal_data)->num_pols);
+      CALLOC((*syscal_data)->computed_tsys[i][j], (*syscal_data)->num_pols);
+      CALLOC((*syscal_data)->computed_tsys_applied[i][j], (*syscal_data)->num_pols);
+      for (k = 0; k < (*syscal_data)->num_pols; k++) {
+	(*syscal_data)->online_tsys[i][j][k] = -1;
+	(*syscal_data)->online_tsys_applied[i][j][k] = -1;
+	(*syscal_data)->computed_tsys[i][j][k] = -1;
+	(*syscal_data)->computed_tsys_applied[i][j][k] = -1;
+      }
+    }
+  }
+
+  high_if = 0;
+  for (i = 0; i < spectrum_data->num_ifs; i++) {
+    if (spectrum_data->spectrum[i] == NULL) {
+      continue;
+    }
+    for (j = 0; j < spectrum_data->num_pols; j++) {
+      if (spectrum_data->spectrum[i][j] == NULL) {
+        continue;
+      }
+      // Check if this spectrum has all the required cal data.
+      if ((spectrum_data->spectrum[i][j]->syscal_data != NULL) &&
+          (spectrum_data->spectrum[i][j]->syscal_data->num_ifs > 0) &&
+          (spectrum_data->spectrum[i][j]->syscal_data->num_ants > 0) &&
+          (spectrum_data->spectrum[i][j]->syscal_data->num_pols > 0) &&
+	  (spectrum_data->spectrum[i][j]->syscal_data->online_tsys != NULL)) {
+        tsys_data = spectrum_data->spectrum[i][j]->syscal_data;
+        for (k = 0; k < tsys_data->num_ants; k++) {
+	  kk = tsys_data->ant_num[k] - 1;
+          for (l = 0; l < tsys_data->num_ifs; l++) {
+	    ll = tsys_data->if_num[l] - 1;
+	    for (m = 0; m < tsys_data->num_pols; m++) {
+	      mm = -1;
+	      for (n = 0; n < (*syscal_data)->num_pols; n++) {
+		if ((*syscal_data)->pol[n] == tsys_data->pol[m]) {
+		  mm = n; //tsys_data->pol[m];
+		  break;
+		}
+	      }
+	      if (mm < 0) {
+		continue;
+	      }
+	      if ((*syscal_data)->online_tsys[kk][ll][mm] == -1) {
+		(*syscal_data)->online_tsys[kk][ll][mm] = tsys_data->online_tsys[k][l][m];
+		(*syscal_data)->online_tsys_applied[kk][ll][mm] =
+		  tsys_data->online_tsys_applied[k][l][m];
+		if (ll > high_if) {
+		  high_if = ll;
+		}
+	      }
+	      if ((*syscal_data)->computed_tsys[kk][ll][mm] == -1) {
+		(*syscal_data)->computed_tsys[kk][ll][mm] = tsys_data->computed_tsys[k][l][m];
+		(*syscal_data)->computed_tsys_applied[kk][ll][mm] =
+		  tsys_data->computed_tsys_applied[k][l][m];
+	      }
+	    }
+	  }
+        }
+      }
+    }
+  }
+  for (i = 0; i < (*syscal_data)->num_ants; i++) {
+    for (j = (high_if + 1); j < (*syscal_data)->num_ifs; j++) {
+      FREE((*syscal_data)->online_tsys[i][j]);
+      FREE((*syscal_data)->online_tsys_applied[i][j]);
+      FREE((*syscal_data)->computed_tsys[i][j]);
+      FREE((*syscal_data)->computed_tsys_applied[i][j]);
+    }
+    REALLOC((*syscal_data)->online_tsys[i], (high_if + 1));
+    REALLOC((*syscal_data)->online_tsys_applied[i], (high_if + 1));
+    REALLOC((*syscal_data)->computed_tsys[i], (high_if + 1));
+    REALLOC((*syscal_data)->computed_tsys_applied[i], (high_if + 1));
+  }
+  REALLOC((*syscal_data)->if_num, (high_if + 1));
+  (*syscal_data)->num_ifs = (high_if + 1);
+
+}

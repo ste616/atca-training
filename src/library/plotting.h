@@ -77,6 +77,8 @@ struct panelspec {
   float information_x2;
   float information_y1;
   float information_y2;
+  // And how many lines are given in the information area.
+  int num_information_lines;
 };
 
 // This structure holds all the details about user plot control
@@ -185,7 +187,7 @@ void init_vis_plotcontrols(struct vis_plotcontrols *plotcontrols,
 void free_vis_plotcontrols(struct vis_plotcontrols *plotcontrols);
 void free_panelspec(struct panelspec *panelspec);
 void splitpanels(int nx, int ny, int pgplot_device, int abut,
-                 float margin_reduction, int make_info_area,
+                 float margin_reduction, int info_area_num_lines,
                  struct panelspec *panelspec);
 void changepanel(int x, int y, struct panelspec *panelspec);
 void plotnum_to_xy(struct panelspec *panelspec, int plotnum, int *px, int *py);
@@ -211,4 +213,5 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
 void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspec,
                    struct spd_plotcontrols *plot_controls,
                    struct scan_header_data *scan_header_data,
-                   bool all_data_present);
+		   struct syscal_data *compiled_tsys_data,
+                   int max_tsys_ifs, bool all_data_present);

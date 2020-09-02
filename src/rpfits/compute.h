@@ -291,3 +291,5 @@ int ampphase_average(struct ampphase *ampphase,
                      struct ampphase_options *options);
 bool ampphase_options_match(struct ampphase_options *a,
                             struct ampphase_options *b);
+void spectrum_data_compile_system_temperatures(struct spectrum_data *spectrum_data,
+					       struct syscal_data **syscal_data);

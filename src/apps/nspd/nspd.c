@@ -75,6 +75,8 @@ struct spectrum_data spectrum_data;
 // The maximum number of divisions supported on the plot.
 #define MAX_XPANELS 6
 #define MAX_YPANELS 6
+// The number of information lines to use on the plot.
+#define NUM_INFO_LINES 4
 
 static error_t parse_opt(int key, char *arg, struct argp_state *state) {
   struct arguments *arguments = state->input;
@@ -131,11 +133,8 @@ void prepare_spd_device(char *device_name, bool *device_opened) {
   // Set up the device with the current settings.
   cpgask(0);
   spd_panelspec.measured = NO;
-  splitpanels(nxpanels, nypanels, spd_device_number, 0, 5, 1, &spd_panelspec);
-  /* fprintf(stderr, "PGPLOT X %.4f -> %.4f\n", spd_panelspec.orig_x1, */
-  /*         spd_panelspec.orig_x2); */
-  /* fprintf(stderr, "PGPLOT Y %.4f -> %.4f\n", spd_panelspec.orig_y1, */
-  /*         spd_panelspec.orig_y2); */
+  splitpanels(nxpanels, nypanels, spd_device_number, 0, 5,
+	      (NUM_INFO_LINES + 1), &spd_panelspec);
   
 }
 
@@ -515,6 +514,7 @@ int main(int argc, char *argv[]) {
   double earliest_mjd, latest_mjd, mjd_cycletime, cmjd, min_dmjd, dmjd;
   double *all_cycle_mjd = NULL;
   struct ampphase_options ampphase_options;
+  struct syscal_data *tsys_data;
 
   // Allocate some memory.
   MALLOC(mesgout, MAX_N_MESSAGES);
@@ -627,7 +627,8 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Changing plot surface.\n");
       }
       free_panelspec(&spd_panelspec);
-      splitpanels(nxpanels, nypanels, spd_device_number, 0, 5, 1, &spd_panelspec);
+      splitpanels(nxpanels, nypanels, spd_device_number, 0, 5,
+		  (NUM_INFO_LINES + 1), &spd_panelspec);
       action_required -= ACTION_CHANGE_PLOTSURFACE;
       action_required |= ACTION_REFRESH_PLOT;
     }
@@ -639,9 +640,13 @@ int main(int argc, char *argv[]) {
       }
       // First, ensure the plotter doesn't try to do something it can't.
       reconcile_spd_plotcontrols(&spectrum_data, &spd_plotcontrols, &spd_alteredcontrols);
+      // Get the Tsys.
+      spectrum_data_compile_system_temperatures(&spectrum_data, &tsys_data);
       make_spd_plot(spectrum_data.spectrum, &spd_panelspec, &spd_alteredcontrols,
-                    spectrum_data.header_data, true);
+                    spectrum_data.header_data, tsys_data, 2, true);
       action_required -= ACTION_REFRESH_PLOT;
+      free_syscal_data(tsys_data);
+      FREE(tsys_data);
     }
 
     if ((action_required & ACTION_CYCLE_FORWARD) ||

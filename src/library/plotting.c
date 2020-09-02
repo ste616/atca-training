@@ -320,13 +320,13 @@ void free_panelspec(struct panelspec *panelspec) {
 }
 
 void splitpanels(int nx, int ny, int pgplot_device, int abut,
-                 float margin_reduction, int make_info_area,
+                 float margin_reduction, int info_area_num_lines,
                  struct panelspec *panelspec) {
   int i, j;
   float panel_width, panel_height, panel_px_width, panel_px_height;
   float padding_fraction = 1.8, padding_x, padding_y;
   float padding_px_x, padding_px_y, dpx_x, dpx_y;
-  float orig_charheight, charheight;
+  float orig_charheight, charheight, meas_charwidth, meas_charheight;
   
   // Allocate some memory.
   panelspec->nx = nx;
@@ -357,7 +357,16 @@ void splitpanels(int nx, int ny, int pgplot_device, int abut,
            &(panelspec->orig_px_y1), &(panelspec->orig_px_y2));
     cpgqvp(0, &(panelspec->orig_x1), &(panelspec->orig_x2),
            &(panelspec->orig_y1), &(panelspec->orig_y2));
-  
+
+    // Change the character height.
+    cpgqch(&orig_charheight);
+    charheight = orig_charheight / 2;
+    cpgsch(charheight);
+
+    // Don't do this stuff again if the user changes the number of
+    // panels.
+    panelspec->measured = YES;
+    
     // Reduce the margins.
     panelspec->orig_x1 /= margin_reduction;
     dpx_x = panelspec->orig_px_x1 - (panelspec->orig_px_x1 / margin_reduction);
@@ -367,14 +376,17 @@ void splitpanels(int nx, int ny, int pgplot_device, int abut,
     panelspec->orig_px_x2 += dpx_x;
     panelspec->orig_y1 /= 0.7 * margin_reduction;
     panelspec->orig_px_y1 /= 0.7 * margin_reduction;
-    if (make_info_area) {
-      panelspec->orig_y2 = 1 - 2 * panelspec->orig_y1;
+    panelspec->num_information_lines = (info_area_num_lines - 1);
+    if (info_area_num_lines > 0) {
+      cpglen(0, "L", &meas_charwidth, &meas_charheight);
+      panelspec->orig_y2 = 1 - 2 * panelspec->orig_y1 -
+	(float)panelspec->num_information_lines * meas_charheight;
     } else {
       panelspec->orig_y2 = 1 - panelspec->orig_y1;
     }
     panelspec->orig_px_y2 += dpx_y;
 
-    if (make_info_area) {
+    if (info_area_num_lines > 0) {
       // Keep the information area dimensions.
       panelspec->information_x1 = panelspec->orig_x1;
       panelspec->information_x2 = panelspec->orig_x2;
@@ -428,17 +440,6 @@ void splitpanels(int nx, int ny, int pgplot_device, int abut,
     }
   }
 
-  if (panelspec->measured == NO) {
-    // Change the character height.
-    cpgqch(&orig_charheight);
-    charheight = orig_charheight / 2;
-    cpgsch(charheight);
-
-    // Don't do this stuff again if the user changes the number of
-    // panels.
-    panelspec->measured = YES;
-  }
-  
 }
 
 void changepanel(int x, int y, struct panelspec *panelspec) {
@@ -1190,19 +1191,25 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
   FREE(plot_lines);
 }
 
+// Definition to align text on a certain line, for use in make_spd_plot.
+// Line 0 is at the top of the information area.
+#define YPOS_LINE(l) (1.0 - (float)(l + 1) / (float)(panelspec->num_information_lines))
+
 void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspec,
                    struct spd_plotcontrols *plot_controls,
                    struct scan_header_data *scan_header_data,
-                   bool all_data_present) {
+		   struct syscal_data *compiled_tsys_data,
+                   int max_tsys_ifs, bool all_data_present) {
   int i, j, k, ant1, ant2, nants = 0, px, py, iauto = 0, icross = 0, isauto = NO;
   int npols = 0, *polidx = NULL, poli, num_ifs = 0, panels_per_if = 0;
   int idxif, ni, ri, rj, rp, bi, bn, pc, inverted = NO, plot_started = NO;
+  int tsys_num_ifs;
   float **panel_plotted = NULL, information_x_pos = 0.01, information_text_width;
   float information_text_height, xaxis_min, xaxis_max, yaxis_min, yaxis_max, theight;
   float ylog_min, ylog_max, pollab_height, pollab_xlen, pollab_ylen, pollab_padding;
-  float *plot_xvalues = NULL, *plot_yvalues = NULL, tsys[2][2];
+  float *plot_xvalues = NULL, *plot_yvalues = NULL, maxlen_tsys;
   char ptitle[BIGBUFSIZE], ptype[BUFSIZE], ftype[BUFSIZE], poltitle[BUFSIZE];
-  char information_text[BUFSIZE];
+  char information_text[BUFSIZE], ***systemp_strings = NULL;
   struct ampphase **ampphase_if = NULL;
 
   // Definitions of some magic numbers that we use.
@@ -1334,17 +1341,17 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
             cpgswin(0, 1, 0, 1);
             cpgsci(1);
             cpgbox("BC", 0, 0, "BC", 0, 0);
-            cpgptxt(information_x_pos, 0.5, 0, 0, cycle_ampphase[0][0]->obsdate);
+            cpgptxt(information_x_pos, YPOS_LINE(0), 0, 0, cycle_ampphase[0][0]->obsdate);
             cpglen(4, cycle_ampphase[0][0]->obsdate, &information_text_width,
                    &information_text_height);
             information_x_pos += information_text_width + 0.02;
             seconds_to_hourlabel(cycle_ampphase[0][0]->ut_seconds,
                                  information_text);
-            cpgptxt(information_x_pos, 0.5, 0, 0, information_text);
+            cpgptxt(information_x_pos, YPOS_LINE(0), 0, 0, information_text);
             cpglen(4, information_text, &information_text_width, &information_text_height);
             information_x_pos += information_text_width + 0.02;
             // The name of the source.
-            cpgptxt(information_x_pos, 0.5, 0, 0, scan_header_data->source_name);
+            cpgptxt(information_x_pos, YPOS_LINE(0), 0, 0, scan_header_data->source_name);
             cpglen(4, scan_header_data->source_name, &information_text_width,
                    &information_text_height);
             information_x_pos += information_text_width + 0.02;
@@ -1358,11 +1365,49 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
               }
             }
             information_text[j] = 0;
-            cpgptxt(information_x_pos, 0.5, 0, 0, information_text);
+            cpgptxt(information_x_pos, YPOS_LINE(0), 0, 0, information_text);
             cpglen(4, information_text, &information_text_width, &information_text_height);
             information_x_pos += information_text_width + 0.02;
             // The system temperatures.
-            
+	    CALLOC(systemp_strings, compiled_tsys_data->num_ants);
+	    maxlen_tsys = 0;
+	    // We may only display the Tsys for a maximum number of IFs.
+	    tsys_num_ifs = ((compiled_tsys_data->num_ifs > max_tsys_ifs) &&
+			    (max_tsys_ifs > 0)) ?
+	      max_tsys_ifs : compiled_tsys_data->num_ifs;
+	    for (j = 0; j < compiled_tsys_data->num_ants; j++) {
+	      CALLOC(systemp_strings[j], tsys_num_ifs);
+	      for (k = 0; k < tsys_num_ifs; k++) {
+		CALLOC(systemp_strings[j][k], BUFSIZE);
+		snprintf(systemp_strings[j][k], BUFSIZE, "%.1f / %.1f",
+			 compiled_tsys_data->online_tsys[j][k][CAL_XX],
+			 compiled_tsys_data->online_tsys[j][k][CAL_YY]);
+		cpglen(4, systemp_strings[j][k], &information_text_width,
+		       &information_text_height);
+		MAXASSIGN(maxlen_tsys, information_text_width);
+	      }
+	    }
+	    for (j = 0; j <= tsys_num_ifs; j++) {
+	      for (k = 0; k <= compiled_tsys_data->num_ants; k++) {
+		if ((j == 0) && (k > 0)) {
+		  snprintf(information_text, BUFSIZE, "CA0%d",
+			   compiled_tsys_data->ant_num[k - 1]);
+		  cpgptxt((information_x_pos + maxlen_tsys +
+			   ((float)(k - 1) * (maxlen_tsys + 0.02))),
+			  YPOS_LINE(0), 0, 0.5, information_text);
+		} else if ((j > 0) && (k == 0)) {
+		  snprintf(information_text, BUFSIZE, "IF%d",
+			   compiled_tsys_data->if_num[j - 1]);
+		  cpgptxt(information_x_pos, YPOS_LINE(j), 0, 0, information_text);
+		} else if ((j == 0) && (k == 0)) {
+		  cpgptxt(information_x_pos, YPOS_LINE(0), 0, 0, "TSYS");
+		} else {
+		  cpgptxt((information_x_pos + (maxlen_tsys / 2.0) +
+			   ((float)(k - 1) * (maxlen_tsys + 0.02))),
+			  YPOS_LINE(j), 0, 0, systemp_strings[k - 1][j - 1]);
+		}
+	      }
+	    }
           }
           changepanel(px, py, panelspec);
           // Set the title for the plot.
