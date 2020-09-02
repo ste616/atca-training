@@ -1408,6 +1408,14 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
 		}
 	      }
 	    }
+	    // Reset back to the left and plot some weather parameters.
+	    information_x_pos = 0.01;
+	    snprintf(information_text, BUFSIZE, "T=%.1f C P=%.1f hPa H=%.1f %%",
+		     cycle_ampphase[0][0]->metinfo.temperature,
+		     cycle_ampphase[0][0]->metinfo.air_pressure,
+		     cycle_ampphase[0][0]->metinfo.humidity);
+	    cpgptxt(information_x_pos, YPOS_LINE(1), 0, 0, information_text);
+	    
           }
           changepanel(px, py, panelspec);
           // Set the title for the plot.
