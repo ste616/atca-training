@@ -594,7 +594,6 @@ void unpack_vis_quantities(cmp_ctx_t *cmp, struct vis_quantities *a) {
   pack_read_float(cmp, &(a->max_phase));
   pack_read_float(cmp, &(a->min_delay));
   pack_read_float(cmp, &(a->max_delay));
-  
 }
 
 void copy_spectrum_data(struct spectrum_data *dest,
@@ -630,7 +629,12 @@ void copy_vis_data(struct vis_data *dest,
 
   // The vis_quantities structures.
   dest->vis_quantities = src->vis_quantities;
-  
+
+  // The metinfo for each cycle.
+  dest->metinfo = src->metinfo;
+
+  // And the calibration parameters.
+  dest->syscal_data = src->syscal_data;
 }
 
 void pack_vis_data(cmp_ctx_t *cmp, struct vis_data *a) {
@@ -663,6 +667,15 @@ void pack_vis_data(cmp_ctx_t *cmp, struct vis_data *a) {
         pack_vis_quantities(cmp, a->vis_quantities[i][j][k]);
       }
     }
+  }
+
+  // The metinfo for each cycle.
+  for (i = 0; i < a->nviscycles; i++) {
+    pack_metinfo(cmp, a->metinfo[i]);
+  }
+  // And the calibration parameters.
+  for (i = 0; i < a->nviscycles; i++) {
+    pack_syscal_data(cmp, a->syscal_data[i]);
   }
 }
 
@@ -707,6 +720,20 @@ void unpack_vis_data(cmp_ctx_t *cmp, struct vis_data *a) {
       }
     }
   }
+
+  // The metinfo for each cycle.
+  MALLOC(a->metinfo, a->nviscycles);
+  for (i = 0; i < a->nviscycles; i++) {
+    MALLOC(a->metinfo[i], 1);
+    unpack_metinfo(cmp, a->metinfo[i]);
+  }
+
+  // And the calibration parameters.
+  MALLOC(a->syscal_data, a->nviscycles);
+  for (i = 0; i < a->nviscycles; i++) {
+    MALLOC(a->syscal_data[i], 1);
+    unpack_syscal_data(cmp, a->syscal_data[i]);
+  }
 }
 
 void free_vis_data(struct vis_data *vis_data) {
@@ -725,11 +752,17 @@ void free_vis_data(struct vis_data *vis_data) {
     /* free_scan_header_data(vis_data->header_data[i]); */
     /* FREE(vis_data->header_data[i]); */
     FREE(vis_data->num_pols[i]);
+    // Free the metinfo and calibration data.
+    FREE(vis_data->metinfo[i]);
+    free_syscal_data(vis_data->syscal_data[i]);
+    FREE(vis_data->syscal_data[i]);
   }
   FREE(vis_data->vis_quantities);
   FREE(vis_data->header_data);
   FREE(vis_data->num_ifs);
   FREE(vis_data->num_pols);
+  FREE(vis_data->metinfo);
+  FREE(vis_data->syscal_data);
 }
 
 void pack_scan_header_data(cmp_ctx_t *cmp, struct scan_header_data *a) {

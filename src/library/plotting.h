@@ -41,6 +41,14 @@
 #define VIS_PLOT_IF1     1<<0
 #define VIS_PLOT_IF2     1<<1
 
+#define VIS_PLOTPANEL_AMPLITUDE    1
+#define VIS_PLOTPANEL_PHASE        2
+#define VIS_PLOTPANEL_DELAY        3
+#define VIS_PLOTPANEL_TEMPERATURE  4
+#define VIS_PLOTPANEL_PRESSURE     5
+#define VIS_PLOTPANEL_HUMIDITY     6
+#define VIS_PLOTPANEL_SYSTEMP      7
+
 #define PANEL_ORIGINAL    -1
 #define PANEL_INFORMATION -2
 
@@ -181,7 +189,8 @@ void change_vis_plotcontrols_limits(struct vis_plotcontrols *plotcontrols,
                                     int paneltype, bool use_limits,
                                     float limit_min, float limit_max);
 void init_vis_plotcontrols(struct vis_plotcontrols *plotcontrols,
-                           int xaxis_type, int paneltypes, int nvisbands, char **visbands,
+                           int xaxis_type, int num_panels,
+                           int *paneltypes, int nvisbands, char **visbands,
                            int pgplot_device,
                            struct panelspec *panelspec);
 void free_vis_plotcontrols(struct vis_plotcontrols *plotcontrols);

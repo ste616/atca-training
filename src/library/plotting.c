@@ -219,9 +219,9 @@ void change_vis_plotcontrols_limits(struct vis_plotcontrols *plotcontrols,
 }
 
 void init_vis_plotcontrols(struct vis_plotcontrols *plotcontrols,
-                           int xaxis_type, int paneltypes, int nvisbands, char **visbands,
-                           int pgplot_device,
-                           struct panelspec *panelspec) {
+                           int xaxis_type, int num_panels,
+                           int *paneltypes, int nvisbands, char **visbands,
+                           int pgplot_device, struct panelspec *panelspec) {
   int npanels = 0, i, j;
   int available_panels[NAVAILABLE_PANELS] = { PLOT_AMPLITUDE,
                                               PLOT_PHASE,

@@ -459,6 +459,8 @@ void data_reader(int read_type, int n_rpfits_files,
       (*vis_data)->num_ifs = NULL;
       (*vis_data)->num_pols = NULL;
       (*vis_data)->vis_quantities = NULL;
+      (*vis_data)->metinfo = NULL;
+      (*vis_data)->syscal_data = NULL;
     } else {
       printf("[data_reader] found cache hit\n");
       read_type -= COMPUTE_VIS_PRODUCTS;
@@ -647,6 +649,10 @@ void data_reader(int read_type, int n_rpfits_files,
                           ((*vis_data)->nviscycles + 1));
                   REALLOC((*vis_data)->num_pols,
                           ((*vis_data)->nviscycles + 1));
+                  REALLOC((*vis_data)->metinfo, ((*vis_data)->nviscycles + 1));
+                  REALLOC((*vis_data)->syscal_data, ((*vis_data)->nviscycles + 1));
+                  CALLOC((*vis_data)->metinfo[(*vis_data)->nviscycles], 1);
+                  //CALLOC((*vis_data)->syscal_data[(*vis_data)->nviscycles], 1);
                   (*vis_data)->num_ifs[(*vis_data)->nviscycles] = temp_spectrum->num_ifs;
                   (*vis_data)->header_data[(*vis_data)->nviscycles] =
                     info_rpfits_files[i]->scan_headers[curr_header];
@@ -697,6 +703,11 @@ void data_reader(int read_type, int n_rpfits_files,
                   }
                 }
                 if (vis_cycled) {
+                  // Compile the metinfo and calibration data.
+                  copy_metinfo((*vis_data)->metinfo[(*vis_data)->nviscycles],
+                               &(temp_spectrum->spectrum[0][0]->metinfo));
+                  spectrum_data_compile_system_temperatures(temp_spectrum,
+                                                            &((*vis_data)->syscal_data[(*vis_data)->nviscycles]));
                   (*vis_data)->nviscycles += 1;
                 }
                 if (spectrum_return) {
@@ -845,7 +856,7 @@ struct vis_data* get_client_vis_data(struct client_vis_data *client_vis_data,
 }
 
 struct spectrum_data* get_client_spd_data(struct client_spd_data *client_spd_data,
-					  char *client_id) {
+                                          char *client_id) {
   // Return spd data associated with the specified client_id, or
   // the DEFAULT otherwise.
   struct spectrum_data *default_spectrum_data = NULL;

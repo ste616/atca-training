@@ -65,7 +65,7 @@ struct arguments {
 // And some fun, totally necessary, global state variables.
 int action_required, server_type;
 int vis_device_number, data_selected_index;
-int xaxis_type, yaxis_type, nxpanels, nypanels, nvisbands;
+int xaxis_type, *yaxis_type, nxpanels, nypanels, nvisbands;
 int *visband_idx;
 char **visband;
 // Whether to order the baselines in length order (true/false).
@@ -569,6 +569,7 @@ int main(int argc, char *argv[]) {
   // And defaults for some of the parameters.
   nxpanels = 1;
   nypanels = 3;
+  CALLOC(yaxis_type, nypanels);
   
   // Parse the arguments.
   argp_parse(&argp, argc, argv, 0, 0, &arguments);
@@ -624,8 +625,11 @@ int main(int argc, char *argv[]) {
 
   // We will need to have a default plot upon entry.
   xaxis_type = PLOT_TIME;
-  yaxis_type = PLOT_AMPLITUDE | PLOT_PHASE | PLOT_DELAY;
-  init_vis_plotcontrols(&vis_plotcontrols, xaxis_type, yaxis_type,
+  yaxis_type[0] = VIS_PLOTPANEL_AMPLITUDE;
+  yaxis_type[1] = VIS_PLOTPANEL_PHASE:
+  yaxis_type[2] = VIS_PLOTPANEL_DELAY;
+  //yaxis_type = PLOT_AMPLITUDE | PLOT_PHASE | PLOT_DELAY;
+  init_vis_plotcontrols(&vis_plotcontrols, xaxis_type, nypanels, yaxis_type,
                         nvisbands, visband, vis_device_number, &vis_panelspec);
   vis_plotcontrols.array_spec = interpret_array_string("1,2,3,4,5,6");
   CALLOC(vis_plotcontrols.vis_products, 1);
@@ -859,5 +863,5 @@ int main(int argc, char *argv[]) {
     FREE(visband[i]);
   }
   FREE(visband);
-
+  FREE(yaxis_type);
 }

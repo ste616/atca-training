@@ -218,7 +218,7 @@ struct vis_quantities {
   float **amplitude;
   float **phase;
   float **delay;
-
+  
   // Metadata.
   float min_amplitude;
   float max_amplitude;
@@ -258,6 +258,10 @@ struct vis_data {
   int **num_pols;
   // The vis_quantities structures.
   struct vis_quantities ****vis_quantities;
+  // The metinfo for each cycle.
+  struct metinfo **metinfo;
+  // And the calibration parameters.
+  struct syscal_data **syscal_data;
 };
 
 struct ampphase* prepare_ampphase(void);
@@ -270,8 +274,8 @@ void set_default_ampphase_options(struct ampphase_options *options);
 void copy_ampphase_options(struct ampphase_options *dest,
                            struct ampphase_options *src);
 void free_ampphase_options(struct ampphase_options *options);
-void copy_metinfo_data(struct metinfo *dest,
-		       struct metinfo *src);
+void copy_metinfo(struct metinfo *dest,
+                  struct metinfo *src);
 void copy_syscal_data(struct syscal_data *dest,
 		      struct syscal_data *src);
 void free_syscal_data(struct syscal_data *syscal_data);

@@ -198,6 +198,7 @@ void free_vis_quantities(struct vis_quantities **vis_quantities) {
   FREE((*vis_quantities)->nbins);
   FREE((*vis_quantities)->baseline);
   FREE((*vis_quantities)->flagged_bad);
+
   FREE(*vis_quantities);
 }
 
@@ -295,8 +296,8 @@ void free_ampphase_options(struct ampphase_options *options) {
 /**
  * Copy one metinfo structure into another.
  */
-void copy_metinfo_data(struct metinfo *dest,
-		       struct metinfo *src) {
+void copy_metinfo(struct metinfo *dest,
+                  struct metinfo *src) {
   strncpy(dest->obsdate, src->obsdate, OBSDATE_LENGTH);
   STRUCTCOPY(src, dest, ut_seconds);
   STRUCTCOPY(src, dest, temperature);
@@ -315,7 +316,7 @@ void copy_metinfo_data(struct metinfo *dest,
  * Copy one syscal_data structure into another.
  */
 void copy_syscal_data(struct syscal_data *dest,
-		      struct syscal_data *src) {
+                      struct syscal_data *src) {
   int i, j, k;
   strncpy(dest->obsdate, src->obsdate, OBSDATE_LENGTH);
   STRUCTCOPY(src, dest, utseconds);
@@ -363,10 +364,10 @@ void copy_syscal_data(struct syscal_data *dest,
       MALLOC(dest->computed_tsys[i][j], dest->num_pols);
       MALLOC(dest->computed_tsys_applied[i][j], dest->num_pols);
       for (k = 0; k < dest->num_pols; k++) {
-	STRUCTCOPY(src, dest, online_tsys[i][j][k]);
-	STRUCTCOPY(src, dest, online_tsys_applied[i][j][k]);
-	STRUCTCOPY(src, dest, computed_tsys[i][j][k]);
-	STRUCTCOPY(src, dest, computed_tsys_applied[i][j][k]);
+        STRUCTCOPY(src, dest, online_tsys[i][j][k]);
+        STRUCTCOPY(src, dest, online_tsys_applied[i][j][k]);
+        STRUCTCOPY(src, dest, computed_tsys[i][j][k]);
+        STRUCTCOPY(src, dest, computed_tsys_applied[i][j][k]);
       }
     }
   }
@@ -418,8 +419,8 @@ void free_syscal_data(struct syscal_data *syscal_data) {
  * and the centre frequency in MHz.
  */
 void default_tvchannels(int num_chan, float chan_width,
-			float centre_freq, int *min_tvchannel,
-			int *max_tvchannel) {
+                        float centre_freq, int *min_tvchannel,
+                        int *max_tvchannel) {
   if (num_chan <= 33) {
     // We're likely in 64 MHz mode.
     *min_tvchannel = 9;
@@ -935,7 +936,7 @@ int ampphase_average(struct ampphase *ampphase,
     // Use the options from the ampphase.
     options = ampphase->options;
   }
-  
+
   // Allocate the necessary arrays.
   /* fprintf(stderr, "[ampphase_average] allocating memory for %d baselines\n", */
   /*         (*vis_quantities)->nbaselines); */
@@ -1142,8 +1143,8 @@ bool ampphase_options_match(struct ampphase_options *a,
     for (i = 0; i < a->num_ifs; i++) {
       if ((a->min_tvchannel[i] != b->min_tvchannel[i]) ||
           (a->max_tvchannel[i] != b->max_tvchannel[i]) ||
-	  (a->delay_averaging[i] != b->delay_averaging[i]) ||
-	  (a->averaging_method[i] != b->averaging_method[i])) {
+          (a->delay_averaging[i] != b->delay_averaging[i]) ||
+          (a->averaging_method[i] != b->averaging_method[i])) {
         match = false;
         break;
       }
@@ -1180,7 +1181,7 @@ void spectrum_data_compile_system_temperatures(struct spectrum_data *spectrum_da
   (*syscal_data)->pol[CAL_XX] = POL_XX;
   (*syscal_data)->pol[CAL_YY] = POL_YY;
   // We set a maximum number of IFs (for future needs, for CABB it's only 2).
-  (*syscal_data)->num_ifs = 10;
+  (*syscal_data)->num_ifs = 34;
   CALLOC((*syscal_data)->if_num, (*syscal_data)->num_ifs);
   for (i = 0; i < (*syscal_data)->num_ifs; i++) {
     (*syscal_data)->if_num[i] = i + 1;
@@ -1190,23 +1191,39 @@ void spectrum_data_compile_system_temperatures(struct spectrum_data *spectrum_da
   CALLOC((*syscal_data)->online_tsys_applied, (*syscal_data)->num_ants);
   CALLOC((*syscal_data)->computed_tsys, (*syscal_data)->num_ants);
   CALLOC((*syscal_data)->computed_tsys_applied, (*syscal_data)->num_ants);
+  // Do the same for the non-Tsys parameters.
+  CALLOC((*syscal_data)->xyphase, (*syscal_data)->num_ants);
+  CALLOC((*syscal_data)->xyamp, (*syscal_data)->num_ants);
+  // And the antenna-based parameters.
+  CALLOC((*syscal_data)->parangle, (*syscal_data)->num_ants);
+  CALLOC((*syscal_data)->tracking_error_max, (*syscal_data)->num_ants);
+  CALLOC((*syscal_data)->tracking_error_rms, (*syscal_data)->num_ants);
+  CALLOC((*syscal_data)->flagging, (*syscal_data)->num_ants);
   for (i = 0; i < (*syscal_data)->num_ants; i++) {
     CALLOC((*syscal_data)->online_tsys[i], (*syscal_data)->num_ifs);
     CALLOC((*syscal_data)->online_tsys_applied[i], (*syscal_data)->num_ifs);
     CALLOC((*syscal_data)->computed_tsys[i], (*syscal_data)->num_ifs);
     CALLOC((*syscal_data)->computed_tsys_applied[i], (*syscal_data)->num_ifs);
+    CALLOC((*syscal_data)->xyphase[i], (*syscal_data)->num_ifs);
+    CALLOC((*syscal_data)->xyamp[i], (*syscal_data)->num_ifs);
     for (j = 0; j < (*syscal_data)->num_ifs; j++) {
       CALLOC((*syscal_data)->online_tsys[i][j], (*syscal_data)->num_pols);
       CALLOC((*syscal_data)->online_tsys_applied[i][j], (*syscal_data)->num_pols);
       CALLOC((*syscal_data)->computed_tsys[i][j], (*syscal_data)->num_pols);
       CALLOC((*syscal_data)->computed_tsys_applied[i][j], (*syscal_data)->num_pols);
       for (k = 0; k < (*syscal_data)->num_pols; k++) {
-	(*syscal_data)->online_tsys[i][j][k] = -1;
-	(*syscal_data)->online_tsys_applied[i][j][k] = -1;
-	(*syscal_data)->computed_tsys[i][j][k] = -1;
-	(*syscal_data)->computed_tsys_applied[i][j][k] = -1;
+        (*syscal_data)->online_tsys[i][j][k] = -1;
+        (*syscal_data)->online_tsys_applied[i][j][k] = -1;
+        (*syscal_data)->computed_tsys[i][j][k] = -1;
+        (*syscal_data)->computed_tsys_applied[i][j][k] = -1;
       }
+      (*syscal_data)->xyphase[i][j] = -1; // Makes no sense...
+      (*syscal_data)->xyamp[i][j] = -1;
     }
+    (*syscal_data)->parangle[i] = -1; // This default makes no sense...
+    (*syscal_data)->tracking_error_max[i] = -1;
+    (*syscal_data)->tracking_error_rms[i] = -1;
+    (*syscal_data)->flagging[i] = -1;
   }
 
   high_if = 0;
@@ -1223,42 +1240,54 @@ void spectrum_data_compile_system_temperatures(struct spectrum_data *spectrum_da
           (spectrum_data->spectrum[i][j]->syscal_data->num_ifs > 0) &&
           (spectrum_data->spectrum[i][j]->syscal_data->num_ants > 0) &&
           (spectrum_data->spectrum[i][j]->syscal_data->num_pols > 0) &&
-	  (spectrum_data->spectrum[i][j]->syscal_data->online_tsys != NULL)) {
+          (spectrum_data->spectrum[i][j]->syscal_data->online_tsys != NULL)) {
         tsys_data = spectrum_data->spectrum[i][j]->syscal_data;
         for (k = 0; k < tsys_data->num_ants; k++) {
-	  kk = tsys_data->ant_num[k] - 1;
+          kk = tsys_data->ant_num[k] - 1;
           for (l = 0; l < tsys_data->num_ifs; l++) {
-	    ll = tsys_data->if_num[l] - 1;
-	    for (m = 0; m < tsys_data->num_pols; m++) {
-	      mm = -1;
-	      for (n = 0; n < (*syscal_data)->num_pols; n++) {
-		if ((*syscal_data)->pol[n] == tsys_data->pol[m]) {
-		  mm = n; //tsys_data->pol[m];
-		  break;
-		}
-	      }
-	      if (mm < 0) {
-		continue;
-	      }
-	      if ((*syscal_data)->online_tsys[kk][ll][mm] == -1) {
-		(*syscal_data)->online_tsys[kk][ll][mm] = tsys_data->online_tsys[k][l][m];
-		(*syscal_data)->online_tsys_applied[kk][ll][mm] =
-		  tsys_data->online_tsys_applied[k][l][m];
-		if (ll > high_if) {
-		  high_if = ll;
-		}
-	      }
-	      if ((*syscal_data)->computed_tsys[kk][ll][mm] == -1) {
-		(*syscal_data)->computed_tsys[kk][ll][mm] = tsys_data->computed_tsys[k][l][m];
-		(*syscal_data)->computed_tsys_applied[kk][ll][mm] =
-		  tsys_data->computed_tsys_applied[k][l][m];
-	      }
-	    }
-	  }
+            ll = tsys_data->if_num[l] - 1;
+            for (m = 0; m < tsys_data->num_pols; m++) {
+              mm = -1;
+              for (n = 0; n < (*syscal_data)->num_pols; n++) {
+                if ((*syscal_data)->pol[n] == tsys_data->pol[m]) {
+                  mm = n; //tsys_data->pol[m];
+                  break;
+                }
+              }
+              if (mm < 0) {
+                continue;
+              }
+              if ((*syscal_data)->online_tsys[kk][ll][mm] == -1) {
+                (*syscal_data)->online_tsys[kk][ll][mm] = tsys_data->online_tsys[k][l][m];
+                (*syscal_data)->online_tsys_applied[kk][ll][mm] =
+                  tsys_data->online_tsys_applied[k][l][m];
+                if (ll > high_if) {
+                  high_if = ll;
+                }
+              }
+              if ((*syscal_data)->computed_tsys[kk][ll][mm] == -1) {
+                (*syscal_data)->computed_tsys[kk][ll][mm] = tsys_data->computed_tsys[k][l][m];
+                (*syscal_data)->computed_tsys_applied[kk][ll][mm] =
+                  tsys_data->computed_tsys_applied[k][l][m];
+              }
+              if ((*syscal_data)->tracking_error_max[kk] == -1) {
+                (*syscal_data)->parangle[kk] = tsys_data->parangle[k];
+                (*syscal_data)->tracking_error_max[kk] = tsys_data->tracking_error_max[k];
+                (*syscal_data)->tracking_error_rms[kk] = tsys_data->tracking_error_rms[k];
+                (*syscal_data)->flagging[kk] = tsys_data->flagging[k];
+              }
+              if ((*syscal_data)->xyamp[kk][ll] == -1) {
+                (*syscal_data)->xyphase[kk][ll] = tsys_data->xyphase[k][l];
+                (*syscal_data)->xyamp[kk][ll] = tsys_data->xyamp[k][l];
+              }
+            }
+          }
         }
       }
     }
   }
+
+  // Now we know how many IFs actually had useful data, we free the unnecessary memory.
   for (i = 0; i < (*syscal_data)->num_ants; i++) {
     for (j = (high_if + 1); j < (*syscal_data)->num_ifs; j++) {
       FREE((*syscal_data)->online_tsys[i][j]);
@@ -1270,6 +1299,8 @@ void spectrum_data_compile_system_temperatures(struct spectrum_data *spectrum_da
     REALLOC((*syscal_data)->online_tsys_applied[i], (high_if + 1));
     REALLOC((*syscal_data)->computed_tsys[i], (high_if + 1));
     REALLOC((*syscal_data)->computed_tsys_applied[i], (high_if + 1));
+    REALLOC((*syscal_data)->xyphase[i], (high_if + 1));
+    REALLOC((*syscal_data)->xyamp[i], (high_if + 1));
   }
   REALLOC((*syscal_data)->if_num, (high_if + 1));
   (*syscal_data)->num_ifs = (high_if + 1);
