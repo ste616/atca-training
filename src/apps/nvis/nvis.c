@@ -254,21 +254,21 @@ static void interpret_command(char *line) {
         pr = vis_interpret_product(line_els[i], &tproduct);
         if (pr == 0) {
           // Successfully matched a product.
-	  // Check if we can use this product.
-	  product_usable = false;
-	  for (j = 1; j <= nvisbands; j++) {
-	    if (tproduct->if_spec & (1<<(j - 1))) {
-	      product_usable = true;
-	      break;
-	    }
-	  }
-	  if (product_usable) {
-	    REALLOC(vis_products, ++nproducts);
-	    vis_products[nproducts - 1] = tproduct;
-	    products_selected = true;
-	  } else {
-	    FREE(tproduct);
-	  }
+          // Check if we can use this product.
+          product_usable = false;
+          for (j = 1; j <= nvisbands; j++) {
+            if (tproduct->if_spec & (1<<(j - 1))) {
+              product_usable = true;
+              break;
+            }
+          }
+          if (product_usable) {
+            REALLOC(vis_products, ++nproducts);
+            vis_products[nproducts - 1] = tproduct;
+            products_selected = true;
+          } else {
+            FREE(tproduct);
+          }
         } else {
           FREE(tproduct);
         }
