@@ -225,7 +225,8 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
                    bool sort_baselines,
                    struct panelspec *panelspec,
                    struct vis_plotcontrols *plot_controls,
-                   struct scan_header_data **header_data);
+                   struct scan_header_data **header_data,
+		   struct metinfo **metinfo, struct syscal_data **syscal_data);
 void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspec,
                    struct spd_plotcontrols *plot_controls,
                    struct scan_header_data *scan_header_data,

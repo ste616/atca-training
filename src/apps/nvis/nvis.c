@@ -223,6 +223,8 @@ int char_to_product(char pstring) {
     return VIS_PLOTPANEL_PHASE;
   case 'd':
     return VIS_PLOTPANEL_DELAY;
+  case 'T':
+    return VIS_PLOTPANEL_TEMPERATURE;
   }
   return -1;
 }
@@ -431,7 +433,9 @@ static void interpret_command(char *line) {
           change_panel = VIS_PLOTPANEL_PHASE;
         } else if (minmatch("delay", line_els[1], 1)) {
           change_panel = VIS_PLOTPANEL_DELAY;
-        }
+        } else if (minmatch("temperature", line_els[1], 4)) {
+	  change_panel = VIS_PLOTPANEL_TEMPERATURE;
+	}
         if (change_panel != VIS_PLOTPANEL_ALL) {
           if (nels == 2) {
             // Reset just the named panel.
@@ -731,7 +735,8 @@ int main(int argc, char *argv[]) {
       // Let's make a plot.
       make_vis_plot(vis_data.vis_quantities, vis_data.nviscycles,
                     vis_data.num_ifs, 4, sort_baselines,
-                    &vis_panelspec, &vis_plotcontrols, vis_data.header_data);
+                    &vis_panelspec, &vis_plotcontrols, vis_data.header_data,
+		    vis_data.metinfo, vis_data.syscal_data);
       action_required -= ACTION_REFRESH_PLOT;
     }
 

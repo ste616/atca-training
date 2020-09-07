@@ -888,7 +888,8 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
                    bool sort_baselines,
                    struct panelspec *panelspec,
                    struct vis_plotcontrols *plot_controls,
-                   struct scan_header_data **header_data) {
+                   struct scan_header_data **header_data,
+		   struct metinfo **metinfo, struct syscal_data **syscal_data) {
   int nants = 0, i = 0, n_vis_lines = 0, j = 0, k = 0, p = 0;
   int singleant = 0, l = 0, m = 0, n = 0, connidx = 0;
   int **n_plot_lines = NULL, ipos = -1;
@@ -1110,7 +1111,14 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
                   } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_DELAY) {
                     plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
                       cycle_vis_quantities[k][l][m]->delay[n][0];
-                  }
+                  } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_TEMPERATURE) {
+		    plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
+		      metinfo[k]->temperature;
+		  } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_SYSTEMP) {
+		    // THIS DOESN'T WORK, JUST HERE TO PREVENT ERROR.
+		    plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
+		      syscal_data[k]->online_tsys[0][0][0];
+		  }
                   MINASSIGN(min_y, plot_lines[i][j][1][n_plot_lines[i][j] - 1]);
                   MAXASSIGN(max_y, plot_lines[i][j][1][n_plot_lines[i][j] - 1]);
                   break;
@@ -1165,6 +1173,9 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
     } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_DELAY) {
       (void)strcpy(panellabel, "Delay");
       (void)strcpy(panelunits, "(ns)");
+    } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_TEMPERATURE) {
+      (void)strcpy(panellabel, "Air Temp.");
+      (void)strcpy(panelunits, "(C)");
     }
     cpgmtxt("L", 2.2, 0.5, 0.5, panellabel);
     cpgmtxt("R", 2.2, 0.5, 0.5, panelunits);
