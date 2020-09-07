@@ -169,7 +169,7 @@ void init_spd_plotcontrols(struct spd_plotcontrols *plotcontrols,
   plotcontrols->pgplot_device = pgplot_device;
 }
 
-#define NAVAILABLE_PANELS 3
+#define NAVAILABLE_PANELS 7
 
 void change_vis_plotcontrols_visbands(struct vis_plotcontrols *plotcontrols,
                                       int nvisbands, char **visbands) {
@@ -206,7 +206,7 @@ void change_vis_plotcontrols_limits(struct vis_plotcontrols *plotcontrols,
   // First, find the panel matching paneltype. If paneltype is -1, change
   // all the panels.
   for (i = 0; i < plotcontrols->num_panels; i++) {
-    if ((paneltype == PLOT_ALL_PANELS) ||
+    if ((paneltype == VIS_PLOTPANEL_ALL) ||
         (plotcontrols->panel_type[i] == paneltype)) {
       plotcontrols->use_panel_limits[i] = use_limit;
       if (use_limit) {
@@ -222,10 +222,14 @@ void init_vis_plotcontrols(struct vis_plotcontrols *plotcontrols,
                            int xaxis_type, int num_panels,
                            int *paneltypes, int nvisbands, char **visbands,
                            int pgplot_device, struct panelspec *panelspec) {
-  int npanels = 0, i, j;
-  int available_panels[NAVAILABLE_PANELS] = { PLOT_AMPLITUDE,
-                                              PLOT_PHASE,
-                                              PLOT_DELAY };
+  int i, j;
+  int available_panels[NAVAILABLE_PANELS] = { VIS_PLOTPANEL_AMPLITUDE,
+                                              VIS_PLOTPANEL_PHASE,
+                                              VIS_PLOTPANEL_DELAY,
+					      VIS_PLOTPANEL_TEMPERATURE,
+					      VIS_PLOTPANEL_PRESSURE,
+					      VIS_PLOTPANEL_HUMIDITY,
+					      VIS_PLOTPANEL_SYSTEMP };
   
   // Initialise the plotcontrols structure and form the panelspec
   // structure using the same information.
@@ -233,21 +237,26 @@ void init_vis_plotcontrols(struct vis_plotcontrols *plotcontrols,
     xaxis_type = PLOT_TIME;
   }
   // Count the number of panels we need.
-  for (i = 0; i < NAVAILABLE_PANELS; i++) {
-    if (paneltypes & available_panels[i]) {
-      npanels++;
+  plotcontrols->num_panels = 0;
+  plotcontrols->panel_type = NULL;
+  for (i = 0; i < num_panels; i++) {
+    for (j = 0; j < NAVAILABLE_PANELS; j++) {
+      if (paneltypes[i] == available_panels[j]) {
+	plotcontrols->num_panels += 1;
+	REALLOC(plotcontrols->panel_type, plotcontrols->num_panels);
+	plotcontrols->panel_type[plotcontrols->num_panels - 1] = paneltypes[i];
+      }
     }
   }
-  plotcontrols->num_panels = npanels;
-  // Order the panels.
-  MALLOC(plotcontrols->panel_type, plotcontrols->num_panels);
-  for (i = 0, j = 0; i < NAVAILABLE_PANELS; i++) {
-    if (paneltypes & available_panels[i]) {
-      plotcontrols->panel_type[j] = available_panels[i];
-      j++;
-    }
-  }
-  plotcontrols->plot_options = xaxis_type | paneltypes;
+  /* // Order the panels. */
+  /* MALLOC(plotcontrols->panel_type, plotcontrols->num_panels); */
+  /* for (i = 0, j = 0; i < NAVAILABLE_PANELS; i++) { */
+  /*   if (paneltypes & available_panels[i]) { */
+  /*     plotcontrols->panel_type[j] = available_panels[i]; */
+  /*     j++; */
+  /*   } */
+  /* } */
+  plotcontrols->plot_options = xaxis_type;
 
   // Initialise the axis limits.
   MALLOC(plotcontrols->use_panel_limits, plotcontrols->num_panels);
@@ -261,7 +270,7 @@ void init_vis_plotcontrols(struct vis_plotcontrols *plotcontrols,
   plotcontrols->pgplot_device = pgplot_device;
   
   // Set up the panelspec structure for this.
-  splitpanels(1, npanels, pgplot_device, 1, 1, 0, panelspec);
+  splitpanels(1, plotcontrols->num_panels, pgplot_device, 1, 1, 0, panelspec);
 
   // Initialise the products to display.
   plotcontrols->nproducts = 0;
@@ -1019,13 +1028,13 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
                   /* 	 n_plot_lines[i][j], */
                   /* 	 plot_lines[i][j][0][n_plot_lines[i][j] - 1]); */
                   // Need to fix for bin.
-                  if (plot_controls->panel_type[i] == PLOT_AMPLITUDE) {
+                  if (plot_controls->panel_type[i] == VIS_PLOTPANEL_AMPLITUDE) {
                     plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
                       cycle_vis_quantities[k][l][m]->amplitude[n][0];
-                  } else if (plot_controls->panel_type[i] == PLOT_PHASE) {
+                  } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_PHASE) {
                     plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
                       cycle_vis_quantities[k][l][m]->phase[n][0];
-                  } else if (plot_controls->panel_type[i] == PLOT_DELAY) {
+                  } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_DELAY) {
                     plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
                       cycle_vis_quantities[k][l][m]->delay[n][0];
                   }
@@ -1048,7 +1057,7 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
     dy = 0.05 * (max_y - min_y);
     min_y -= dy;
     max_y += dy;
-    if ((plot_controls->panel_type[i] == PLOT_AMPLITUDE) && (min_y < 0)) {
+    if ((plot_controls->panel_type[i] == VIS_PLOTPANEL_AMPLITUDE) && (min_y < 0)) {
       // Amplitude cannot be below 0.
       min_y = 0;
     }
@@ -1074,13 +1083,13 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
       (void)strcpy(xopts, "BCTSZ");
     }
     cpgtbox(xopts, 0, 0, yopts, 0, 0);
-    if (plot_controls->panel_type[i] == PLOT_AMPLITUDE) {
+    if (plot_controls->panel_type[i] == VIS_PLOTPANEL_AMPLITUDE) {
       (void)strcpy(panellabel, "Amplitude");
       (void)strcpy(panelunits, "(Pseudo-Jy)");
-    } else if (plot_controls->panel_type[i] == PLOT_PHASE) {
+    } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_PHASE) {
       (void)strcpy(panellabel, "Phase");
       (void)strcpy(panelunits, "(degrees)");
-    } else if (plot_controls->panel_type[i] == PLOT_DELAY) {
+    } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_DELAY) {
       (void)strcpy(panellabel, "Delay");
       (void)strcpy(panelunits, "(ns)");
     }

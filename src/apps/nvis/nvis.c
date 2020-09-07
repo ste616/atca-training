@@ -407,15 +407,15 @@ static void interpret_command(char *line) {
         action_required = ACTION_REFRESH_PLOT;
       } else if (nels > 1) {
         // Get the panel type from the second argument.
-        change_panel = PLOT_ALL_PANELS;
+        change_panel = VIS_PLOTPANEL_ALL;
         if (minmatch("amplitude", line_els[1], 1)) {
-          change_panel = PLOT_AMPLITUDE;
+          change_panel = VIS_PLOTPANEL_AMPLITUDE;
         } else if (minmatch("phase", line_els[1], 1)) {
-          change_panel = PLOT_PHASE;
+          change_panel = VIS_PLOTPANEL_PHASE;
         } else if (minmatch("delay", line_els[1], 1)) {
-          change_panel = PLOT_DELAY;
+          change_panel = VIS_PLOTPANEL_DELAY;
         }
-        if (change_panel != PLOT_ALL_PANELS) {
+        if (change_panel != VIS_PLOTPANEL_ALL) {
           if (nels == 2) {
             // Reset just the named panel.
             change_vis_plotcontrols_limits(&vis_plotcontrols, change_panel,
@@ -626,7 +626,7 @@ int main(int argc, char *argv[]) {
   // We will need to have a default plot upon entry.
   xaxis_type = PLOT_TIME;
   yaxis_type[0] = VIS_PLOTPANEL_AMPLITUDE;
-  yaxis_type[1] = VIS_PLOTPANEL_PHASE:
+  yaxis_type[1] = VIS_PLOTPANEL_PHASE;
   yaxis_type[2] = VIS_PLOTPANEL_DELAY;
   //yaxis_type = PLOT_AMPLITUDE | PLOT_PHASE | PLOT_DELAY;
   init_vis_plotcontrols(&vis_plotcontrols, xaxis_type, nypanels, yaxis_type,

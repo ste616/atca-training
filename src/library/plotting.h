@@ -41,6 +41,7 @@
 #define VIS_PLOT_IF1     1<<0
 #define VIS_PLOT_IF2     1<<1
 
+#define VIS_PLOTPANEL_ALL         -1
 #define VIS_PLOTPANEL_AMPLITUDE    1
 #define VIS_PLOTPANEL_PHASE        2
 #define VIS_PLOTPANEL_DELAY        3
