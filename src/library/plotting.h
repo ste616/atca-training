@@ -144,6 +144,8 @@ struct vis_plotcontrols {
   bool *use_panel_limits;
   float *panel_limits_min;
   float *panel_limits_max;
+  // The x-axis type.
+  int x_axis_type;
   // The maximum history to plot (minutes).
   float history_length;
   // The history start point (minutes).
@@ -189,6 +191,10 @@ void change_vis_plotcontrols_visbands(struct vis_plotcontrols *plotcontrols,
 void change_vis_plotcontrols_limits(struct vis_plotcontrols *plotcontrols,
                                     int paneltype, bool use_limits,
                                     float limit_min, float limit_max);
+bool product_can_be_x(int product);
+void change_vis_plotcontrols_panels(struct vis_plotcontrols *plotcontrols,
+				    int xaxis_type, int num_panels,
+				    int *paneltypes, struct panelspec *panelspec);
 void init_vis_plotcontrols(struct vis_plotcontrols *plotcontrols,
                            int xaxis_type, int num_panels,
                            int *paneltypes, int nvisbands, char **visbands,

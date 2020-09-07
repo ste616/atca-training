@@ -212,17 +212,34 @@ static void interpret_username(char *line) {
   FREE(line);
 }
 
+int char_to_product(char pstring) {
+  switch (pstring) {
+  case 't':
+    // This is time, which is a valid x-axis.
+    return PLOT_TIME;
+  case 'a':
+    return VIS_PLOTPANEL_AMPLITUDE;
+  case 'p':
+    return VIS_PLOTPANEL_PHASE;
+  case 'd':
+    return VIS_PLOTPANEL_DELAY;
+  }
+  return -1;
+}
+
 // Callback function called for each line when accept-line
 // executed, EOF seen, or EOF character read.
 static void interpret_command(char *line) {
   char **line_els = NULL, *cycomma = NULL, delim[] = " ";
   char duration[VISBUFSIZE], historystart[VISBUFSIZE];
   int nels, i, j, k, array_change_spec, nproducts, pr, closeidx = -1;
-  int change_panel = PLOT_ALL_PANELS, iarg;
+  int change_panel = PLOT_ALL_PANELS, iarg, plen = 0, temp_xaxis_type;
+  int *temp_yaxis_type = NULL, temp_nypanels, idx_low, idx_high, ty;
   float histlength, data_seconds = 0, delta_time = 0, close_time = 0;
   float limit_min, limit_max;
   struct vis_product **vis_products = NULL, *tproduct = NULL;
   bool products_selected, data_time_parsed = false, product_usable, succ = false;
+  bool product_backwards = false;
 
   if ((line == NULL) || (strcasecmp(line, "exit") == 0) ||
       (strcasecmp(line, "quit") == 0)) {
@@ -515,6 +532,48 @@ static void interpret_command(char *line) {
         ampphase_options.include_flagged_data = YES;
       }
       action_required = ACTION_AMPPHASE_OPTIONS_CHANGED;
+    } else {
+      /* fprintf(stderr, "caught a default %d\n", nels); */
+      if (nels == 1) {
+	// We try to interpret the string as the panels to show.
+	// If the second-to-last character is - then the x-axis is at
+	// the end.
+	plen = strlen(line_els[0]);
+	product_backwards = false;
+	if (line_els[0][plen - 2] == '-') {
+	  product_backwards = true;
+	  temp_xaxis_type = char_to_product(line_els[0][plen - 1]);
+	} else {
+	  // Otherwise the x-axis is specified as the first char.
+	  temp_xaxis_type = char_to_product(line_els[0][0]);
+	}
+	// Now go through all the other characters.
+	if (product_backwards) {
+	  idx_low = 0;
+	  idx_high = plen - 1;
+	} else {
+	  idx_low = 1;
+	  idx_high = plen;
+	}
+	for (i = idx_low, temp_nypanels = 0; i < idx_high; i++) {
+	  ty = char_to_product(line_els[0][i]);
+	  if (ty >= 0) {
+	    temp_nypanels += 1;
+	    REALLOC(temp_yaxis_type, temp_nypanels);
+	    temp_yaxis_type[temp_nypanels - 1] = ty;
+	  }
+	}
+	// Make the change if we have enough usable information.
+	if ((product_can_be_x(temp_xaxis_type)) &&
+	    (temp_nypanels > 0)) {
+	  change_vis_plotcontrols_panels(&vis_plotcontrols, temp_xaxis_type,
+					 temp_nypanels, temp_yaxis_type,
+					 &vis_panelspec);
+	  action_required = ACTION_REFRESH_PLOT;
+	}
+	// And free our memory.
+	FREE(temp_yaxis_type);
+      }
     }
     
     FREE(line_els);

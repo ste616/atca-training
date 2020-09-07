@@ -169,8 +169,6 @@ void init_spd_plotcontrols(struct spd_plotcontrols *plotcontrols,
   plotcontrols->pgplot_device = pgplot_device;
 }
 
-#define NAVAILABLE_PANELS 7
-
 void change_vis_plotcontrols_visbands(struct vis_plotcontrols *plotcontrols,
                                       int nvisbands, char **visbands) {
   int i;
@@ -218,24 +216,107 @@ void change_vis_plotcontrols_limits(struct vis_plotcontrols *plotcontrols,
   }
 }
 
+#define NAVAILABLE_PANELS 7
+const int available_panels[NAVAILABLE_PANELS] = { VIS_PLOTPANEL_AMPLITUDE,
+						  VIS_PLOTPANEL_PHASE,
+						  VIS_PLOTPANEL_DELAY,
+						  VIS_PLOTPANEL_TEMPERATURE,
+						  VIS_PLOTPANEL_PRESSURE,
+						  VIS_PLOTPANEL_HUMIDITY,
+						  VIS_PLOTPANEL_SYSTEMP };
+
+bool product_can_be_x(int product) {
+  switch (product) {
+  case PLOT_TIME:
+    return true;
+  }
+  return false;
+}
+
+
+void change_vis_plotcontrols_panels(struct vis_plotcontrols *plotcontrols,
+				    int xaxis_type, int num_panels,
+				    int *paneltypes, struct panelspec *panelspec) {
+  int cnpanels = 0, i, j;
+  bool *climits = NULL;
+  float *climits_min = NULL, *climits_max = NULL;
+  
+  // We change which panels are displayed, and the axis types.
+  if (xaxis_type == DEFAULT) {
+    xaxis_type = PLOT_TIME;
+  }
+  // Count the number of panels we need.
+  for (i = 0; i < num_panels; i++) {
+    for (j = 0; j < NAVAILABLE_PANELS; j++) {
+      if (paneltypes[i] == available_panels[j]) {
+	cnpanels += 1;
+	/* REALLOC(cpanel, cnpanels); */
+	/* cpanel[cnpanels - 1] = paneltypes[i]; */
+	break;
+      }
+    }
+  }
+  // Copy it to the actual structure if we get complete success.
+  if ((cnpanels == num_panels) && (product_can_be_x(xaxis_type))) {
+    // We don't want to reset any currently set axis limits, so it
+    // gets complicated.
+    CALLOC(climits, num_panels);
+    CALLOC(climits_min, num_panels);
+    CALLOC(climits_max, num_panels);
+    for (i = 0; i < num_panels; i++) {
+      for (j = 0; j < plotcontrols->num_panels; j++) {
+	if (paneltypes[i] == plotcontrols->panel_type[j]) {
+	  climits[i] = plotcontrols->use_panel_limits[j];
+	  climits_min[i] = plotcontrols->panel_limits_min[j];
+	  climits_max[i] = plotcontrols->panel_limits_max[j];
+	  break;
+	}
+      }
+    }
+    // Make the changes now.
+    if (plotcontrols->num_panels != num_panels) {
+      // Change the PGPLOT splitting.
+      splitpanels(1, num_panels, plotcontrols->pgplot_device, 1, 1, 0, panelspec);
+    }
+    plotcontrols->x_axis_type = xaxis_type;
+    plotcontrols->num_panels = num_panels;
+    REALLOC(plotcontrols->panel_type, plotcontrols->num_panels);
+    REALLOC(plotcontrols->use_panel_limits, plotcontrols->num_panels);
+    REALLOC(plotcontrols->panel_limits_min, plotcontrols->num_panels);
+    REALLOC(plotcontrols->panel_limits_max, plotcontrols->num_panels);
+    for (i = 0; i < num_panels; i++) {
+      plotcontrols->panel_type[i] = paneltypes[i];
+      plotcontrols->use_panel_limits[i] = climits[i];
+      plotcontrols->panel_limits_min[i] = climits_min[i];
+      plotcontrols->panel_limits_max[i] = climits_max[i];
+    }
+    // Free our memory.
+    FREE(climits);
+    FREE(climits_min);
+    FREE(climits_max);
+  }
+  
+}
+
 void init_vis_plotcontrols(struct vis_plotcontrols *plotcontrols,
                            int xaxis_type, int num_panels,
                            int *paneltypes, int nvisbands, char **visbands,
                            int pgplot_device, struct panelspec *panelspec) {
   int i, j;
-  int available_panels[NAVAILABLE_PANELS] = { VIS_PLOTPANEL_AMPLITUDE,
-                                              VIS_PLOTPANEL_PHASE,
-                                              VIS_PLOTPANEL_DELAY,
-					      VIS_PLOTPANEL_TEMPERATURE,
-					      VIS_PLOTPANEL_PRESSURE,
-					      VIS_PLOTPANEL_HUMIDITY,
-					      VIS_PLOTPANEL_SYSTEMP };
   
   // Initialise the plotcontrols structure and form the panelspec
   // structure using the same information.
   if (xaxis_type == DEFAULT) {
     xaxis_type = PLOT_TIME;
   }
+
+  if (!product_can_be_x(xaxis_type)) {
+    // We can't continue;
+    return;
+  }
+  plotcontrols->plot_options = 0;
+  plotcontrols->x_axis_type = xaxis_type;
+
   // Count the number of panels we need.
   plotcontrols->num_panels = 0;
   plotcontrols->panel_type = NULL;
@@ -245,6 +326,7 @@ void init_vis_plotcontrols(struct vis_plotcontrols *plotcontrols,
 	plotcontrols->num_panels += 1;
 	REALLOC(plotcontrols->panel_type, plotcontrols->num_panels);
 	plotcontrols->panel_type[plotcontrols->num_panels - 1] = paneltypes[i];
+	break;
       }
     }
   }
@@ -256,7 +338,6 @@ void init_vis_plotcontrols(struct vis_plotcontrols *plotcontrols,
   /*     j++; */
   /*   } */
   /* } */
-  plotcontrols->plot_options = xaxis_type;
 
   // Initialise the axis limits.
   MALLOC(plotcontrols->use_panel_limits, plotcontrols->num_panels);
