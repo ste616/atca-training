@@ -533,7 +533,6 @@ static void interpret_command(char *line) {
       }
       action_required = ACTION_AMPPHASE_OPTIONS_CHANGED;
     } else {
-      /* fprintf(stderr, "caught a default %d\n", nels); */
       if (nels == 1) {
 	// We try to interpret the string as the panels to show.
 	// If the second-to-last character is - then the x-axis is at

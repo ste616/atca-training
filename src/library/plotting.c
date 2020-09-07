@@ -330,14 +330,6 @@ void init_vis_plotcontrols(struct vis_plotcontrols *plotcontrols,
       }
     }
   }
-  /* // Order the panels. */
-  /* MALLOC(plotcontrols->panel_type, plotcontrols->num_panels); */
-  /* for (i = 0, j = 0; i < NAVAILABLE_PANELS; i++) { */
-  /*   if (paneltypes & available_panels[i]) { */
-  /*     plotcontrols->panel_type[j] = available_panels[i]; */
-  /*     j++; */
-  /*   } */
-  /* } */
 
   // Initialise the axis limits.
   MALLOC(plotcontrols->use_panel_limits, plotcontrols->num_panels);
