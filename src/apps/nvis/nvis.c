@@ -225,6 +225,12 @@ int char_to_product(char pstring) {
     return VIS_PLOTPANEL_DELAY;
   case 'T':
     return VIS_PLOTPANEL_TEMPERATURE;
+  case 'P':
+    return VIS_PLOTPANEL_PRESSURE;
+  case 'H':
+    return VIS_PLOTPANEL_HUMIDITY;
+  case 'S':
+    return VIS_PLOTPANEL_SYSTEMP;
   }
   return -1;
 }

@@ -249,10 +249,8 @@ void change_vis_plotcontrols_panels(struct vis_plotcontrols *plotcontrols,
   for (i = 0; i < num_panels; i++) {
     for (j = 0; j < NAVAILABLE_PANELS; j++) {
       if (paneltypes[i] == available_panels[j]) {
-	cnpanels += 1;
-	/* REALLOC(cpanel, cnpanels); */
-	/* cpanel[cnpanels - 1] = paneltypes[i]; */
-	break;
+        cnpanels += 1;
+        break;
       }
     }
   }
@@ -265,12 +263,12 @@ void change_vis_plotcontrols_panels(struct vis_plotcontrols *plotcontrols,
     CALLOC(climits_max, num_panels);
     for (i = 0; i < num_panels; i++) {
       for (j = 0; j < plotcontrols->num_panels; j++) {
-	if (paneltypes[i] == plotcontrols->panel_type[j]) {
-	  climits[i] = plotcontrols->use_panel_limits[j];
-	  climits_min[i] = plotcontrols->panel_limits_min[j];
-	  climits_max[i] = plotcontrols->panel_limits_max[j];
-	  break;
-	}
+        if (paneltypes[i] == plotcontrols->panel_type[j]) {
+          climits[i] = plotcontrols->use_panel_limits[j];
+          climits_min[i] = plotcontrols->panel_limits_min[j];
+          climits_max[i] = plotcontrols->panel_limits_max[j];
+          break;
+        }
       }
     }
     // Make the changes now.
@@ -323,10 +321,10 @@ void init_vis_plotcontrols(struct vis_plotcontrols *plotcontrols,
   for (i = 0; i < num_panels; i++) {
     for (j = 0; j < NAVAILABLE_PANELS; j++) {
       if (paneltypes[i] == available_panels[j]) {
-	plotcontrols->num_panels += 1;
-	REALLOC(plotcontrols->panel_type, plotcontrols->num_panels);
-	plotcontrols->panel_type[plotcontrols->num_panels - 1] = paneltypes[i];
-	break;
+        plotcontrols->num_panels += 1;
+        REALLOC(plotcontrols->panel_type, plotcontrols->num_panels);
+        plotcontrols->panel_type[plotcontrols->num_panels - 1] = paneltypes[i];
+        break;
       }
     }
   }
@@ -462,7 +460,7 @@ void splitpanels(int nx, int ny, int pgplot_device, int abut,
     if (info_area_num_lines > 0) {
       cpglen(0, "L", &meas_charwidth, &meas_charheight);
       panelspec->orig_y2 = 1 - 2 * panelspec->orig_y1 -
-	(float)panelspec->num_information_lines * meas_charheight;
+        (float)panelspec->num_information_lines * meas_charheight;
     } else {
       panelspec->orig_y2 = 1 - panelspec->orig_y1;
     }
@@ -889,7 +887,7 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
                    struct panelspec *panelspec,
                    struct vis_plotcontrols *plot_controls,
                    struct scan_header_data **header_data,
-		   struct metinfo **metinfo, struct syscal_data **syscal_data) {
+                   struct metinfo **metinfo, struct syscal_data **syscal_data) {
   int nants = 0, i = 0, n_vis_lines = 0, j = 0, k = 0, p = 0;
   int singleant = 0, l = 0, m = 0, n = 0, connidx = 0;
   int **n_plot_lines = NULL, ipos = -1;
@@ -1112,13 +1110,19 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
                     plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
                       cycle_vis_quantities[k][l][m]->delay[n][0];
                   } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_TEMPERATURE) {
-		    plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
-		      metinfo[k]->temperature;
-		  } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_SYSTEMP) {
-		    // THIS DOESN'T WORK, JUST HERE TO PREVENT ERROR.
-		    plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
-		      syscal_data[k]->online_tsys[0][0][0];
-		  }
+                    plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
+                      metinfo[k]->temperature;
+                  } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_PRESSURE) {
+                    plot_lines[i][j][l][n_plot_lines[i][j] - 1] =
+                      metinfo[k]->air_pressure;
+                  } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_HUMIDITY) {
+                    plot_lines[i][j][l][n_plot_lines[i][j] - 1] =
+                      metinfo[k]->humidity;
+                  } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_SYSTEMP) {
+                    // THIS DOESN'T WORK, JUST HERE TO PREVENT ERROR.
+                    plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
+                      syscal_data[k]->online_tsys[0][0][0];
+                  }
                   MINASSIGN(min_y, plot_lines[i][j][1][n_plot_lines[i][j] - 1]);
                   MAXASSIGN(max_y, plot_lines[i][j][1][n_plot_lines[i][j] - 1]);
                   break;
@@ -1176,6 +1180,12 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
     } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_TEMPERATURE) {
       (void)strcpy(panellabel, "Air Temp.");
       (void)strcpy(panelunits, "(C)");
+    } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_PRESSURE) {
+      (void)strcpy(panellabel, "Air Press.");
+      (void)strcpy(panelunits, "(hPa)");
+    } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_HUMIDITY) {
+      (void)strcpy(panellabel, "Rel. Humidity");
+      (void)strcpy(panelunits, "(%)");
     }
     cpgmtxt("L", 2.2, 0.5, 0.5, panellabel);
     cpgmtxt("R", 2.2, 0.5, 0.5, panelunits);
@@ -1221,30 +1231,30 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
       // Then print the frequencies of the bands at the top right.
       maxwidth = 0;
       for (j = 0; j < plot_controls->nvisbands; j++) {
-	snprintf(bandstring, BUFSIZE, "%c%c,%c%c = %s",
-		 ('A' + (j * 2)), ('A' + (j * 2)),
-		 ('B' + (j * 2)), ('B' + (j * 2)),
-		 plot_controls->visbands[j]);
-	twidth = fracwidth(panelspec, min_x, max_x, 0, i, bandstring);
-	MAXASSIGN(maxwidth, twidth);
-	ipos = find_if_name(vlh, plot_controls->visbands[j]) - 1;
-	snprintf(bandstring, BUFSIZE, "%.0f", vlh->if_centre_freq[ipos]);
-	twidth = fracwidth(panelspec, min_x, max_x, 0, i, bandstring);
-	MAXASSIGN(maxwidth, twidth);
+        snprintf(bandstring, BUFSIZE, "%c%c,%c%c = %s",
+                 ('A' + (j * 2)), ('A' + (j * 2)),
+                 ('B' + (j * 2)), ('B' + (j * 2)),
+                 plot_controls->visbands[j]);
+        twidth = fracwidth(panelspec, min_x, max_x, 0, i, bandstring);
+        MAXASSIGN(maxwidth, twidth);
+        ipos = find_if_name(vlh, plot_controls->visbands[j]) - 1;
+        snprintf(bandstring, BUFSIZE, "%.0f", vlh->if_centre_freq[ipos]);
+        twidth = fracwidth(panelspec, min_x, max_x, 0, i, bandstring);
+        MAXASSIGN(maxwidth, twidth);
       }
-
+      
       cxpos = 1 - (plot_controls->nvisbands * maxwidth + padlabel);
       cpgqch(&cch);
       for (j = 0; j < plot_controls->nvisbands; j++) {
-	ipos = find_if_name(vlh, plot_controls->visbands[j]) - 1;
-	snprintf(bandstring, BUFSIZE, "%.0f", vlh->if_centre_freq[ipos]);
-	cpgmtxt("T", 0.5, cxpos, 0, bandstring);
-	snprintf(bandstring, BUFSIZE, "%c%c,%c%c = %s",
-		 ('A' + (j * 2)), ('A' + (j * 2)),
-		 ('B' + (j * 2)), ('B' + (j * 2)),
-		 plot_controls->visbands[j]);
-	cpgmtxt("T", 0.5 + cch, cxpos, 0, bandstring);
-	cxpos += maxwidth + (padlabel / (plot_controls->nvisbands - 1));
+        ipos = find_if_name(vlh, plot_controls->visbands[j]) - 1;
+        snprintf(bandstring, BUFSIZE, "%.0f", vlh->if_centre_freq[ipos]);
+        cpgmtxt("T", 0.5, cxpos, 0, bandstring);
+        snprintf(bandstring, BUFSIZE, "%c%c,%c%c = %s",
+                 ('A' + (j * 2)), ('A' + (j * 2)),
+                 ('B' + (j * 2)), ('B' + (j * 2)),
+                 plot_controls->visbands[j]);
+        cpgmtxt("T", 0.5 + cch, cxpos, 0, bandstring);
+        cxpos += maxwidth + (padlabel / (plot_controls->nvisbands - 1));
       }
     }
     cpgsci(1);
@@ -1462,53 +1472,53 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
             cpglen(4, information_text, &information_text_width, &information_text_height);
             information_x_pos += information_text_width + 0.02;
             // The system temperatures.
-	    CALLOC(systemp_strings, compiled_tsys_data->num_ants);
-	    maxlen_tsys = 0;
-	    // We may only display the Tsys for a maximum number of IFs.
-	    tsys_num_ifs = ((compiled_tsys_data->num_ifs > max_tsys_ifs) &&
-			    (max_tsys_ifs > 0)) ?
-	      max_tsys_ifs : compiled_tsys_data->num_ifs;
-	    for (j = 0; j < compiled_tsys_data->num_ants; j++) {
-	      CALLOC(systemp_strings[j], tsys_num_ifs);
-	      for (k = 0; k < tsys_num_ifs; k++) {
-		CALLOC(systemp_strings[j][k], BUFSIZE);
-		snprintf(systemp_strings[j][k], BUFSIZE, "%.1f / %.1f",
-			 compiled_tsys_data->online_tsys[j][k][CAL_XX],
-			 compiled_tsys_data->online_tsys[j][k][CAL_YY]);
-		cpglen(4, systemp_strings[j][k], &information_text_width,
-		       &information_text_height);
-		MAXASSIGN(maxlen_tsys, information_text_width);
-	      }
-	    }
-	    for (j = 0; j <= tsys_num_ifs; j++) {
-	      for (k = 0; k <= compiled_tsys_data->num_ants; k++) {
-		if ((j == 0) && (k > 0)) {
-		  snprintf(information_text, BUFSIZE, "CA0%d",
-			   compiled_tsys_data->ant_num[k - 1]);
-		  cpgptxt((information_x_pos + maxlen_tsys +
-			   ((float)(k - 1) * (maxlen_tsys + 0.02))),
-			  YPOS_LINE(0), 0, 0.5, information_text);
-		} else if ((j > 0) && (k == 0)) {
-		  snprintf(information_text, BUFSIZE, "IF%d",
-			   compiled_tsys_data->if_num[j - 1]);
-		  cpgptxt(information_x_pos, YPOS_LINE(j), 0, 0, information_text);
-		} else if ((j == 0) && (k == 0)) {
-		  cpgptxt(information_x_pos, YPOS_LINE(0), 0, 0, "TSYS");
-		} else {
-		  cpgptxt((information_x_pos + (maxlen_tsys / 2.0) +
-			   ((float)(k - 1) * (maxlen_tsys + 0.02))),
-			  YPOS_LINE(j), 0, 0, systemp_strings[k - 1][j - 1]);
-		}
-	      }
-	    }
-	    // Reset back to the left and plot some weather parameters.
-	    information_x_pos = 0.01;
-	    snprintf(information_text, BUFSIZE, "T=%.1f C P=%.1f hPa H=%.1f %%",
-		     cycle_ampphase[0][0]->metinfo.temperature,
-		     cycle_ampphase[0][0]->metinfo.air_pressure,
-		     cycle_ampphase[0][0]->metinfo.humidity);
-	    cpgptxt(information_x_pos, YPOS_LINE(1), 0, 0, information_text);
-	    
+            CALLOC(systemp_strings, compiled_tsys_data->num_ants);
+            maxlen_tsys = 0;
+            // We may only display the Tsys for a maximum number of IFs.
+            tsys_num_ifs = ((compiled_tsys_data->num_ifs > max_tsys_ifs) &&
+                            (max_tsys_ifs > 0)) ?
+              max_tsys_ifs : compiled_tsys_data->num_ifs;
+            for (j = 0; j < compiled_tsys_data->num_ants; j++) {
+              CALLOC(systemp_strings[j], tsys_num_ifs);
+              for (k = 0; k < tsys_num_ifs; k++) {
+                CALLOC(systemp_strings[j][k], BUFSIZE);
+                snprintf(systemp_strings[j][k], BUFSIZE, "%.1f / %.1f",
+                         compiled_tsys_data->online_tsys[j][k][CAL_XX],
+                         compiled_tsys_data->online_tsys[j][k][CAL_YY]);
+                cpglen(4, systemp_strings[j][k], &information_text_width,
+                       &information_text_height);
+                MAXASSIGN(maxlen_tsys, information_text_width);
+              }
+            }
+            for (j = 0; j <= tsys_num_ifs; j++) {
+              for (k = 0; k <= compiled_tsys_data->num_ants; k++) {
+                if ((j == 0) && (k > 0)) {
+                  snprintf(information_text, BUFSIZE, "CA0%d",
+                           compiled_tsys_data->ant_num[k - 1]);
+                  cpgptxt((information_x_pos + maxlen_tsys +
+                           ((float)(k - 1) * (maxlen_tsys + 0.02))),
+                          YPOS_LINE(0), 0, 0.5, information_text);
+                } else if ((j > 0) && (k == 0)) {
+                  snprintf(information_text, BUFSIZE, "IF%d",
+                           compiled_tsys_data->if_num[j - 1]);
+                  cpgptxt(information_x_pos, YPOS_LINE(j), 0, 0, information_text);
+                } else if ((j == 0) && (k == 0)) {
+                  cpgptxt(information_x_pos, YPOS_LINE(0), 0, 0, "TSYS");
+                } else {
+                  cpgptxt((information_x_pos + (maxlen_tsys / 2.0) +
+                           ((float)(k - 1) * (maxlen_tsys + 0.02))),
+                          YPOS_LINE(j), 0, 0, systemp_strings[k - 1][j - 1]);
+                }
+              }
+            }
+            // Reset back to the left and plot some weather parameters.
+            information_x_pos = 0.01;
+            snprintf(information_text, BUFSIZE, "T=%.1f C P=%.1f hPa H=%.1f %%",
+                     cycle_ampphase[0][0]->metinfo.temperature,
+                     cycle_ampphase[0][0]->metinfo.air_pressure,
+                     cycle_ampphase[0][0]->metinfo.humidity);
+            cpgptxt(information_x_pos, YPOS_LINE(1), 0, 0, information_text);
+            
           }
           changepanel(px, py, panelspec);
           // Set the title for the plot.
