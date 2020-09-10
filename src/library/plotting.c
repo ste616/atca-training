@@ -216,14 +216,19 @@ void change_vis_plotcontrols_limits(struct vis_plotcontrols *plotcontrols,
   }
 }
 
-#define NAVAILABLE_PANELS 7
+#define NAVAILABLE_PANELS 12
 const int available_panels[NAVAILABLE_PANELS] = { VIS_PLOTPANEL_AMPLITUDE,
 						  VIS_PLOTPANEL_PHASE,
 						  VIS_PLOTPANEL_DELAY,
 						  VIS_PLOTPANEL_TEMPERATURE,
 						  VIS_PLOTPANEL_PRESSURE,
 						  VIS_PLOTPANEL_HUMIDITY,
-						  VIS_PLOTPANEL_SYSTEMP };
+						  VIS_PLOTPANEL_SYSTEMP,
+						  VIS_PLOTPANEL_WINDSPEED,
+						  VIS_PLOTPANEL_WINDDIR,
+						  VIS_PLOTPANEL_RAINGAUGE,
+						  VIS_PLOTPANEL_SEEMONPHASE,
+						  VIS_PLOTPANEL_SEEMONRMS };
 
 bool product_can_be_x(int product) {
   switch (product) {
@@ -1118,6 +1123,21 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
                   } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_HUMIDITY) {
                     plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
                       metinfo[k]->humidity;
+		  } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_WINDSPEED) {
+		    plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
+		      metinfo[k]->wind_speed;
+		  } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_WINDDIR) {
+		    plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
+		      metinfo[k]->wind_direction;
+		  } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_RAINGAUGE) {
+		    plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
+		      metinfo[k]->rain_gauge;
+		  } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_SEEMONPHASE) {
+		    plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
+		      metinfo[k]->seemon_phase;
+		  } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_SEEMONRMS) {
+		    plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
+		      metinfo[k]->seemon_rms;
                   } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_SYSTEMP) {
                     // THIS DOESN'T WORK, JUST HERE TO PREVENT ERROR.
                     plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
@@ -1153,6 +1173,13 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
       min_y = plot_controls->panel_limits_min[i];
       max_y = plot_controls->panel_limits_max[i];
     }
+
+    // Now check that min and max aren't the same, and put in a bit of padding
+    // if they are.
+    if (min_y == max_y) {
+      min_y -= 0.1;
+      max_y += 0.1;
+    }
     
     cpgswin(min_x, max_x, min_y, max_y);
     cpgsci(3);
@@ -1186,6 +1213,21 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
     } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_HUMIDITY) {
       (void)strcpy(panellabel, "Rel. Humidity");
       (void)strcpy(panelunits, "(%)");
+    } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_WINDSPEED) {
+      (void)strcpy(panellabel, "Wind Speed");
+      (void)strcpy(panelunits, "(km/h)");
+    } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_WINDDIR) {
+      (void)strcpy(panellabel, "Wind Dir.");
+      (void)strcpy(panelunits, "(deg)");
+    } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_RAINGAUGE) {
+      (void)strcpy(panellabel, "Rain");
+      (void)strcpy(panelunits, "(mm)");
+    } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_SEEMONPHASE) {
+      (void)strcpy(panellabel, "See. Mon. Phase");
+      (void)strcpy(panelunits, "(deg)");
+    } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_SEEMONRMS) {
+      (void)strcpy(panellabel, "See. Mon. RMS");
+      (void)strcpy(panelunits, "(micron)");
     }
     cpgmtxt("L", 2.2, 0.5, 0.5, panellabel);
     cpgmtxt("R", 2.2, 0.5, 0.5, panelunits);

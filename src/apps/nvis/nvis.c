@@ -214,23 +214,33 @@ static void interpret_username(char *line) {
 
 int char_to_product(char pstring) {
   switch (pstring) {
+  case 'a':
+    return VIS_PLOTPANEL_AMPLITUDE;
+  case 'd':
+    return VIS_PLOTPANEL_DELAY;
+  case 'D':
+    return VIS_PLOTPANEL_WINDDIR;
+  case 'H':
+    return VIS_PLOTPANEL_HUMIDITY;
+  case 'p':
+    return VIS_PLOTPANEL_PHASE;
+  case 'P':
+    return VIS_PLOTPANEL_PRESSURE;
+  case 'R':
+    return VIS_PLOTPANEL_RAINGAUGE;
+  case 'S':
+    return VIS_PLOTPANEL_SYSTEMP;
   case 't':
     // This is time, which is a valid x-axis.
     return PLOT_TIME;
-  case 'a':
-    return VIS_PLOTPANEL_AMPLITUDE;
-  case 'p':
-    return VIS_PLOTPANEL_PHASE;
-  case 'd':
-    return VIS_PLOTPANEL_DELAY;
   case 'T':
     return VIS_PLOTPANEL_TEMPERATURE;
-  case 'P':
-    return VIS_PLOTPANEL_PRESSURE;
-  case 'H':
-    return VIS_PLOTPANEL_HUMIDITY;
-  case 'S':
-    return VIS_PLOTPANEL_SYSTEMP;
+  case 'V':
+    return VIS_PLOTPANEL_WINDSPEED;
+  case 'X':
+    return VIS_PLOTPANEL_SEEMONPHASE;
+  case 'Y':
+    return VIS_PLOTPANEL_SEEMONRMS;
   }
   return -1;
 }
@@ -441,6 +451,22 @@ static void interpret_command(char *line) {
           change_panel = VIS_PLOTPANEL_DELAY;
         } else if (minmatch("temperature", line_els[1], 4)) {
 	  change_panel = VIS_PLOTPANEL_TEMPERATURE;
+	} else if (minmatch("pressure", line_els[1], 4)) {
+	  change_panel = VIS_PLOTPANEL_PRESSURE;
+	} else if (minmatch("humidity", line_els[1], 4)) {
+	  change_panel = VIS_PLOTPANEL_HUMIDITY;
+	} else if (minmatch("systemp", line_els[1], 4)) {
+	  change_panel = VIS_PLOTPANEL_SYSTEMP;
+	} else if (minmatch("windspeed", line_els[1], 5)) {
+	  change_panel = VIS_PLOTPANEL_WINDSPEED;
+	} else if (minmatch("winddirection", line_els[1], 5)) {
+	  change_panel = VIS_PLOTPANEL_WINDDIR;
+	} else if (minmatch("rain", line_els[1], 3)) {
+	  change_panel = VIS_PLOTPANEL_RAINGAUGE;
+	} else if (minmatch("seemonphase", line_els[1], 7)) {
+	  change_panel = VIS_PLOTPANEL_SEEMONPHASE;
+	} else if (minmatch("seemonrms", line_els[1], 7)) {
+	  change_panel = VIS_PLOTPANEL_SEEMONRMS;
 	}
         if (change_panel != VIS_PLOTPANEL_ALL) {
           if (nels == 2) {
