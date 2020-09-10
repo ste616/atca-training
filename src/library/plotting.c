@@ -1113,10 +1113,10 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
                     plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
                       metinfo[k]->temperature;
                   } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_PRESSURE) {
-                    plot_lines[i][j][l][n_plot_lines[i][j] - 1] =
+                    plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
                       metinfo[k]->air_pressure;
                   } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_HUMIDITY) {
-                    plot_lines[i][j][l][n_plot_lines[i][j] - 1] =
+                    plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
                       metinfo[k]->humidity;
                   } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_SYSTEMP) {
                     // THIS DOESN'T WORK, JUST HERE TO PREVENT ERROR.
