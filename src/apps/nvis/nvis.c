@@ -450,24 +450,24 @@ static void interpret_command(char *line) {
         } else if (minmatch("delay", line_els[1], 1)) {
           change_panel = VIS_PLOTPANEL_DELAY;
         } else if (minmatch("temperature", line_els[1], 4)) {
-	  change_panel = VIS_PLOTPANEL_TEMPERATURE;
-	} else if (minmatch("pressure", line_els[1], 4)) {
-	  change_panel = VIS_PLOTPANEL_PRESSURE;
-	} else if (minmatch("humidity", line_els[1], 4)) {
-	  change_panel = VIS_PLOTPANEL_HUMIDITY;
-	} else if (minmatch("systemp", line_els[1], 4)) {
-	  change_panel = VIS_PLOTPANEL_SYSTEMP;
-	} else if (minmatch("windspeed", line_els[1], 5)) {
-	  change_panel = VIS_PLOTPANEL_WINDSPEED;
-	} else if (minmatch("winddirection", line_els[1], 5)) {
-	  change_panel = VIS_PLOTPANEL_WINDDIR;
-	} else if (minmatch("rain", line_els[1], 3)) {
-	  change_panel = VIS_PLOTPANEL_RAINGAUGE;
-	} else if (minmatch("seemonphase", line_els[1], 7)) {
-	  change_panel = VIS_PLOTPANEL_SEEMONPHASE;
-	} else if (minmatch("seemonrms", line_els[1], 7)) {
-	  change_panel = VIS_PLOTPANEL_SEEMONRMS;
-	}
+          change_panel = VIS_PLOTPANEL_TEMPERATURE;
+        } else if (minmatch("pressure", line_els[1], 4)) {
+          change_panel = VIS_PLOTPANEL_PRESSURE;
+        } else if (minmatch("humidity", line_els[1], 4)) {
+          change_panel = VIS_PLOTPANEL_HUMIDITY;
+        } else if (minmatch("systemp", line_els[1], 4)) {
+          change_panel = VIS_PLOTPANEL_SYSTEMP;
+        } else if (minmatch("windspeed", line_els[1], 5)) {
+          change_panel = VIS_PLOTPANEL_WINDSPEED;
+        } else if (minmatch("winddirection", line_els[1], 5)) {
+          change_panel = VIS_PLOTPANEL_WINDDIR;
+        } else if (minmatch("rain", line_els[1], 3)) {
+          change_panel = VIS_PLOTPANEL_RAINGAUGE;
+        } else if (minmatch("seemonphase", line_els[1], 7)) {
+          change_panel = VIS_PLOTPANEL_SEEMONPHASE;
+        } else if (minmatch("seemonrms", line_els[1], 7)) {
+          change_panel = VIS_PLOTPANEL_SEEMONRMS;
+        }
         if (change_panel != VIS_PLOTPANEL_ALL) {
           if (nels == 2) {
             // Reset just the named panel.
@@ -570,44 +570,44 @@ static void interpret_command(char *line) {
       action_required = ACTION_AMPPHASE_OPTIONS_CHANGED;
     } else {
       if (nels == 1) {
-	// We try to interpret the string as the panels to show.
-	// If the second-to-last character is - then the x-axis is at
-	// the end.
-	plen = strlen(line_els[0]);
-	product_backwards = false;
-	if (line_els[0][plen - 2] == '-') {
-	  product_backwards = true;
-	  temp_xaxis_type = char_to_product(line_els[0][plen - 1]);
-	} else {
-	  // Otherwise the x-axis is specified as the first char.
-	  temp_xaxis_type = char_to_product(line_els[0][0]);
-	}
-	// Now go through all the other characters.
-	if (product_backwards) {
-	  idx_low = 0;
-	  idx_high = plen - 1;
-	} else {
-	  idx_low = 1;
-	  idx_high = plen;
-	}
-	for (i = idx_low, temp_nypanels = 0; i < idx_high; i++) {
-	  ty = char_to_product(line_els[0][i]);
-	  if (ty >= 0) {
-	    temp_nypanels += 1;
-	    REALLOC(temp_yaxis_type, temp_nypanels);
-	    temp_yaxis_type[temp_nypanels - 1] = ty;
-	  }
-	}
-	// Make the change if we have enough usable information.
-	if ((product_can_be_x(temp_xaxis_type)) &&
-	    (temp_nypanels > 0)) {
-	  change_vis_plotcontrols_panels(&vis_plotcontrols, temp_xaxis_type,
-					 temp_nypanels, temp_yaxis_type,
-					 &vis_panelspec);
-	  action_required = ACTION_REFRESH_PLOT;
-	}
-	// And free our memory.
-	FREE(temp_yaxis_type);
+        // We try to interpret the string as the panels to show.
+        // If the second-to-last character is - then the x-axis is at
+        // the end.
+        plen = strlen(line_els[0]);
+        product_backwards = false;
+        if (line_els[0][plen - 2] == '-') {
+          product_backwards = true;
+          temp_xaxis_type = char_to_product(line_els[0][plen - 1]);
+        } else {
+          // Otherwise the x-axis is specified as the first char.
+          temp_xaxis_type = char_to_product(line_els[0][0]);
+        }
+        // Now go through all the other characters.
+        if (product_backwards) {
+          idx_low = 0;
+          idx_high = plen - 1;
+        } else {
+          idx_low = 1;
+          idx_high = plen;
+        }
+        for (i = idx_low, temp_nypanels = 0; i < idx_high; i++) {
+          ty = char_to_product(line_els[0][i]);
+          if (ty >= 0) {
+            temp_nypanels += 1;
+            REALLOC(temp_yaxis_type, temp_nypanels);
+            temp_yaxis_type[temp_nypanels - 1] = ty;
+          }
+        }
+        // Make the change if we have enough usable information.
+        if ((product_can_be_x(temp_xaxis_type)) &&
+            (temp_nypanels > 0)) {
+          change_vis_plotcontrols_panels(&vis_plotcontrols, temp_xaxis_type,
+                                         temp_nypanels, temp_yaxis_type,
+                                         &vis_panelspec);
+          action_required = ACTION_REFRESH_PLOT;
+        }
+        // And free our memory.
+        FREE(temp_yaxis_type);
       }
     }
     
@@ -768,7 +768,7 @@ int main(int argc, char *argv[]) {
       make_vis_plot(vis_data.vis_quantities, vis_data.nviscycles,
                     vis_data.num_ifs, 4, sort_baselines,
                     &vis_panelspec, &vis_plotcontrols, vis_data.header_data,
-		    vis_data.metinfo, vis_data.syscal_data);
+                    vis_data.metinfo, vis_data.syscal_data);
       action_required -= ACTION_REFRESH_PLOT;
     }
 

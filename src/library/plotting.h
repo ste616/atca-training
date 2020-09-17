@@ -178,6 +178,8 @@ struct vis_line {
   char label[BUFSIZE];
   // The colour.
   int pgplot_colour;
+  // The linestyle.
+  int line_style;
   // To come: baseline length for sorting.
   float baseline_length;
 };
@@ -189,8 +191,8 @@ void change_spd_plotcontrols(struct spd_plotcontrols *plotcontrols,
 int change_spd_plotflags(struct spd_plotcontrols *plotcontrols,
                          long int changed_flags, int add_remove);
 void init_spd_plotcontrols(struct spd_plotcontrols *plotcontrols,
-			   int xaxis_type, int yaxis_type, int pols,
-			   int pgplot_device);
+                           int xaxis_type, int yaxis_type, int pols,
+                           int pgplot_device);
 void change_vis_plotcontrols_visbands(struct vis_plotcontrols *plotcontrols,
                                       int nvisbands, char **visbands);
 void change_vis_plotcontrols_limits(struct vis_plotcontrols *plotcontrols,
@@ -198,8 +200,8 @@ void change_vis_plotcontrols_limits(struct vis_plotcontrols *plotcontrols,
                                     float limit_min, float limit_max);
 bool product_can_be_x(int product);
 void change_vis_plotcontrols_panels(struct vis_plotcontrols *plotcontrols,
-				    int xaxis_type, int num_panels,
-				    int *paneltypes, struct panelspec *panelspec);
+                                    int xaxis_type, int num_panels,
+                                    int *paneltypes, struct panelspec *panelspec);
 void init_vis_plotcontrols(struct vis_plotcontrols *plotcontrols,
                            int xaxis_type, int num_panels,
                            int *paneltypes, int nvisbands, char **visbands,
@@ -213,27 +215,28 @@ void splitpanels(int nx, int ny, int pgplot_device, int abut,
 void changepanel(int x, int y, struct panelspec *panelspec);
 void plotnum_to_xy(struct panelspec *panelspec, int plotnum, int *px, int *py);
 void plotpanel_minmax(struct ampphase **plot_ampphase,
-		      struct spd_plotcontrols *plot_controls,
-		      int plot_baseline_idx, int npols, int *polidx,
-		      float *plotmin_x, float *plotmax_x,
-		      float *plotmin_y, float *plotmax_y);
+                      struct spd_plotcontrols *plot_controls,
+                      int plot_baseline_idx, int npols, int *polidx,
+                      float *plotmin_x, float *plotmax_x,
+                      float *plotmin_y, float *plotmax_y);
 void add_vis_line(struct vis_line ***vis_lines, int *n_vis_lines,
                   int ant1, int ant2, int ifnum, char *if_label, int pol,
+                  int colour, int line_style,
                   struct scan_header_data *scan_header_data);
 void vis_interpret_pol(char *pol, struct vis_product *vis_product);
 int vis_interpret_product(char *product, struct vis_product **vis_product);
 float fracwidth(struct panelspec *panelspec,
-		float axis_min_x, float axis_max_x,
-		int x, int y, char *label);
+                float axis_min_x, float axis_max_x,
+                int x, int y, char *label);
 void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
                    int ncycles, int *cycle_numifs, int npols,
                    bool sort_baselines,
                    struct panelspec *panelspec,
                    struct vis_plotcontrols *plot_controls,
                    struct scan_header_data **header_data,
-		   struct metinfo **metinfo, struct syscal_data **syscal_data);
+                   struct metinfo **metinfo, struct syscal_data **syscal_data);
 void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspec,
                    struct spd_plotcontrols *plot_controls,
                    struct scan_header_data *scan_header_data,
-		   struct syscal_data *compiled_tsys_data,
+                   struct syscal_data *compiled_tsys_data,
                    int max_tsys_ifs, bool all_data_present);

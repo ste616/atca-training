@@ -240,8 +240,8 @@ bool product_can_be_x(int product) {
 
 
 void change_vis_plotcontrols_panels(struct vis_plotcontrols *plotcontrols,
-				    int xaxis_type, int num_panels,
-				    int *paneltypes, struct panelspec *panelspec) {
+                                    int xaxis_type, int num_panels,
+                                    int *paneltypes, struct panelspec *panelspec) {
   int cnpanels = 0, i, j;
   bool *climits = NULL;
   float *climits_min = NULL, *climits_max = NULL;
@@ -744,7 +744,8 @@ void pol_to_vis_name(int pol, int if_num, char *vis_name) {
 }
 
 void add_vis_line(struct vis_line ***vis_lines, int *n_vis_lines,
-                  int ant1, int ant2, int ifnum, char *if_label, int pol,
+                  int ant1, int ant2, int ifnum, char *if_label,
+                  int pol, int colour, int line_style,
                   struct scan_header_data *header_data) {
   struct vis_line *new_line = NULL;
   double dx, dy, dz;
@@ -760,11 +761,21 @@ void add_vis_line(struct vis_line ***vis_lines, int *n_vis_lines,
   pol_to_vis_name(new_line->pol, ifnum, polname);
   snprintf(new_line->label, BUFSIZE, "%d%d%s",
 	   new_line->ant1, new_line->ant2, polname);
-  dx = header_data->ant_cartesian[ant2 - 1][0] - header_data->ant_cartesian[ant1 - 1][0];
-  dy = header_data->ant_cartesian[ant2 - 1][1] - header_data->ant_cartesian[ant1 - 1][1];
-  dz = header_data->ant_cartesian[ant2 - 1][2] - header_data->ant_cartesian[ant1 - 1][2];
+  dx = header_data->ant_cartesian[ant2 - 1][0] -
+    header_data->ant_cartesian[ant1 - 1][0];
+  dy = header_data->ant_cartesian[ant2 - 1][1] -
+    header_data->ant_cartesian[ant1 - 1][1];
+  dz = header_data->ant_cartesian[ant2 - 1][2] -
+    header_data->ant_cartesian[ant1 - 1][2];
   new_line->baseline_length = (float)sqrt(dx * dx + dy * dy + dz * dz);
 
+  new_line->pgplot_colour = colour;
+  if (line_style == DEFAULT) {
+    new_line->line_style = 1;
+  } else {
+    new_line->line_style = line_style;
+  }
+  
   (*vis_lines)[*n_vis_lines - 1] = new_line;
 }
 
@@ -894,14 +905,17 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
                    struct scan_header_data **header_data,
                    struct metinfo **metinfo, struct syscal_data **syscal_data) {
   int nants = 0, i = 0, n_vis_lines = 0, j = 0, k = 0, p = 0;
-  int singleant = 0, l = 0, m = 0, n = 0, connidx = 0;
-  int **n_plot_lines = NULL, ipos = -1;
+  int singleant = 0, l = 0, m = 0, n = 0, ii, connidx = 0;
+  int sysantidx = -1, sysifidx = -1, syspolidx = -1;
+  int **n_plot_lines = NULL, ipos = -1, *panel_n_vis_lines = NULL, n_active_ants = 0;
+  int n_tsys_vis_lines = 0, n_meta_vis_lines = 0, dbrk;
   float ****plot_lines = NULL, min_x, max_x, min_y, max_y;
   float cxpos, dxpos, labtotalwidth, labspacing, dy, maxwidth, twidth;
   float padlabel = 0.01, cch;
   char xopts[BUFSIZE], yopts[BUFSIZE], panellabel[BUFSIZE], panelunits[BUFSIZE];
   char antstring[BUFSIZE], bandstring[BUFSIZE];
-  struct vis_line **vis_lines = NULL;
+  struct vis_line **vis_lines = NULL, **tsys_vis_lines = NULL, **meta_vis_line = NULL;
+  struct vis_line ***plot_vis_lines = NULL;
   struct scan_header_data *vlh = NULL;
 
   // Work out how many antennas we will show.
@@ -921,6 +935,13 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
 
   // Select a representative scan header.
   vlh = header_data[ncycles - 1];
+
+  // Work out how many active antennas there are.
+  for (i = 1; i <= MAXANTS; i++) {
+    if ((1 << i) & plot_controls->array_spec) {
+      n_active_ants += 1;
+    }
+  }
   
   // We make up to 16 lines per panel.
   // The first dimension will be the panel number.
@@ -928,7 +949,8 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
   MALLOC(n_plot_lines, plot_controls->num_panels);
   // The second dimension will be the line number.
   // We need to work out how to allocate up to 16 lines.
-  for (p = 0, n_vis_lines = 0; p < plot_controls->nproducts; p++) {
+  for (p = 0, n_vis_lines = 0, n_tsys_vis_lines = 0;
+       p < plot_controls->nproducts; p++) {
     // Check if only a single antenna is requested.
     for (i = 1; i <= MAXANTS; i++) {
       if ((plot_controls->vis_products[p]->antenna_spec == (1<<i)) &&
@@ -949,21 +971,25 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
               if (plot_controls->vis_products[p]->pol_spec & PLOT_POL_XX) {
                 if (plot_controls->vis_products[p]->if_spec & VIS_PLOT_IF1) {
                   add_vis_line(&vis_lines, &n_vis_lines,
-                               i, j, 1, plot_controls->visbands[0], POL_XX, vlh);
+                               i, j, 1, plot_controls->visbands[0], 
+                               POL_XX, DEFAULT, DEFAULT, vlh);
                 }
                 if (plot_controls->vis_products[p]->if_spec & VIS_PLOT_IF2) {
                   add_vis_line(&vis_lines, &n_vis_lines,
-                               i, j, 2, plot_controls->visbands[1], POL_XX, vlh);
+                               i, j, 2, plot_controls->visbands[1], POL_XX,
+                               DEFAULT, DEFAULT, vlh);
                 }
               }
               if (plot_controls->vis_products[p]->pol_spec & PLOT_POL_YY) {
                 if (plot_controls->vis_products[p]->if_spec & VIS_PLOT_IF1) {
                   add_vis_line(&vis_lines, &n_vis_lines,
-                               i, j, 1, plot_controls->visbands[0], POL_YY, vlh);
+                               i, j, 1, plot_controls->visbands[0], POL_YY,
+                               DEFAULT, DEFAULT, vlh);
                 }
                 if (plot_controls->vis_products[p]->if_spec & VIS_PLOT_IF2) {
                   add_vis_line(&vis_lines, &n_vis_lines,
-                               i, j, 2, plot_controls->visbands[1], POL_YY, vlh);
+                               i, j, 2, plot_controls->visbands[1], POL_YY,
+                               DEFAULT, DEFAULT, vlh);
                 }
               }
             } else {
@@ -971,11 +997,44 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
               if (plot_controls->vis_products[p]->pol_spec & PLOT_POL_XY) {
                 if (plot_controls->vis_products[p]->if_spec & VIS_PLOT_IF1) {
                   add_vis_line(&vis_lines, &n_vis_lines,
-                               i, j, 1, plot_controls->visbands[0], POL_XY, vlh);
+                               i, j, 1, plot_controls->visbands[0], POL_XY,
+                               DEFAULT, DEFAULT, vlh);
                 }
                 if (plot_controls->vis_products[p]->if_spec & VIS_PLOT_IF2) {
                   add_vis_line(&vis_lines, &n_vis_lines,
-                               i, j, 2, plot_controls->visbands[1], POL_XY, vlh);
+                               i, j, 2, plot_controls->visbands[1], POL_XY,
+                               DEFAULT, DEFAULT, vlh);
+                }
+              }
+              // Prepare if we're plotting Tsys.
+              if (plot_controls->vis_products[p]->pol_spec & PLOT_POL_XX) {
+                if (plot_controls->vis_products[p]->if_spec & VIS_PLOT_IF1) {
+                  add_vis_line(&tsys_vis_lines, &n_tsys_vis_lines,
+                               i, j, 1, plot_controls->visbands[0], POL_XX,
+                               (i + 3), 1, vlh);
+                }
+                if (plot_controls->vis_products[p]->if_spec & VIS_PLOT_IF2) {
+                  add_vis_line(&tsys_vis_lines, &n_tsys_vis_lines,
+                               i, j, 1, plot_controls->visbands[1], POL_XX,
+                               (i + 3),
+                               ((plot_controls->vis_products[p]->if_spec &
+                                 VIS_PLOT_IF1) ? 2 : 1),
+                               vlh);
+                }
+              }
+              if (plot_controls->vis_products[p]->pol_spec & PLOT_POL_YY) {
+                if (plot_controls->vis_products[p]->if_spec & VIS_PLOT_IF1) {
+                  add_vis_line(&tsys_vis_lines, &n_tsys_vis_lines,
+                               i, j, 1, plot_controls->visbands[0], POL_YY,
+                               (i + 3), 1, vlh);
+                }
+                if (plot_controls->vis_products[p]->if_spec & VIS_PLOT_IF2) {
+                  add_vis_line(&tsys_vis_lines, &n_tsys_vis_lines,
+                               i, j, 1, plot_controls->visbands[1], POL_YY,
+                               (i + 3),
+                               ((plot_controls->vis_products[p]->if_spec &
+                                 VIS_PLOT_IF1) ? 2 : 1),
+                               vlh);
                 }
               }
             }
@@ -984,8 +1043,11 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
       }
     }
   }
+  // Prepare if we're plotting site metadata.
+  add_vis_line(&meta_vis_line, &n_meta_vis_lines,
+               1, 1, 1, plot_controls->visbands[0], POL_XX, 1, 1, vlh);
   //printf("generating %d vis lines\n", n_vis_lines);
-  if (n_vis_lines == 0) {
+  if ((n_vis_lines == 0) && (n_tsys_vis_lines == 0) && (n_meta_vis_lines == 0)) {
     // Nothing to plot!
     return;
   }
@@ -1038,126 +1100,249 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
   
   // Always keep another 5% on the right side.
   max_x += (max_x - min_x) * 0.05;
-  
-  for (i = 0; i < plot_controls->num_panels; i++) {
-    // Make the lines.
-    MALLOC(plot_lines[i], n_vis_lines);
-    MALLOC(n_plot_lines[i], n_vis_lines);
 
+  CALLOC(panel_n_vis_lines, plot_controls->num_panels);
+  CALLOC(plot_vis_lines, plot_controls->num_panels);
+  for (i = 0; i < plot_controls->num_panels; i++) {
     min_y = INFINITY;
     max_y = -INFINITY;
 
-    // Now go through the data and make our arrays.
-    // The third dimension of the plot lines will be the X and Y
-    // coordinates, then the cycle time in seconds.
-    for (j = 0; j < n_vis_lines; j++) {
-      n_plot_lines[i][j] = 0;
-      MALLOC(plot_lines[i][j], 3);
-      plot_lines[i][j][0] = NULL;
-      plot_lines[i][j][1] = NULL;
-      plot_lines[i][j][2] = NULL;
-      // The fourth dimension is the points to plot in the line.
-      // We accumulate these now.
-      for (k = 0; k < ncycles; k++) {
-        /* printf(" cycle %d has %d IFs, type %s\n", k, cycle_numifs[k], */
-        /*        cycle_vis_quantities[k][0][0]->scantype); */
-        for (l = 0; l < cycle_numifs[k]; l++) {
-          for (m = 0; m < npols; m++) {
-            // Exclude data outside our history range.
-            if ((cycle_vis_quantities[k][l][m]->ut_seconds < min_x) ||
-                (cycle_vis_quantities[k][l][m]->ut_seconds > max_x)) {
-              break;
-            }
-            /* printf("comparing pols %d to %d, window %d\n", */
-            /*        cycle_vis_quantities[k][l][m]->pol, vis_lines[j]->pol, */
-            /*        cycle_vis_quantities[k][l][m]->window); */
-            if ((cycle_vis_quantities[k][l][m]->pol ==
-                 vis_lines[j]->pol) &&
-                (cycle_vis_quantities[k][l][m]->window ==
-                 find_if_name(header_data[k], vis_lines[j]->if_label))) {
-              /* printf("   found appropriate vis quantity!\n"); */
-              // Find the correct baseline.
-              for (n = 0; n < cycle_vis_quantities[k][l][m]->nbaselines; n++) {
-                if (cycle_vis_quantities[k][l][m]->baseline[n] ==
-                    ants_to_base(vis_lines[j]->ant1, vis_lines[j]->ant2)) {
-                  /* printf("  IF %d, pol %d, baseline %d, flagged = %d\n", */
-                  /* 	 l, m, n, cycle_vis_quantities[k][l][m]->flagged_bad[n]); */
-                  if (cycle_vis_quantities[k][l][m]->flagged_bad[n] > 0) {
-                    continue;
+    if ((plot_controls->panel_type[i] == VIS_PLOTPANEL_AMPLITUDE) ||
+        (plot_controls->panel_type[i] == VIS_PLOTPANEL_PHASE) ||
+        (plot_controls->panel_type[i] == VIS_PLOTPANEL_DELAY)) {
+
+      // Make the lines.
+      panel_n_vis_lines[i] = n_vis_lines;
+      MALLOC(plot_lines[i], n_vis_lines);
+      MALLOC(n_plot_lines[i], n_vis_lines);
+      CALLOC(plot_vis_lines[i], n_vis_lines);
+      
+      // Now go through the data and make our arrays.
+      // The third dimension of the plot lines will be the X and Y
+      // coordinates, then the cycle time in seconds.
+      // We plot per baseline (or autocorrelation).
+      for (j = 0; j < n_vis_lines; j++) {
+        n_plot_lines[i][j] = 0;
+        MALLOC(plot_lines[i][j], 3);
+        plot_lines[i][j][0] = NULL;
+        plot_lines[i][j][1] = NULL;
+        plot_lines[i][j][2] = NULL;
+        plot_vis_lines[i][j] = vis_lines[j];
+        // The fourth dimension is the points to plot in the line.
+        // We accumulate these now.
+        for (k = 0; k < ncycles; k++) {
+          /* printf(" cycle %d has %d IFs, type %s\n", k, cycle_numifs[k], */
+          /*        cycle_vis_quantities[k][0][0]->scantype); */
+          for (l = 0; l < cycle_numifs[k]; l++) {
+            for (m = 0; m < npols; m++) {
+              // Exclude data outside our history range.
+              if ((cycle_vis_quantities[k][l][m]->ut_seconds < min_x) ||
+                  (cycle_vis_quantities[k][l][m]->ut_seconds > max_x)) {
+                break;
+              }
+              /* printf("comparing pols %d to %d, window %d\n", */
+              /*        cycle_vis_quantities[k][l][m]->pol, vis_lines[j]->pol, */
+              /*        cycle_vis_quantities[k][l][m]->window); */
+              if ((cycle_vis_quantities[k][l][m]->pol ==
+                   vis_lines[j]->pol) &&
+                  (cycle_vis_quantities[k][l][m]->window ==
+                   find_if_name(header_data[k], vis_lines[j]->if_label))) {
+                /* printf("   found appropriate vis quantity!\n"); */
+                // Find the correct baseline.
+                for (n = 0; n < cycle_vis_quantities[k][l][m]->nbaselines; n++) {
+                  if (cycle_vis_quantities[k][l][m]->baseline[n] ==
+                      ants_to_base(vis_lines[j]->ant1, vis_lines[j]->ant2)) {
+                    /* printf("  IF %d, pol %d, baseline %d, flagged = %d\n", */
+                    /* 	 l, m, n, cycle_vis_quantities[k][l][m]->flagged_bad[n]); */
+                    if (cycle_vis_quantities[k][l][m]->flagged_bad[n] > 0) {
+                      continue;
+                    }
+                    // Found it.
+                    n_plot_lines[i][j] += 1;
+                    REALLOC(plot_lines[i][j][0], n_plot_lines[i][j]);
+                    REALLOC(plot_lines[i][j][1], n_plot_lines[i][j]);
+                    REALLOC(plot_lines[i][j][2], n_plot_lines[i][j]);
+                    plot_lines[i][j][0][n_plot_lines[i][j] - 1] =
+                      cycle_vis_quantities[k][l][m]->ut_seconds;
+                    if (header_data != NULL) {
+                      // Get the cycle time from this cycle.
+                      plot_lines[i][j][2][n_plot_lines[i][j] - 1] =
+                        header_data[k]->cycle_time;
+                    } else {
+                      // Get the cycle time from the plot options.
+                      plot_lines[i][j][2][n_plot_lines[i][j] - 1] =
+                        plot_controls->cycletime;
+                    }
+                    /* printf("  number of points is now %d, time %.3f\n", */
+                    /* 	 n_plot_lines[i][j], */
+                    /* 	 plot_lines[i][j][0][n_plot_lines[i][j] - 1]); */
+                    // Need to fix for bin.
+                    if (plot_controls->panel_type[i] == VIS_PLOTPANEL_AMPLITUDE) {
+                      plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
+                        cycle_vis_quantities[k][l][m]->amplitude[n][0];
+                    } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_PHASE) {
+                      plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
+                        cycle_vis_quantities[k][l][m]->phase[n][0];
+                    } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_DELAY) {
+                      plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
+                        cycle_vis_quantities[k][l][m]->delay[n][0];
+                    }
+                    MINASSIGN(min_y, plot_lines[i][j][1][n_plot_lines[i][j] - 1]);
+                    MAXASSIGN(max_y, plot_lines[i][j][1][n_plot_lines[i][j] - 1]);
+                    break;                    
                   }
-                  // Found it.
-                  n_plot_lines[i][j] += 1;
-                  REALLOC(plot_lines[i][j][0], n_plot_lines[i][j]);
-                  REALLOC(plot_lines[i][j][1], n_plot_lines[i][j]);
-                  REALLOC(plot_lines[i][j][2], n_plot_lines[i][j]);
-                  plot_lines[i][j][0][n_plot_lines[i][j] - 1] =
-                    cycle_vis_quantities[k][l][m]->ut_seconds;
-                  if (header_data != NULL) {
-                    // Get the cycle time from this cycle.
-                    plot_lines[i][j][2][n_plot_lines[i][j] - 1] =
-                      header_data[k]->cycle_time;
-                  } else {
-                    // Get the cycle time from the plot options.
-                    plot_lines[i][j][2][n_plot_lines[i][j] - 1] =
-                      plot_controls->cycletime;
-                  }
-                  /* printf("  number of points is now %d, time %.3f\n", */
-                  /* 	 n_plot_lines[i][j], */
-                  /* 	 plot_lines[i][j][0][n_plot_lines[i][j] - 1]); */
-                  // Need to fix for bin.
-                  if (plot_controls->panel_type[i] == VIS_PLOTPANEL_AMPLITUDE) {
-                    plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
-                      cycle_vis_quantities[k][l][m]->amplitude[n][0];
-                  } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_PHASE) {
-                    plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
-                      cycle_vis_quantities[k][l][m]->phase[n][0];
-                  } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_DELAY) {
-                    plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
-                      cycle_vis_quantities[k][l][m]->delay[n][0];
-                  } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_TEMPERATURE) {
-                    plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
-                      metinfo[k]->temperature;
-                  } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_PRESSURE) {
-                    plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
-                      metinfo[k]->air_pressure;
-                  } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_HUMIDITY) {
-                    plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
-                      metinfo[k]->humidity;
-		  } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_WINDSPEED) {
-		    plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
-		      metinfo[k]->wind_speed;
-		  } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_WINDDIR) {
-		    plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
-		      metinfo[k]->wind_direction;
-		  } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_RAINGAUGE) {
-		    plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
-		      metinfo[k]->rain_gauge;
-		  } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_SEEMONPHASE) {
-		    plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
-		      metinfo[k]->seemon_phase;
-		  } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_SEEMONRMS) {
-		    plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
-		      metinfo[k]->seemon_rms;
-                  } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_SYSTEMP) {
-                    // THIS DOESN'T WORK, JUST HERE TO PREVENT ERROR.
-                    plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
-                      syscal_data[k]->online_tsys[0][0][0];
-                  }
-                  MINASSIGN(min_y, plot_lines[i][j][1][n_plot_lines[i][j] - 1]);
-                  MAXASSIGN(max_y, plot_lines[i][j][1][n_plot_lines[i][j] - 1]);
-                  break;
                 }
               }
             }
           }
         }
       }
+    } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_SYSTEMP) {
+      // Make a metadata plot that only has antenna-based lines.
+      panel_n_vis_lines[i] = n_tsys_vis_lines;
+      MALLOC(plot_lines[i], n_tsys_vis_lines);
+      MALLOC(n_plot_lines[i], n_tsys_vis_lines);
+      CALLOC(plot_vis_lines[i], n_tsys_vis_lines);
+      for (j = 0; j < n_tsys_vis_lines; j++) {
+        n_plot_lines[i][j] = 0;
+        CALLOC(plot_lines[i][j], 3);
+        plot_vis_lines[i][j] = tsys_vis_lines[j];
+        for (k = 0; k < ncycles; k++) {
+          for (l = 0; l < cycle_numifs[k]; l++) {
+            for (m = 0; m < npols; m++) {
+              if ((cycle_vis_quantities[k][l][m]->ut_seconds < min_x) ||
+                  (cycle_vis_quantities[k][l][m]->ut_seconds > max_x)) {
+                break;
+              }
+              // We need to find the correct Tsys to show.
+              // We choose to plot the Tsys of the first antenna of the baseline,
+              // unless the second is antenna 6, at which point we plot it.
+              sysantidx = sysifidx = syspolidx = -1;
+              fprintf(stderr, "[make_vis_plot] search for ant %d, pol %d, IF %d\n",
+                      tsys_vis_lines[j]->ant1, cycle_vis_quantities[k][l][m]->pol,
+                      cycle_vis_quantities[k][l][m]->window);
+              for (ii = 0; ii < syscal_data[k]->num_ants; ii++) {
+                if (syscal_data[k]->ant_num[ii] == tsys_vis_lines[j]->ant1) {
+                  sysantidx = ii;
+                  break;
+                }
+              }
+              for (ii = 0; ii < syscal_data[k]->num_ifs; ii++) {
+                if (syscal_data[k]->if_num[ii] ==
+                    cycle_vis_quantities[k][l][m]->window) {
+                  sysifidx = ii;
+                  break;
+                }
+              }
+              for (ii = 0; ii < syscal_data[k]->num_pols; ii++) {
+                if (syscal_data[k]->pol[ii] == cycle_vis_quantities[k][l][m]->pol) {
+                  syspolidx = ii;
+                  break;
+                }
+              }
+              if ((sysantidx > -1) && (sysifidx > -1) && (syspolidx > -1)) {
+                n_plot_lines[i][j] += 1;
+                REALLOC(plot_lines[i][j][0], n_plot_lines[i][j]);
+                REALLOC(plot_lines[i][j][1], n_plot_lines[i][j]);
+                REALLOC(plot_lines[i][j][2], n_plot_lines[i][j]);
+                plot_lines[i][j][0][n_plot_lines[i][j] - 1] =
+                  cycle_vis_quantities[k][l][m]->ut_seconds;
+                if (header_data != NULL) {
+                  plot_lines[i][j][2][n_plot_lines[i][j] - 1] =
+                    header_data[k]->cycle_time;
+                } else {
+                  plot_lines[i][j][2][n_plot_lines[i][j] - 1] =
+                    plot_controls->cycletime;
+                }
+                fprintf(stderr, "  adding plot line\n");
+                plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
+                  syscal_data[k]->online_tsys[sysantidx][sysifidx][syspolidx];
+                MINASSIGN(min_y, plot_lines[i][j][1][n_plot_lines[i][j] - 1]);
+                MAXASSIGN(max_y, plot_lines[i][j][1][n_plot_lines[i][j] - 1]);
+                break;
+              }
+            }
+          }
+        }
+      }
+    } else if ((plot_controls->panel_type[i] == VIS_PLOTPANEL_TEMPERATURE) ||
+               (plot_controls->panel_type[i] == VIS_PLOTPANEL_PRESSURE) ||
+               (plot_controls->panel_type[i] == VIS_PLOTPANEL_HUMIDITY) ||
+               (plot_controls->panel_type[i] == VIS_PLOTPANEL_WINDSPEED) ||
+               (plot_controls->panel_type[i] == VIS_PLOTPANEL_WINDDIR) ||
+               (plot_controls->panel_type[i] == VIS_PLOTPANEL_RAINGAUGE) ||
+               (plot_controls->panel_type[i] == VIS_PLOTPANEL_SEEMONPHASE) ||
+               (plot_controls->panel_type[i] == VIS_PLOTPANEL_SEEMONRMS)) {
+      // Make a metadata plot that only has a single site-based line.
+      panel_n_vis_lines[i] = 1;
+      MALLOC(plot_lines[i], 1);
+      MALLOC(n_plot_lines[i], 1);
+      CALLOC(plot_vis_lines[i], 1);
+      j = 0;
+      n_plot_lines[i][j] = 0;
+      CALLOC(plot_lines[i][j], 3);
+      plot_vis_lines[i][j] = meta_vis_line[j];
+      for (k = 0; k < ncycles; k++) {
+        dbrk = 0;
+        for (l = 0; l < cycle_numifs[k]; l++) {
+          for (m = 0; m < npols; m++) {
+            if ((cycle_vis_quantities[k][l][m]->ut_seconds < min_x) ||
+                (cycle_vis_quantities[k][l][m]->ut_seconds > max_x)) {
+              break;
+            }
+            n_plot_lines[i][j] += 1;
+            REALLOC(plot_lines[i][j][0], n_plot_lines[i][j]);
+            REALLOC(plot_lines[i][j][1], n_plot_lines[i][j]);
+            REALLOC(plot_lines[i][j][2], n_plot_lines[i][j]);
+            plot_lines[i][j][0][n_plot_lines[i][j] - 1] =
+              cycle_vis_quantities[k][0][0]->ut_seconds;
+            if (header_data != NULL) {
+              plot_lines[i][j][2][n_plot_lines[i][j] - 1] =
+                header_data[k]->cycle_time;
+            } else {
+              plot_lines[i][j][2][n_plot_lines[i][j] - 1] =
+                plot_controls->cycletime;
+            }
+            if (plot_controls->panel_type[i] == VIS_PLOTPANEL_TEMPERATURE) {
+              plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
+                metinfo[k]->temperature;
+            } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_PRESSURE) {
+              plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
+                metinfo[k]->air_pressure;
+            } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_HUMIDITY) {
+              plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
+                metinfo[k]->humidity;
+            } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_WINDSPEED) {
+              plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
+                metinfo[k]->wind_speed;
+            } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_WINDDIR) {
+              plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
+                metinfo[k]->wind_direction;
+            } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_RAINGAUGE) {
+              plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
+                metinfo[k]->rain_gauge;
+            } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_SEEMONPHASE) {
+              plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
+                metinfo[k]->seemon_phase;
+            } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_SEEMONRMS) {
+              plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
+                metinfo[k]->seemon_rms;
+            }
+            MINASSIGN(min_y, plot_lines[i][j][1][n_plot_lines[i][j] - 1]);
+            MAXASSIGN(max_y, plot_lines[i][j][1][n_plot_lines[i][j] - 1]);
+            dbrk = 1;
+            break;
+          }
+          if (dbrk == 1) {
+            break;
+          }
+        }
+      }
     }
+
     // Make the panel.
     changepanel(0, i, panelspec);
     
-    /* printf("plotting panel %d with %.2f <= x <= %.2f, %.2f <= y <= %.2f\n", */
-    /* 	   i, min_x, max_x, min_y, max_y); */
     // Extend the y-range slightly.
     dy = 0.05 * (max_y - min_y);
     min_y -= dy;
@@ -1180,6 +1365,9 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
       min_y -= 0.1;
       max_y += 0.1;
     }
+
+    /* printf("plotting panel %d with %.2f <= x <= %.2f, %.2f <= y <= %.2f\n", */
+    /* 	   i, min_x, max_x, min_y, max_y); */
     
     cpgswin(min_x, max_x, min_y, max_y);
     cpgsci(3);
@@ -1228,6 +1416,9 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
     } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_SEEMONRMS) {
       (void)strcpy(panellabel, "See. Mon. RMS");
       (void)strcpy(panelunits, "(micron)");
+    } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_SYSTEMP) {
+      (void)strcpy(panellabel, "Sys. Temp");
+      (void)strcpy(panelunits, "(K)");
     }
     cpgmtxt("L", 2.2, 0.5, 0.5, panellabel);
     cpgmtxt("R", 2.2, 0.5, 0.5, panelunits);
@@ -1300,8 +1491,9 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
       }
     }
     cpgsci(1);
-    for (j = 0; j < n_vis_lines; j++) {
-      cpgsci(vis_lines[j]->pgplot_colour);
+    for (j = 0; j < panel_n_vis_lines[i]; j++) {
+      cpgsci(plot_vis_lines[i][j]->pgplot_colour);
+      cpgsls(plot_vis_lines[i][j]->line_style);
       // Plot the line in segments connected in time.
       for (k = 0, connidx = 0; k < (n_plot_lines[i][j] - 1); k++) {
         if ((plot_lines[i][j][0][k + 1] >
@@ -1322,18 +1514,27 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
     FREE(vis_lines[i]);
   }
   FREE(vis_lines);
+  for (i = 0; i < n_tsys_vis_lines; i++) {
+    FREE(tsys_vis_lines[i]);
+  }
+  FREE(tsys_vis_lines);
+  FREE(meta_vis_line);
   for (i = 0; i < plot_controls->num_panels; i++) {
-    for (j = 0; j < n_vis_lines; j++) {
+    for (j = 0; j < panel_n_vis_lines[i]; j++) {
       for (k = 0; k < 3; k++) {
         FREE(plot_lines[i][j][k]);
       }
       FREE(plot_lines[i][j]);
+      /* FREE(plot_vis_lines[i][j]); */
     }
     FREE(n_plot_lines[i]);
     FREE(plot_lines[i]);
+    FREE(plot_vis_lines[i]);
   }
+  FREE(panel_n_vis_lines);
   FREE(n_plot_lines);
   FREE(plot_lines);
+  FREE(plot_vis_lines);
 }
 
 // Definition to align text on a certain line, for use in make_spd_plot.
