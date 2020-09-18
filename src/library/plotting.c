@@ -906,9 +906,9 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
                    struct metinfo **metinfo, struct syscal_data **syscal_data) {
   int nants = 0, i = 0, n_vis_lines = 0, j = 0, k = 0, p = 0;
   int singleant = 0, l = 0, m = 0, n = 0, ii, connidx = 0;
-  int sysantidx = -1, sysifidx = -1, syspolidx = -1;
+  int sysantidx = -1, sysifidx = -1, syspolidx = -1, ap;
   int **n_plot_lines = NULL, ipos = -1, *panel_n_vis_lines = NULL, n_active_ants = 0;
-  int n_tsys_vis_lines = 0, n_meta_vis_lines = 0, dbrk;
+  int n_tsys_vis_lines = 0, n_meta_vis_lines = 0, dbrk, *antprod = NULL, nls = 1;
   float ****plot_lines = NULL, min_x, max_x, min_y, max_y;
   float cxpos, dxpos, labtotalwidth, labspacing, dy, maxwidth, twidth;
   float padlabel = 0.01, cch;
@@ -947,6 +947,11 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
   // The first dimension will be the panel number.
   MALLOC(plot_lines, plot_controls->num_panels);
   MALLOC(n_plot_lines, plot_controls->num_panels);
+  // We need to ensure we can plot antenna values in unambiguous
+  // fashion. We keep track of 2 pols in 2 IFs (this second number
+  // will change eventually). This number will be the line style,
+  // since the colour is determined by the antenna.
+  CALLOC(antprod, 2 * 2);
   // The second dimension will be the line number.
   // We need to work out how to allocate up to 16 lines.
   for (p = 0, n_vis_lines = 0, n_tsys_vis_lines = 0;
@@ -1008,33 +1013,47 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
               }
               // Prepare if we're plotting Tsys.
               if (plot_controls->vis_products[p]->pol_spec & PLOT_POL_XX) {
+		ap = 0;
                 if (plot_controls->vis_products[p]->if_spec & VIS_PLOT_IF1) {
+		  ap += 0 * 2; // For algorithmic purposes later.
+		  if (antprod[ap] == 0) {
+		    // We fill this product with the next line style and
+		    // increment the next line style.
+		    antprod[ap] = nls++;
+		  }
                   add_vis_line(&tsys_vis_lines, &n_tsys_vis_lines,
                                i, j, 1, plot_controls->visbands[0], POL_XX,
-                               (i + 3), 1, vlh);
+                               (i + 3), antprod[ap], vlh);
                 }
                 if (plot_controls->vis_products[p]->if_spec & VIS_PLOT_IF2) {
+		  ap += 1 * 2;
+		  if (antprod[ap] == 0) {
+		    antprod[ap] = nls++;
+		  }
                   add_vis_line(&tsys_vis_lines, &n_tsys_vis_lines,
                                i, j, 1, plot_controls->visbands[1], POL_XX,
-                               (i + 3),
-                               ((plot_controls->vis_products[p]->if_spec &
-                                 VIS_PLOT_IF1) ? 2 : 1),
-                               vlh);
+                               (i + 3), antprod[ap], vlh);
                 }
               }
               if (plot_controls->vis_products[p]->pol_spec & PLOT_POL_YY) {
+		ap = 1;
                 if (plot_controls->vis_products[p]->if_spec & VIS_PLOT_IF1) {
+		  ap += 0 * 2;
+		  if (antprod[ap] == 0) {
+		    antprod[ap] = nls++;
+		  }
                   add_vis_line(&tsys_vis_lines, &n_tsys_vis_lines,
                                i, j, 1, plot_controls->visbands[0], POL_YY,
-                               (i + 3), 1, vlh);
+                               (i + 3), antprod[ap], vlh);
                 }
                 if (plot_controls->vis_products[p]->if_spec & VIS_PLOT_IF2) {
+		  ap += 1 * 2;
+		  if (antprod[ap] == 0) {
+		    antprod[ap] = nls++;
+		  }
                   add_vis_line(&tsys_vis_lines, &n_tsys_vis_lines,
                                i, j, 1, plot_controls->visbands[1], POL_YY,
-                               (i + 3),
-                               ((plot_controls->vis_products[p]->if_spec &
-                                 VIS_PLOT_IF1) ? 2 : 1),
-                               vlh);
+                               (i + 3), antprod[ap], vlh);
                 }
               }
             }
@@ -1218,9 +1237,9 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
               // We choose to plot the Tsys of the first antenna of the baseline,
               // unless the second is antenna 6, at which point we plot it.
               sysantidx = sysifidx = syspolidx = -1;
-              fprintf(stderr, "[make_vis_plot] search for ant %d, pol %d, IF %d\n",
-                      tsys_vis_lines[j]->ant1, cycle_vis_quantities[k][l][m]->pol,
-                      cycle_vis_quantities[k][l][m]->window);
+              /* fprintf(stderr, "[make_vis_plot] search for ant %d, pol %d, IF %d\n", */
+              /*         tsys_vis_lines[j]->ant1, cycle_vis_quantities[k][l][m]->pol, */
+              /*         cycle_vis_quantities[k][l][m]->window); */
               for (ii = 0; ii < syscal_data[k]->num_ants; ii++) {
                 if (syscal_data[k]->ant_num[ii] == tsys_vis_lines[j]->ant1) {
                   sysantidx = ii;
@@ -1228,14 +1247,17 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
                 }
               }
               for (ii = 0; ii < syscal_data[k]->num_ifs; ii++) {
-                if (syscal_data[k]->if_num[ii] ==
-                    cycle_vis_quantities[k][l][m]->window) {
+                if ((syscal_data[k]->if_num[ii] ==
+                    cycle_vis_quantities[k][l][m]->window) &&
+		    (cycle_vis_quantities[k][l][m]->window ==
+		     find_if_name(header_data[k], tsys_vis_lines[j]->if_label))) {
                   sysifidx = ii;
                   break;
                 }
               }
               for (ii = 0; ii < syscal_data[k]->num_pols; ii++) {
-                if (syscal_data[k]->pol[ii] == cycle_vis_quantities[k][l][m]->pol) {
+                if ((syscal_data[k]->pol[ii] == cycle_vis_quantities[k][l][m]->pol) &&
+		    (tsys_vis_lines[j]->pol == syscal_data[k]->pol[ii])) {
                   syspolidx = ii;
                   break;
                 }
@@ -1254,7 +1276,7 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
                   plot_lines[i][j][2][n_plot_lines[i][j] - 1] =
                     plot_controls->cycletime;
                 }
-                fprintf(stderr, "  adding plot line\n");
+                /* fprintf(stderr, "  adding plot line\n"); */
                 plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
                   syscal_data[k]->online_tsys[sysantidx][sysifidx][syspolidx];
                 MINASSIGN(min_y, plot_lines[i][j][1][n_plot_lines[i][j] - 1]);
@@ -1382,6 +1404,7 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
     } else {
       (void)strcpy(xopts, "BCTSZ");
     }
+    cpgsls(1);
     cpgtbox(xopts, 0, 0, yopts, 0, 0);
     if (plot_controls->panel_type[i] == VIS_PLOTPANEL_AMPLITUDE) {
       (void)strcpy(panellabel, "Amplitude");
@@ -1489,6 +1512,10 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
         cpgmtxt("T", 0.5 + cch, cxpos, 0, bandstring);
         cxpos += maxwidth + (padlabel / (plot_controls->nvisbands - 1));
       }
+
+      // Print a legend of antenna based lines in the middle if
+      // necessary.
+      
     }
     cpgsci(1);
     for (j = 0; j < panel_n_vis_lines[i]; j++) {
