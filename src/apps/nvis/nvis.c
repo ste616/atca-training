@@ -948,6 +948,11 @@ int main(int argc, char *argv[]) {
   release_vis_device(&vis_device_opened);
 
   // Release all the memory.
+  // We have to handle freeing header data.
+  for (i = 0; i < vis_data.nviscycles; i++) {
+    free_scan_header_data(vis_data.header_data[i]);
+    FREE(vis_data.header_data[i]);
+  }
   free_vis_data(&vis_data);
   free_vis_plotcontrols(&vis_plotcontrols);
   for (i = 0; i < MAX_N_MESSAGES; i++) {

@@ -1516,18 +1516,10 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
             twidth = fracwidth(panelspec, min_x, max_x, 0, i, bandstring);
             cpgmtxt("T", 0.5 + cch, cxpos, 0, bandstring);
             cpgsls(antprod[j]);
-            /* trange_x = max_x - min_x; */
-            /* trange_y = max_y - min_y; */
             antlines[j][0][0] = cxpos;
             antlines[j][0][1] = cxpos + twidth;
             antlines[j][1][0] = antlines[j][1][1] = 0.15;
             cxpos += twidth * 1.5;
-            /* antline_x[0] = min_x + cxpos * trange_x; */
-            /* antline_x[1] = min_x + (cxpos + twidth) * trange_x; */
-            /* antline_y[0] = antline_y[1] = max_y + 0.1 * trange_y; */
-            /* fprintf(stderr, "plotting line between (%.3f,%.3f) -> (%.3f,%.3f)\n", */
-            /*         antline_x[0], antline_y[0], antline_x[1], antline_y[1]); */
-            /* cpgline(2, antline_x, antline_y); */
           }
         }
       }
@@ -1602,6 +1594,7 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
     FREE(tsys_vis_lines[i]);
   }
   FREE(tsys_vis_lines);
+  FREE(meta_vis_line[0]);
   FREE(meta_vis_line);
   for (i = 0; i < plot_controls->num_panels; i++) {
     for (j = 0; j < panel_n_vis_lines[i]; j++) {
