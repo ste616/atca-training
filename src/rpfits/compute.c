@@ -1153,6 +1153,21 @@ bool ampphase_options_match(struct ampphase_options *a,
   return match;
 }
 
+void calculate_system_temperatures(struct ampphase *ampphase,
+				   struct ampphase_options *options) {
+  int i, j, k;
+  float tp_on, tp_off;
+  // Recalculate the system temperature from the data in the new
+  // tvchannel range, and with different options.
+  
+  // First, we need to calculate the total power while the noise diode
+  // is on and off.
+  for (i = 0; i < ampphase->nbaselines; i++) {
+    
+  }
+  
+}
+
 void spectrum_data_compile_system_temperatures(struct spectrum_data *spectrum_data,
                                                struct syscal_data **syscal_data) {
   // Go through a spectrum_data structure and find all the system temperatures.
