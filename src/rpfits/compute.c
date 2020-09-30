@@ -1185,6 +1185,11 @@ void calculate_system_temperatures(struct ampphase *ampphase,
   if ((window_idx < 0) || (pol_idx < 0)) {
     return;
   }
+
+  // Fail if the ampphase options aren't suitable.
+  if (options->num_ifs < ampphase->window) {
+    return;
+  }
   
   // We need to have the syscal_data structure filled with the data
   // from the telescope first, which shouldn't be too much of an
@@ -1196,7 +1201,8 @@ void calculate_system_temperatures(struct ampphase *ampphase,
       if ((a1 == a2) && (a1 == ampphase->syscal_data->ant_num[i])) {
         // Make our sums.
         for (k = 0; k < ampphase->f_nchannels[j][0]; k++) {
-          if (ampphase->f_channel[j][0][k] >= options->
+          if (ampphase->f_channel[j][0][k] >=
+	      options->
         }
       }
     }
