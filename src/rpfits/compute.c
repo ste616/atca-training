@@ -609,8 +609,10 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
     // first IF.
     (*ampphase)->syscal_data->ant_num[i] = cycle_data->cal_ants[i];
     (*ampphase)->syscal_data->parangle[i] = cycle_data->parangle[0][i];
-    (*ampphase)->syscal_data->tracking_error_max[i] = cycle_data->tracking_error_max[0][i];
-    (*ampphase)->syscal_data->tracking_error_rms[i] = cycle_data->tracking_error_rms[0][i];
+    (*ampphase)->syscal_data->tracking_error_max[i] =
+      cycle_data->tracking_error_max[0][i];
+    (*ampphase)->syscal_data->tracking_error_rms[i] =
+      cycle_data->tracking_error_rms[0][i];
     (*ampphase)->syscal_data->flagging[i] = cycle_data->flagging[0][i];
   }
   if (syscal_if_idx >= 0) {
@@ -1154,18 +1156,51 @@ bool ampphase_options_match(struct ampphase_options *a,
 }
 
 void calculate_system_temperatures(struct ampphase *ampphase,
-				   struct ampphase_options *options) {
-  int i, j, k;
-  float tp_on, tp_off;
+                                   struct ampphase_options *options) {
+  int i, j, k, window_idx = -1, pol_idx = -1, a1, a2;
+  float tp_on = 0, tp_off = 0;
   // Recalculate the system temperature from the data in the new
   // tvchannel range, and with different options.
   
   // First, we need to calculate the total power while the noise diode
   // is on and off.
-  for (i = 0; i < ampphase->nbaselines; i++) {
-    
+
+  // Find the matching window in the syscal_data structure to the
+  // current data.
+  for (i = 0; i < ampphase->syscal_data->num_ifs; i++) {
+    if (ampphase->syscal_data->if_num[i] == ampphase->window) {
+      window_idx = i;
+      break;
+    }
+  }
+  // Find the matching pol in the same way.
+  for (i = 0; i < ampphase->syscal_data->num_pols; i++) {
+    if (ampphase->syscal_data->pol[i] == ampphase->pol) {
+      pol_idx = i;
+      break;
+    }
+  }
+
+  // Fail if we don't find matches.
+  if ((window_idx < 0) || (pol_idx < 0)) {
+    return;
   }
   
+  // We need to have the syscal_data structure filled with the data
+  // from the telescope first, which shouldn't be too much of an
+  // assumption.
+  for (i = 0; i < ampphase->syscal_data->num_ants; i++) {
+    // Find the autocorrelation for this antenna.
+    for (j = 0; j < ampphase->nbaselines; j++) {
+      base_to_ants(ampphase->baseline[j], &a1, &a2);
+      if ((a1 == a2) && (a1 == ampphase->syscal_data->ant_num[i])) {
+        // Make our sums.
+        for (k = 0; k < ampphase->f_nchannels[j][0]; k++) {
+          if (ampphase->f_channel[j][0][k] >= options->
+        }
+      }
+    }
+  }
 }
 
 void spectrum_data_compile_system_temperatures(struct spectrum_data *spectrum_data,
@@ -1273,7 +1308,8 @@ void spectrum_data_compile_system_temperatures(struct spectrum_data *spectrum_da
                 continue;
               }
               if ((*syscal_data)->online_tsys[kk][ll][mm] == -1) {
-                (*syscal_data)->online_tsys[kk][ll][mm] = tsys_data->online_tsys[k][l][m];
+                (*syscal_data)->online_tsys[kk][ll][mm] =
+                  tsys_data->online_tsys[k][l][m];
                 (*syscal_data)->online_tsys_applied[kk][ll][mm] =
                   tsys_data->online_tsys_applied[k][l][m];
                 if (ll > high_if) {
@@ -1281,7 +1317,8 @@ void spectrum_data_compile_system_temperatures(struct spectrum_data *spectrum_da
                 }
               }
               if ((*syscal_data)->computed_tsys[kk][ll][mm] == -1) {
-                (*syscal_data)->computed_tsys[kk][ll][mm] = tsys_data->computed_tsys[k][l][m];
+                (*syscal_data)->computed_tsys[kk][ll][mm] =
+                  tsys_data->computed_tsys[k][l][m];
                 (*syscal_data)->computed_tsys_applied[kk][ll][mm] =
                   tsys_data->computed_tsys_applied[k][l][m];
               }
