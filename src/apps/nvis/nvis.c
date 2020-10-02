@@ -216,6 +216,8 @@ int char_to_product(char pstring) {
   switch (pstring) {
   case 'a':
     return VIS_PLOTPANEL_AMPLITUDE;
+  case 'C':
+    return VIS_PLOTPANEL_SYSTEMP_COMPUTED;
   case 'd':
     return VIS_PLOTPANEL_DELAY;
   case 'D':
@@ -467,6 +469,8 @@ static void interpret_command(char *line) {
           change_panel = VIS_PLOTPANEL_SEEMONPHASE;
         } else if (minmatch("seemonrms", line_els[1], 7)) {
           change_panel = VIS_PLOTPANEL_SEEMONRMS;
+        } else if (minmatch("computed_systemp", line_els[1], 4)) {
+          change_panel = VIS_PLOTPANEL_SYSTEMP_COMPUTED;
         }
         if (change_panel != VIS_PLOTPANEL_ALL) {
           if (nels == 2) {

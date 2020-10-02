@@ -1159,6 +1159,7 @@ void calculate_system_temperatures(struct ampphase *ampphase,
                                    struct ampphase_options *options) {
   int i, j, k, window_idx = -1, pol_idx = -1, a1, a2;
   float tp_on = 0, tp_off = 0;
+  double dx, dy;
   // Recalculate the system temperature from the data in the new
   // tvchannel range, and with different options.
   
@@ -1187,7 +1188,9 @@ void calculate_system_temperatures(struct ampphase *ampphase,
   }
 
   // Fail if the ampphase options aren't suitable.
-  if (options->num_ifs < ampphase->window) {
+  if (options->num_ifs <= ampphase->window) {
+    fprintf(stderr, "Options has %d windows, window number is %d\n",
+            options->num_ifs, ampphase->window);
     return;
   }
   
@@ -1201,12 +1204,34 @@ void calculate_system_temperatures(struct ampphase *ampphase,
       if ((a1 == a2) && (a1 == ampphase->syscal_data->ant_num[i])) {
         // Make our sums.
         for (k = 0; k < ampphase->f_nchannels[j][0]; k++) {
-          if (ampphase->f_channel[j][0][k] >=
-	      options->
+          if ((ampphase->f_channel[j][0][k] >=
+               options->min_tvchannel[ampphase->window]) &&
+              (ampphase->f_channel[j][0][k] <=
+               options->max_tvchannel[ampphase->window]) &&
+              (ampphase->nbins[j] > 1)) {
+            tp_on += ampphase->f_amplitude[j][1][k];
+            tp_off += ampphase->f_amplitude[j][0][k];
+          }
         }
+        dx = fabs((double)(tp_on - tp_off));
+        dy = (double)(tp_on + tp_off) / 2.0;
+        if ((dy > 1.0) && (dx > (0.001 * dy))) {
+          // This is what we want to happen.
+          dx = dy / dx;
+        } else {
+          // In case of badness.
+          dx = 25.0;
+        }
+        // The memory for the computed_tsys is alloacted at the same
+        // time as for the online_tsys.
+        ampphase->syscal_data->computed_tsys[i][window_idx][pol_idx] =
+          (float)sqrt(dx);
+        // We leave it to another routine to apply any Tsys.
+        ampphase->syscal_data->computed_tsys_applied[i][window_idx][pol_idx] = 0;
       }
     }
   }
+
 }
 
 void spectrum_data_compile_system_temperatures(struct spectrum_data *spectrum_data,

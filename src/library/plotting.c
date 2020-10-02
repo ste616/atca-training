@@ -216,19 +216,20 @@ void change_vis_plotcontrols_limits(struct vis_plotcontrols *plotcontrols,
   }
 }
 
-#define NAVAILABLE_PANELS 12
+#define NAVAILABLE_PANELS 13
 const int available_panels[NAVAILABLE_PANELS] = { VIS_PLOTPANEL_AMPLITUDE,
-						  VIS_PLOTPANEL_PHASE,
-						  VIS_PLOTPANEL_DELAY,
-						  VIS_PLOTPANEL_TEMPERATURE,
-						  VIS_PLOTPANEL_PRESSURE,
-						  VIS_PLOTPANEL_HUMIDITY,
-						  VIS_PLOTPANEL_SYSTEMP,
-						  VIS_PLOTPANEL_WINDSPEED,
-						  VIS_PLOTPANEL_WINDDIR,
-						  VIS_PLOTPANEL_RAINGAUGE,
-						  VIS_PLOTPANEL_SEEMONPHASE,
-						  VIS_PLOTPANEL_SEEMONRMS };
+                                                  VIS_PLOTPANEL_PHASE,
+                                                  VIS_PLOTPANEL_DELAY,
+                                                  VIS_PLOTPANEL_TEMPERATURE,
+                                                  VIS_PLOTPANEL_PRESSURE,
+                                                  VIS_PLOTPANEL_HUMIDITY,
+                                                  VIS_PLOTPANEL_SYSTEMP,
+                                                  VIS_PLOTPANEL_WINDSPEED,
+                                                  VIS_PLOTPANEL_WINDDIR,
+                                                  VIS_PLOTPANEL_RAINGAUGE,
+                                                  VIS_PLOTPANEL_SEEMONPHASE,
+                                                  VIS_PLOTPANEL_SEEMONRMS,
+                                                  VIS_PLOTPANEL_SYSTEMP_COMPUTED };
 
 bool product_can_be_x(int product) {
   switch (product) {
@@ -951,7 +952,8 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
 
   // Work out some global needs.
   for (i = 0; i < plot_controls->num_panels; i++) {
-    if (plot_controls->panel_type[i] == VIS_PLOTPANEL_SYSTEMP) {
+    if ((plot_controls->panel_type[i] == VIS_PLOTPANEL_SYSTEMP) ||
+        (plot_controls->panel_type[i] == VIS_PLOTPANEL_SYSTEMP_COMPUTED)) {
       show_tsys_legend = true;
     }
   }
@@ -1236,7 +1238,8 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
           }
         }
       }
-    } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_SYSTEMP) {
+    } else if ((plot_controls->panel_type[i] == VIS_PLOTPANEL_SYSTEMP) ||
+               (plot_controls->panel_type[i] == VIS_PLOTPANEL_SYSTEMP_COMPUTED)) {
       // Make a metadata plot that only has antenna-based lines.
       panel_n_vis_lines[i] = n_tsys_vis_lines;
       MALLOC(plot_lines[i], n_tsys_vis_lines);
@@ -1297,8 +1300,13 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
                     plot_controls->cycletime;
                 }
                 /* fprintf(stderr, "  adding plot line\n"); */
-                plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
-                  syscal_data[k]->online_tsys[sysantidx][sysifidx][syspolidx];
+                if (plot_controls->panel_type[i] == VIS_PLOTPANEL_SYSTEMP) {
+                  plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
+                    syscal_data[k]->online_tsys[sysantidx][sysifidx][syspolidx];
+                } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_SYSTEMP_COMPUTED) {
+                  plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
+                    syscal_data[k]->computed_tsys[sysantidx][sysifidx][syspolidx];
+                }                  
                 MINASSIGN(min_y, plot_lines[i][j][1][n_plot_lines[i][j] - 1]);
                 MAXASSIGN(max_y, plot_lines[i][j][1][n_plot_lines[i][j] - 1]);
                 break;
@@ -1460,7 +1468,10 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
       (void)strcpy(panellabel, "See. Mon. RMS");
       (void)strcpy(panelunits, "(micron)");
     } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_SYSTEMP) {
-      (void)strcpy(panellabel, "Sys. Temp");
+      (void)strcpy(panellabel, "Sys. Temp.");
+      (void)strcpy(panelunits, "(K)");
+    } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_SYSTEMP_COMPUTED) {
+      (void)strcpy(panellabel, "Comp. Sys. Temp.");
       (void)strcpy(panelunits, "(K)");
     }
     cpgmtxt("L", 2.2, 0.5, 0.5, panellabel);
