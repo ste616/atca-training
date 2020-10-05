@@ -1189,8 +1189,8 @@ void calculate_system_temperatures(struct ampphase *ampphase,
 
   // Fail if the ampphase options aren't suitable.
   if (options->num_ifs <= ampphase->window) {
-    fprintf(stderr, "Options has %d windows, window number is %d\n",
-            options->num_ifs, ampphase->window);
+    /* fprintf(stderr, "Options has %d windows, window number is %d\n", */
+    /*         options->num_ifs, ampphase->window); */
     return;
   }
   
