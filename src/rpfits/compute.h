@@ -122,6 +122,11 @@ struct syscal_data {
   int ***online_tsys_applied;
   float ***computed_tsys;
   int ***computed_tsys_applied;
+
+  // Parameters measured by the correlator (varies by antenna, IF and pol).
+  float ***gtp;
+  float ***sdo;
+  float ***caljy;
 };
 
 /**

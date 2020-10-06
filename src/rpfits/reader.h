@@ -64,12 +64,12 @@
 #define SYSCAL_TSYS_Y(a, i) fabsf(SYSCAL_PARAM(a, i, 4))
 #define SYSCAL_TSYS_X_APPLIED(a, i) (SYSCAL_PARAM(a, i, 3) < 0) ? 0 : 1
 #define SYSCAL_TSYS_Y_APPLIED(a, i) (SYSCAL_PARAM(a, i, 4) < 0) ? 0 : 1
-#define SYSCAL_SAMPLER_NEG_X(a, i) SYSCAL_PARAM(a, i, 5)
-#define SYSCAL_SAMPLER_ZERO_X(a, i) SYSCAL_PARAM(a, i, 6)
-#define SYSCAL_SAMPLER_POS_X(a, i) SYSCAL_PARAM(a, i, 7)
-#define SYSCAL_SAMPLER_NEG_Y(a, i) SYSCAL_PARAM(a, i, 8)
-#define SYSCAL_SAMPLER_ZERO_Y(a, i) SYSCAL_PARAM(a, i, 9)
-#define SYSCAL_SAMPLER_POS_Y(a, i) SYSCAL_PARAM(a, i, 10)
+#define SYSCAL_GTP_X(a, i) SYSCAL_PARAM(a, i, 5)
+#define SYSCAL_SDO_X(a, i) SYSCAL_PARAM(a, i, 6)
+#define SYSCAL_CALJY_X(a, i) SYSCAL_PARAM(a, i, 7)
+#define SYSCAL_GTP_Y(a, i) SYSCAL_PARAM(a, i, 8)
+#define SYSCAL_SDO_Y(a, i) SYSCAL_PARAM(a, i, 9)
+#define SYSCAL_CALJY_Y(a, i) SYSCAL_PARAM(a, i, 10)
 #define SYSCAL_PARANGLE(a, i) SYSCAL_PARAM(a, i, 11)
 #define SYSCAL_FLAG_BAD(a, i) (int)SYSCAL_PARAM(a, i, 12)
 #define SYSCAL_XYAMP(a, i) SYSCAL_PARAM(a, i, 13)

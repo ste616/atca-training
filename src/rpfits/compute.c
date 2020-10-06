@@ -345,6 +345,9 @@ void copy_syscal_data(struct syscal_data *dest,
   REALLOC(dest->online_tsys_applied, dest->num_ants);
   REALLOC(dest->computed_tsys, dest->num_ants);
   REALLOC(dest->computed_tsys_applied, dest->num_ants);
+  REALLOC(dest->gtp, dest->num_ants);
+  REALLOC(dest->sdo, dest->num_ants);
+  REALLOC(dest->caljy, dest->num_ants);
   for (i = 0; i < dest->num_ants; i++) {
     STRUCTCOPY(src, dest, parangle[i]);
     STRUCTCOPY(src, dest, tracking_error_max[i]);
@@ -356,6 +359,9 @@ void copy_syscal_data(struct syscal_data *dest,
     MALLOC(dest->online_tsys_applied[i], dest->num_ifs);
     MALLOC(dest->computed_tsys[i], dest->num_ifs);
     MALLOC(dest->computed_tsys_applied[i], dest->num_ifs);
+    MALLOC(dest->gtp[i], dest->num_ifs);
+    MALLOC(dest->sdo[i], dest->num_ifs);
+    MALLOC(dest->caljy[i], dest->num_ifs);
     for (j = 0; j < dest->num_ifs; j++) {
       STRUCTCOPY(src, dest, xyphase[i][j]);
       STRUCTCOPY(src, dest, xyamp[i][j]);
@@ -363,11 +369,17 @@ void copy_syscal_data(struct syscal_data *dest,
       MALLOC(dest->online_tsys_applied[i][j], dest->num_pols);
       MALLOC(dest->computed_tsys[i][j], dest->num_pols);
       MALLOC(dest->computed_tsys_applied[i][j], dest->num_pols);
+      MALLOC(dest->gtp[i][j], dest->num_pols);
+      MALLOC(dest->sdo[i][j], dest->num_pols);
+      MALLOC(dest->caljy[i][j], dest->num_pols);
       for (k = 0; k < dest->num_pols; k++) {
         STRUCTCOPY(src, dest, online_tsys[i][j][k]);
         STRUCTCOPY(src, dest, online_tsys_applied[i][j][k]);
         STRUCTCOPY(src, dest, computed_tsys[i][j][k]);
         STRUCTCOPY(src, dest, computed_tsys_applied[i][j][k]);
+	STRUCTCOPY(src, dest, gtp[i][j][k]);
+	STRUCTCOPY(src, dest, sdo[i][j][k]);
+	STRUCTCOPY(src, dest, caljy[i][j][k]);
       }
     }
   }
@@ -400,16 +412,25 @@ void free_syscal_data(struct syscal_data *syscal_data) {
         FREE(syscal_data->online_tsys_applied[i][j]);
         FREE(syscal_data->computed_tsys[i][j]);
         FREE(syscal_data->computed_tsys_applied[i][j]);
+	FREE(syscal_data->gtp[i][j]);
+	FREE(syscal_data->sdo[i][j]);
+	FREE(syscal_data->caljy[i][j]);
       }
       FREE(syscal_data->online_tsys[i]);
       FREE(syscal_data->online_tsys_applied[i]);
       FREE(syscal_data->computed_tsys[i]);
       FREE(syscal_data->computed_tsys_applied[i]);
+      FREE(syscal_data->gtp[i]);
+      FREE(syscal_data->sdo[i]);
+      FREE(syscal_data->caljy[i]);
     }
     FREE(syscal_data->online_tsys);
     FREE(syscal_data->online_tsys_applied);
     FREE(syscal_data->computed_tsys);
     FREE(syscal_data->computed_tsys_applied);
+    FREE(syscal_data->gtp);
+    FREE(syscal_data->sdo);
+    FREE(syscal_data->caljy);
   }
 }
 
@@ -637,6 +658,12 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
              (*ampphase)->syscal_data->num_ants);
       CALLOC((*ampphase)->syscal_data->computed_tsys_applied,
              (*ampphase)->syscal_data->num_ants);
+      CALLOC((*ampphase)->syscal_data->gtp,
+	     (*ampphase)->syscal_data->num_ants);
+      CALLOC((*ampphase)->syscal_data->sdo,
+	     (*ampphase)->syscal_data->num_ants);
+      CALLOC((*ampphase)->syscal_data->caljy,
+	     (*ampphase)->syscal_data->num_ants);
       for (i = 0; i < (*ampphase)->syscal_data->num_ants; i++) {
         CALLOC((*ampphase)->syscal_data->online_tsys[i], 1);
         CALLOC((*ampphase)->syscal_data->online_tsys[i][0], 1);
@@ -650,6 +677,21 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
         CALLOC((*ampphase)->syscal_data->computed_tsys[i][0], 1);
         CALLOC((*ampphase)->syscal_data->computed_tsys_applied[i], 1);
         CALLOC((*ampphase)->syscal_data->computed_tsys_applied[i][0], 1);
+	CALLOC((*ampphase)->syscal_data->gtp[i], 1);
+	CALLOC((*ampphase)->syscal_data->gtp[i][0], 1);
+	if (syscal_pol_idx == CAL_XX) {
+	  (*ampphase)->syscal_data->gtp[i][0][0] =
+	    cycle_data->gtp_x[syscal_if_idx][i];
+	} else if (syscal_pol_idx == CAL_YY) {
+	  (*ampphase)->syscal_data->gtp[i][0][0] =
+	    cycle_data->gtp_y[syscal_if_idx][i];
+	}
+	CALLOC((*ampphase)->syscal_data->sdo[i], 1);
+	CALLOC((*ampphase)->syscal_data->sdo[i][0], 1);
+	// CONTINUE FROM HERE!!!
+	CALLOC((*ampphase)->syscal_data->caljy[i], 1);
+	CALLOC((*ampphase)->syscal_data->caljy[i][0], 1);
+	
       }
     } else {
       (*ampphase)->syscal_data->online_tsys = NULL;

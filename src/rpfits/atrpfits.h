@@ -116,6 +116,12 @@ struct cycle_data {
   float **parangle;
   float **tracking_error_max;
   float **tracking_error_rms;
+  float **gtp_x;
+  float **gtp_y;
+  float **sdo_x;
+  float **sdo_y;
+  float **caljy_x;
+  float **caljy_y;
   int **flagging;
   // Weather metadata.
   float temperature;
