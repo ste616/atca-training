@@ -977,12 +977,23 @@ void pack_syscal_data(cmp_ctx_t *cmp, struct syscal_data *a) {
 
   // The system temperatures (varies by antenna, IF and pol).
   if ((a->num_ifs > 0) && (a->num_pols > 0)) {
-    for (i = 0; i < a ->num_ants; i++) {
+    for (i = 0; i < a->num_ants; i++) {
       for (j = 0; j < a->num_ifs; j++) {
         pack_writearray_float(cmp, a->num_pols, a->online_tsys[i][j]);
         pack_writearray_sint(cmp, a->num_pols, a->online_tsys_applied[i][j]);
         pack_writearray_float(cmp, a->num_pols, a->computed_tsys[i][j]);
         pack_writearray_sint(cmp, a->num_pols, a->computed_tsys_applied[i][j]);
+      }
+    }
+  }
+
+  // Paramters measured by the correlator (varies by antenna, IF and pol).
+  if ((a->num_ifs > 0) && (a->num_pols > 0)) {
+    for (i = 0; i < a->num_ants; i++) {
+      for (j = 0; j < a->num_ifs; j++) {
+        pack_writearray_float(cmp, a->num_pols, a->gtp[i][j]);
+        pack_writearray_float(cmp, a->num_pols, a->sdo[i][j]);
+        pack_writearray_float(cmp, a->num_pols, a->caljy[i][j]);
       }
     }
   }
@@ -1069,7 +1080,31 @@ void unpack_syscal_data(cmp_ctx_t *cmp, struct syscal_data *a) {
     a->computed_tsys = NULL;
     a->computed_tsys_applied = NULL;
   }
-    
+  
+  // Parameters measured by the correlator (varies by antenna, IF and pol).
+  if ((a->num_ifs > 0) && (a->num_pols > 0)) {
+    MALLOC(a->gtp, a->num_ants);
+    MALLOC(a->sdo, a->num_ants);
+    MALLOC(a->caljy, a->num_ants);
+    for (i = 0; i < a->num_ants; i++) {
+      MALLOC(a->gtp[i], a->num_ifs);
+      MALLOC(a->sdo[i], a->num_ifs);
+      MALLOC(a->caljy[i], a->num_ifs);
+      for (j = 0; j < a->num_ifs; j++) {
+        MALLOC(a->gtp[i][j], a->num_pols);
+        pack_readarray_float(cmp, a->num_pols, a->gtp[i][j]);
+        MALLOC(a->sdo[i][j], a->num_pols);
+        pack_readarray_float(cmp, a->num_pols, a->sdo[i][j]);
+        MALLOC(a->caljy[i][j], a->num_pols);
+        pack_readarray_float(cmp, a->num_pols, a->caljy[i][j]);
+      }
+    }
+  } else {
+    a->gtp = NULL;
+    a->sdo = NULL;
+    a->caljy = NULL;
+  }
+  
 }
 
 void init_cmp_memory_buffer(cmp_ctx_t *cmp, cmp_mem_access_t *mem, void *buffer,

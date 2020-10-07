@@ -677,21 +677,33 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
         CALLOC((*ampphase)->syscal_data->computed_tsys[i][0], 1);
         CALLOC((*ampphase)->syscal_data->computed_tsys_applied[i], 1);
         CALLOC((*ampphase)->syscal_data->computed_tsys_applied[i][0], 1);
-	CALLOC((*ampphase)->syscal_data->gtp[i], 1);
-	CALLOC((*ampphase)->syscal_data->gtp[i][0], 1);
-	if (syscal_pol_idx == CAL_XX) {
-	  (*ampphase)->syscal_data->gtp[i][0][0] =
-	    cycle_data->gtp_x[syscal_if_idx][i];
-	} else if (syscal_pol_idx == CAL_YY) {
-	  (*ampphase)->syscal_data->gtp[i][0][0] =
-	    cycle_data->gtp_y[syscal_if_idx][i];
-	}
-	CALLOC((*ampphase)->syscal_data->sdo[i], 1);
-	CALLOC((*ampphase)->syscal_data->sdo[i][0], 1);
-	// CONTINUE FROM HERE!!!
-	CALLOC((*ampphase)->syscal_data->caljy[i], 1);
-	CALLOC((*ampphase)->syscal_data->caljy[i][0], 1);
-	
+        CALLOC((*ampphase)->syscal_data->gtp[i], 1);
+        CALLOC((*ampphase)->syscal_data->gtp[i][0], 1);
+        if (syscal_pol_idx == CAL_XX) {
+          (*ampphase)->syscal_data->gtp[i][0][0] =
+            cycle_data->gtp_x[syscal_if_idx][i];
+        } else if (syscal_pol_idx == CAL_YY) {
+          (*ampphase)->syscal_data->gtp[i][0][0] =
+            cycle_data->gtp_y[syscal_if_idx][i];
+        }
+        CALLOC((*ampphase)->syscal_data->sdo[i], 1);
+        CALLOC((*ampphase)->syscal_data->sdo[i][0], 1);
+        if (syscal_pol_idx == CAL_XX) {
+          (*ampphase)->syscal_data->sdo[i][0][0] =
+            cycle_data->gtp_x[syscal_if_idx][i];
+        } else if (syscal_pol_idx == CAL_YY) {
+          (*ampphase)->syscal_data->sdo[i][0][0] =
+            cycle_data->gtp_y[syscal_if_idx][i];
+        }
+        CALLOC((*ampphase)->syscal_data->caljy[i], 1);
+        CALLOC((*ampphase)->syscal_data->caljy[i][0], 1);
+        if (syscal_pol_idx == CAL_XX) {
+          (*ampphase)->syscal_data->caljy[i][0][0] =
+            cycle_data->caljy_x[syscal_if_idx][i];
+        } else if (syscal_pol_idx == CAL_YY) {
+          (*ampphase)->syscal_data->caljy[i][0][0] =
+            cycle_data->caljy_y[syscal_if_idx][i];
+        }
       }
     } else {
       (*ampphase)->syscal_data->online_tsys = NULL;
@@ -1314,6 +1326,9 @@ void spectrum_data_compile_system_temperatures(struct spectrum_data *spectrum_da
   CALLOC((*syscal_data)->online_tsys_applied, (*syscal_data)->num_ants);
   CALLOC((*syscal_data)->computed_tsys, (*syscal_data)->num_ants);
   CALLOC((*syscal_data)->computed_tsys_applied, (*syscal_data)->num_ants);
+  CALLOC((*syscal_data)->gtp, (*syscal_data)->num_ants);
+  CALLOC((*syscal_data)->sdo, (*syscal_data)->num_ants);
+  CALLOC((*syscal_data)->caljy, (*syscal_data)->num_ants);
   // Do the same for the non-Tsys parameters.
   CALLOC((*syscal_data)->xyphase, (*syscal_data)->num_ants);
   CALLOC((*syscal_data)->xyamp, (*syscal_data)->num_ants);
@@ -1327,6 +1342,9 @@ void spectrum_data_compile_system_temperatures(struct spectrum_data *spectrum_da
     CALLOC((*syscal_data)->online_tsys_applied[i], (*syscal_data)->num_ifs);
     CALLOC((*syscal_data)->computed_tsys[i], (*syscal_data)->num_ifs);
     CALLOC((*syscal_data)->computed_tsys_applied[i], (*syscal_data)->num_ifs);
+    CALLOC((*syscal_data)->gtp[i], (*syscal_data)->num_ifs);
+    CALLOC((*syscal_data)->sdo[i], (*syscal_data)->num_ifs);
+    CALLOC((*syscal_data)->caljy[i], (*syscal_data)->num_ifs);
     CALLOC((*syscal_data)->xyphase[i], (*syscal_data)->num_ifs);
     CALLOC((*syscal_data)->xyamp[i], (*syscal_data)->num_ifs);
     for (j = 0; j < (*syscal_data)->num_ifs; j++) {
@@ -1334,11 +1352,17 @@ void spectrum_data_compile_system_temperatures(struct spectrum_data *spectrum_da
       CALLOC((*syscal_data)->online_tsys_applied[i][j], (*syscal_data)->num_pols);
       CALLOC((*syscal_data)->computed_tsys[i][j], (*syscal_data)->num_pols);
       CALLOC((*syscal_data)->computed_tsys_applied[i][j], (*syscal_data)->num_pols);
+      CALLOC((*syscal_data)->gtp[i][j], (*syscal_data)->num_pols);
+      CALLOC((*syscal_data)->sdo[i][j], (*syscal_data)->num_pols);
+      CALLOC((*syscal_data)->caljy[i][j], (*syscal_data)->num_pols);
       for (k = 0; k < (*syscal_data)->num_pols; k++) {
         (*syscal_data)->online_tsys[i][j][k] = -1;
         (*syscal_data)->online_tsys_applied[i][j][k] = -1;
         (*syscal_data)->computed_tsys[i][j][k] = -1;
         (*syscal_data)->computed_tsys_applied[i][j][k] = -1;
+        (*syscal_data)->gtp[i][j][k] = -1;
+        (*syscal_data)->sdo[i][j][k] = -1;
+        (*syscal_data)->caljy[i][j][k] = -1;
       }
       (*syscal_data)->xyphase[i][j] = -1; // Makes no sense...
       (*syscal_data)->xyamp[i][j] = -1;
@@ -1395,10 +1419,20 @@ void spectrum_data_compile_system_temperatures(struct spectrum_data *spectrum_da
                 (*syscal_data)->computed_tsys_applied[kk][ll][mm] =
                   tsys_data->computed_tsys_applied[k][l][m];
               }
+              if ((*syscal_data)->gtp[kk][ll][mm] == -1) {
+                (*syscal_data)->gtp[kk][ll][mm] =
+                  tsys_data->gtp[k][l][m];
+                (*syscal_data)->sdo[kk][ll][mm] =
+                  tsys_data->sdo[k][l][m];
+                (*syscal_data)->caljy[kk][ll][mm] =
+                  tsys_data->sdo[k][l][m];
+              }
               if ((*syscal_data)->tracking_error_max[kk] == -1) {
                 (*syscal_data)->parangle[kk] = tsys_data->parangle[k];
-                (*syscal_data)->tracking_error_max[kk] = tsys_data->tracking_error_max[k];
-                (*syscal_data)->tracking_error_rms[kk] = tsys_data->tracking_error_rms[k];
+                (*syscal_data)->tracking_error_max[kk] =
+                  tsys_data->tracking_error_max[k];
+                (*syscal_data)->tracking_error_rms[kk] =
+                  tsys_data->tracking_error_rms[k];
                 (*syscal_data)->flagging[kk] = tsys_data->flagging[k];
               }
               if ((*syscal_data)->xyamp[kk][ll] == -1) {
@@ -1419,11 +1453,17 @@ void spectrum_data_compile_system_temperatures(struct spectrum_data *spectrum_da
       FREE((*syscal_data)->online_tsys_applied[i][j]);
       FREE((*syscal_data)->computed_tsys[i][j]);
       FREE((*syscal_data)->computed_tsys_applied[i][j]);
+      FREE((*syscal_data)->gtp[i][j]);
+      FREE((*syscal_data)->sdo[i][j]);
+      FREE((*syscal_data)->caljy[i][j]);
     }
     REALLOC((*syscal_data)->online_tsys[i], (high_if + 1));
     REALLOC((*syscal_data)->online_tsys_applied[i], (high_if + 1));
     REALLOC((*syscal_data)->computed_tsys[i], (high_if + 1));
     REALLOC((*syscal_data)->computed_tsys_applied[i], (high_if + 1));
+    REALLOC((*syscal_data)->gtp[i], (high_if + 1));
+    REALLOC((*syscal_data)->sdo[i], (high_if + 1));
+    REALLOC((*syscal_data)->caljy[i], (high_if + 1));
     REALLOC((*syscal_data)->xyphase[i], (high_if + 1));
     REALLOC((*syscal_data)->xyamp[i], (high_if + 1));
   }

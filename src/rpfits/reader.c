@@ -462,8 +462,8 @@ void free_cycle_data(struct cycle_data *cycle_data) {
   FREE(cycle_data->gtp_y);
   FREE(cycle_data->sdo_x);
   FREE(cycle_data->sdo_y);
-  FREE(cycle_data->caljy_x[i]);
-  FREE(cycle_data->caljy_y[i]);
+  FREE(cycle_data->caljy_x);
+  FREE(cycle_data->caljy_y);
   FREE(cycle_data->flagging);
   
   cycle_data = NULL;
