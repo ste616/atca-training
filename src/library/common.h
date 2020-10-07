@@ -41,6 +41,7 @@
 // Our routine definitions.
 int interpret_array_string(char *array_string);
 int find_pol(struct ampphase ***cycle_ampphase, int npols, int ifnum, int poltype);
+int find_if_name_nosafe(struct scan_header_data *scan_header_data, char *name);
 int find_if_name(struct scan_header_data *scan_header_data, char *name);
 void seconds_to_hourlabel(float seconds, char *hourlabel);
 bool minmatch(char *ref, char *chk, int minlength);

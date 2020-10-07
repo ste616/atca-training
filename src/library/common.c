@@ -46,8 +46,8 @@ int find_pol(struct ampphase ***cycle_ampphase, int npols, int ifnum, int poltyp
 }
 
 
-int find_if_name(struct scan_header_data *scan_header_data,
-                 char *name) {
+int find_if_name_nosafe(struct scan_header_data *scan_header_data,
+                        char *name) {
   int res = -1, i, j;
   /* fprintf(stderr, "[find_if_name] searching for band %s\n", name); */
   for (i = 0; i < scan_header_data->num_ifs; i++) {
@@ -62,11 +62,21 @@ int find_if_name(struct scan_header_data *scan_header_data,
     }
   }
 
-  if (res < 0) {
-    res = 1; // For safety.
-  }
+  /* if (res < 0) { */
+  /*   res = 1; // For safety. */
+  /* } */
 
   /* fprintf(stderr, "[find_if_name] found band %d %s\n", res, scan_header_data->if_name[res - 1][0]); */
+  return res;
+}
+
+int find_if_name(struct scan_header_data *scan_header_data,
+                 char *name) {
+  int res = find_if_name_nosafe(scan_header_data, name);
+  if (res < 0) {
+    res = 1;
+  }
+
   return res;
 }
 

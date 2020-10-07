@@ -66,8 +66,8 @@ struct arguments {
 int action_required, server_type;
 int vis_device_number, data_selected_index;
 int xaxis_type, *yaxis_type, nxpanels, nypanels, nvisbands;
-int *visband_idx;
-char **visband;
+int *visband_idx, tvchan_change_min, tvchan_change_max;
+char **visband, tvchan_visband[10];
 // Whether to order the baselines in length order (true/false).
 bool sort_baselines;
 struct vis_plotcontrols vis_plotcontrols;
@@ -162,6 +162,7 @@ static void sighandler(int sig) {
 #define ACTION_AMPPHASE_OPTIONS_CHANGED  1<<6
 #define ACTION_AMPPHASE_OPTIONS_PRINT    1<<7
 #define ACTION_USERNAME_OBTAINED         1<<8
+#define ACTION_TVCHANNELS_CHANGED        1<<9
 
 // Make a shortcut to stop action for those actions which can only be
 // done by a simulator.
@@ -575,6 +576,20 @@ static void interpret_command(char *line) {
         }
         printf("\n");
       }
+    } else if (minmatch("tvchannel", line_els[0], 4)) {
+      // Change the tvchannels to compute with.
+      if (nels == 4) {
+        CHECKSIMULATOR;
+        // The user should have given us a visband, followed by the
+        // min and max.
+        strncpy(tvchan_visband, line_els[1], 10);
+        tvchan_change_min = atoi(line_els[2]);
+        tvchan_change_max = atoi(line_els[3]);
+        action_required = ACTION_TVCHANNELS_CHANGED;
+      } else {
+        // Output the current tvchannels.
+        action_required = ACTION_AMPPHASE_OPTIONS_PRINT;
+      }
     } else if (minmatch("onsource", line_els[0], 3)) {
       CHECKSIMULATOR;
       // Change whether we display data while off-source.
@@ -637,7 +652,7 @@ static void interpret_command(char *line) {
 
 int main(int argc, char *argv[]) {
   struct arguments arguments;
-  int i, j, r, bytes_received, nmesg = 0, fidx = 0;
+  int i, j, r, bytes_received, nmesg = 0, fidx = 0, bidx = -1;
   cmp_ctx_t cmp;
   cmp_mem_access_t mem;
   struct requests server_request;
@@ -849,6 +864,25 @@ int main(int argc, char *argv[]) {
       }
       readline_print_messages(nmesg, mesgout);
       action_required -= ACTION_AMPPHASE_OPTIONS_PRINT;
+    }
+
+    if (action_required & ACTION_TVCHANNELS_CHANGED) {
+      // Change the tvchannels as requested after finding the correct
+      // specified band to change.
+      bidx = find_if_name_nosafe(described_hdr, tvchan_visband);
+      nmesg = 0;
+      if (bidx < 0) {
+        // Didn't find the specified band.
+        snprintf(mesgout[nmesg++], VISBUFSIZE, "Band %s not found in data.\n",
+                 tvchan_visband);
+      } else {
+        ampphase_options.min_tvchannel[bidx] = tvchan_change_min;
+        ampphase_options.max_tvchannel[bidx] = tvchan_change_max;
+        action_required |= ACTION_AMPPHASE_OPTIONS_CHANGED;
+      }
+
+      readline_print_messages(nmesg, mesgout);
+      action_required -= ACTION_TVCHANNELS_CHANGED;
     }
     
     if (action_required & ACTION_AMPPHASE_OPTIONS_CHANGED) {

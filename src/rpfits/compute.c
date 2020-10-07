@@ -1279,7 +1279,7 @@ void calculate_system_temperatures(struct ampphase *ampphase,
         // The memory for the computed_tsys is alloacted at the same
         // time as for the online_tsys.
         ampphase->syscal_data->computed_tsys[i][window_idx][pol_idx] =
-          (float)sqrt(dx);
+          (float)dx;
         // We leave it to another routine to apply any Tsys.
         ampphase->syscal_data->computed_tsys_applied[i][window_idx][pol_idx] = 0;
       }
