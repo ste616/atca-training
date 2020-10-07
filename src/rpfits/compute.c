@@ -1425,7 +1425,7 @@ void spectrum_data_compile_system_temperatures(struct spectrum_data *spectrum_da
                 (*syscal_data)->sdo[kk][ll][mm] =
                   tsys_data->sdo[k][l][m];
                 (*syscal_data)->caljy[kk][ll][mm] =
-                  tsys_data->sdo[k][l][m];
+                  tsys_data->caljy[k][l][m];
               }
               if ((*syscal_data)->tracking_error_max[kk] == -1) {
                 (*syscal_data)->parangle[kk] = tsys_data->parangle[k];

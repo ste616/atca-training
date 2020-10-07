@@ -55,6 +55,9 @@
 #define VIS_PLOTPANEL_SEEMONPHASE      11
 #define VIS_PLOTPANEL_SEEMONRMS        12
 #define VIS_PLOTPANEL_SYSTEMP_COMPUTED 13
+#define VIS_PLOTPANEL_GTP              14
+#define VIS_PLOTPANEL_SDO              15
+#define VIS_PLOTPANEL_CALJY            16
 
 #define PANEL_ORIGINAL    -1
 #define PANEL_INFORMATION -2

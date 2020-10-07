@@ -222,8 +222,14 @@ int char_to_product(char pstring) {
     return VIS_PLOTPANEL_DELAY;
   case 'D':
     return VIS_PLOTPANEL_WINDDIR;
+  case 'G':
+    return VIS_PLOTPANEL_GTP;
   case 'H':
     return VIS_PLOTPANEL_HUMIDITY;
+  case 'n':
+    return VIS_PLOTPANEL_CALJY;
+  case 'N':
+    return VIS_PLOTPANEL_SDO;
   case 'p':
     return VIS_PLOTPANEL_PHASE;
   case 'P':
@@ -471,6 +477,12 @@ static void interpret_command(char *line) {
           change_panel = VIS_PLOTPANEL_SEEMONRMS;
         } else if (minmatch("computed_systemp", line_els[1], 4)) {
           change_panel = VIS_PLOTPANEL_SYSTEMP_COMPUTED;
+        } else if (minmatch("gtp", line_els[1], 3)) {
+          change_panel = VIS_PLOTPANEL_GTP;
+        } else if (minmatch("sdo", line_els[1], 3)) {
+          change_panel = VIS_PLOTPANEL_SDO;
+        } else if (minmatch("caljy", line_els[1], 3)) {
+          change_panel = VIS_PLOTPANEL_CALJY;
         }
         if (change_panel != VIS_PLOTPANEL_ALL) {
           if (nels == 2) {

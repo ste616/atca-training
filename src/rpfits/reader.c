@@ -596,12 +596,12 @@ int read_cycle_data(struct scan_header_data *scan_header_data,
         REALLOC(cycle_data->parangle, cycle_data->num_cal_ifs);
         REALLOC(cycle_data->tracking_error_max, cycle_data->num_cal_ifs);
         REALLOC(cycle_data->tracking_error_rms, cycle_data->num_cal_ifs);
-	REALLOC(cycle_data->gtp_x, cycle_data->num_cal_ifs);
-	REALLOC(cycle_data->gtp_y, cycle_data->num_cal_ifs);
-	REALLOC(cycle_data->sdo_x, cycle_data->num_cal_ifs);
-	REALLOC(cycle_data->sdo_y, cycle_data->num_cal_ifs);
-	REALLOC(cycle_data->caljy_x, cycle_data->num_cal_ifs);
-	REALLOC(cycle_data->caljy_y, cycle_data->num_cal_ifs);
+        REALLOC(cycle_data->gtp_x, cycle_data->num_cal_ifs);
+        REALLOC(cycle_data->gtp_y, cycle_data->num_cal_ifs);
+        REALLOC(cycle_data->sdo_x, cycle_data->num_cal_ifs);
+        REALLOC(cycle_data->sdo_y, cycle_data->num_cal_ifs);
+        REALLOC(cycle_data->caljy_x, cycle_data->num_cal_ifs);
+        REALLOC(cycle_data->caljy_y, cycle_data->num_cal_ifs);
         REALLOC(cycle_data->flagging, cycle_data->num_cal_ifs);
         
         MALLOC(cycle_data->tsys[sif], cycle_data->num_cal_ants);
@@ -611,12 +611,12 @@ int read_cycle_data(struct scan_header_data *scan_header_data,
         MALLOC(cycle_data->parangle[sif], cycle_data->num_cal_ants);
         MALLOC(cycle_data->tracking_error_max[sif], cycle_data->num_cal_ants);
         MALLOC(cycle_data->tracking_error_rms[sif], cycle_data->num_cal_ants);
-	MALLOC(cycle_data->gtp_x[sif], cycle_data->num_cal_ants);
-	MALLOC(cycle_data->gtp_y[sif], cycle_data->num_cal_ants);
-	MALLOC(cycle_data->sdo_x[sif], cycle_data->num_cal_ants);
-	MALLOC(cycle_data->sdo_y[sif], cycle_data->num_cal_ants);
-	MALLOC(cycle_data->caljy_x[sif], cycle_data->num_cal_ants);
-	MALLOC(cycle_data->caljy_y[sif], cycle_data->num_cal_ants);
+        MALLOC(cycle_data->gtp_x[sif], cycle_data->num_cal_ants);
+        MALLOC(cycle_data->gtp_y[sif], cycle_data->num_cal_ants);
+        MALLOC(cycle_data->sdo_x[sif], cycle_data->num_cal_ants);
+        MALLOC(cycle_data->sdo_y[sif], cycle_data->num_cal_ants);
+        MALLOC(cycle_data->caljy_x[sif], cycle_data->num_cal_ants);
+        MALLOC(cycle_data->caljy_y[sif], cycle_data->num_cal_ants);
         MALLOC(cycle_data->flagging[sif], cycle_data->num_cal_ants);
         for (i = 0; i < cycle_data->num_cal_ants; i++) {
           cycle_data->cal_ants[i] = SYSCAL_ANT(i, 0);
@@ -632,12 +632,12 @@ int read_cycle_data(struct scan_header_data *scan_header_data,
           cycle_data->parangle[sif][i] = SYSCAL_PARANGLE(i, 0);
           cycle_data->tracking_error_max[sif][i] = SYSCAL_TRACKERR_MAX(i, 0);
           cycle_data->tracking_error_rms[sif][i] = SYSCAL_TRACKERR_RMS(i, 0);
-	  cycle_data->gtp_x[sif][i] = SYSCAL_GTP_X(i, 0);
-	  cycle_data->gtp_y[sif][i] = SYSCAL_GTP_Y(i, 0);
-	  cycle_data->sdo_x[sif][i] = SYSCAL_SDO_X(i, 0);
-	  cycle_data->sdo_y[sif][i] = SYSCAL_SDO_Y(i, 0);
-	  cycle_data->caljy_x[sif][i] = SYSCAL_CALJY_X(i, 0);
-	  cycle_data->caljy_y[sif][i] = SYSCAL_CALJY_Y(i, 0);
+          cycle_data->gtp_x[sif][i] = SYSCAL_GTP_X(i, 0);
+          cycle_data->gtp_y[sif][i] = SYSCAL_GTP_Y(i, 0);
+          cycle_data->sdo_x[sif][i] = SYSCAL_SDO_X(i, 0);
+          cycle_data->sdo_y[sif][i] = SYSCAL_SDO_Y(i, 0);
+          cycle_data->caljy_x[sif][i] = SYSCAL_CALJY_X(i, 0);
+          cycle_data->caljy_y[sif][i] = SYSCAL_CALJY_Y(i, 0);
           cycle_data->flagging[sif][i] = SYSCAL_FLAG_BAD(i, 0);
         }
         /* printf("Baseline is -1\n"); */
