@@ -23,6 +23,16 @@
 #include "memory.h"
 #include "compute.h"
 
+float fmedianf(float *a, int n) {
+  // Get the median of the array a, with n points.
+  if (n % 2) {
+    // Odd number of points.
+    return (a[(n + 1) / 2]);
+  } else {
+    return ((a[n / 2] + a[(n / 2) + 1]) / 2.0);
+  }
+}
+
 /**
  * Initialise and return an ampphase structure.
  */
@@ -1211,8 +1221,9 @@ bool ampphase_options_match(struct ampphase_options *a,
 
 void calculate_system_temperatures(struct ampphase *ampphase,
                                    struct ampphase_options *options) {
-  int i, j, k, window_idx = -1, pol_idx = -1, a1, a2;
-  float tp_on = 0, tp_off = 0;
+  int i, j, k, window_idx = -1, pol_idx = -1, a1, a2, n_expected, n_actual = 0;
+  float tp_on = 0, tp_off = 0, *median_array_tpon = NULL;
+  float *median_array_tpoff = NULL;
   double dx, dy;
   // Recalculate the system temperature from the data in the new
   // tvchannel range, and with different options.
@@ -1247,6 +1258,16 @@ void calculate_system_temperatures(struct ampphase *ampphase,
     /*         options->num_ifs, ampphase->window); */
     return;
   }
+
+  // Allocate the median arrays if necessary.
+  if (options->averaging_method[window_idx] & AVERAGETYPE_MEDIAN) {
+    n_expected = 1 + options->max_tvchannel[window_idx] -
+      options->min_tvchannel[window_idx];
+    if (n_expected > 0) {
+      CALLOC(median_array_tpon, n_expected);
+      CALLOC(median_array_tpoff, n_expected);
+    }
+  }
   
   // We need to have the syscal_data structure filled with the data
   // from the telescope first, which shouldn't be too much of an
@@ -1257,18 +1278,33 @@ void calculate_system_temperatures(struct ampphase *ampphase,
       base_to_ants(ampphase->baseline[j], &a1, &a2);
       if ((a1 == a2) && (a1 == ampphase->syscal_data->ant_num[i])) {
         // Make our sums.
-        for (k = 0; k < ampphase->f_nchannels[j][0]; k++) {
+        for (k = 0, n_actual = 0; k < ampphase->f_nchannels[j][0]; k++) {
           if ((ampphase->f_channel[j][0][k] >=
                options->min_tvchannel[ampphase->window]) &&
               (ampphase->f_channel[j][0][k] <=
                options->max_tvchannel[ampphase->window]) &&
               (ampphase->nbins[j] > 1)) {
-            tp_on += ampphase->f_amplitude[j][1][k];
-            tp_off += ampphase->f_amplitude[j][0][k];
+            if (options->averaging_method[window_idx] & AVERAGETYPE_MEDIAN) {
+              median_array_tpon[n_actual] = ampphase->f_amplitude[j][1][k];
+              median_array_tpoff[n_actual] = ampphase->f_amplitude[j][0][k];
+              n_actual++;
+            } else {
+              tp_on += ampphase->f_amplitude[j][1][k];
+              tp_off += ampphase->f_amplitude[j][0][k];
+            }
           }
         }
-        dx = fabs((double)(tp_on - tp_off));
-        dy = (double)(tp_on + tp_off) / 2.0;
+        if (options->averaging_method[window_idx] & AVERAGETYPE_MEDIAN) {
+          qsort(median_array_tpon, n_actual, sizeof(float), cmpfunc_real);
+          qsort(median_array_tpoff, n_actual, sizeof(float), cmpfunc_real);
+          dx = fabs((double)(fmedianf(median_array_tpon, n_actual) -
+                             fmedianf(median_array_tpoff, n_actual)));
+          dy = (double)(fmedianf(median_array_tpon, n_actual) +
+                        fmedianf(median_array_tpoff, n_actual)) / 2.0;
+        } else {
+          dx = fabs((double)(tp_on - tp_off));
+          dy = (double)(tp_on + tp_off) / 2.0;
+        }
         if ((dy > 1.0) && (dx > (0.001 * dy))) {
           // This is what we want to happen.
           dx = dy / dx;

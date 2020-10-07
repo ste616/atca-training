@@ -269,6 +269,7 @@ struct vis_data {
   struct syscal_data **syscal_data;
 };
 
+float fmedianf(float *a, int n);
 struct ampphase* prepare_ampphase(void);
 struct vis_quantities* prepare_vis_quantities(void);
 void free_ampphase(struct ampphase **ampphase);
