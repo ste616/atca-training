@@ -1223,8 +1223,7 @@ void calculate_system_temperatures(struct ampphase *ampphase,
                                    struct ampphase_options *options) {
   int i, j, k, window_idx = -1, pol_idx = -1, a1, a2, n_expected, n_actual = 0;
   float tp_on = 0, tp_off = 0, *median_array_tpon = NULL;
-  float *median_array_tpoff = NULL;
-  double dx, dy;
+  float *median_array_tpoff = NULL, fs, fd, dx;
   // Recalculate the system temperature from the data in the new
   // tvchannel range, and with different options.
   
@@ -1285,37 +1284,36 @@ void calculate_system_temperatures(struct ampphase *ampphase,
                options->max_tvchannel[ampphase->window]) &&
               (ampphase->nbins[j] > 1)) {
             if (options->averaging_method[window_idx] & AVERAGETYPE_MEDIAN) {
-              median_array_tpon[n_actual] = ampphase->f_amplitude[j][1][k];
-              median_array_tpoff[n_actual] = ampphase->f_amplitude[j][0][k];
-              n_actual++;
+              median_array_tpon[n_actual] = crealf(ampphase->f_raw[j][1][k]);
+              median_array_tpoff[n_actual] = crealf(ampphase->f_raw[j][0][k]);
             } else {
-              tp_on += ampphase->f_amplitude[j][1][k];
-              tp_off += ampphase->f_amplitude[j][0][k];
+              tp_on += crealf(ampphase->f_raw[j][1][k]);
+              tp_off += crealf(ampphase->f_raw[j][0][k]);
             }
+            n_actual++;
           }
         }
         if (options->averaging_method[window_idx] & AVERAGETYPE_MEDIAN) {
           qsort(median_array_tpon, n_actual, sizeof(float), cmpfunc_real);
           qsort(median_array_tpoff, n_actual, sizeof(float), cmpfunc_real);
-          dx = fabs((double)(fmedianf(median_array_tpon, n_actual) -
-                             fmedianf(median_array_tpoff, n_actual)));
-          dy = (double)(fmedianf(median_array_tpon, n_actual) +
-                        fmedianf(median_array_tpoff, n_actual)) / 2.0;
+          fs = 0.5 * (fmedianf(median_array_tpon, n_actual) +
+                      fmedianf(median_array_tpoff, n_actual));
+          fd = fmedianf(median_array_tpon, n_actual) -
+            fmedianf(median_array_tpoff, n_actual);
         } else {
-          dx = fabs((double)(tp_on - tp_off));
-          dy = (double)(tp_on + tp_off) / 2.0;
+          fs = 0.5 * (tp_on + tp_off);
+          fd = tp_on - tp_off;
         }
-        if ((dy > 1.0) && (dx > (0.001 * dy))) {
-          // This is what we want to happen.
-          dx = dy / dx;
+        if ((ampphase->syscal_data->caljy[i][window_idx][pol_idx] > 0) &&
+            (fd > (0.01 * fs))) {
+          dx = (fs / fd) * ampphase->syscal_data->caljy[i][window_idx][pol_idx];
         } else {
-          // In case of badness.
-          dx = 25.0;
+          dx = 99.995 * 99.995;
         }
         // The memory for the computed_tsys is alloacted at the same
         // time as for the online_tsys.
         ampphase->syscal_data->computed_tsys[i][window_idx][pol_idx] =
-          (float)dx;
+          sqrtf(dx);
         // We leave it to another routine to apply any Tsys.
         ampphase->syscal_data->computed_tsys_applied[i][window_idx][pol_idx] = 0;
       }
