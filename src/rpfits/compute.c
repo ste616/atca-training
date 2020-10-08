@@ -1259,9 +1259,9 @@ void calculate_system_temperatures(struct ampphase *ampphase,
   }
 
   // Allocate the median arrays if necessary.
-  if (options->averaging_method[window_idx] & AVERAGETYPE_MEDIAN) {
-    n_expected = 1 + options->max_tvchannel[window_idx] -
-      options->min_tvchannel[window_idx];
+  if (options->averaging_method[ampphase->window] & AVERAGETYPE_MEDIAN) {
+    n_expected = 1 + options->max_tvchannel[ampphase->window] -
+      options->min_tvchannel[ampphase->window];
     if (n_expected > 0) {
       CALLOC(median_array_tpon, n_expected);
       CALLOC(median_array_tpoff, n_expected);
@@ -1283,7 +1283,7 @@ void calculate_system_temperatures(struct ampphase *ampphase,
               (ampphase->f_channel[j][0][k] <=
                options->max_tvchannel[ampphase->window]) &&
               (ampphase->nbins[j] > 1)) {
-            if (options->averaging_method[window_idx] & AVERAGETYPE_MEDIAN) {
+            if (options->averaging_method[ampphase->window] & AVERAGETYPE_MEDIAN) {
               median_array_tpon[n_actual] = crealf(ampphase->f_raw[j][1][k]);
               median_array_tpoff[n_actual] = crealf(ampphase->f_raw[j][0][k]);
             } else {
@@ -1293,7 +1293,7 @@ void calculate_system_temperatures(struct ampphase *ampphase,
             n_actual++;
           }
         }
-        if (options->averaging_method[window_idx] & AVERAGETYPE_MEDIAN) {
+        if (options->averaging_method[ampphase->window] & AVERAGETYPE_MEDIAN) {
           qsort(median_array_tpon, n_actual, sizeof(float), cmpfunc_real);
           qsort(median_array_tpoff, n_actual, sizeof(float), cmpfunc_real);
           fs = 0.5 * (fmedianf(median_array_tpon, n_actual) +
