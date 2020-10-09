@@ -310,6 +310,8 @@ struct cycle_data* prepare_new_cycle_data(void) {
   cycle_data->cal_ants = NULL;
   cycle_data->tsys = NULL;
   cycle_data->tsys_applied = NULL;
+  cycle_data->computed_tsys = NULL;
+  cycle_data->computed_tsys_applied = NULL;
   cycle_data->xyphase = NULL;
   cycle_data->xyamp = NULL;
   cycle_data->parangle = NULL;
@@ -435,9 +437,13 @@ void free_cycle_data(struct cycle_data *cycle_data) {
     for (j = 0; j < cycle_data->num_cal_ants; j++) {
       FREE(cycle_data->tsys[i][j]);
       FREE(cycle_data->tsys_applied[i][j]);
+      FREE(cycle_data->computed_tsys[i][j]);
+      FREE(cycle_data->computed_tsys_applied[i][j]);
     }
     FREE(cycle_data->tsys[i]);
     FREE(cycle_data->tsys_applied[i]);
+    FREE(cycle_data->computed_tsys[i]);
+    FREE(cycle_data->computed_tsys_applied[i]);
     FREE(cycle_data->xyphase[i]);
     FREE(cycle_data->xyamp[i]);
     FREE(cycle_data->parangle[i]);
@@ -453,6 +459,8 @@ void free_cycle_data(struct cycle_data *cycle_data) {
   }
   FREE(cycle_data->tsys);
   FREE(cycle_data->tsys_applied);
+  FREE(cycle_data->computed_tsys);
+  FREE(cycle_data->computed_tsys_applied);
   FREE(cycle_data->xyphase);
   FREE(cycle_data->xyamp);
   FREE(cycle_data->parangle);
@@ -591,6 +599,8 @@ int read_cycle_data(struct scan_header_data *scan_header_data,
         // Do some array allocation.
         REALLOC(cycle_data->tsys, cycle_data->num_cal_ifs);
         REALLOC(cycle_data->tsys_applied, cycle_data->num_cal_ifs);
+	REALLOC(cycle_data->computed_tsys, cycle_data->num_cal_ifs);
+	REALLOC(cycle_data->computed_tsys_applied, cycle_data->num_cal_ifs);
         REALLOC(cycle_data->xyphase, cycle_data->num_cal_ifs);
         REALLOC(cycle_data->xyamp, cycle_data->num_cal_ifs);
         REALLOC(cycle_data->parangle, cycle_data->num_cal_ifs);
@@ -606,6 +616,8 @@ int read_cycle_data(struct scan_header_data *scan_header_data,
         
         MALLOC(cycle_data->tsys[sif], cycle_data->num_cal_ants);
         MALLOC(cycle_data->tsys_applied[sif], cycle_data->num_cal_ants);
+	MALLOC(cycle_data->computed_tsys[sif], cycle_data->num_cal_ants);
+	MALLOC(cycle_data->computed_tsys_applied[sif], cycle_data->num_cal_ants);
         MALLOC(cycle_data->xyphase[sif], cycle_data->num_cal_ants);
         MALLOC(cycle_data->xyamp[sif], cycle_data->num_cal_ants);
         MALLOC(cycle_data->parangle[sif], cycle_data->num_cal_ants);
@@ -622,6 +634,8 @@ int read_cycle_data(struct scan_header_data *scan_header_data,
           cycle_data->cal_ants[i] = SYSCAL_ANT(i, 0);
           MALLOC(cycle_data->tsys[sif][i], 2);
           MALLOC(cycle_data->tsys_applied[sif][i], 2);
+	  CALLOC(cycle_data->computed_tsys[sif][i], 2);
+	  CALLOC(cycle_data->computed_tsys_applied[sif][i], 2);
           cycle_data->tsys[sif][i][CAL_XX] = SYSCAL_TSYS_X(i, 0);
           cycle_data->tsys[sif][i][CAL_YY] = SYSCAL_TSYS_Y(i, 0);
           cycle_data->tsys_applied[sif][i][CAL_XX] = SYSCAL_TSYS_X_APPLIED(i, 0);

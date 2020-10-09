@@ -1219,6 +1219,33 @@ bool ampphase_options_match(struct ampphase_options *a,
   return match;
 }
 
+void calculate_system_temperatures_cycle_data(struct cycle_data *cycle_data,
+					      struct scan_header_data *scan_header_data,
+					      struct ampphase_options *options) {
+  int i, bl, bidx;
+  // Recalculate the system temperature from the data within the
+  // specified tvchannel range, and with different options.
+
+  // This routine is designed to run straight after the data is read into
+  // the cycle_data structure.
+  for (i = 0; i < cycle_data->num_points; i++) {
+    bl = ants_to_base(cycle_data->ant1[i], cycle_data->ant2[i]);
+    if (bl < 0) {
+      continue;
+    }
+    // We only do system temperature calculation if the baseline
+    // is an autocorrelation.
+    bidx = cycle_data->all_baselines[bl] - 1;
+    if (bidx < 0) {
+      return;
+    }
+    if ((cycle_data->ant1[i] == cycle_data->ant2[i])) {
+      
+    }
+  }
+  
+}
+
 void calculate_system_temperatures(struct ampphase *ampphase,
                                    struct ampphase_options *options) {
   int i, j, k, window_idx = -1, pol_idx = -1, a1, a2, n_expected, n_actual = 0;

@@ -110,6 +110,8 @@ struct cycle_data {
   // This is indexed [IF][ANT][POL]
   float ***tsys;
   int ***tsys_applied;
+  float ***computed_tsys;
+  int ***computed_tsys_applied;
   // These are indexed [IF][ANT].
   float **xyphase;
   float **xyamp;
