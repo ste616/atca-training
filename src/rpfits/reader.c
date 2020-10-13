@@ -599,8 +599,8 @@ int read_cycle_data(struct scan_header_data *scan_header_data,
         // Do some array allocation.
         REALLOC(cycle_data->tsys, cycle_data->num_cal_ifs);
         REALLOC(cycle_data->tsys_applied, cycle_data->num_cal_ifs);
-	REALLOC(cycle_data->computed_tsys, cycle_data->num_cal_ifs);
-	REALLOC(cycle_data->computed_tsys_applied, cycle_data->num_cal_ifs);
+        REALLOC(cycle_data->computed_tsys, cycle_data->num_cal_ifs);
+        REALLOC(cycle_data->computed_tsys_applied, cycle_data->num_cal_ifs);
         REALLOC(cycle_data->xyphase, cycle_data->num_cal_ifs);
         REALLOC(cycle_data->xyamp, cycle_data->num_cal_ifs);
         REALLOC(cycle_data->parangle, cycle_data->num_cal_ifs);
@@ -616,8 +616,8 @@ int read_cycle_data(struct scan_header_data *scan_header_data,
         
         MALLOC(cycle_data->tsys[sif], cycle_data->num_cal_ants);
         MALLOC(cycle_data->tsys_applied[sif], cycle_data->num_cal_ants);
-	MALLOC(cycle_data->computed_tsys[sif], cycle_data->num_cal_ants);
-	MALLOC(cycle_data->computed_tsys_applied[sif], cycle_data->num_cal_ants);
+        MALLOC(cycle_data->computed_tsys[sif], cycle_data->num_cal_ants);
+        MALLOC(cycle_data->computed_tsys_applied[sif], cycle_data->num_cal_ants);
         MALLOC(cycle_data->xyphase[sif], cycle_data->num_cal_ants);
         MALLOC(cycle_data->xyamp[sif], cycle_data->num_cal_ants);
         MALLOC(cycle_data->parangle[sif], cycle_data->num_cal_ants);
@@ -634,8 +634,8 @@ int read_cycle_data(struct scan_header_data *scan_header_data,
           cycle_data->cal_ants[i] = SYSCAL_ANT(i, 0);
           MALLOC(cycle_data->tsys[sif][i], 2);
           MALLOC(cycle_data->tsys_applied[sif][i], 2);
-	  CALLOC(cycle_data->computed_tsys[sif][i], 2);
-	  CALLOC(cycle_data->computed_tsys_applied[sif][i], 2);
+          CALLOC(cycle_data->computed_tsys[sif][i], 2);
+          CALLOC(cycle_data->computed_tsys_applied[sif][i], 2);
           cycle_data->tsys[sif][i][CAL_XX] = SYSCAL_TSYS_X(i, 0);
           cycle_data->tsys[sif][i][CAL_YY] = SYSCAL_TSYS_Y(i, 0);
           cycle_data->tsys_applied[sif][i][CAL_XX] = SYSCAL_TSYS_X_APPLIED(i, 0);

@@ -1220,14 +1220,36 @@ bool ampphase_options_match(struct ampphase_options *a,
 }
 
 void calculate_system_temperatures_cycle_data(struct cycle_data *cycle_data,
-					      struct scan_header_data *scan_header_data,
-					      struct ampphase_options *options) {
-  int i, bl, bidx;
+                                              struct scan_header_data *scan_header_data,
+                                              struct ampphase_options *options) {
+  int i, j, bl, bidx, ***n_tp_on_array = NULL, ***n_tp_off_array = NULL;
+  int ***n_tp_array = NULL, aidx, iidx;
+  float ****tp_on_array = NULL, ****tp_off_array = NULL, ****tp_array = NULL;
   // Recalculate the system temperature from the data within the
   // specified tvchannel range, and with different options.
 
   // This routine is designed to run straight after the data is read into
   // the cycle_data structure.
+
+  // Make some initial allocations.
+  CALLOC(tp_on_array, cycle_data->num_cal_ants);
+  CALLOC(tp_off_array, cycle_data->num_cal_ants);
+  CALLOC(n_tp_on_array, cycle_data->num_cal_ants);
+  CALLOC(n_tp_off_array, cycle_data->num_cal_ants);
+  for (i = 0; i < cycle_data->num_cal_ants; i++) {
+    CALLOC(tp_on_array[i], cycle_data->num_cal_ifs);
+    CALLOC(tp_off_array[i], cycle_data->num_cal_ifs);
+    CALLOC(n_tp_on_array[i], cycle_data->num_cal_ifs);
+    CALLOC(n_tp_off_array[i], cycle_data->num_cal_ifs);
+    for (j = 0; j < cycle_data->num_cal_ifs; j++) {
+      // Pols, we only care about XX and YY.
+      CALLOC(tp_on_array[i][j], 2);
+      CALLOC(tp_off_array[i][j], 2);
+      CALLOC(n_tp_on_array[i][j], 2);
+      CALLOC(n_tp_off_array[i][j], 2);
+    }
+  }
+  
   for (i = 0; i < cycle_data->num_points; i++) {
     bl = ants_to_base(cycle_data->ant1[i], cycle_data->ant2[i]);
     if (bl < 0) {
@@ -1240,10 +1262,29 @@ void calculate_system_temperatures_cycle_data(struct cycle_data *cycle_data,
       return;
     }
     if ((cycle_data->ant1[i] == cycle_data->ant2[i])) {
-      
+      aidx = cycle_data->ant1[i] - 1;
+      iidx = cycle_data->if_no[i] - 1;
+      if (cycle_data->bin[i] == 1) {
+        // The noise diode is off.
+        tp_array = tp_off_array;
+        n_tp_array = n_tp_off_array;
+      } else if (cycle_data->bin[i] == 2) {
+        // The noise diode is on.
+        tp_array = tp_on_array;
+        n_tp_array = n_tp_on_array;
+      }
+      for (j = 0; j < 
     }
   }
-  
+
+  for (i = 0; i < cycle_data->num_cal_ants; i++) {
+    FREE(tp_on_array[i]);
+    FREE(tp_off_array[i]);
+  }
+  FREE(tp_on_array);
+  FREE(tp_off_array);
+  FREE(n_tp_on_array);
+  FREE(n_tp_off_array);
 }
 
 void calculate_system_temperatures(struct ampphase *ampphase,
