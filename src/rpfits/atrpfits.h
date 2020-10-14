@@ -114,29 +114,189 @@ struct scan_header_data {
    */
   float ut_seconds;
   // Details about the observation.
-  
+  /*! \var obstype
+   *  \brief The type of observation this scan describes.
+   *
+   * The observation type is something like:
+   * - Dwell
+   * - Point
+   */
   char obstype[OBSTYPE_LENGTH];
+  /*! \var calcode
+   *  \brief The calibrator code setting for this scan.
+   */
   char calcode[CALCODE_LENGTH];
+  /*! \var cycle_time
+   *  \brief The cycle time for this scan, in seconds.
+   *
+   * This parameter comes from the RPFITS variable `param_.intime`.
+   */
   int cycle_time;
-  // Name of the source.
+  /*! \var source_name
+   *  \brief The name of the source, supplied by the observer.
+   *
+   * The observer can name each scan whatever they like as the
+   * source name, and this name is represented here.
+   */
   char source_name[SOURCE_LENGTH];
   // Source coordinates.
+  /*! \var rightascension_hours
+   *  \brief The right ascension of the correlated phase centre, in hours.
+   */
   float rightascension_hours;
+  /*! \var declination_degrees
+   *  \brief The declination of the correlated phase centre, in degrees.
+   */
   float declination_degrees;
   // Frequency configuration.
+  /*! \var num_ifs
+   *  \brief The number of IFs stored in this scan.
+   *
+   * The number of intermediate frequencies (IFs, or windows) is stored
+   * in this variable, and can not change within a single scan.
+   */
   int num_ifs;
+  /*! \var if_centre_freq
+   *  \brief The frequency at the centre of each IF, in MHz.
+   *
+   * Each IF in this scan has an entry in this array of size num_ifs.
+   *
+   * The centre frequency of the central channel of the IF, in MHz.
+   */
   float *if_centre_freq;
+  /*! \var if_bandwidth
+   *  \brief The total bandwidth of each IF, in MHz.
+   *
+   * Each IF in this scan has an entry in this array of size num_ifs.
+   *
+   * The total bandwidth covered by all the channels of the IF, in MHz.
+   */
   float *if_bandwidth;
+  /*! \var if_num_channels
+   *  \brief The number of channels of each IF.
+   *
+   * Each IF in this scan has an entry in this array of size num_ifs.
+   */
   int *if_num_channels;
+  /*! \var if_num_stokes
+   *  \brief The number of Stokes parameters of each IF.
+   *
+   * Each IF in this scan has an entry in this array of size num_ifs.
+   *
+   * For CABB, this should always be 4 (XX, YY, XY, YX).
+   */
   int *if_num_stokes;
+  /*! \var if_sideband
+   *  \brief The sideband of each IF.
+   *
+   * Each IF in this scan has an entry in this array of size num_ifs.
+   *
+   * If the IF is upper sideband (USB), this variable will have value 1.
+   * If the IF is lower sideband (LSB), this variable will have value -1.
+   */
   int *if_sideband;
+  /*! \var if_chain
+   *  \brief The RF chain used for each IF.
+   *
+   * Each IF in this scan has an entry in this array of size num_ifs.
+   *
+   * The RF signal from the receivers are first divided into broad IFs.
+   * For CABB, the first division is into 2 IFs, and each zoom will come
+   * from one of these two divisions. This variable describes which of the
+   * broad divisions each IF comes from.
+   *
+   * **This variable has no 0 value. The first IF division is labelled 1.**
+   */
   int *if_chain;
+  /*! \var if_label
+   *  \brief The label of each IF.
+   *
+   * Each IF in this scan has an entry in this array of size num_ifs.
+   *
+   * Each IF is given a numbered label, starting at 1, which is stored
+   * in this variable.
+   *
+   * **This variable has no 0 value. The first IF is labelled 1.**
+   */
   int *if_label;
+  /*! \var if_name
+   *  \brief A collection of names for each IF.
+   *
+   * Each IF in this scan has an entry in this array. This array has
+   * dimensions [num_ifs][3][8]. That is, each IF has 3 names, each being
+   * a string of length 8. These two magic numbers are hard-coded, and this
+   * should be fixed.
+   *
+   * Each IF has the following three names:
+   * 1. The simple name, like `f1` or `f3`; simply `f` followed by the
+   *    number stored in if_label.
+   * 2. The classified name, like `f1` or `z1`; if `f`, this is a band
+   *    with coarse resolution (the continuum bands for CABB), and if `z`
+   *    this is a zoom band. The numbering is incremental in order of the
+   *    bands as specified in this header. That is, the first zoom encountered
+   *    while traversing num_ifs in ascending order will be labelled `z1`.
+   * 3. The informative name, like `f1` or `z1-1`. The same name as 2 will
+   *    be used for continuum bands, but for each zoom, the chain number is
+   *    given first, then the number of the zoom within that chain second.
+   *    For example, if all 16 zooms are individual specified for each IF
+   *    (CABB), then name 2 will go from `z1` to `z16` for the zooms in chain 1,
+   *    and from `z17` to `z32` in chain 2. This name 3 however will go
+   *    from `z1-1` to `z1-16` for the zooms in chain 1, and from `z2-1` to
+   *    `z2-16` in chain 2.
+   */
   char ***if_name;
+  /*! \var if_stokes_names
+   *  \brief The names of the Stokes parameters present for each IF.
+   *
+   * Each IF in this scan has an entry in this array. This array has
+   * dimensions [num_ifs][if_num_stokes[n_if]][3], where n_if is the
+   * index of the IF (each IF can have different numbers of Stokes parameters,
+   * although for CABB this never occurs). The magic number 3 is hard-coded
+   * and should be fixed.
+   *
+   * Each Stokes parameter of each IF has a name like `XX` or `YY` or `XY`.
+   */
   char ***if_stokes_names;
+  /*! \var num_ants
+   *  \brief The number of antennas in the data in this scan.
+   *
+   * For CABB, all antennas are always stored regardless of whether they
+   * were on-line or not. This number should always be 6 for CABB, but this
+   * is not an RPFITS restriction.
+   */
   int num_ants;
+  /*! \var ant_label
+   *  \brief The label of each antenna.
+   *
+   * Each antenna in this scan has an entry in this array of size num_ants.
+   *
+   * The antenna label is simply the number of the antenna, starting at 1 for
+   * the ATCA antennas.
+   */
   int *ant_label;
+  /*! \var ant_name
+   *  \brief The name of each antenna, which for ATCA is actually the
+   *         name of the station each antenna is connected to.
+   *
+   * Each antenna in this scan has an entry in this array. This array has
+   * dimensions [num_ants][9]. The magic number 9 is hard-coded and should
+   * be fixed.
+   *
+   * Example names will be `W104` or `N2`.
+   */
   char **ant_name;
+  /*! \var ant_cartesian
+   *  \brief The coordinates of each antenna on the WGS84 Cartesian plane, in m.
+   *
+   * Each antenna in this scan has an entry in this array. This array has
+   * dimensions [num_ants][3]. The magic number 3 is hard-coded and should
+   * be fixed.
+   *
+   * The coordinates are listed in X=0, Y=1, Z=2 index order of the second
+   * array dimension, and are given in m. Each coordinate is that assumed by
+   * the correlator, and thus (for ATCA) will represent the corrected location
+   * calculated during the baseline length determination after each reconfiguration.
+   */
   double **ant_cartesian;
 };
 

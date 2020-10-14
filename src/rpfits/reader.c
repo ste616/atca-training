@@ -1,3 +1,13 @@
+/** \file reader.c
+ *  \brief Functions to make reading from RPFITS files more convenient, and to populate
+ *         the structures for easier access later.
+ *
+ * ATCA Training Library: reader.c
+ * (C) Jamie Stevens CSIRO 2020
+ *
+ * This module handles reading from an RPFITS file.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -8,24 +18,20 @@
 #include "reader.h"
 #include "memory.h"
 
-/**
- * ATCA Training Library: reader.c
- * (C) Jamie Stevens CSIRO 2019
- *
- * This library is designed to read an RPFITS file and for each cycle make available
- * the products which would be available online: spectra, amp, phase, delay,
- * u, v, w, etc.
- * This is so we can make tools which will let observers muck around with what they 
- * would see online in all sorts of real situations, as represented by real data 
- * files.
- * 
- * This module handles reading an RPFITS file.
- */
 
-/**
- * Routine to assess how large the visibility set is.
- * Unfortunately, RPFITS makes a bunch of data visible via global variables,
- * which is why we don't take any arguments.
+/** 
+ *  \brief Routine to assess how large this visibility set is.
+ *  \return the total size of the visibility [int]
+ *
+ * RPFITS makes a bunch of data visible via global variables,
+ * which is why we don't take any arguments. The total size is the
+ * sum over all the IFs present in the data, for the product of
+ * number of Stokes parameters and the number of channels in each IF.
+ * 
+ * For example, if we had 3 IFs, and the first 2 IFs had 2048 channels
+ * each, and the third IF had 4096 channels, and all the IFs had
+ * 4 Stokes parameters, then this routine would return:
+ * 2048 * 4 + 2048 * 4 + 4096 * 4 = 32768.
  */
 int size_of_vis(void) {
   int i, vis_size = 0;
@@ -37,9 +43,17 @@ int size_of_vis(void) {
   return(vis_size);
 }
 
-/**
- * Routine to work out how big the visibility set is for
- * a nominated IF.
+/** 
+ *  \brief Routine to work out how big the visibility set is for
+ *         a specified IF.
+ *  \param if_no the IF number of interest (**the first IF is 1, not 0**) [int]
+ *  \return the total size of the IF's visibility [int]
+ *
+ * The total size is the product of the number of Stokes parameters
+ * and the number of channels in the specified IF.
+ *
+ * For example, if the specified IF had 2048 channels and 4 Stokes
+ * parameters, this routine would return 2048 * 4 = 8192.
  */
 int size_of_if_vis(int if_no) {
   int vis_size = 0, idx = -1;
@@ -54,10 +68,15 @@ int size_of_if_vis(int if_no) {
   return(vis_size);
 }
 
-/**
- * Routine to work out the maximum size required for a vis array.
- * We need this since we can't get the if_no until after the
- * rpfitsin_ call, but we need the vis allocated before it.
+/** 
+ *  \brief Routine to work out the maximum size required for a vis array.
+ *  \return the maximum visibility set size [int]
+ *
+ * After reading in the header, but before asking for the data, the vis
+ * variable needs to be allocated to be large enough to accept all data
+ * from all IFs (since you don't know which IF will be returned by the next
+ * call to rpfitsin_). This routine returns the visibility set size of
+ * the largest IF specified in the most recently-read header.
  */
 int max_size_of_vis(void) {
   int i = 0, vis_size = 0, max_vis_size = 0;
@@ -70,8 +89,14 @@ int max_size_of_vis(void) {
   return(max_vis_size);
 }
 
-/**
- * This routine attempts to open an RPFITS file.
+/** 
+ *  \brief Routine to open an RPFITS file.
+ *  \param filename the name of the file to open [string]
+ *  \return the JSTAT return code from the call to rpfitsin_ [int]
+ *
+ * If the file is opened successfully, this routine will return the
+ * magic number JSTAT_SUCCESSFUL, otherwise it will return
+ * JSTAT_UNSUCCESSFUL.
  */
 int open_rpfits_file(char *filename) {
   int this_jstat = JSTAT_UNSUCCESSFUL;
@@ -93,7 +118,12 @@ int open_rpfits_file(char *filename) {
 }
 
 /**
- * This routine attempts to close the currently open RPFITS file.
+ *  \brief This routine attempts to close the currently open RPFITS file.
+ *  \return the JSTAT return code from the call to rpfitsin_ [int]
+ *
+ * If the file is closed successfully, this routine will return the
+ * magic number JSTAT_SUCCESSFUL, otherwise it will return
+ * JSTAT_UNSUCCESSFUL.
  */
 int close_rpfits_file(void) {
   int this_jstat = JSTAT_CLOSEFILE;

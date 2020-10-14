@@ -1,38 +1,111 @@
-/**
- * ATCA Training Library: reader.h
- * (C) Jamie Stevens CSIRO 2019
+/** \file reader.h
+ *  \brief Definitions, macros and functions to make reading from RPFITS files
+ *         more convenient in this library.
  *
- * This library is designed to read an RPFITS file and for each cycle make available
- * the products which would be available online: spectra, amp, phase, delay,
- * u, v, w, etc.
- * This is so we can make tools which will let observers muck around with what they 
- * would see online in all sorts of real situations, as represented by real data 
- * files.
- * 
- * This module handles reading an RPFITS file.
+ * ATCA Training Library: reader.h
+ * (C) Jamie Stevens CSIRO 2020
+ *
+ * This header file defines useful macros and functions to make it easier to
+ * read from RPFITS files.
+ *
  */
 
 #pragma once
 #include "atrpfits.h"
 
 /* RPFITS commands numerical definitions to make the code more readable */
+/*! \def JSTAT_OPENFILE
+ *  \brief Magic number used to open an RPFITS file.
+ *
+ * This parameter is given as this_jstat in calls to rpfitsin_ to get the
+ * RPFITS library to open the file specified in names_.file.
+ */
 #define JSTAT_OPENFILE -3
+/*! \def JSTAT_OPENFILE_READHEADER
+ *  \brief Magic number used to open a file and immediately read the
+ *         first header in that file.
+ *
+ * This parameter is given as this_jstat in calls to rpfitsin_ to get the
+ * RPFITS library to open the file specified in names_.file and read the
+ * first header.
+ */
 #define JSTAT_OPENFILE_READHEADER -2
+/*! \def JSTAT_READNEXTHEADER
+ *  \brief Magic number used to read the next header in the currently
+ *         open file.
+ *
+ * This parameter is given as this_jstat in calls to rpfitsin_ to get the
+ * RPFITS library to skip all further data until the next header is encountered
+ * and read in.
+ */
 #define JSTAT_READNEXTHEADER -1
+/*! \def JSTAT_READDATA
+ *  \brief Magic number used to read some data in the currently open file.
+ *
+ * This parameter is given as this_jstat in calls to rpfitsin_ to get the
+ * RPFITS library to read a cycle of data from the currently open file.
+ */
 #define JSTAT_READDATA 0
+/*! \def JSTAT_CLOSEFILE
+ *  \brief Magic number used to close the currently open file.
+ *
+ * This parameter is given as this_jstat in calls to rpfitsin_ to get the
+ * RPFITS library to close the currently open file.
+ */
 #define JSTAT_CLOSEFILE 1
+/*! \def JSTAT_SKIPTOEND
+ *  \brief Magic number used to move the internal file pointer to the
+ *         end of the currently open file.
+ *
+ * This parameter is given as this_jstat in calls to rpfitsin_ to get the
+ * RPFITS library to move to the end of the currently open file. This would
+ * be useful if you wanted to append data to an existing RPFITS file.
+ */
 #define JSTAT_SKIPTOEND 2
 
 /* RPFITS return codes definitions to make the code more readable */
+/*! \def JSTAT_UNSUCCESSFUL
+ *  \brief RPFITS return code meaning the last operation failed.
+ */
 #define JSTAT_UNSUCCESSFUL -1
+/*! \def JSTAT_SUCCESSFUL
+ *  \brief RPFITS return code meaning the last operation succeded.
+ */
 #define JSTAT_SUCCESSFUL 0
+/*! \def JSTAT_HEADERNOTDATA
+ *  \brief RPFITS return code meaning that data was expected but a header
+ *         was encountered while reading from the file.
+ */
 #define JSTAT_HEADERNOTDATA 1
+/*! \def JSTAT_ENDOFSCAN
+ *  \brief RPFITS return code meaning that the end of a scan was reached.
+ *         *This is not necessarily an error*.
+ */
 #define JSTAT_ENDOFSCAN 2
+/*! \def JSTAT_ENDOFFILE
+ *  \brief RPFITS return code meaning that the end of the file was reached.
+ */
 #define JSTAT_ENDOFFILE 3
+/*! \def JSTAT_FGTABLE
+ *  \brief RPFITS return code meaning that the RPFITS FG table was found.
+ */
 #define JSTAT_FGTABLE 4
+/*! \def JSTAT_ILLEGALDATA
+ *  \brief RPFITS return code meaning that the reader encountered some data
+ *         it could not process.
+ */
 #define JSTAT_ILLEGALDATA 5
 
 /* Macros to get information. */
+/*! \def SOURCENAME
+ *  \brief Get the name of source \a s from the RPFITS variables.
+ *  \param s the number of the source
+ *  \returns a pointer to the start of the source name string
+ *
+ * A convenience macro to determine the pointer location to obtain the
+ * name of the source with number \a s from the RPFITS variables, after
+ * reading in the header.
+ */
 #define SOURCENAME(s) names_.su_name + (s) * SOURCE_LENGTH
 #define RIGHTASCENSION(s) doubles_.su_ra[s]
 #define DECLINATION(s) doubles_.su_dec[s]
