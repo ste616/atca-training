@@ -138,14 +138,29 @@ int close_rpfits_file(void) {
 }
 
 /**
- * Routine to copy some length of string from a pointer, and ensure
- * it's terminated correctly.
+ *  \brief Routine to copy some length of string from a pointer, and ensure
+ *         it's terminated correctly.
+ *  \param start pointer to the start of the string to copy [char *]
+ *  \param length how many characters to copy into the destination [int]
+ *  \param dest pointer to the destination string [char *]
+ *
+ * The RPFITS library stores all its strings in a single char array, and
+ * all strings within it are of fixed length. This means there are no null
+ * characters within the substrings. This routine makes it easy to copy
+ * a substring to a destination, and ensuring the correct string termination.
  */
 void string_copy(char *start, int length, char *dest) {
   (void)strncpy(dest, start, length);
   dest[length - 1] = '\0';
 };
 
+/**
+ *  \brief Routine to find an RPFITS header card label and return its value.
+ *  \param header_name the header tag [string]
+ *  \param value a pointer to the destination string [char *]
+ *  \param value_maxlength the limit to the number of characters that can be
+ *                         stored in the destination string
+ */
 void get_card_value(char *header_name, char *value, int value_maxlength) {
   int i, j;
   char *firstptr = NULL;
@@ -174,9 +189,20 @@ void get_card_value(char *header_name, char *value, int value_maxlength) {
 }
 
 /**
- * Routine to read a single cycle from the open file and return some
- * parameters.
- * The return value is whether the file has more data in it after this cycle.
+ *  \brief Routine to move to and read the next cycle header from the open file and
+ *         return some parameters.
+ *  \param scan_header_data pointer to the destination scan_header_data structure,
+ *                          which will be filled by this routine
+ *  \return indication of whether there is something left after the header, a bitwise
+ *          OR combination of:
+ *          - READER_HEADER_AVAILABLE: another header is available
+ *          - READER_DATA_AVAILABLE: some data is available
+ *          - READER_EXHAUSTED: there is no further information in the currently
+ *            opened file.
+ *
+ * When reading from an RPFITS file, this routine should be called first to get
+ * information about the size and shape of the data in the cycle that will be present
+ * after the next header.
  */
 int read_scan_header(struct scan_header_data *scan_header_data) {
   int keep_reading = READER_HEADER_AVAILABLE, this_jstat = 0, that_jstat = 0;
@@ -313,8 +339,9 @@ int read_scan_header(struct scan_header_data *scan_header_data) {
 }
 
 /**
- * This routine makes an empty cycle_data structure ready to be
- * filled by the reader.
+ *   \brief This routine makes an empty cycle_data structure ready to be
+ *          filled by the reader.
+ *   \return a pointer to a properly initialised cycle_data structure
  */
 struct cycle_data* prepare_new_cycle_data(void) {
   struct cycle_data *cycle_data = NULL;
@@ -365,8 +392,9 @@ struct cycle_data* prepare_new_cycle_data(void) {
 }
 
 /**
- * This routine makes an empty scan_data structure ready to be
- * filled by the reader.
+ *  \brief This routine makes an empty scan_data structure ready to be
+ *         filled by the reader.
+ *  \return a pointer to a properly initialised scan_data structure
  */
 struct scan_data* prepare_new_scan_data(void) {
   struct scan_data *scan_data = NULL;
@@ -380,7 +408,12 @@ struct scan_data* prepare_new_scan_data(void) {
 }
 
 /**
- * This routine adds a cycle to a scan and returns the cycle.
+ *  \brief This routine adds a cycle to a scan and returns the cycle.
+ *  \param scan_data pointer to the scan_data structure representing a single
+ *                   scan
+ *  \return a pointer to the properly initialised cycle_data structure that has
+ *          just been added to the end of the scan_data structure's cycle
+ *          array
  */
 struct cycle_data* scan_add_cycle(struct scan_data *scan_data) {
   scan_data->num_cycles += 1;
@@ -392,7 +425,12 @@ struct cycle_data* scan_add_cycle(struct scan_data *scan_data) {
 }
 
 /**
- * Free memory from a scan header.
+ *  \brief Free memory used by a scan_header_data structure.
+ *  \param scan_header_data a pointer to a scan_header_data structure which is
+ *                          no longer required
+ *
+ * This routine properly frees all the memory allocated within a scan_header_data
+ * structure, but does not free the memory of the scan_header_data pointer.
  */
 void free_scan_header_data(struct scan_header_data *scan_header_data) {
   int i, j;
@@ -435,7 +473,12 @@ void free_scan_header_data(struct scan_header_data *scan_header_data) {
 }
 
 /**
- * Free memory from a cycle.
+ *  \brief Free memory used by a cycle_data structure.
+ *  \param cycle_data a pointer to a cycle_data structure which is no longer
+ *                    required
+ *
+ * This routine properly frees all the memory allocated within a cycle_data
+ * structure, but does not free the memory of the cycle_data pointer.
  */
 void free_cycle_data(struct cycle_data *cycle_data) {
   int i, j;
@@ -508,7 +551,13 @@ void free_cycle_data(struct cycle_data *cycle_data) {
 }
 
 /**
- * Free memory from a scan.
+ *  \brief Free memory from a scan.
+ *  \param scan_data a pointer to a scan_data structure which is no longer
+ *                   required
+ *
+ * This routine properly frees all the memory allocated within a scan_data
+ * structure, including by freeing the memory for scan_header_data structures
+ * within. It also frees the pointer memory.
  */
 void free_scan_data(struct scan_data *scan_data) {
   int i = 0;
@@ -523,7 +572,19 @@ void free_scan_data(struct scan_data *scan_data) {
 }
 
 /**
- * This routine reads in a full cycle's worth of data.
+ *  \brief This routine reads in a full cycle's worth of data, allocating
+ *         memory as required
+ *  \param scan_header_data a pointer to the scan_header_data structure
+ *                          for this scan, but is currently unused
+ *  \param cycle_data a pointer to the cycle_data structure to be filled
+ *                    with the data from the RPFITS file; this should be
+ *                    pre-allocated using prepare_new_cycle_data
+ *  \return indication of whether there is something left after this cycle data,
+ *          a bitwise OR combination of:
+ *          - READER_HEADER_AVAILABLE: the next bit of data is a header
+ *          - READER_DATA_AVAILABLE: more data is immediately available
+ *          - READER_EXHAUSTED: there is no further information in the currently
+ *            opened file.
  */
 int read_cycle_data(struct scan_header_data *scan_header_data,
                     struct cycle_data *cycle_data) {
@@ -569,13 +630,9 @@ int read_cycle_data(struct scan_header_data *scan_header_data,
       // Stop reading.
       read_data = 0;
       if (this_jstat == JSTAT_ENDOFFILE) {
-        /* printf("reached end of file\n"); */
         rv = READER_EXHAUSTED;
       } else if (this_jstat == JSTAT_FGTABLE) {
         // We've hit the end of this data.
-        /* printf("reached a new header\n"); */
-        /* printf("READER: while reading data, hit a FG table with %d entries\n", */
-        /*        fg_.n_fg); */
         rv = READER_HEADER_AVAILABLE;
       } else if (this_jstat == JSTAT_HEADERNOTDATA) {
         /* printf("READER: while reading data, hit a header with %d entries\n", */
@@ -585,12 +642,6 @@ int read_cycle_data(struct scan_header_data *scan_header_data,
     } else if (rpfits_result == 0) {
       fprintf(stderr, "While reading data, rpfitsin encountered an error\n");
     } else {
-      /* seconds_to_hourlabel(ut, utstring); */
-      /* seconds_to_hourlabel(last_ut, lastutstring); */
-      /* printf("jstat = %d ut = %s last = %s baseline = %d\n", this_jstat, */
-      /* 	     utstring, lastutstring, baseline); */
-      /* printf("if_no = %d sourceno = %d flag = %d bin = %d\n", */
-      /* 	     if_no, sourceno, flag, bin); */
       // Check for a time change. The time has to change by at least 0.5
       // otherwise it's not really a cycle change.
       /* if ((baseline == -1) && (ut > (last_ut + 0.5))) { */
@@ -622,8 +673,6 @@ int read_cycle_data(struct scan_header_data *scan_header_data,
             cycle_data->seemon_phase = SYSCAL_ADDITIONAL_SEEMON_PHASE;
             cycle_data->seemon_rms = SYSCAL_ADDITIONAL_SEEMON_RMS;
             cycle_data->seemon_valid = SYSCAL_ADDITIONAL_SEEMON_FLAG;
-            /* printf("temp = %.1f pressure = %.1f seemon rms = %.1f\n", */
-            /*        cycle_data->temperature, cycle_data->air_pressure, cycle_data->seemon_rms); */
           }
         }
         // Do some array allocation.
@@ -684,20 +733,6 @@ int read_cycle_data(struct scan_header_data *scan_header_data,
           cycle_data->caljy_y[sif][i] = SYSCAL_CALJY_Y(i, 0);
           cycle_data->flagging[sif][i] = SYSCAL_FLAG_BAD(i, 0);
         }
-        /* printf("Baseline is -1\n"); */
-        /* fprintf(stdout, "found SYSCAL group with %d ants %d IFs %d quantities for source %d\n", */
-        /*         sc_.sc_ant, sc_.sc_if, sc_.sc_q, sc_.sc_srcno); */
-        /* for (i = 0; i < (sc_.sc_ant * sc_.sc_if * sc_.sc_q); i++) { */
-        /*   fprintf(stdout, "cal param %d: %.5f\n", i, sc_.sc_cal[i]); */
-        /* } */
-        /* for (i = 0; i < sc_.sc_ant; i++) { */
-        /*   for (j = 0; j < sc_.sc_if; j++) { */
-        /*     printf("index %d ANT %d IF %d XYphase = %.4f TSys X = %.4f Y = %.4f\n", */
-        /*            SYSCAL_GRP(i, j), */
-        /*            SYSCAL_ANT(i, j), SYSCAL_IF(i, j), SYSCAL_XYPHASE(i, j), */
-        /*            SYSCAL_TSYS_X(i, j), SYSCAL_TSYS_Y(i, j)); */
-        /*   } */
-        /* } */
         if (ut > (last_ut + 0.5)) {
           // We've gone to a new cycle.
           /* printf("stopping because new cycle!\n"); */
