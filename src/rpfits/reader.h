@@ -544,6 +544,7 @@
  * a valid value if the SYSCAL table has just been read.
  */
 #define SYSCAL_TRACKERR_RMS(a, i) SYSCAL_PARAM(a, i, 15)
+
 /* These next macros will work if SYSCAL_ADDITIONAL_CHECK returns 0. */
 /*! \def SYSCAL_ADDITIONAL_CHECK
  *  \brief Return a check flag for whether the SYSCAL record just read corresponds
@@ -558,20 +559,109 @@
  * convenience macros can be used, otherwise the SYSCAL_* macros should be used.
  */
 #define SYSCAL_ADDITIONAL_CHECK (int)SYSCAL_PARAM((SYSCAL_NUM_ANTS - 1), (SYSCAL_NUM_IFS - 1), 0)
+/*! \def SYSCAL_ADDITIONAL_TEMP
+ *  \brief Return the temperature as recorded by the site weather station for this
+ *         cycle
+ *  \return the site ambient temperature [C]
+ *
+ * Convenience macro to obtain the ambient temperature on site during this cycle.
+ */
 #define SYSCAL_ADDITIONAL_TEMP SYSCAL_PARAM((SYSCAL_NUM_ANTS - 1), (SYSCAL_NUM_IFS - 1), 1)
+/*! \def SYSCAL_ADDITIONAL_AIRPRESS
+ *  \brief Return the air pressure as recorded by the site weather station for this
+ *         cycle
+ *  \return the site air pressure [mBar]
+ *
+ * Convenience macro to obtain the air pressure on site during this cycle.
+ */
 #define SYSCAL_ADDITIONAL_AIRPRESS SYSCAL_PARAM((SYSCAL_NUM_ANTS - 1), (SYSCAL_NUM_IFS - 1), 2)
+/*! \def SYSCAL_ADDITIONAL_HUMI
+ *  \brief Return the relative humidity as recorded by the site weather station for this
+ *         cycle
+ *  \return the site relative humidity [%]
+ *
+ * Convenience macro to obtain the relative humidity on site during this cycle.
+ */
 #define SYSCAL_ADDITIONAL_HUMI SYSCAL_PARAM((SYSCAL_NUM_ANTS - 1), (SYSCAL_NUM_IFS - 1), 3)
+/*! \def SYSCAL_ADDITIONAL_WINDSPEED
+ *  \brief Return the wind speed as recorded by the site weather station for this
+ *         cycle
+ *  \return the site wind speed [km/h]
+ *
+ * Convenience macro to obtain the wind speed on site during this cycle.
+ */
 #define SYSCAL_ADDITIONAL_WINDSPEED SYSCAL_PARAM((SYSCAL_NUM_ANTS - 1), (SYSCAL_NUM_IFS - 1), 4)
+/*! \def SYSCAL_ADDITIONAL_WINDDIR
+ *  \brief Return the wind direction as recorded by the site weather station for this
+ *         cycle
+ *  \return the site wind direction [deg]
+ *
+ * Convenience macro to obtain the direction of the wind on site during this cycle.
+ */
 #define SYSCAL_ADDITIONAL_WINDDIR SYSCAL_PARAM((SYSCAL_NUM_ANTS - 1), (SYSCAL_NUM_IFS - 1), 5)
+/*! \def SYSCAL_ADDITIONAL_WEATHERFLAG
+ *  \brief Return a flag to indicate if the additional SYSCAL weather parameters are
+ *         valid for this cycle
+ *  \return SYSCAL_VALID if the weather parameters are valid for this cycle, or
+ *          SYSCAL_INVALID if they are not
+ *
+ * Convenience macro to signal whether the weather station parameters recorded for this cycle
+ * are valid and useful.
+ */
 #define SYSCAL_ADDITIONAL_WEATHERFLAG (int)SYSCAL_PARAM((SYSCAL_NUM_ANTS - 1), (SYSCAL_NUM_IFS - 1), 6)
+/*! \def SYSCAL_ADDITIONAL_RAIN
+ *  \brief Return the rain gauge value as recorded by the site weather station for this
+ *         cycle
+ *  \return the amount of rain in the rain gauge [mm]
+ *
+ * Convenience macro to obtain the amount of rain in the rain gauge during this cycle.
+ */
 #define SYSCAL_ADDITIONAL_RAIN SYSCAL_PARAM((SYSCAL_NUM_ANTS - 1), (SYSCAL_NUM_IFS - 1), 7)
+/*! \def SYSCAL_ADDITIONAL_SEEMON_PHASE
+ *  \brief Return the average phase value as recorded by the site atmospheric seeing monitor 
+ *         for this cycle
+ *  \return the atmospheric seeing monitor average phase [rad]
+ *
+ * Convenience macro to obtain the average phase of the satellite observed by the atmospheric 
+ * seeing monitor during this cycle.
+ */
 #define SYSCAL_ADDITIONAL_SEEMON_PHASE SYSCAL_PARAM((SYSCAL_NUM_ANTS - 1), (SYSCAL_NUM_IFS - 1), 8)
+/*! \def SYSCAL_ADDITIONAL_SEEMON_RMS
+ *  \brief Return the RMS phase variation observed by the site atmospheric seeing monitor for this
+ *         cycle
+ *  \return the atmospheric seeing monitor RMS phase variation [rad]
+ *
+ * Convenience macro to obtain the RMS phase variation of the satellite observed by the 
+ * atmospheric seeing monitor during this cycle.
+ */
 #define SYSCAL_ADDITIONAL_SEEMON_RMS SYSCAL_PARAM((SYSCAL_NUM_ANTS - 1), (SYSCAL_NUM_IFS - 1), 9)
+/*! \def SYSCAL_ADDITIONAL_SEEMON_FLAG
+ *  \brief Return a flag to indicate if the additional SYSCAL seeing monitor parameters are
+ *         valid for this cycle
+ *  \return SYSCAL_VALID if the seeing monitor parameters are valid for this cycle, or
+ *          SYSCAL_INVALID if they are not
+ *
+ * Convenience macro to signal whether the atmospheric seeing monitor parameters recorded for 
+ * this cycle are valid and useful.
+ */
 #define SYSCAL_ADDITIONAL_SEEMON_FLAG (int)SYSCAL_PARAM((SYSCAL_NUM_ANTS - 1), (SYSCAL_NUM_IFS - 1), 10)
 
 // Return values from the read routines.
+/*! \def READER_EXHAUSTED
+ *  \brief Magic number return value indicating that no more data is available in the
+ *         currently opened file; this magic number is part of a bitwise OR set
+ */
 #define READER_EXHAUSTED 0
+/*! \def READER_DATA_AVAILABLE
+ *  \brief Magic number return value indicating that more data is available in the
+ *         currently opened file and can be read immediately; this magic number is 
+ *         part of a bitwise OR set
+ */
 #define READER_DATA_AVAILABLE 1
+/*! \def READER_HEADER_AVAILABLE
+ *  \brief Magic number return value indicating that the next data available in the
+ *         currently opened file is a header; this magic number is part of a bitwise OR set
+ */
 #define READER_HEADER_AVAILABLE 2
 
 int size_of_vis(void);

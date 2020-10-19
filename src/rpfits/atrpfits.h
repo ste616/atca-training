@@ -335,7 +335,23 @@ struct scan_header_data {
  * certainly means that the scaling has been reversed by this software.
  */
 #define SYSCAL_TSYS_NOT_APPLIED 0
+/*! \def SYSCAL_VALID
+ *  \brief Magic number to indicate that either the SYSCAL weather parameters or the
+ *         seeing monitor parameters are valid and useful.
+ *
+ * This flag is used by the correlator to indicate that the weather or seeing monitor
+ * parameters in the SYSCAL additional record are valid and useful. These parameters
+ * can be obtained using the SYSCAL_ADDITIONAL_* macros.
+ */
 #define SYSCAL_VALID   0
+/*! \def SYSCAL_INVALID
+ *  \brief Magic number to indicate that either the SYSCAL weather parameters or the
+ *         seeing monitor parameters are invalid and not useful.
+ *
+ * This flag is used by the correlator to indicate that the weather or seeing monitor
+ * parameters in the SYSCAL additional record are not valid or useful. These parameters
+ * can be obtained using the SYSCAL_ADDITIONAL_* macros.
+ */
 #define SYSCAL_INVALID 1
 
 /**
