@@ -301,13 +301,39 @@ struct scan_header_data {
 };
 
 /* Indexing for the metadata arrays. */
+/*! \def CAL_XX
+ *  \brief The array indexing magic number needed to access X-pol data in the SYSCAL arrays.
+ */
 #define CAL_XX 0
+/*! \def CAL_YY
+ *  \brief The array indexing magic number needed to access Y-pol data in the SYSCAL arrays.
+ */
 #define CAL_YY 1
 
 /* Some integer values for the syscal data. */
 #define SYSCAL_FLAGGED_GOOD 1
 #define SYSCAL_FLAGGED_BAD  0
+/*! \def SYSCAL_TSYS_APPLIED
+ *  \brief Magic number to indicate that the data has been scaled according to the
+ *         system temperature.
+ *
+ * This flag is intended to indicate that the data within a structure has been scaled
+ * according to the system temperature. This flag should never be encountered as the value
+ * for both the system temperature measured by the correlator, and the system temperature
+ * measured by this library.
+ */
 #define SYSCAL_TSYS_APPLIED     1
+/*! \def SYSCAL_TSYS_NOT_APPLIED
+ *  \brief Magic number to indicate that the data has **not** been scaled according to
+ *         the system temperature.
+ *
+ * This flag is intended to indicate that the data within a structure has not been scaled
+ * according to the system temperature that the correlator measured at the time the
+ * data was taken, or the system temperature calculated by this library, depending on which
+ * variable has this value. Since the ATCA correlator is almost always instructed to scale the
+ * data by the Tsys, if this flag is encountered for the online-Tsys variable, it almost 
+ * certainly means that the scaling has been reversed by this software.
+ */
 #define SYSCAL_TSYS_NOT_APPLIED 0
 #define SYSCAL_VALID   0
 #define SYSCAL_INVALID 1

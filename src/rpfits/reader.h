@@ -325,7 +325,7 @@
 #define SYSCAL_PARAM(a, i, o) (sc_.sc_cal[SYSCAL_GRP(a, i) + o])
 /*! \def SYSCAL_ANT
  *  \brief Get the assigned antenna number for the SYSCAL parameter pertaining to
- *         antenna \a and IF \i
+ *         antenna \a a and IF \a i
  *  \param a the number of the antenna (starts at 0)
  *  \param i the number of the IF (starts at 0)
  *  \return the assigned antenna number (starts at 1) [int]
@@ -335,7 +335,7 @@
 #define SYSCAL_ANT(a, i) (int)SYSCAL_PARAM(a, i, 0)
 /*! \def SYSCAL_IF
  *  \brief Get the assigned IF number for the SYSCAL parameter pertaining to
- *         antenna \a and IF \i
+ *         antenna \a a and IF \a i
  *  \param a the number of the antenna (starts at 0)
  *  \param i the number of the IF (starts at 0)
  *  \return the assigned IF number (starts at 1) [int]
@@ -346,7 +346,7 @@
 #define SYSCAL_IF(a, i) (int)SYSCAL_PARAM(a, i, 1)
 /*! \def SYSCAL_XYPHASE
  *  \brief Get the phase between the X and Y polarisations from the SYSCAL parameter 
- *         pertaining to antenna \a and IF \i
+ *         pertaining to antenna \a a and IF \a i
  *  \param a the number of the antenna (starts at 0)
  *  \param i the number of the IF (starts at 0)
  *  \return the phase between the X and Y polarisations, as measured by the correlator,
@@ -359,7 +359,7 @@
 #define SYSCAL_XYPHASE(a, i) SYSCAL_PARAM(a, i, 2)
 /*! \def SYSCAL_TSYS_X
  *  \brief Get the system temperature of the X polarisation from the SYSCAL parameter 
- *         pertaining to antenna \a and IF \i
+ *         pertaining to antenna \a a and IF \a i
  *  \param a the number of the antenna (starts at 0)
  *  \param i the number of the IF (starts at 0)
  *  \return the system temperature of the X polarisation, as measured by the correlator,
@@ -372,7 +372,7 @@
 #define SYSCAL_TSYS_X(a, i) fabsf(SYSCAL_PARAM(a, i, 3))
 /*! \def SYSCAL_TSYS_Y
  *  \brief Get the system temperature of the Y polarisation from the SYSCAL parameter 
- *         pertaining to antenna \a and IF \i
+ *         pertaining to antenna \a a and IF \a i
  *  \param a the number of the antenna (starts at 0)
  *  \param i the number of the IF (starts at 0)
  *  \return the system temperature of the Y polarisation, as measured by the correlator,
@@ -383,20 +383,180 @@
  * This macro will only return a valid value if the SYSCAL table has just been read.
  */
 #define SYSCAL_TSYS_Y(a, i) fabsf(SYSCAL_PARAM(a, i, 4))
-#define SYSCAL_TSYS_X_APPLIED(a, i) (SYSCAL_PARAM(a, i, 3) < 0) ? 0 : 1
-#define SYSCAL_TSYS_Y_APPLIED(a, i) (SYSCAL_PARAM(a, i, 4) < 0) ? 0 : 1
+/*! \def SYSCAL_TSYS_X_APPLIED
+ *  \brief Get a flag of whether the X-pol Tsys has been applied to the data pertaining
+ *         to antenna \a a and IF \a i
+ *  \param a the number of the antenna (starts at 0)
+ *  \param i the number of the IF (starts at 0)
+ *  \return an indication of whether the Tsys has been applied to the X-pol data
+ *          (SYSCAL_TSYS_APPLIED) or not (SYSCAL_TSYS_NOT_APPLIED)
+ *
+ * Convenience macro to return a flag indicating if the correlator scaled the correlated
+ * data according to the measured system temperature for the specified antenna \a a and
+ * IF \a i. This macro will only return a valid value if the SYSCAL table has just been read.
+ */
+#define SYSCAL_TSYS_X_APPLIED(a, i) (SYSCAL_PARAM(a, i, 3) < 0) ? SYSCAL_TSYS_NOT_APPLIED : SYSCAL_TSYS_APPLIED
+/*! \def SYSCAL_TSYS_Y_APPLIED
+ *  \brief Get a flag of whether the Y-pol Tsys has been applied to the data pertaining
+ *         to antenna \a a and IF \a i
+ *  \param a the number of the antenna (starts at 0)
+ *  \param i the number of the IF (starts at 0)
+ *  \return an indication of whether the Tsys has been applied to the Y-pol data
+ *          (SYSCAL_TSYS_APPLIED) or not (SYSCAL_TSYS_NOT_APPLIED)
+ *
+ * Convenience macro to return a flag indicating if the correlator scaled the correlated
+ * data according to the measured system temperature for the specified antenna \a a and
+ * IF \a i. This macro will only return a valid value if the SYSCAL table has just been read.
+ */
+#define SYSCAL_TSYS_Y_APPLIED(a, i) (SYSCAL_PARAM(a, i, 4) < 0) ? SYSCAL_TSYS_NOT_APPLIED : SYSCAL_TSYS_APPLIED
+/*! \def SYSCAL_GTP_X
+ *  \brief Get the gated total power (GTP) calculated by the correlator pertaining
+ *         to antenna \a a and IF \a i for the X polarisation
+ *  \param a the number of the antenna (starts at 0)
+ *  \param i the number of the IF (starts at 0)
+ *  \return the correlator-measured X-pol GTP
+ *
+ * Convenience macro to return the X-pol gated total power for the specified antenna \a a and
+ * IF \a i. This macro will only return a valid value if the SYSCAL table has just been read.
+ */
 #define SYSCAL_GTP_X(a, i) SYSCAL_PARAM(a, i, 5)
+/*! \def SYSCAL_SDO_X
+ *  \brief Get the synchronously-demodulated output (SDO) calculated by the correlator 
+ *         pertaining to antenna \a a and IF \a i for the X polarisation
+ *  \param a the number of the antenna (starts at 0)
+ *  \param i the number of the IF (starts at 0)
+ *  \return the correlator-measured X-pol SDO
+ *
+ * Convenience macro to return the X-pol synchronously-demodulated output level for the specified 
+ * antenna \a a and IF \a i. This macro will only return a valid value if the SYSCAL table 
+ * has just been read.
+ */
 #define SYSCAL_SDO_X(a, i) SYSCAL_PARAM(a, i, 6)
+/*! \def SYSCAL_CALJY_X
+ *  \brief Get the assumed strength of the noise diode pertaining to antenna \a a and 
+ *         IF \a i for the X polarisation
+ *  \param a the number of the antenna (starts at 0)
+ *  \param i the number of the IF (starts at 0)
+ *  \return the correlator-assumed X-pol noise diode amplitude [Jy]
+ *
+ * Convenience macro to return the X-pol amplitude of the noise diode, in Jy, that the correlator
+ * was assuming when calculating the system temperatures for this cycle, for the specified
+ * antenna \a a and IF \a i. This macro will only return a valid value if the SYSCAL table 
+ * has just been read.
+ */
 #define SYSCAL_CALJY_X(a, i) SYSCAL_PARAM(a, i, 7)
+/*! \def SYSCAL_GTP_Y
+ *  \brief Get the gated total power (GTP) calculated by the correlator pertaining
+ *         to antenna \a a and IF \a i for the Y polarisation
+ *  \param a the number of the antenna (starts at 0)
+ *  \param i the number of the IF (starts at 0)
+ *  \return the correlator-measured Y-pol GTP
+ *
+ * Convenience macro to return the Y-pol gated total power for the specified antenna \a a and
+ * IF \a i. This macro will only return a valid value if the SYSCAL table has just been read.
+ */
 #define SYSCAL_GTP_Y(a, i) SYSCAL_PARAM(a, i, 8)
+/*! \def SYSCAL_SDO_Y
+ *  \brief Get the synchronously-demodulated output (SDO) calculated by the correlator 
+ *         pertaining to antenna \a a and IF \a i for the Y polarisation
+ *  \param a the number of the antenna (starts at 0)
+ *  \param i the number of the IF (starts at 0)
+ *  \return the correlator-measured Y-pol SDO
+ *
+ * Convenience macro to return the Y-pol synchronously-demodulated output level for the specified 
+ * antenna \a a and IF \a i. This macro will only return a valid value if the SYSCAL table 
+ * has just been read.
+ */
 #define SYSCAL_SDO_Y(a, i) SYSCAL_PARAM(a, i, 9)
+/*! \def SYSCAL_CALJY_Y
+ *  \brief Get the assumed strength of the noise diode pertaining to antenna \a a and 
+ *         IF \a i for the Y polarisation
+ *  \param a the number of the antenna (starts at 0)
+ *  \param i the number of the IF (starts at 0)
+ *  \return the correlator-assumed Y-pol noise diode amplitude [Jy]
+ *
+ * Convenience macro to return the Y-pol amplitude of the noise diode, in Jy, that the correlator
+ * was assuming when calculating the system temperatures for this cycle, for the specified
+ * antenna \a a and IF \a i. This macro will only return a valid value if the SYSCAL table 
+ * has just been read.
+ */
 #define SYSCAL_CALJY_Y(a, i) SYSCAL_PARAM(a, i, 10)
+/*! \def SYSCAL_PARANGLE
+ *  \brief Get the parallactic angle of the cycle with regards the antenna \a a and IF
+ *         \a i
+ *  \param a the number of the antenna (starts at 0)
+ *  \param i the number of the IF (starts at 0)
+ *  \return the parallactic angle [deg]
+ *
+ * Convenience macro to return the parallactic angle calculated by the correlator for the
+ * current cycle, for the specified antenna \a a and IF \a i. This macro will only return
+ * a valid value if the SYSCAL table has just been read.
+ */
 #define SYSCAL_PARANGLE(a, i) SYSCAL_PARAM(a, i, 11)
+/*! \def SYSCAL_FLAG_BAD
+ *  \brief Get an indicator of whether this data has been flagged bad for the antenna
+ *         \a a and IF \a i
+ *  \param a the number of the antenna (starts at 0)
+ *  \param i the number of the IF (starts at 0)
+ *  \return a bitwise OR indication that the data in this cycle is bad for the reason:
+ *          - 1 the antenna was not on source
+ *          - 2 the correlator flagged it for pol X
+ *          - 4 the correlator flagged it for pol Y
+ *
+ * Convenience macro to return the flagging status of the
+ * current cycle, for the specified antenna \a a and IF \a i. This macro will only return
+ * a valid value if the SYSCAL table has just been read.
+ */
 #define SYSCAL_FLAG_BAD(a, i) (int)SYSCAL_PARAM(a, i, 12)
+/*! \def SYSCAL_XYAMP
+ *  \brief Get the XY-amplitude measured by the correlator for this the cycle pertaining
+ *         to the antenna \a a and IF \a i
+ *  \param a the number of the antenna (starts at 0)
+ *  \param i the number of the IF (starts at 0)
+ *  \return the XY-amplitude [Jy]
+ *
+ * Convenience macro to return the XY-amplitude measured by the correlator for the
+ * current cycle, for the specified antenna \a a and IF \a i. This macro will only return
+ * a valid value if the SYSCAL table has just been read.
+ */
 #define SYSCAL_XYAMP(a, i) SYSCAL_PARAM(a, i, 13)
+/*! \def SYSCAL_TRACKERR_MAX
+ *  \brief Get the maximum tracking error of antenna \a a (and IF \a i, but this should
+ *         of course be invariant) observed during this cycle
+ *  \param a the number of the antenna (starts at 0)
+ *  \param i the number of the IF (starts at 0)
+ *  \return the maximum tracking error [arcsec]
+ *
+ * Convenience macro to return the maximum tracking error observed during
+ * current cycle, for the specified antenna \a a and IF \a i. This macro will only return
+ * a valid value if the SYSCAL table has just been read.
+ */
 #define SYSCAL_TRACKERR_MAX(a, i) SYSCAL_PARAM(a, i, 14)
+/*! \def SYSCAL_TRACKERR_RMS
+ *  \brief Get the RMS tracking error of antenna \a a (and IF \a i, but this should
+ *         of course be invariant) observed during this cycle
+ *  \param a the number of the antenna (starts at 0)
+ *  \param i the number of the IF (starts at 0)
+ *  \return the RMS tracking error [arcsec]
+ *
+ * Convenience macro to return the RMS tracking error observed during
+ * current cycle, for the specified antenna \a a and IF \a i. This macro will only return
+ * a valid value if the SYSCAL table has just been read.
+ */
 #define SYSCAL_TRACKERR_RMS(a, i) SYSCAL_PARAM(a, i, 15)
 /* These next macros will work if SYSCAL_ADDITIONAL_CHECK returns 0. */
+/*! \def SYSCAL_ADDITIONAL_CHECK
+ *  \brief Return a check flag for whether the SYSCAL record just read corresponds
+ *         to an RPFITS additional SYSCAL record, which carries different information
+ *  \return 0 if the SYSCAL record just read matches the additional record, or not
+ *          0 otherwise
+ *
+ * RPFITS SYSCAL records can either be per-antenna and per-IF, or an additional
+ * record which contains information about site-based parameters. This check macro
+ * can be used to determine which type of record was just read; if this macro returns 0
+ * it must be the additional record. If that is the case, all the SYSCAL_ADDITIONAL_*
+ * convenience macros can be used, otherwise the SYSCAL_* macros should be used.
+ */
 #define SYSCAL_ADDITIONAL_CHECK (int)SYSCAL_PARAM((SYSCAL_NUM_ANTS - 1), (SYSCAL_NUM_IFS - 1), 0)
 #define SYSCAL_ADDITIONAL_TEMP SYSCAL_PARAM((SYSCAL_NUM_ANTS - 1), (SYSCAL_NUM_IFS - 1), 1)
 #define SYSCAL_ADDITIONAL_AIRPRESS SYSCAL_PARAM((SYSCAL_NUM_ANTS - 1), (SYSCAL_NUM_IFS - 1), 2)
