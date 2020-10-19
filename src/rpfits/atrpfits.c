@@ -1,16 +1,11 @@
-/**
- * ATCA Training Library: reader.h
- * (C) Jamie Stevens CSIRO 2019
+/** \file atrpfits.c
+ *  \brief Convenience functions relevant to RPFITS conventions
  *
- * This library is designed to read an RPFITS file and for each cycle make available
- * the products which would be available online: spectra, amp, phase, delay,
- * u, v, w, etc.
- * This is so we can make tools which will let observers muck around with what they 
- * would see online in all sorts of real situations, as represented by real data 
- * files.
- * 
- * This module contains the structures and common-use functions necessary for all 
- * the other routines.
+ * ATCA Training Library
+ * (C) Jamie Stevens CSIRO 2020
+ *
+ * This module contains functions that can interpret the conventions present in
+ * the RPFITS standard, for use in all the other routines.
  */
 
 #include <stdio.h>
@@ -18,19 +13,34 @@
 #include "atrpfits.h"
 
 /**
- * Routine to convert an RPFITS baseline number into the component antennas.
+ *  \brief Routine to convert an RPFITS baseline number into the component antennas
+ *  \param baseline the baseline number from an RPFITS file
+ *  \param ant1 pointer to a variable that upon exit will contain the lower-numbered
+ *              antenna of the baseline pair
+ *  \param ant2 pointer to a variable that upon exit will contain the higher-numbered
+ *              antenna of the baseline pair.
+ *
+ * The RPFITS baseline number can be uniquely resolved into its component antennas
+ * using the rule that baseline number is just 256 * a1 + a2, where a1 is antenna 1,
+ * a2 is antenna 2, and a1 <= a2.
  */
 void base_to_ants(int baseline,int *ant1,int *ant2){
-  /* the baseline number is just 256*a1 + a2, where
-     a1 is antenna 1, and a2 is antenna 2, and a1<=a2 */
-
   *ant2 = baseline % 256;
   *ant1 = (baseline - *ant2) / 256;
-  
 }
 
 /**
- * Routine to convert two antenna numbers to a baseline.
+ *  \brief Routine to convert two antenna numbers to a baseline.
+ *  \param ant1 the first antenna in the baseline pair
+ *  \param ant2 the second antenna in the baseline pair
+ *  \return the baseline number
+ *
+ * The RPFITS baseline number is a unique number generated from its component
+ * antennas using the rule that baseline number (returned from this routine)
+ * is just 256 * a1 + a2, where a1 is antenna 1, a2 is antenna 2 and a1 <= a2.
+ * If the antenna 2 number given to this routine is lower than the antenna 1
+ * number, this routine will automatically swap them to ensure the proper
+ * calculation of the baseline number.
  */
 int ants_to_base(int ant1, int ant2) {
   int swapper = -1;

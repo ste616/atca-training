@@ -1,7 +1,7 @@
 /** \file atrpfits.h
  *  \brief Definitions for low-level RPFITS-related parameters.
  *
- * ATCA Training Library: atrpfits.h
+ * ATCA Training Library
  * (C) Jamie Stevens CSIRO 2020
  *
  * This file contains the structures and common-use functions necessary for all 
@@ -310,9 +310,6 @@ struct scan_header_data {
  */
 #define CAL_YY 1
 
-/* Some integer values for the syscal data. */
-#define SYSCAL_FLAGGED_GOOD 1
-#define SYSCAL_FLAGGED_BAD  0
 /*! \def SYSCAL_TSYS_APPLIED
  *  \brief Magic number to indicate that the data has been scaled according to the
  *         system temperature.
@@ -354,87 +351,472 @@ struct scan_header_data {
  */
 #define SYSCAL_INVALID 1
 
-/**
- * This structure holds all the cycle data.
+/*! \struct cycle_data
+ *  \brief This structure holds all the data from a single cycle from the telescope
+ *
+ * When reading from the RPFITS file, each cycle's data is read at once, along
+ * with all the necessary metadata. The reader routine takes the cycle data and stores
+ * it in this structure for easy access.
  */
 struct cycle_data {
   // Time variables.
+  /*! \var ut_seconds
+   *  \brief The number of seconds past midnight on the base date of the file at this
+   *         cycle's mid-point
+   *
+   * The mid-point of each cycle is recorded as the number of seconds that have passed
+   * since UTC midnight on the date that the file was opened. This base date is recorded
+   * in the obsdate variable in the scan header associated with this cycle.
+   */
   float ut_seconds;
   // Antennas and baselines.
+  /*! \var num_points
+   *  \brief The number of points contained within this cycle structure
+   *
+   * This structure's data variables are all index by "point", where a single point
+   * represents a single antenna pair (and an autocorrelation is an antenna paired
+   * with itself) at a single time, in a single bin and IF. This variable indicates
+   * the total number of points in this cycle, and thus allows for iteration over
+   * the arrays.
+   */
   int num_points;
+  /*! \var all_baselines
+   *  \brief The index of where baselines are in the points of this cycle
+   *
+   * This stores the order of the baselines found in this cycle. As the data is read
+   * in, the first baseline number encountered is given the index of 1, the next
+   * baseline that is different to the first is given the index of 2, the next
+   * baseline that is different to all the baselines previously read is given the
+   * index of 3, and so on.
+   *
+   * If any particular value in this array is 0, then no data about that baseline
+   * number is present in this structure.
+   */
   int all_baselines[MAX_BASELINENUM];
+  /*! \var n_baselines
+   *  \brief The total number of different baselines found in the cycle
+   */
   int n_baselines;
+  /*! \var u
+   *  \brief The u coordinate of the baseline [m]
+   *
+   * This array has length of `num_points` and is indexed starting at 0.
+   */
   float *u;
+  /*! \var v
+   *  \brief The v coordinate of the baseline [m]
+   *
+   * This array has length of `num_points` and is indexed starting at 0.
+   */
   float *v;
+  /*! \var w
+   *  \brief The w coordinate of the baseline [m]
+   *
+   * This array has length of `num_points` and is indexed starting at 0.
+   */
   float *w;
+  /*! \var ant1
+   *  \brief The number of the first antenna in the baseline
+   *
+   * This array has length of `num_points` and is indexed starting at 0.
+   *
+   * This value is computed from the baseline number stored in the RPFITS file.
+   */
   int *ant1;
+  /*! \var ant2
+   *  \brief The number of the second antenna in the baseline
+   *
+   * This array has length of `num_points` and is indexed starting at 0.
+   *
+   * This value is computed from the baseline number stored in the RPFITS file.
+   */
   int *ant2;
+
   // Flagging.
+  /*! \var flag
+   *  \brief Whether this point should be flagged; 0 here implies perfect data
+   *
+   * This array has length of `num_points` and is indexed starting at 0.
+   */
   int *flag;
+
   // Data.
+  /*! \var vis_size
+   *  \brief The return value from max_size_of_vis during this read operation,
+   *         which is also the size of the vis and wgt arrays
+   *
+   * This array has length of `num_points` and is indexed starting at 0.
+   */
   int *vis_size;
+  /*! \var vis
+   *  \brief The complex channel data
+   *
+   * This 2-dimensional array has size `num_points` * `vis_size[i]`, where
+   * `i` is the index along the `num_points` axis (which is the first array
+   * index), and is indexed starting at 0 in each axis.
+   */
   float complex **vis;
+  /*! \var wgt
+   *  \brief The channel weighting data
+   *
+   * This 2-dimensional array has size `num_points` * `vis_size[i]`, where
+   * `i` is the index along the `num_points` axis (which is the first array
+   * index), and is indexed starting at 0 in each axis.
+   *
+   * **This parameter is likely completely pointless and will probably not
+   * be kept in this structure for very long, as it takes up memory for no
+   * useful reason.**
+   */
   float **wgt;
+
   // Labelling.
+  /*! \var bin
+   *  \brief The bin number pertaining to this point
+   *
+   * This array has length of `num_points` and is indexed starting at 0.
+   */
   int *bin;
+  /* \var if_no
+   * \brief The IF number pertaining to this point
+   *
+   * This array has length of `num_points` and is indexed starting at 0.
+   */
   int *if_no;
+  /*! \var source
+   *  \brief The source name pertaining to this point
+   *
+   * This array has length of `num_points` * SOURCE_LENGTH, essentially a set
+   * of `num_points` strings, each of length SOURCE_LENGTH, and is indexed
+   * starting at 0. 
+   */
   char **source;
+
   // Metadata.
+  /*! \var num_cal_ifs
+   *  \brief The number of IFs about which SYSCAL data was found in this
+   *         cycle, and thus the length of the first index of all the SYSCAL-related
+   *         parameters in this structure
+   */
   int num_cal_ifs;
+  /*! \var num_cal_ants
+   *  \brief The number of antennas which have data in the SYSCAL data entries
+   *         in this cycle, and thus the length of the second index of all the
+   *         SYSCAL-related parameters in this structure
+   */
   int num_cal_ants;
+  /*! \var cal_ifs
+   *  \brief The IF number of the SYSCAL entry at this index
+   *
+   * This array has length of `num_cal_ifs`, and is indexed starting at 0.
+   */
   int *cal_ifs;
+  /*! \var cal_ants
+   *  \brief The antenna number of the SYSCAL entry at this index
+   *
+   * This array has length of `num_cal_ants`, and is indexed starting at 0.
+   */
   int *cal_ants;
-  // This is indexed [IF][ANT][POL]
+
+  // These are indexed [IF][ANT][POL]
+  /*! \var tsys
+   *  \brief The system temperature measured by the correlator for each IF, antenna
+   *         and polarisation combination, in Kelvin
+   *
+   * This array has length `num_cal_ifs` * `num_cal_ants` * 2. The first index
+   * is over the IFs, the second index is over the antennas, and the third index is
+   * over the polarisations, with the indexing there controlled by the magic
+   * numbers CAL_XX and CAL_YY. Each array index starts at 0.
+   *
+   * The order of the IF and antenna indices is the same as for the arrays `cal_ifs` and
+   * `cal_ants` respectively.
+   */
   float ***tsys;
+  /*! \var tsys_applied
+   *  \brief Flag indicating whether the data in this structure has been corrected for
+   *         the system temperature measured by the correlator for each IF, antenna and 
+   *         polarisation combination; SYSCAL_TSYS_APPLIED means that the data has been
+   *         corrected, whereas SYSCAL_TSYS_NOT_APPLIED means the opposite
+   *
+   * This array has length `num_cal_ifs` * `num_cal_ants` * 2. The first index
+   * is over the IFs, the second index is over the antennas, and the third index is
+   * over the polarisations, with the indexing there controlled by the magic
+   * numbers CAL_XX and CAL_YY. Each array index starts at 0.
+   *
+   * The order of the IF and antenna indices is the same as for the arrays `cal_ifs` and
+   * `cal_ants` respectively.
+   */
   int ***tsys_applied;
+  /*! \var computed_tsys
+   *  \brief The system temperature computed by this library for each IF, antenna
+   *         and polarisation combination, in Kelvin
+   *
+   * This array has length `num_cal_ifs` * `num_cal_ants` * 2. The first index
+   * is over the IFs, the second index is over the antennas, and the third index is
+   * over the polarisations, with the indexing there controlled by the magic
+   * numbers CAL_XX and CAL_YY. Each array index starts at 0.
+   *
+   * The order of the IF and antenna indices is the same as for the arrays `cal_ifs` and
+   * `cal_ants` respectively.
+   */
   float ***computed_tsys;
+  /*! \var computed_tsys_applied
+   *  \brief Flag indicating whether the data in this structure has been corrected for
+   *         the system temperature computed by this library for each IF, antenna and 
+   *         polarisation combination; SYSCAL_TSYS_APPLIED means that the data has been
+   *         corrected, whereas SYSCAL_TSYS_NOT_APPLIED means the opposite
+   *
+   * This array has length `num_cal_ifs` * `num_cal_ants` * 2. The first index
+   * is over the IFs, the second index is over the antennas, and the third index is
+   * over the polarisations, with the indexing there controlled by the magic
+   * numbers CAL_XX and CAL_YY. Each array index starts at 0.
+   *
+   * The order of the IF and antenna indices is the same as for the arrays `cal_ifs` and
+   * `cal_ants` respectively.
+   */
   int ***computed_tsys_applied;
+
   // These are indexed [IF][ANT].
+  /*! \var xyphase
+   *  \brief The XY-phase measured by the correlator for each IF and antenna combination,
+   *         in degrees
+   *
+   * This array has length `num_cal_ifs` * `num_cal_ants`. The first index is over the IFs,
+   * and the second index is over the antennas. Each array index starts at 0.
+   *
+   * The order of the IF and antenna indices is the same as for the arrays `cal_ifs` and
+   * `cal_ants` respectively.
+   */
   float **xyphase;
+  /*! \var xyamp
+   *  \brief The XY-amplitude measured by the correlator for each IF and antenna combination,
+   *         in Jy
+   *
+   * This array has length `num_cal_ifs` * `num_cal_ants`. The first index is over the IFs,
+   * and the second index is over the antennas. Each array index starts at 0.
+   *
+   * The order of the IF and antenna indices is the same as for the arrays `cal_ifs` and
+   * `cal_ants` respectively.
+   */
   float **xyamp;
+  /*! \var parangle
+   *  \brief The parallactic angle for each IF and antenna combination, in degrees
+   *
+   * This array has length `num_cal_ifs` * `num_cal_ants`. The first index is over the IFs,
+   * and the second index is over the antennas. Each array index starts at 0.
+   *
+   * The order of the IF and antenna indices is the same as for the arrays `cal_ifs` and
+   * `cal_ants` respectively.
+   */
   float **parangle;
+  /*! \var tracking_error_max
+   *  \brief The maximum antenna tracking error observed during this cycle, for each IF 
+   *         and antenna combination, in arcsec
+   *
+   * This array has length `num_cal_ifs` * `num_cal_ants`. The first index is over the IFs,
+   * and the second index is over the antennas. Each array index starts at 0.
+   *
+   * The order of the IF and antenna indices is the same as for the arrays `cal_ifs` and
+   * `cal_ants` respectively.
+   */
   float **tracking_error_max;
+  /*! \var tracking_error_rms
+   *  \brief The RMS antenna tracking error observed during this cycle, for each IF 
+   *         and antenna combination, in arcsec
+   *
+   * This array has length `num_cal_ifs` * `num_cal_ants`. The first index is over the IFs,
+   * and the second index is over the antennas. Each array index starts at 0.
+   *
+   * The order of the IF and antenna indices is the same as for the arrays `cal_ifs` and
+   * `cal_ants` respectively.
+   */
   float **tracking_error_rms;
+  /*! \var gtp_x
+   *  \brief The gated total power (GTP) observed during this cycle for the X pol, for each IF 
+   *         and antenna combination
+   *
+   * This array has length `num_cal_ifs` * `num_cal_ants`. The first index is over the IFs,
+   * and the second index is over the antennas. Each array index starts at 0.
+   *
+   * The order of the IF and antenna indices is the same as for the arrays `cal_ifs` and
+   * `cal_ants` respectively.
+   */
   float **gtp_x;
+  /*! \var gtp_y
+   *  \brief The gated total power (GTP) observed during this cycle for the Y pol, for each IF 
+   *         and antenna combination
+   *
+   * This array has length `num_cal_ifs` * `num_cal_ants`. The first index is over the IFs,
+   * and the second index is over the antennas. Each array index starts at 0.
+   *
+   * The order of the IF and antenna indices is the same as for the arrays `cal_ifs` and
+   * `cal_ants` respectively.
+   */
   float **gtp_y;
+  /*! \var sdo_x
+   *  \brief The synchronously-demodulated output (SDO) observed during this cycle for the
+   *         X pol, for each IF and antenna combination
+   *
+   * This array has length `num_cal_ifs` * `num_cal_ants`. The first index is over the IFs,
+   * and the second index is over the antennas. Each array index starts at 0.
+   *
+   * The order of the IF and antenna indices is the same as for the arrays `cal_ifs` and
+   * `cal_ants` respectively.
+   */
   float **sdo_x;
+  /*! \var sdo_y
+   *  \brief The synchronously-demodulated output (SDO) observed during this cycle for the
+   *         Y pol, for each IF and antenna combination
+   *
+   * This array has length `num_cal_ifs` * `num_cal_ants`. The first index is over the IFs,
+   * and the second index is over the antennas. Each array index starts at 0.
+   *
+   * The order of the IF and antenna indices is the same as for the arrays `cal_ifs` and
+   * `cal_ants` respectively.
+   */
   float **sdo_y;
+  /*! \var caljy_x
+   *  \brief The noise diode signal level assumed by the correlator during this cycle for the
+   *         X pol, for each IF and antenna combination, in Jy
+   *
+   * This array has length `num_cal_ifs` * `num_cal_ants`. The first index is over the IFs,
+   * and the second index is over the antennas. Each array index starts at 0.
+   *
+   * The order of the IF and antenna indices is the same as for the arrays `cal_ifs` and
+   * `cal_ants` respectively.
+   */
   float **caljy_x;
+  /*! \var caljy_y
+   *  \brief The noise diode signal level assumed by the correlator during this cycle for the
+   *         Y pol, for each IF and antenna combination, in Jy
+   *
+   * This array has length `num_cal_ifs` * `num_cal_ants`. The first index is over the IFs,
+   * and the second index is over the antennas. Each array index starts at 0.
+   *
+   * The order of the IF and antenna indices is the same as for the arrays `cal_ifs` and
+   * `cal_ants` respectively.
+   */
   float **caljy_y;
+  /*! \var flagging
+   *  \brief An indication of whether this cycle was flagged as bad by the correlator,
+   *         for each IF and antenna combination; the flagging indicators are explained
+   *         in the documentation for the SYSCAL_FLAG_BAD macro
+   *
+   * This array has length `num_cal_ifs` * `num_cal_ants`. The first index is over the IFs,
+   * and the second index is over the antennas. Each array index starts at 0.
+   *
+   * The order of the IF and antenna indices is the same as for the arrays `cal_ifs` and
+   * `cal_ants` respectively.
+   */
   int **flagging;
+
   // Weather metadata.
+  /*! \var temperature
+   *  \brief The ambient temperature measured by the site weather station during this
+   *         cycle, in C
+   */
   float temperature;
+  /*! \var air_pressure
+   *  \brief The air pressure measured by the site weather station during this
+   *         cycle, in mBar
+   */
   float air_pressure;
+  /*! \var humidity
+   *  \brief The relative humidity measured by the site weather station during this
+   *         cycle, in %
+   */
   float humidity;
+  /*! \var wind_speed
+   *  \brief The wind speed measured by the site weather station during this
+   *         cycle, in km/h
+   */
   float wind_speed;
+  /*! \var wind_direction
+   *  \brief The wind direction measured by the site weather station during this
+   *         cycle, in deg
+   */
   float wind_direction;
+  /*! \var rain_gauge
+   *  \brief The rain gauge level measured by the site weather station during this
+   *         cycle, in mm
+   */
   float rain_gauge;
+  /*! \var weather_valid
+   *  \brief An indicator of the quality of data from the site weather station during this
+   *         cycle; consider this data useful only if this variable has value SYSCAL_VALID
+   */
   int weather_valid;
+  /*! \var seemon_phase
+   *  \brief The average phase value observed by the atmospheric seeing monitor during this
+   *         cycle, in deg
+   */
   float seemon_phase;
+  /*! \var seemon_rms
+   *  \brief The RMS phase variation observed by the atmospheric seeing monitor during this
+   *         cycle, in deg
+   */
   float seemon_rms;
+  /*! \var seemon_valid
+   *  \brief An indicator of the quality of data from the site atmospheric seeing monitor
+   *         during this cycle; consider this data useful only if this variable has value 
+   *         SYSCAL_VALID
+   */
   int seemon_valid;
 };
 
-/**
- * A structure to hold everything together for a scan.
+/*! \struct scan_data
+ *  \brief A structure to hold all the cycles together for a scan, along with the
+ *         corresponding header
  */
 struct scan_data {
-  // Needs a header.
+  /*! \var header_data
+   *  \brief The header parameters for this scan
+   */
   struct scan_header_data header_data;
-  // And any number of cycles.
+  /*! \var num_cycles
+   *  \brief The number of cycles read in for this scan
+   */
   int num_cycles;
+  /*! \var cycles
+   *  \brief An array of pointers to cycle_data structures, one for each cycle in this scan
+   *
+   * This array has size `num_cycles`, and is indexed starting at 0.
+   */
   struct cycle_data **cycles;
 };
 
-/**
- * A structure which describes how to quickly access data
- * in an RFPITS file.
+/*! \struct rpfits_index
+ *  \brief A structure which describes how to quickly access data in an RFPITS file.
+ *
+ * **UNUSED AND NOT WORKING, HOPEFULLY AVAILABLE IN FUTURE VERSIONS**
  */
 struct rpfits_index {
+  /*! \var filename
+   *  \brief The name of the RPFITS file that this index pertains to
+   */
   char filename[FILENAME_LENGTH];
+  /*! \var num_headers
+   *  \brief The number of headers contained in the RPFITS file
+   */
   int num_headers;
+  /*! \var header_pos
+   *  \brief An array of binary file positions corresponding to each header
+   *
+   * This array has size `num_headers`, and is indexed starting at 0.
+   */
   long int *header_pos;
+  /*! \var num_cycles
+   *  \brief A record of how many cycles each scan (remembering there is one scan
+   *         per header) has
+   *
+   * This array has size `num_headers`, and is indexed starting at 0.
+   */
   int *num_cycles;
+  /*! \var cycle_pos
+   *  \brief An array of binary file positions corresponding to each cycle
+   *
+   * This 2-D array has size `num_headers` * `num_cycles[i]`, where `i` is the position
+   * along the `num_headers` axis (the first axis), and both indices start at 0.
+   */
   long int **cycle_pos;
 };
 

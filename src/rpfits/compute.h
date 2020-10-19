@@ -1,16 +1,12 @@
-/**
- * ATCA Training Library: compute.h
- * (C) Jamie Stevens CSIRO 2019
+/** \file compute.h
+ *  \brief Definitions for structures and parameters pertaining to low-level computations
+ *         on the raw data
  *
- * This library is designed to read an RPFITS file and for each cycle make available
- * the products which would be available online: spectra, amp, phase, delay,
- * u, v, w, etc.
- * This is so we can make tools which will let observers muck around with what they 
- * would see online in all sorts of real situations, as represented by real data 
- * files.
- * 
+ * ATCA Training Library
+ * (C) Jamie Stevens CSIRO 2020
+ *
  * This module handles computing quantities like amplitude, phase, delay etc.
- * using the vis data.
+ * using the vis data, and system temperatures.
  */
 
 #pragma once
