@@ -32,14 +32,38 @@
 /**
  * Magic numbers for averaging types.
  */
+/*! \def AVERAGETYPE_MEAN
+ *  \brief A magic number used to indicate that the mean value should be used
+ *         as the average value when computing vis properties
+ *
+ * This is a bitwise OR magic number along with the other AVERAGETYPE_* values.
+ */
 #define AVERAGETYPE_MEAN   1
+/*! \def AVERAGETYPE_MEDIAN
+ *  \brief A magic number used to indicate that the median value should be used
+ *         as the average value when computing vis properties
+ *
+ * This is a bitwise OR magic number along with the other AVERAGETYPE_* values.
+ */
 #define AVERAGETYPE_MEDIAN 2
+/*! \def AVERAGETYPE_VECTOR
+ *  \brief A magic number used to indicate that the phase value should be considered
+ *         while computing average values for vis
+ *
+ * This is a bitwise OR magic number along with the other AVERAGETYPE_* values.
+ */
 #define AVERAGETYPE_VECTOR 4
+/*! \def AVERAGETYPE_SCALAR
+ *  \brief A magic number used to indicate that the phase value should be discarded
+ *         while computing average values for vis
+ *
+ * This is a bitwise OR magic number along with the other AVERAGETYPE_* values.
+ */
 #define AVERAGETYPE_SCALAR 8
 
-/**
- * Structure to hold options to pass to the function
- * that computes the amplitude and phase.
+/*! \struct ampphase_options
+ *  \brief Structure to hold options controlling how to take raw data and produce
+ *         more useful quantities like amplitude and phase.
  */
 struct ampphase_options {
   // Return phase in degrees (default is radians).
