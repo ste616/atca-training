@@ -16,17 +16,53 @@
 /**
  * Some polarisation flags.
  */
+/*! \def POL_X
+ *  \brief Magic number used for RPFITS pol X, listed in STRPOL_X
+ */
 #define    POL_X  1
+/*! \def STRPOL_X
+ *  \brief The string we're looking for from RPFITS data to assign as POL_X
+ */
 #define STRPOL_X  "X "
+/*! \def POL_Y
+ *  \brief Magic number used for RPFITS pol Y, listed in STRPOL_Y
+ */
 #define    POL_Y  2
+/*! \def STRPOL_Y
+ *  \brief The string we're looking for from RPFITS data to assign as POL_Y
+ */
 #define STRPOL_Y  "Y "
+/*! \def POL_XX
+ *  \brief Magic number used for RPFITS product XX, listed in STRPOL_XX
+ */
 #define    POL_XX 3
+/*! \def STRPOL_XX
+ *  \brief The string we're looking for from RPFITS data to assign as POL_XX
+ */
 #define STRPOL_XX "XX"
+/*! \def POL_YY
+ *  \brief Magic number used for RPFITS product YY, listed in STRPOL_YY
+ */
 #define    POL_YY 4
+/*! \def STRPOL_YY
+ *  \brief The string we're looking for from RPFITS data to assign as POL_YY
+ */
 #define STRPOL_YY "YY"
+/*! \def POL_XY
+ *  \brief Magic number used for RPFITS product XY, listed in STRPOL_XY
+ */
 #define    POL_XY 5
+/*! \def STRPOL_XY
+ *  \brief The string we're looking for from RPFITS data to assign as POL_XY
+ */
 #define STRPOL_XY "XY"
+/*! \def POL_YX
+ *  \brief Magic number used for RPFITS product YX, listed in STRPOL_YX
+ */
 #define    POL_YX 6
+/*! \def STRPOL_YX
+ *  \brief The string we're looking for from RPFITS data to assign as POL_YX
+ */
 #define STRPOL_YX "YX"
 
 /**
@@ -66,15 +102,33 @@
  *         more useful quantities like amplitude and phase.
  */
 struct ampphase_options {
-  // Return phase in degrees (default is radians).
+  /*! \var phase_in_degrees
+   *  \brief Flag to instruct the library to calculate phases in degrees (if set to
+   *         true) or radians (if set to false).
+   */
   bool phase_in_degrees;
 
   // Whether to include flagged data in vis outputs.
+  /*! \var include_flagged_data
+   *  \brief Flag to instruct the library to include flagged channels when producing
+   *         tvchannel-averaged data (if set to 1), or to discard flagged channels
+   *         (if set to 0)
+   */
   int include_flagged_data;
   
   // The "tv" channels can be set independently for
   // all the IFs.
+  /*! \var num_ifs
+   *  \brief The number of IFs that have information in the tvchannel arrays
+   *         in this structure
+   */
   int num_ifs;
+  /*! \var min_tvchannel
+   *  \brief The lowest numbered channel to include in the tvchannel range for
+   *         each IF
+   *
+   * This array has size `num_ifs`, and is indexed starting at 0.
+   */
   int *min_tvchannel;
   int *max_tvchannel;
 
@@ -149,20 +203,66 @@ struct syscal_data {
   float ***caljy;
 };
 
-/**
- * Structure to hold amplitude and phase quantities.
+/*! \struct ampphase
+ *  \brief Structure to hold amplitude and phase quantities and associated
+ *         metadata
+ *
+ * This structure is the primary way to get access to all the data from a
+ * particular product. Each structure represents a single IF and polarisation
+ * from a single cycle, but contains all the baselines, channels and bins.
+ * Both the raw complex data is stored here, along with the amplitudes and
+ * phases computed from them. Two copies of the data are included, one which
+ * has all the data, and another which excludes the data that was flagged bad.
+ *
+ * Metadata about the data ranges are available here to make it easier to plot
+ * this data, The options used to compute this data is linked here, and the
+ * meteorological and system calibration metadata is also available.
  */
 struct ampphase {
   // The number of quantities in each array.
+  /*! \var nchannels
+   *  \brief The number of channels for all the unflagged arrays in this
+   *         structure; this is how many channels were computed in this IF
+   */
   int nchannels;
+  /*! \var nbaselines
+   *  \brief The number of baselines for all the arrays in this structure
+   *
+   * For CABB, this is almost always 21, which includes 6 auto-correlations
+   * and 15 cross-correlations.
+   */
   int nbaselines;
 
   // Now the arrays storing the labels for each quantity.
+  /*! \var channel
+   *  \brief The channel number for each channel
+   *
+   * This array has length `nchannels` and is indexed starting at 0.
+   *
+   * This is a float array so that it can be used while plotting scatter plots,
+   * especially in PGPLOT which requires the arrays to be floats.
+   */
   float *channel;
-  float *frequency; // in GHz.
+  /*! \var frequency
+   *  \brief The central frequency of each channel, in GHz
+   *
+   * This array has length `nchannels` and is indexed starting at 0.
+   */
+  float *frequency;
+  /*! \var baseline
+   *  \brief The baseline number of each baseline
+   *
+   * This array has length `nbaselines` and is indexed starting at 0.
+   */
   int *baseline;
 
   // The static quantities.
+  /*! \var pol
+   *  \brief The polarisation represented by these data
+   *
+   * The value of this variable will be one of the POL_* magic numbers
+   * defined at the top of this header file.
+   */
   int pol;
   int window;
   char window_name[8];
