@@ -1,16 +1,11 @@
-/**
- * ATCA Training Library: compute.c
- * (C) Jamie Stevens CSIRO 2019
+/** \file compute.c
+ *  \brief Routines to handle computing quantities from the raw data
  *
- * This library is designed to read an RPFITS file and for each cycle make available
- * the products which would be available online: spectra, amp, phase, delay,
- * u, v, w, etc.
- * This is so we can make tools which will let observers muck around with what they 
- * would see online in all sorts of real situations, as represented by real data 
- * files.
- * 
+ * ATCA Training Library
+ * (C) Jamie Stevens CSIRO 2020
+ *
  * This module handles computing quantities like amplitude, phase, delay etc.
- * using the vis data.
+ * using the vis data, and system temperatures.
  */
 
 #include <stdio.h>
@@ -23,8 +18,13 @@
 #include "memory.h"
 #include "compute.h"
 
+/*!
+ *  \brief Get the median value of a float array
+ *  \param a the array of values
+ *  \param n the number of values in the array
+ *  \return the median value of the first \a n entries in the array \a a
+ */
 float fmedianf(float *a, int n) {
-  // Get the median of the array a, with n points.
   if (n % 2) {
     // Odd number of points.
     return (a[(n + 1) / 2]);
@@ -33,8 +33,9 @@ float fmedianf(float *a, int n) {
   }
 }
 
-/**
- * Initialise and return an ampphase structure.
+/*!
+ *  \brief Initialise and return an ampphase structure
+ *  \return a pointer to a properly initialised ampphase structure
  */
 struct ampphase* prepare_ampphase(void) {
   struct ampphase *ampphase = NULL;
@@ -87,8 +88,9 @@ struct ampphase* prepare_ampphase(void) {
   return(ampphase);
 }
 
-/**
- * Initialise and return a vis_quantities structure.
+/*!
+ *  \brief Initialise and return a vis_quantities structure
+ *  \return a pointer to a properly initialised vis_quantities structure
  */
 struct vis_quantities* prepare_vis_quantities(void) {
   struct vis_quantities *vis_quantities = NULL;
@@ -119,8 +121,12 @@ struct vis_quantities* prepare_vis_quantities(void) {
   return(vis_quantities);
 }
 
-/**
- * Free an ampphase structure's memory.
+/*!
+ *  \brief Free an ampphase structure's memory
+ *  \param ampphase a pointer the ampphase structure pointer
+ *
+ * This routine frees all the memory that would have been allocated within
+ * the ampphase structure, and also frees the structure itself.
  */
 void free_ampphase(struct ampphase **ampphase) {
   int i = 0, j = 0;
@@ -187,13 +193,15 @@ void free_ampphase(struct ampphase **ampphase) {
   FREE(*ampphase);
 }
 
-/**
- * Free a vis_quantities structure's memory.
+/*!
+ *  \brief Free a vis_quantities structure's memory
+ *  \param vis_quantities a pointer to the vis_quantities structure pointer
+ *
+ * This routine frees all the memory that would have been allocated within
+ * the vis_quantities structure, and also frees the structure itself.
  */
 void free_vis_quantities(struct vis_quantities **vis_quantities) {
   int i;
-  /* FREE((*vis_quantities)->options->min_tvchannel); */
-  /* FREE((*vis_quantities)->options->max_tvchannel); */
   free_ampphase_options((*vis_quantities)->options);
   FREE((*vis_quantities)->options);
   
@@ -212,9 +220,15 @@ void free_vis_quantities(struct vis_quantities **vis_quantities) {
   FREE(*vis_quantities);
 }
 
-/**
- * This routine looks at a string representation of a polarisation
- * specification and returns our magic number for it.
+/*!
+ *  \brief This routine looks at a string representation of a polarisation
+ *         specification and returns our magic number for it
+ *  \param polstring the string from the RPFITS file indicating a polarisation
+ *  \return an internal magic number representation of the polarisation, one of the
+ *          POL_* numbers defined in our header file
+ *
+ * This routine is here to convert the RPFITS representation of polarisation parameters
+ * (which are strings) into an integer flag for easier processing.
  */
 int polarisation_number(char *polstring) {
   int ncmp = 2;
@@ -239,8 +253,13 @@ int polarisation_number(char *polstring) {
   return -1;
 }
 
-/**
- * Set default options in an ampphase_options structure.
+/*!
+ *  \brief Set default options in an ampphase_options structure
+ *  \return a properly initialised ampphase_options structure
+ *
+ * The default parameters set in this routine are:
+ * - compute phase in degrees
+ * - do not include flagged data in computations
  */
 struct ampphase_options ampphase_options_default(void) {
   struct ampphase_options options;
@@ -250,17 +269,19 @@ struct ampphase_options ampphase_options_default(void) {
   options.num_ifs = 0;
   options.min_tvchannel = NULL;
   options.max_tvchannel = NULL;
-  //options.delay_averaging = 1;
   options.delay_averaging = NULL;
-  //options.averaging_method = AVERAGETYPE_MEAN | AVERAGETYPE_VECTOR;
   options.averaging_method = NULL;
 
   return options;
 }
 
-/**
- * Set default options in an already existing ampphase_options
- * structure.
+/*!
+ *  \brief Set default options in an already existing ampphase_options structure
+ *  \param options the ampphase_options structure to reset to default
+ *
+ * The default parameters set in this routine are:
+ * - compute phase in degrees
+ * - do not include flagged data in computations
  */
 void set_default_ampphase_options(struct ampphase_options *options) {
   options->phase_in_degrees = true;
@@ -272,8 +293,10 @@ void set_default_ampphase_options(struct ampphase_options *options) {
   options->averaging_method = NULL;
 }
 
-/**
- * Copy one ampphase structure into another.
+/*!
+ *  \brief Copy one ampphase structure into another
+ *  \param dest the destination structure which will be over-written
+ *  \param src the source structure from which all values will be copied
  */
 void copy_ampphase_options(struct ampphase_options *dest,
                            struct ampphase_options *src) {
@@ -293,8 +316,12 @@ void copy_ampphase_options(struct ampphase_options *dest,
   }
 }
 
-/**
- * Free an ampphase_options structure.
+/*!
+ *  \brief Free an ampphase_options structure
+ *  \param options a pointer to the ampphase_options structure
+ *
+ * This routine will free all the memory that would have been allocated within
+ * the structure, but will not free the structure memory.
  */
 void free_ampphase_options(struct ampphase_options *options) {
   FREE(options->min_tvchannel);
@@ -303,8 +330,10 @@ void free_ampphase_options(struct ampphase_options *options) {
   FREE(options->averaging_method);
 }
 
-/**
- * Copy one metinfo structure into another.
+/*!
+ *  \brief Copy one metinfo structure into another
+ *  \param dest the destination structure which will be over-written
+ *  \param src the source structure from which all values will be copied
  */
 void copy_metinfo(struct metinfo *dest,
                   struct metinfo *src) {
@@ -322,8 +351,14 @@ void copy_metinfo(struct metinfo *dest,
   STRUCTCOPY(src, dest, seemon_valid);
 }
 
-/**
- * Copy one syscal_data structure into another.
+/*!
+ *  \brief Copy one syscal_data structure into another
+ *  \param dest the destination structure which will be over-written
+ *  \param src the source structure from which all values will be copied
+ *
+ * The memory in the destination structure is reallocated as required to match
+ * the source; the pointers in the destination should therefore be NULL or
+ * properly pre-allocated otherwise a segfault will occur.
  */
 void copy_syscal_data(struct syscal_data *dest,
                       struct syscal_data *src) {
@@ -395,8 +430,12 @@ void copy_syscal_data(struct syscal_data *dest,
   }
 }
 
-/**
- * Free a syscal_data structure.
+/*!
+ *  \brief Free a syscal_data structure's memory
+ *  \param syscal_data a pointer to the syscal_data structure pointer
+ *
+ * This routine frees all the memory that would have been allocated within
+ * the free_syscal_data structure, but does not free the structure pointer.
  */
 void free_syscal_data(struct syscal_data *syscal_data) {
   int i, j;
@@ -444,7 +483,16 @@ void free_syscal_data(struct syscal_data *syscal_data) {
   }
 }
 
-/**
+/*!
+ *  \brief Compute default tvchannel ranges for an IF
+ *  \param num_chan the number of channels in the IF
+ *  \param chan_width the width of each channel, in MHz
+ *  \param centre_freq the frequency of the centre channel of the IF, in MHz
+ *  \param min_tvchannel a pointer to a variable that upon exit will contain the
+ *                       default minimum tvchannel
+ *  \param max_tvchannel a pointer to a variable that upon exit will contain the
+ *                       default maximum tvchannel
+ *
  * Routine that computes the "default" tv channel range given
  * the number of channels present in an IF, the channel width,
  * and the centre frequency in MHz.
@@ -482,7 +530,11 @@ void default_tvchannels(int num_chan, float chan_width,
   *max_tvchannel = num_chan - 2;
 }
 
-/**
+/*!
+ *  \brief Add a tvchannel specification to an ampphase_options structure
+ *  \param ampphase_options a pointer to a structure which will upon exit contain at
+ *                          least as many windows required to accommodate the IF window
+ *                          number specified as \a window
  * Routine to add a tvchannel specification for a specified window
  * into the ampphase_options structure. It takes care of putting in
  * defaults which get recognised as not being set if windows are missing.
