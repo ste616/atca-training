@@ -535,7 +535,7 @@ void default_tvchannels(int num_chan, float chan_width,
  *  \param ampphase_options a pointer to a structure which will upon exit contain at
  *                          least as many windows required to accommodate the IF window
  *                          number specified as \a window
- *  \param window the IF number to add tvchannels for
+ *  \param window the IF number to add tvchannels for (starts at 1)
  *  \param min_tvchannel the minimum channel to use in the tvchannel range
  *  \param max_tvchannel the maximum channel to use in the tvchannel range
  *
@@ -578,10 +578,30 @@ void add_tvchannels_to_options(struct ampphase_options *ampphase_options,
 }
 
 
-/**
- * Routine to compute amplitude and phase from a vis array.
- * The user needs to specify which pol quantity they want,
- * and which IF and bin.
+/*!
+ *  \brief Compute amplitude and phase from raw data for a single cycle, pol
+ *         and window
+ *  \param scan_header_data the header information for the scan
+ *  \param cycle_data the raw data and metadata for a cycle within the scan
+ *  \param ampphase a pointer to the output ampphase structure that will be filled
+ *                  with the computed data; if this dereferenced pointer is NULL,
+ *                  this routine will allocate the memory for the output structure
+ *  \param pol the polarisation to compute the data for; one of the magic numbers POL_*
+ *  \param ifnum the window number to compute the data for; the first window is 1
+ *  \param options the options to use when doing the computations
+ *  \return an indication of whether the computations have worked:
+ *          - -1 means that the specified `ifnum` or `pol` aren't in the raw data
+ *          - 0 means the computations were successful
+ *
+ * This routine takes some raw complex data from a scan's cycle, and computes several
+ * parameters, which would normally be thought of as "spectra" and viewed in SPD.
+ * The data in the output `ampphase` is formatted in a way to allow for easy plotting,
+ * and this routine also computes the maximum and minimum values along the plotting
+ * axes. All raw data is available in the output, but a "clean" version is also available
+ * which omits any channels that have been flagged bad.
+ *
+ * The metadata regarding calibration is also collated for the requested window and
+ * polarisation.
  */
 int vis_ampphase(struct scan_header_data *scan_header_data,
                  struct cycle_data *cycle_data,

@@ -122,46 +122,112 @@ struct ampphase_options {
    *  \brief The number of IFs that have information in the tvchannel arrays
    *         in this structure
    *
-   * Because all the arrays in this structure have size `num_ifs`, and
+   * Because all the arrays in this structure have size `num_ifs`, and all are
+   * indexed directly by the RPFITS window parameter which starts at 1, this is
+   * actually the largest window number we know about plus 1.
    */
   int num_ifs;
   /*! \var min_tvchannel
    *  \brief The lowest numbered channel to include in the tvchannel range for
    *         each IF
    *
-   * This array has size `num_ifs`, and is indexed starting at 0.
+   * This array has size `num_ifs`, and is indexed starting at 1.
    */
   int *min_tvchannel;
+  /*! \var max_tvchannel
+   *  \brief The highest numbered channel to include in the tvchannel range for
+   *         each IF
+   *
+   * This array has size `num_ifs`, and is indexed starting at 1.
+   */
   int *max_tvchannel;
 
-  // The delay averaging factor (default is 1).
+  /*! \var delay_averaging
+   *  \brief The number of channels to average together while computing the delay
+   *         in each IF
+   *
+   * This array has size `num_ifs`, and is indexed starting at 1.
+   */
   int *delay_averaging;
   
-  // The method to do the averaging (default is mean).
+  /*! \var averaging_method
+   *  \brief The type of averaging used when computing parameters within the
+   *         tvchannel range.
+   *
+   * This array has size `num_ifs`, and is indexed starting at 1.
+   *
+   * The magic numbers to use when setting this parameter are listed at the top
+   * of this header file: AVERAGETYPE_*.
+   */
   int *averaging_method;
 
 };
 
-/**
- * Structure to hold meteorological information.
+/*! \struct metinfo
+ *  \brief Structure to hold meteorological information for a cycle
  */
 struct metinfo {
   // Labelling.
+  /*! \var obsdate
+   *  \brief String representation of the base date of the file that
+   *         the data in this structure represents
+   */
   char obsdate[OBSDATE_LENGTH];
+  /*! \var ut_seconds
+   *  \brief The number of seconds past midnight UTC on `obsdate` at the midpoint
+   *         of this cycle
+   */
   float ut_seconds;
 
   // Quantities from the weather station.
+  /*! \var temperature
+   *  \brief The ambient temperature as measured by the site weather station, in C
+   */
   float temperature;
+  /*! \var air_pressure
+   *  \brief The air pressure as measured by the site weather station, in mBar
+   */
   float air_pressure;
+  /*! \var humidity
+   *  \brief The relative humidity as measured by the site weather station, in %
+   */
   float humidity;
+  /*! \var wind_speed
+   *  \brief The wind speed as measured by the site weather station, in km/h
+   */
   float wind_speed;
+  /*! \var wind_direction
+   *  \brief The wind direction as measured by the site weather station, in deg,
+   *         where 0 deg is North and 90 deg is East
+   */
   float wind_direction;
+  /*! \var rain_gauge
+   *  \brief The amount of rain in the rain gauge, in mm
+   *
+   * This is a quantity that resets to 0 each day 9am local time.
+   */
   float rain_gauge;
+  /*! \var weather_valid
+   *  \brief Flag to indicate if the meteorological data for this cycle can be
+   *         trusted (true) or not (false)
+   */
   bool weather_valid;
 
   // Quantities from the seeing monitor.
+  /*! \var seemon_phase
+   *  \brief The average phase value measured by the site atmospheric seeing monitor,
+   *         in radians
+   */
   float seemon_phase;
+  /*! \var seemon_rms
+   *  \brief The RMS phase variation observed by the site atmospheric seeing monitor
+   *         during this cycle, in radians
+   */
   float seemon_rms;
+  /*! \var seemon_valid
+   *  \brief Flag to indicate if the measurements from the atmospheric seeing monitor
+   *         can be trusted (true) or not (false)
+   */
   bool seemon_valid;
 };
 
@@ -266,52 +332,254 @@ struct ampphase {
    * defined at the top of this header file.
    */
   int pol;
+  /*! \var window
+   *  \brief The window represented by these data
+   *
+   * The data windows start at 1 and increment for each set of data that
+   * is correlated at a different frequency or with a different number of
+   * channels. Usually, windows 1 and 2 are the continuum bands, and any additional
+   * windows represent zoom bands, but this is not guaranteed to be the case.
+   * Windows are distinct from IFs since IFs represent the signal after mixing
+   * to different frequencies, and a single IF can have multiple windows within it,
+   * but often the two terminologies are used interchangably.
+   */
   int window;
+  /*! \var window_name
+   *  \brief The classified IF name, from the header data's `if_label` variable
+   */
   char window_name[8];
+  /*! \var obsdate
+   *  \brief String representation of the base date of the file that the data in
+   *         this structure represents
+   */
   char obsdate[OBSDATE_LENGTH];
+  /*! \var ut_seconds
+   *  \brief The number of seconds past midnight UTC on `obsdate` at the midpoint
+   *         of this cycle
+   */
   float ut_seconds;
+  /*! \var scantype
+   *  \brief The type of observation this scan describes, from `obstype` in the
+   *         scan header
+   */
   char scantype[OBSTYPE_LENGTH];
   
   // The bin arrays have one element per baseline.
+  /*! \var nbins
+   *  \brief The number of bins present per baseline
+   *
+   * This array has length `nbaselines` and is indexed starting at 0.
+   */
   int *nbins;
 
   // The flag array has the indexing:
   // array[baseline][bin]
+  /*! \var flagged_bad
+   *  \brief An indication of whether the entire baseline and bin data is to be
+   *         flagged bad (value 0 means good data)
+   *
+   * This 2-D array has length `nbaselines` for the first index, and `nbins[i]`
+   * for the second index, and where `i` is the position along the first index, 
+   * because each baseline may have a different number of bins. Each index starts at 0.
+   */
   int **flagged_bad;
   
   // The arrays here have the following indexing.
   // array[baseline][bin][channel]
-  // Weighting.
+  /*! \var weight
+   *  \brief The weight of the data, which is currently unused
+   *
+   * This 3-D array has length `nbaselines` for the first index, `nbins[i]`
+   * for the second index (where `i` is the position along the first index), and
+   * `nchannels` for the third index. Each index starts at 0.
+   */
   float ***weight;
-  // Amplitude.
+  /*! \var amplitude
+   *  \brief The computed amplitude
+   *
+   * This 3-D array has length `nbaselines` for the first index, `nbins[i]`
+   * for the second index (where `i` is the position along the first index), and
+   * `nchannels` for the third index. Each index starts at 0.
+   */
   float ***amplitude;
-  // Phase.
+  /*! \var phase
+   *  \brief The computed phase, the units of which are controlled by the variable
+   *         `phase_in_degrees` in the ampphase_options structure
+   *
+   * This 3-D array has length `nbaselines` for the first index, `nbins[i]`
+   * for the second index (where `i` is the position along the first index), and
+   * `nchannels` for the third index. Each index starts at 0.
+   */
   float ***phase;
-  // The raw data.
+  /*! \var raw
+   *  \brief A copy of the raw complex data, from which the computed parameters
+   *         were derived
+   *
+   * This 3-D array has length `nbaselines` for the first index, `nbins[i]`
+   * for the second index (where `i` is the position along the first index), and
+   * `nchannels` for the third index. Each index starts at 0.
+   */
   float complex ***raw;
 
   // These next arrays contain the same data as above, but
   // do not include the flagged channels.
+  /*! \var f_nchannels
+   *  \brief The number of good channels per baseline and bin
+   *
+   * This 2-D array has length `nbaselines` for the first index, and `nbins[i]`
+   * for the second index (where `i` is the position along the first index).
+   * Each index starts at 0.
+   *
+   * A channel from the raw complex data is bad if the real value of the channel
+   * does not equal itself, ie. it has value NaN. Only those channels which are not
+   * bad in this sense are included in the f_* arrays in this structure.
+   */
   int **f_nchannels;
+  /*! \var f_channel
+   *  \brief The channel number of the raw data corresponding to this good channel
+   *
+   * This 3-D array has length `nbaselines` for the first index, `nbins[i]` for
+   * the second index (where `i` is the position along the first index) and
+   * `f_nchannels[i][j]` for the third index (where `j` is the position along the
+   * second index). Each index starts at 0.
+   */
   float ***f_channel;
+  /*! \var f_frequency
+   *  \brief The frequency corresponding to this good channel, in GHz
+   *
+   * This 3-D array has length `nbaselines` for the first index, `nbins[i]` for
+   * the second index (where `i` is the position along the first index) and
+   * `f_nchannels[i][j]` for the third index (where `j` is the position along the
+   * second index). Each index starts at 0.
+   */
   float ***f_frequency;
+  /*! \var f_weight
+   *  \brief The weight for this good channel, which is currently unused
+   *
+   * This 3-D array has length `nbaselines` for the first index, `nbins[i]` for
+   * the second index (where `i` is the position along the first index) and
+   * `f_nchannels[i][j]` for the third index (where `j` is the position along the
+   * second index). Each index starts at 0.
+   */
   float ***f_weight;
+  /*! \var f_amplitude
+   *  \brief The computed amplitude of this good channel
+   *
+   * This 3-D array has length `nbaselines` for the first index, `nbins[i]` for
+   * the second index (where `i` is the position along the first index) and
+   * `f_nchannels[i][j]` for the third index (where `j` is the position along the
+   * second index). Each index starts at 0.
+   */
   float ***f_amplitude;
+  /*! \var f_phase
+   *  \brief The computed phase corresponding to this good channel, the units of which
+   *         are controlled by the variable `phase_in_degrees` in the ampphase_options
+   *         structure
+   *
+   * This 3-D array has length `nbaselines` for the first index, `nbins[i]` for
+   * the second index (where `i` is the position along the first index) and
+   * `f_nchannels[i][j]` for the third index (where `j` is the position along the
+   * second index). Each index starts at 0.
+   */
   float ***f_phase;
+  /*! \var f_raw
+   *  \brief The raw complex data corresponding to this good channel
+   *
+   * This 3-D array has length `nbaselines` for the first index, `nbins[i]` for
+   * the second index (where `i` is the position along the first index) and
+   * `f_nchannels[i][j]` for the third index (where `j` is the position along the
+   * second index). Each index starts at 0.
+   */
   float complex ***f_raw;
   
   // Some metadata.
+  /*! \var min_amplitude_global
+   *  \brief The minimum computed amplitude (including good data only) observed across
+   *         all the baselines and bins
+   *
+   * This "global" minimum amplitude value is here to make it easy to plot multiple
+   * baselines and bins on the same axis range.
+   */
   float min_amplitude_global;
+  /*! \var max_amplitude_global
+   *  \brief The maximum computed amplitude (including good data only) observed across
+   *         all the baselines and bins
+   *
+   * This "global" maximum amplitude value is here to make it easy to plot multiple
+   * baselines and bins on the same axis range.
+   */
   float max_amplitude_global;
+  /*! \var min_phase_global
+   *  \brief The minimum computed phase (including good data only) observed across
+   *         all the baselines and bins
+   *
+   * This "global" minimum phase value is here to make it easy to plot multiple
+   * baselines and bins on the same axis range.
+   */
   float min_phase_global;
+  /*! \var max_phase_global
+   *  \brief The maximum computed phase (including good data only) observed across
+   *         all the baselines and bins
+   *
+   * This "global" maximum phase value is here to make it easy to plot multiple
+   * baselines and bins on the same axis range.
+   */
   float max_phase_global;
+  /*! \var min_amplitude
+   *  \brief The minimum computed amplitude (including good data only) observed across
+   *         all the bins on each baseline
+   *
+   * This array has length `nbaselines`, and is indexed starting at 0.
+   */
   float *min_amplitude;
+  /*! \var max_amplitude
+   *  \brief The maximum computed amplitude (including good data only) observed across
+   *         all the bins on each baseline
+   *
+   * This array has length `nbaselines`, and is indexed starting at 0.
+   */
   float *max_amplitude;
+  /*! \var min_phase
+   *  \brief The minimum computed phase (including good data only) observed across
+   *         all the bins on each baseline
+   *
+   * This array has length `nbaselines`, and is indexed starting at 0.
+   */
   float *min_phase;
+  /*! \var max_phase
+   *  \brief The maximum computed phase (including good data only) observed across
+   *         all the bins on each baseline
+   *
+   * This array has length `nbaselines`, and is indexed starting at 0.
+   */
   float *max_phase;
+  /*! \var min_real
+   *  \brief The minimum raw real value (including good data only) observed across
+   *         all the bins on each baseline
+   *
+   * This array has length `nbaselines`, and is indexed starting at 0.
+   */
   float *min_real;
+  /*! \var max_real
+   *  \brief The maximum raw real value (including good data only) observed across
+   *         all the bins on each baseline
+   *
+   * This array has length `nbaselines`, and is indexed starting at 0.
+   */
   float *max_real;
+  /*! \var min_imag
+   *  \brief The minimum raw imaginary value (including good data only) observed across
+   *         all the bins on each baseline
+   *
+   * This array has length `nbaselines`, and is indexed starting at 0.
+   */
   float *min_imag;
+  /*! \var max_imag
+   *  \brief The maximum raw imaginary value (including good data only) observed across
+   *         all the bins on each baseline
+   *
+   * This array has length `nbaselines`, and is indexed starting at 0.
+   */
   float *max_imag;
   struct ampphase_options *options;
   struct metinfo metinfo;
