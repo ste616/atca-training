@@ -460,8 +460,8 @@ static void interpret_command(char *line) {
 }
 
 void reconcile_spd_plotcontrols(struct spectrum_data *spectrum_data,
-				struct spd_plotcontrols *user_plotcontrols,
-				struct spd_plotcontrols *data_plotcontrols) {
+                                struct spd_plotcontrols *user_plotcontrols,
+                                struct spd_plotcontrols *data_plotcontrols) {
   int i;
   // This routine is here to ensure that the user plot controls doesn't
   // allow the plotter to try things which aren't supported by the data.

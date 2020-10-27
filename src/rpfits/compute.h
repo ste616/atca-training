@@ -121,6 +121,8 @@ struct ampphase_options {
   /*! \var num_ifs
    *  \brief The number of IFs that have information in the tvchannel arrays
    *         in this structure
+   *
+   * Because all the arrays in this structure have size `num_ifs`, and
    */
   int num_ifs;
   /*! \var min_tvchannel

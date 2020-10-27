@@ -422,9 +422,9 @@ void copy_syscal_data(struct syscal_data *dest,
         STRUCTCOPY(src, dest, online_tsys_applied[i][j][k]);
         STRUCTCOPY(src, dest, computed_tsys[i][j][k]);
         STRUCTCOPY(src, dest, computed_tsys_applied[i][j][k]);
-	STRUCTCOPY(src, dest, gtp[i][j][k]);
-	STRUCTCOPY(src, dest, sdo[i][j][k]);
-	STRUCTCOPY(src, dest, caljy[i][j][k]);
+        STRUCTCOPY(src, dest, gtp[i][j][k]);
+        STRUCTCOPY(src, dest, sdo[i][j][k]);
+        STRUCTCOPY(src, dest, caljy[i][j][k]);
       }
     }
   }
@@ -461,9 +461,9 @@ void free_syscal_data(struct syscal_data *syscal_data) {
         FREE(syscal_data->online_tsys_applied[i][j]);
         FREE(syscal_data->computed_tsys[i][j]);
         FREE(syscal_data->computed_tsys_applied[i][j]);
-	FREE(syscal_data->gtp[i][j]);
-	FREE(syscal_data->sdo[i][j]);
-	FREE(syscal_data->caljy[i][j]);
+        FREE(syscal_data->gtp[i][j]);
+        FREE(syscal_data->sdo[i][j]);
+        FREE(syscal_data->caljy[i][j]);
       }
       FREE(syscal_data->online_tsys[i]);
       FREE(syscal_data->online_tsys_applied[i]);
@@ -535,6 +535,10 @@ void default_tvchannels(int num_chan, float chan_width,
  *  \param ampphase_options a pointer to a structure which will upon exit contain at
  *                          least as many windows required to accommodate the IF window
  *                          number specified as \a window
+ *  \param window the IF number to add tvchannels for
+ *  \param min_tvchannel the minimum channel to use in the tvchannel range
+ *  \param max_tvchannel the maximum channel to use in the tvchannel range
+ *
  * Routine to add a tvchannel specification for a specified window
  * into the ampphase_options structure. It takes care of putting in
  * defaults which get recognised as not being set if windows are missing.
@@ -555,14 +559,14 @@ void add_tvchannels_to_options(struct ampphase_options *ampphase_options,
     REALLOC(ampphase_options->averaging_method, nwindow);
     for (i = ampphase_options->num_ifs; i < nwindow; i++) {
       if (i == 0) {
-	// First go!
-	ampphase_options->delay_averaging[i] = 1;
-	ampphase_options->averaging_method[i] = AVERAGETYPE_MEAN | AVERAGETYPE_SCALAR;
+        // First go!
+        ampphase_options->delay_averaging[i] = 1;
+        ampphase_options->averaging_method[i] = AVERAGETYPE_MEAN | AVERAGETYPE_SCALAR;
       } else {
-	ampphase_options->delay_averaging[i] =
-	  ampphase_options->delay_averaging[i - 1];
-	ampphase_options->averaging_method[i] =
-	  ampphase_options->averaging_method[i - 1];
+        ampphase_options->delay_averaging[i] =
+          ampphase_options->delay_averaging[i - 1];
+        ampphase_options->averaging_method[i] =
+          ampphase_options->averaging_method[i - 1];
       }
     }
     ampphase_options->num_ifs = nwindow;
