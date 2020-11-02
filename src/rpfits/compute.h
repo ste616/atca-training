@@ -231,20 +231,52 @@ struct metinfo {
   bool seemon_valid;
 };
 
-/**
- * Structure to hold system calibration data.
+/*! \struct syscal_data
+ *  \brief Structure to hold system calibration data for a cycle
+ *
+ * This structure contains a mixture of information that is presented in the RPFITS
+ * SYSCAL record, including antenna-based parameters, and correlator-computed system
+ * temperatures. It can also hold any system temperatures this library computes from
+ * the data.
  */
 struct syscal_data {
   // Labelling.
+  /*! \var obsdate
+   *  \brief String representation of the base date of the file that the data in
+   *         this structure represents
+   */
   char obsdate[OBSDATE_LENGTH];
+  /*! \var utseconds
+   *  \brief The number of seconds past midnight UTC on `obsdate` at the midpoint
+   *         of this cycle
+   */
   float utseconds;
 
   // Array sizes.
+  /*! \var num_ifs
+   *  \brief The number of windows with information in this structure
+   */
   int num_ifs;
+  /*! \var num_ants
+   *  \brief The number of antennas with information in this structure
+   *
+   * For CABB, this should always be 6.
+   */
   int num_ants;
+  /*! \var num_pols
+   *  \brief The number of polarisations with information in this structure
+   *
+   * For CABB, this should always be 2, since calibration is relevant only for
+   * the actual receptors, not the cross-pol products.
+   */
   int num_pols;
 
   // Array descriptors.
+  /*! \var if_num
+   *  \brief The window number for all the windows we have information for
+   *
+   * This array has length `num_ifs` and is indexed starting at 0.
+   */
   int *if_num;
   int *ant_num;
   int *pol;
@@ -581,8 +613,27 @@ struct ampphase {
    * This array has length `nbaselines`, and is indexed starting at 0.
    */
   float *max_imag;
+  /*! \var options
+   *  \brief The options used while computing the parameters from the raw data
+   *
+   * At the moment, the only option relevant to the computations in this structure
+   * is whether the phase is in degrees or radians.
+   */
   struct ampphase_options *options;
+  /*! \var metinfo
+   *  \brief Information about the weather conditions on site during this cycle
+   *
+   * Storing this here means multiple copies, which might be a target for
+   * efficiency if required.
+   */
   struct metinfo metinfo;
+  /*! \var syscal_data
+   *  \brief Information about calibration data pertaining to this cycle
+   *
+   * Only the calibration data relevant for the listed polarisation and window
+   * is stored in this structure, and this is stored at the 0-th index of all
+   * the arrays when multiple polarisations or windows might be stored.
+   */
   struct syscal_data *syscal_data;
 };
 
