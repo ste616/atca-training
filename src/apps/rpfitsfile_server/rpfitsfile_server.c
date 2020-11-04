@@ -27,41 +27,107 @@
 #include "atnetworking.h"
 #include "common.h"
 
+/*! \def RPSBUFSIZE
+ *  \brief Length used for "reasonable length" strings throughout
+ */
 #define RPSBUFSIZE 1024
 
+/*! \var argp_program_version
+ *  \brief Variable used by the argp library as the name of the application and
+ *         its version number, when printing help
+ */
 const char *argp_program_version = "rpfitsfile_server 1.0";
+/*! \var argp_program_bug_address
+ *  \brief Variable used by the argp library as the email address to send a message
+ *         to when reporting a bug
+ */
 const char *argp_program_bug_address = "<Jamie.Stevens@csiro.au>";
 
-// Program documentation.
-static char doc[] = "RPFITS file reader for network tasks";
+/*! \var rpfitsfile_server_doc
+ *  \brief Variable used by the argp library as a short description of what this
+ *         application does, when printing help
+ */
+static char rpfitsfile_server_doc[] = "RPFITS file reader for network tasks";
 
 // Argument description.
-static char args_doc[] = "[options] RPFITS_FILES...";
+/*! \var rpfitsfile_server_args_doc
+ *  \brief Variable used by the argp library as a description of how to call
+ *         this application, when printing help
+ */
+static char rpfitsfile_server_args_doc[] = "[options] RPFITS_FILES...";
 
 // Our options.
-static struct argp_option options[] = {
-                                       { "networked", 'n', 0, 0,
-                                         "Switch to operate as a network data server " },
-                                       { "port", 'p', "PORTNUM", 0,
-                                         "The port number to listen on" },
-                                       { "testing", 't', "TESTFILE", 0,
-                                         "Operate as a testing server with instructions given "
-                                         "in this file (multiple accepted)" },
+/*! \var rpfitsfile_server_options
+ *  \brief An array of options we accept, required by the argp library to allow
+ *         it to properly parse command line arguments
+ */
+static struct argp_option rpfitsfile_server_options[] = {
+  { "networked", 'n', 0, 0,
+    "Switch to operate as a network data server " },
+  { "port", 'p', "PORTNUM", 0,
+    "The port number to listen on" },
+  { "testing", 't', "TESTFILE", 0,
+    "Operate as a testing server with instructions given "
+    "in this file (multiple accepted)" },
   { 0 }
 };
 
-// The arguments structure.
-struct arguments {
+/*! \struct rpfitsfile_server_arguments
+ *  \brief The structure holding values representing the command line arguments
+ *         we were called with; filled by the argp library
+ */
+struct rpfitsfile_server_arguments {
+  /*! \var n_rpfits_files
+   *  \brief The number of RPFITS files that were specified by the user
+   */
   int n_rpfits_files;
+  /*! \var rpfits_files
+   *  \brief The name of each RPFITS file that was specified by the user
+   *
+   * This array of strings has length `n_rpfits_files`, and is indexed starting
+   * at 0. Each string has its own length (argp handles this) but is properly
+   * NULL terminated.
+   */
   char **rpfits_files;
+  /*! \var port_number
+   *  \brief The TCP port number to listen on, default is 8880
+   */
   int port_number;
+  /*! \var network_operation
+   *  \brief A flag to indicate that this application should operate as a
+   *         network server
+   */
   bool network_operation;
+  /*! \var testing_operation
+   *  \brief A flag to indicate that we offer an examination to connected
+   *         users
+   */
   bool testing_operation;
+  /*! \var num_instruction_files
+   *  \brief The number of instruction files specified by the user
+   */
   int num_instruction_files;
+  /*! \var testing_instruction_files
+   *  \brief The name of each instruction file specified by the user
+   *
+   * This array of strings has length `num_instruction_files`, and is indexed
+   * starting at 0. Each string has length RPSBUFSIZE.
+   */
   char **testing_instruction_files;
 };
 
-static error_t parse_opt(int key, char *arg, struct argp_state *state) {
+/*!
+ *  \brief Routine that helps argp parse the command line arguments and
+ *         store the appropriate values in the rpfitsfile_server_arguments
+ *         structure
+ *  \param key a single character key, as specified in rpfitsfile_server_options,
+ *             representing the option being parsed
+ *  \param arg the argument string specified by the user alongside the key, or NULL if
+ *             the option doesn't accept arguments
+ *  \param state an argp internal state variable
+ *  \return an indication of success, or error reason magic number, as known by argp
+ */
+static error_t rpfitsfile_server_parse_opt(int key, char *arg, struct argp_state *state) {
   struct arguments *arguments = state->input;
   
   switch (key) {
@@ -91,10 +157,17 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state) {
   return 0;
 }
 
-static struct argp argp = { options, parse_opt, args_doc, doc };
+static struct argp argp = {
+  rpfitsfile_server_options,
+  rpfitsfile_server_parse_opt,
+  rpfitsfile_server_args_doc,
+  rpfitsfile_server_doc
+};
 
 
-// A linked list structure to contain instructions from a file.
+/*! \struct file_instructions
+ *  \brief A linked list structure to contain instructions from a file
+ */
 struct file_instructions {
   // The files to read for this instruction.
   int num_files;
@@ -880,7 +953,7 @@ struct spectrum_data* get_client_spd_data(struct client_spd_data *client_spd_dat
 }
 
 int main(int argc, char *argv[]) {
-  struct arguments arguments;
+  struct rpfitsfile_server_arguments arguments;
   int i, j, k, l, ri, rj, bytes_received, r, n_cycle_mjd = 0;
   bool pointer_found = false, vis_cache_updated = false;
   bool spd_cache_updated = false, outside_mjd_range = false;

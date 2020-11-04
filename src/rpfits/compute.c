@@ -1396,7 +1396,7 @@ void calculate_system_temperatures_cycle_data(struct cycle_data *cycle_data,
         tp_array = tp_on_array;
         n_tp_array = n_tp_on_array;
       }
-      for (j = 0; j < 
+      
     }
   }
 
