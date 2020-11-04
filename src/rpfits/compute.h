@@ -278,28 +278,138 @@ struct syscal_data {
    * This array has length `num_ifs` and is indexed starting at 0.
    */
   int *if_num;
+  /*! \var ant_num
+   *  \brief The antenna number for all the antennas we have information for
+   *
+   * This array has length `num_ants` and is indexed starting at 0.
+   */
   int *ant_num;
+  /*! \var pol
+   *  \brief The polarisation magic number for all the polarisations we have
+   *         information for
+   *
+   * This array has length `num_pols` and is indexed starting at 0. For CABB it
+   * should be one of POL_XX or POL_YY, and POL_XX should always be at index CAL_XX,
+   * and POL_YY should always be at index CAL_YY.
+   */
   int *pol;
 
   // Parameters that only depend on antenna.
+  /*! \var parangle
+   *  \brief The parallactic angle for each antenna
+   *
+   * This array has length `num_ants` and is indexed starting at 0.
+   */
   float *parangle;
+  /*! \var tracking_error_max
+   *  \brief The maximum tracking error for each antenna during this cycle, in
+   *         arcsec
+   *
+   * This array has length `num_ants` and is indexed starting at 0.
+   */
   float *tracking_error_max;
+  /*! \var tracking_error_rms
+   *  \brief The RMS tracking error for each antenna during this cycle, in
+   *         arcsec
+   *
+   * This array has length `num_ants` and is indexed starting at 0.
+   */
   float *tracking_error_rms;
+  /*! \var flagging
+   *  \brief Flag reasoning for each antenna for the whole of this cycle
+   *
+   * This array has length `num_ants` and is indexed starting at 0. The value for
+   * each antenna is a bitwise OR indication of why the antenna was flagged, or 0
+   * if the antenna was not flagged bad:
+   * - 1 the antenna was not on source
+   * - 2 the correlator flagged it for pol X
+   * - 4 the correlator flagged it for pol Y
+   */
   int *flagging;
 
   // Parameters that vary for each antenna and IF.
+  /*! \var xyphase
+   *  \brief The XY phase measured by the correlator for each antenna and window,
+   *         in degrees
+   *
+   * This 2-D array has length `num_ants` for the first index and `num_ifs` for
+   * the second index. Each index starts at 0.
+   */
   float **xyphase;
+  /*! \var xyamp
+   *  \brief The XY amplitude measured by the correlator for each antenna and window,
+   *         in Jy
+   *
+   * This 2-D array has length `num_ants` for the first index and `num_ifs` for
+   * the second index. Each index starts at 0.
+   */
   float **xyamp;
 
   // The system temperatures (varies by antenna, IF and pol).
+  /*! \var online_tsys
+   *  \brief The system temperature as measured by the correlator for each antenna,
+   *         window and polarisation, in K
+   *
+   * This 3-D array has length `num_ants` for the first index, `num_ifs`
+   * for the second index, and `num_pols` for the third index. Each index starts at 0.
+   */
   float ***online_tsys;
+  /*! \var online_tsys_applied
+   *  \brief Indication of whether the raw data has been corrected for the system
+   *         temperatures of the antennas as computed by the correlator; 0 means
+   *         that the raw data is just correlation coefficients, 1 means that the
+   *         system temperature corrections have been made
+   *
+   * This 3-D array has length `num_ants` for the first index, `num_ifs` for the
+   * second index and `num_pols` for the third index. Each index starts at 0.
+   */
   int ***online_tsys_applied;
+  /*! \var computed_tsys
+   *  \brief The system temperature as measured by this library for each antenna,
+   *         window and polarisation, in K
+   *
+   * This 3-D array has length `num_ants` for the first index, `num_ifs` for the
+   * second index and `num_pols` for the third index. Each index starts at 0.
+   */
   float ***computed_tsys;
+  /*! \var computed_tsys_applied
+   *  \brief Indication of whether the raw data has been corrected for the system
+   *         temperatures of the antennas as computed by this library; 0 means
+   *         that the raw data is just correlation coefficients, 1 means that the
+   *         system temperature corrections have been made
+   *
+   * This 3-D array has length `num_ants` for the first index, `num_ifs` for the
+   * second index and `num_pols` for the third index. Each index starts at 0.
+   *
+   * This library should ensure that only one of the online or computed
+   * system temperatures is applied to the raw data.
+   */
   int ***computed_tsys_applied;
 
   // Parameters measured by the correlator (varies by antenna, IF and pol).
+  /*! \var gtp
+   *  \brief The gated total power as computed by the correlator for each antenna,
+   *         window and polarisation, in Jy
+   *
+   * This 3-D array has length `num_ants` for the first index, `num_ifs` for the
+   * second index and `num_pols` for the third index. Each index starts at 0.
+   */
   float ***gtp;
+  /*! \var sdo
+   *  \brief The synchronously demodulated output as computed by the correlator 
+   *         for each antenna, window and polarisation, in Jy
+   *
+   * This 3-D array has length `num_ants` for the first index, `num_ifs` for the
+   * second index and `num_pols` for the third index. Each index starts at 0.
+   */
   float ***sdo;
+  /*! \var caljy
+   *  \brief The flux density of the switching noise source on each antenna, window
+   *         and polarisation
+   *
+   * This 3-D array has length `num_ants` for the first index, `num_ifs` for the
+   * second index and `num_pols` for the third index. Each index starts at 0.
+   */
   float ***caljy;
 };
 
@@ -637,76 +747,259 @@ struct ampphase {
   struct syscal_data *syscal_data;
 };
 
-/**
- * Structure to hold average amplitude, phase and delay
- * quantities.
+/*! \struct vis_quantities
+ *  \brief Structure to hold average amplitude, phase and delay quantities
+ *
+ * This structure is designed to have all the quantities you would normally see
+ * in vis, which presents one amplitude, phase and delay number (and other quantities)
+ * per baseline, per pol, per window. One structure holds information about a single
+ * polarisation and window, but all baselines and bins. It also only contains
+ * information about a single cycle; to make a vis plot requires many of these structures.
  */
 struct vis_quantities {
-  // The options that were used.
+  /*! \var options
+   *  \brief The options that were used while computing the average quantities
+   *         in this structure
+   */
   struct ampphase_options *options;
 
-  // Number of quantities in the array.
+  /*! \var nbaselines
+   *  \brief The number of baselines with information in this structure
+   *
+   * This value is the length of the first index of the other arrays in this
+   * structure.
+   */
   int nbaselines;
 
-  // The time.
+  /*! \var obsdate
+   *  \brief String representation of the base date of the file that the data in
+   *         this structure represents
+   */
   char obsdate[OBSDATE_LENGTH];
+  /*! \var ut_seconds
+   *  \brief The number of seconds past midnight UTC on `obsdate` at the midpoint
+   *         of this cycle
+   */
   float ut_seconds;
   
   // Labels.
+  /*! \var pol
+   *  \brief The polarisation represented by these data
+   *
+   * The value of this variable will be one of the POL_* magic numbers defined at
+   * the tops of this header file.
+   */
   int pol;
+  /*! \var window
+   *  \brief The window represented by these data
+   *
+   * The data windows start at 1 and increment for each set of data that is correlated
+   * at a different frequency or with a different number of channels. Usually, windows
+   * 1 and 2 are the continuum bands, and any additional windows represent zoom bands,
+   * but this is not guaranteed to be the case. Windows are distinct from IFs since IFs
+   * represent the signal after mixing to different frequencies, and a single IF can 
+   * have multiple windows within it, but often the two terminologies are used
+   * interchangeably.
+   */
   int window;
+  /*! \var nbins
+   *  \brief The number of bins present for each baseline
+   *
+   * This array has length `nbaselines` and is indexed starting at 0.
+   *
+   * For CABB, `nbaselines` will usually be 21 (15 cross-correlation baselines and 6
+   * auto-correlation "baselines"). The cross-correlation baselines will usually have
+   * 1 bin (unless doing pulsar binning or HTR), and the auto-correlations will
+   * normally have 2 bins (at least in the continuum bands) representing the on-off
+   * noise diode states.
+   */
   int *nbins;
+  /*! \var baseline
+   *  \brief The baseline number of each baseline
+   *
+   * This array has length `nbaselines` and is indexed starting at 0.
+   */
   int *baseline;
+  /*! \var flagged_bad
+   *  \brief Indicator if each baseline should be flagged as bad
+   *
+   * This array has length `nbaselines` and is indexed starting at 0.
+   *
+   * This indicator will have value 0 if the baseline is good.
+   */
   int *flagged_bad;
+  /*! \var scantype
+   *  \brief The type of observation this cycle describes
+   */
   char scantype[OBSTYPE_LENGTH];
   
   // The arrays.
+  /*! \var amplitude
+   *  \brief The averaged amplitude for each baseline and bin, in Jy
+   *
+   * This 2-D array has length `nbaselines` for the first index, and `nbins[i]`
+   * for the second index, where `i` is the position along the first index. Both indices
+   * start at 0.
+   *
+   * This amplitude should be in Jy, but if the data has not been corrected for the
+   * system temperatures, it will just be the correlation coefficient.
+   */
   float **amplitude;
+  /*! \var phase
+   *  \brief The averaged phase for each baseline and bin, in units determined
+   *         by the options
+   *
+   * This 2-D array has length `nbaselines` for the first index, and `nbins[i]`
+   * for the second index, where `i` is the position along the first index. Both indices
+   * start at 0.
+   *
+   * If the \a options parameter has its `phase_in_degrees` variable set to true, then
+   * this value should be in degrees, or radians otherwise.
+   */
   float **phase;
+  /*! \var delay
+   *  \brief The computed delay for each baseline and bin, in ns
+   *
+   * This 2-D array has length `nbaselines` for the first index, and `nbins[i]`
+   * for the second index, where `i` is the position along the first index. Both indices
+   * start at 0.
+   *
+   * Because the delay on an auto-correlation would be between two polarisations, and
+   * this structure can only hold one, any auto-correlation delay will not be sensible.
+   */
   float **delay;
   
   // Metadata.
+  /*! \var min_amplitude
+   *  \brief The minimum amplitude across all the baselines
+   */
   float min_amplitude;
+  /*! \var max_amplitude
+   *  \brief The maximum amplitude across all the baselines
+   */
   float max_amplitude;
+  /*! \var min_phase
+   *  \brief The minimum phase across all the baselines
+   */
   float min_phase;
+  /*! \var max_phase
+   *  \brief The maximum phase across all the baselines
+   */
   float max_phase;
+  /*! \var min_delay
+   *  \brief The minimum delay across all the baselines
+   */
   float min_delay;
+  /*! \var max_delay
+   *  \brief The maximum delay across all the baselines
+   */
   float max_delay;
 };
 
-// This structure wraps around all the ampphase structures and
-// will allow for easy transport.
+/*! \struct spectrum_data
+ *  \brief This structure wraps around all the ampphase structures allowing
+ *         for easy transport
+ *
+ * Since a user very rarely wants only a single polarisation and window when
+ * asking for a spectrum, this structure collects related spectra together.
+ * It still is limited to containing a single cycle from a single scan.
+ */
 struct spectrum_data {
-  // The spectrum header.
+  /*! \var header_data
+   *  \brief The spectrum header
+   */
   struct scan_header_data *header_data;
-  // The number of IFs in this spectra set.
+  /*! \var num_ifs
+   *  \brief The number of IFs in this spectra set
+   */
   int num_ifs;
-  // The number of polarisations.
+  /*! \var num_pols
+   *  \brief The number of polarisations in this spectra set
+   */
   int num_pols;
-  // The ampphase structures.
+  /*! \var spectrum
+   *  \brief All the spectra from this scan and cycle
+   *
+   * This 2-D array of pointers has length `num_ifs` for the first index,
+   * and `num_pols` for the second index. Both indices start at 0.
+   */
   struct ampphase ***spectrum;
 };
 
-// This structure wraps around all the vis_quantities structures
-// and will allow for easy transport.
+/*! \struct vis_data
+ *  \brief This structure wraps around all the vis_quantities structures
+ *         allowing for easy transport
+ *
+ * Since a user very rarely wants only a single polarisation, window and time
+ * when asking for vis data, this structure collects related vis quantities
+ * together. It also comes along with meteorological and calibration data for
+ * those same time ranges.
+ */
 struct vis_data {
-  // The number of cycles contained here.
+  /*! \var nviscycles
+   *  \brief The number of cycles contained in this vis set
+   */
   int nviscycles;
   // The range of MJDs that were allowed when these data
   // were compiled.
+  /*! \var mjd_low
+   *  \brief The earliest MJD that was allowed when compiling these data
+   */
   double mjd_low;
+  /*! \var mjd_high
+   *  \brief The latest MJD that was allowed when compiling these data
+   */
   double mjd_high;
-  // The header data for each cycle.
+  /*! \var header_data
+   *  \brief The header data for each cycle
+   *
+   * This array of pointers has length `nviscycles` and is indexed starting
+   * at 0.
+   */
   struct scan_header_data **header_data;
-  // The number of IFs per cycle.
+  /*! \var num_ifs
+   *  \brief The number of IFs per cycle
+   *
+   * This array has length `nviscycles` and is indexed starting at 0.
+   *
+   * Since the window configuration can change at any time, this variable keeps
+   * track of how many IFs are available as the time progresses.
+   */
   int *num_ifs;
-  // The number of pols per cycle per IF.
+  /*! \var num_pols
+   *  \brief The number of pols per cycle per IF
+   *
+   * This 2-D array has length `nviscycles` for the first index, and
+   * `num_ifs[i]` for the second index, where `i` is the position along the
+   * first index. Both indices start at 0.
+   *
+   * Although it is possible for the number of polarisations to change with
+   * different windows and window configurations, for CABB it's unlikely. However,
+   * not all polarisation combinations need to be included for each cycle, so
+   * this variable is still useful.
+   */
   int **num_pols;
-  // The vis_quantities structures.
+  /*! \var vis_quantities
+   *  \brief The vis_quantities structures representing each cycle, window and
+   *         polarisation
+   *
+   * This 3-D array of pointers has length `nviscycles` for the first index,
+   * `num_ifs[i]` for the second index (where `i` is the position along the
+   * first index), and `num_pols[i][j]` for the third index (where `j` is the
+   * position along the second index). All indices start at 0.
+   */
   struct vis_quantities ****vis_quantities;
-  // The metinfo for each cycle.
+  /*! \var metinfo
+   *  \brief Meteorological information for each cycle
+   *
+   * This array of pointers has length `nviscycles`, and is indexed starting at 0.
+   */
   struct metinfo **metinfo;
-  // And the calibration parameters.
+  /*! \var syscal_data
+   *  \brief Calibration parameters for each cycle
+   *
+   * This array of pointers has length `nviscycles`, and is indexed starting at 0.
+   */
   struct syscal_data **syscal_data;
 };
 

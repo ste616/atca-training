@@ -1,9 +1,9 @@
-/**
- * ATCA Training Library: rpfitsfile_server.c
- * (C) Jamie Stevens CSIRO 2020
+/** \file rpfitsfile_server.c
+ *  \brief An application to make one or more RPFITS files available to the network
+ *         control and view tasks
  *
- * This application makes one or more RPFITS files available to
- * the network control and view tasks.
+ * ATCA Training Library
+ * (C) Jamie Stevens CSIRO 2020
  */
 #include <stdio.h>
 #include <stdlib.h>

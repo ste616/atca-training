@@ -1032,18 +1032,58 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
 /**
  * Sorting comparator functions for the median calculation.
  */
+/*!
+ *  \brief A qsort comparator function for float real type numbers
+ *  \param a a pointer to a number
+ *  \param b a pointer to another number
+ *  \return - 0 if the two dereferenced numbers are equal
+ *          - -ive if the dereferenced \a b number is larger
+ *          - +ive if the dereferenced \a a number is larger
+ */
 int cmpfunc_real(const void *a, const void *b) {
   return ( *(float*)a - *(float*)b );
 }
 
+/*!
+ *  \brief A qsort comparator function for float complex type numbers
+ *  \param a a pointer to a number
+ *  \param b a pointer to another number
+ *  \return - 0 if the two dereferenced numbers are equal
+ *          - -ive if the dereferenced \a b number is larger
+ *          - +ive if the dereferenced \a a number is larger
+ */
 int cmpfunc_complex(const void *a, const void *b) {
   return ( *(float complex*)a - *(float complex*)b );
 }
 
-/**
- * Calculate average amplitude, phase and delays from data in an
- * ampphase structure. The ampphase_options structure control how the
- * calculations are made.
+/*!
+ *  \brief Calculate average amplitude, phase and delays from data in an
+ *         ampphase structure
+ *  \param ampphase the structure holding the raw data, along with data computed
+ *                  with vis_ampphase, which will be averaged in this routine
+ *  \param vis_quantities a pointer to the structure which will be filled with the
+ *                        average values computed in this routine; if the dereferenced
+ *                        value of this pointer is NULL at entry, a vis_quantities
+ *                        structure will be allocated and properly initialised
+ *  \param options the options that control how this routine will do the averaging;
+ *                 if this is NULL at entry, the same options structure from
+ *                 \a ampphase will be used, and if those options do not have
+ *                 already have their tvchannel ranges set, this routine will set
+ *                 them to sensible defaults
+ *  \return an indication of whether this routine was able to successfully complete or
+ *          not (0 means success)
+ *
+ * This routine takes some amplitude and phase spectra (which must have been pre-computed
+ * from the raw data), and takes averages of these within definable tvchannel ranges;
+ * the averaging method can also be selected (mean or median). From the phase spectra,
+ * the delays are computed within the same tvchannel ranges, and with a specified delavg
+ * parameter.
+ *
+ * The minimum and maximum values of the amplitudes, phases and delays over the baselines
+ * and bins is kept here for easy plotting later.
+ *
+ * The polarisation and window present in the \a ampphase input will of course be the
+ * same in the \a vis_quantities output.
  */
 int ampphase_average(struct ampphase *ampphase,
                      struct vis_quantities **vis_quantities,
@@ -1271,6 +1311,13 @@ int ampphase_average(struct ampphase *ampphase,
   return 0;
 }
 
+/*!
+ *  \brief Compare two ampphase_options structure to determine if they match
+ *  \param a a pointer to an ampphase_options structure
+ *  \param b a pointer to another ampphase_options structure
+ *  \return true if \a a and \a b have exactly the same values for all their
+ *          parameters, or false otherwise
+ */
 bool ampphase_options_match(struct ampphase_options *a,
                             struct ampphase_options *b) {
   // Check if two ampphase_options structures match.

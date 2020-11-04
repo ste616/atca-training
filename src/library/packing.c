@@ -1,9 +1,8 @@
-/**
- * ATCA Training Library: packing.c
- * (C) Jamie Stevens CSIRO 2020
+/** \file packing.c
+ *  \brief Routines necessary to pack and unpack data structures
  *
- * This library contains routines necessary to pack and unpack
- * data.
+ * ATCA Training Library
+ * (C) Jamie Stevens CSIRO 2020
  */
 #include <stdio.h>
 #include <stdbool.h>
