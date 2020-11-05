@@ -1345,9 +1345,12 @@ bool ampphase_options_match(struct ampphase_options *a,
 void calculate_system_temperatures_cycle_data(struct cycle_data *cycle_data,
                                               struct scan_header_data *scan_header_data,
                                               struct ampphase_options *options) {
-  int i, j, bl, bidx, ***n_tp_on_array = NULL, ***n_tp_off_array = NULL;
-  int ***n_tp_array = NULL, aidx, iidx;
+  int i, j, k, bl, bidx, ***n_tp_on_array = NULL, ***n_tp_off_array = NULL;
+  int ***n_tp_array = NULL, aidx, iidx, nchannels, ifno, chan_low = -1, chan_high = -1;
+  int reqpol[2], polnum, vidx;
   float ****tp_on_array = NULL, ****tp_off_array = NULL, ****tp_array = NULL;
+  float nhalfchan, chanwidth, rcheck;
+  struct ampphase_options default_options;
   // Recalculate the system temperature from the data within the
   // specified tvchannel range, and with different options.
 
@@ -1372,7 +1375,13 @@ void calculate_system_temperatures_cycle_data(struct cycle_data *cycle_data,
       CALLOC(n_tp_off_array[i][j], 2);
     }
   }
-  
+
+  // Set some default options.
+  default_options = ampphase_options_default();
+  if (options == NULL) {
+    options = &default_options;
+  }
+
   for (i = 0; i < cycle_data->num_points; i++) {
     bl = ants_to_base(cycle_data->ant1[i], cycle_data->ant2[i]);
     if (bl < 0) {
@@ -1396,11 +1405,66 @@ void calculate_system_temperatures_cycle_data(struct cycle_data *cycle_data,
         tp_array = tp_on_array;
         n_tp_array = n_tp_on_array;
       }
-      
+      ifno = cycle_data->if_no[i];
+      nchannels = scan_header_data->if_num_channels[ifno];
+      // Loop over the tvchannels.
+      // But if our options don't know about the tvchannels, set them up now.
+      if ((ifno < options->num_ifs) &&
+	  (options->min_tvchannel[ifno] > 0) &&
+	  (options->max_tvchannel[ifno] > 0)) {
+	// We already have valid tvchannels.
+	chan_low = options->min_tvchannel[ifno];
+	chan_high = options->max_tvchannel[ifno];
+      } else {
+	// Get default values for this type of IF.
+	nhalfchan = (nchannels % 2) == 1 ?
+	  (float)((nchannels - 1) / 2) : (float)(nchannels / 2);
+	chanwidth = scan_header_data->if_sideband[ifno] *
+	  scan_header_data->if_bandwidth[ifno] / (nhalfchan * 2);
+	default_tvchannels(nchannels, chanwidth * 1000,
+			   scan_header_data->if_centre_freq[ifno] * 1000,
+			   &chan_low, &chan_high);
+	add_tvchannels_to_options(options, ifno, chan_low, chan_high);
+      }
+      // Find the polarisations we need in the data.
+      for (j = 0; j < scan_header_data->if_num_stokes[ifno]; j++) {
+	polnum = polarisation_number(scan_header_data->if_stokes_names[ifno][j]);
+	if (polnum == POL_XX) {
+	  reqpol[CAL_XX] = j;
+	} else if (polnum == POL_YY) {
+	  reqpol[CAL_YY] = j;
+	}
+      }
+  
+      for (j = chan_low; j <= chan_high; j++) {
+	for (k = CAL_XX; k <= CAL_YY; k++) {
+	  // Work out where our data is.
+	  vidx = reqpol[k] + j * scan_header_data->if_num_stokes[ifno];
+	  rcheck = crealf(cycle_data->vis[i][vidx]);
+	  if (rcheck != rcheck) {
+	    // Flagged channel.
+	    continue;
+	  }
+	  n_tp_array[aidx][iidx][k] += 1;
+	  ARRAY_APPEND(tp_array[aidx][iidx][k], n_tp_array[aidx][iidx][k], rcheck);
+	}
+      }
     }
   }
 
   for (i = 0; i < cycle_data->num_cal_ants; i++) {
+    for (j = 0; j < cycle_data->num_cal_ifs; j++) {
+      for (k = CAL_XX; k <= CAL_YY; k++) {
+	FREE(tp_on_array[i][j][k]);
+	FREE(tp_off_array[i][j][k]);
+      }
+      FREE(n_tp_on_array[i][j]);
+      FREE(n_tp_off_array[i][j]);
+      FREE(tp_on_array[i][j]);
+      FREE(tp_off_array[i][j]);
+    }
+    FREE(n_tp_on_array[i]);
+    FREE(n_tp_off_array[i]);
     FREE(tp_on_array[i]);
     FREE(tp_off_array[i]);
   }

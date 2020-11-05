@@ -128,7 +128,7 @@ struct rpfitsfile_server_arguments {
  *  \return an indication of success, or error reason magic number, as known by argp
  */
 static error_t rpfitsfile_server_parse_opt(int key, char *arg, struct argp_state *state) {
-  struct arguments *arguments = state->input;
+  struct rpfitsfile_server_arguments *arguments = state->input;
   
   switch (key) {
   case 'n':
