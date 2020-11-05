@@ -34,6 +34,22 @@ float fmedianf(float *a, int n) {
 }
 
 /*!
+ *  \brief Get the total sum of a float array
+ *  \param a the array of values
+ *  \param n the number of values in the array
+ *  \return the total sum of the first \a n entries in the array \a a
+ */
+float fsumf(float *a, int n) {
+  float r = 0;
+  int i;
+  for (i = 0; i < n; i++) {
+    r += a[i];
+  }
+
+  return (r);
+}
+
+/*!
  *  \brief Initialise and return an ampphase structure
  *  \return a pointer to a properly initialised ampphase structure
  */
@@ -761,8 +777,12 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
           cycle_data->tsys[syscal_if_idx][i][syscal_pol_idx];
         CALLOC((*ampphase)->syscal_data->computed_tsys[i], 1);
         CALLOC((*ampphase)->syscal_data->computed_tsys[i][0], 1);
+	(*ampphase)->syscal_data->computed_tsys[i][0][0] =
+	  cycle_data->computed_tsys[syscal_if_idx][i][syscal_pol_idx];
         CALLOC((*ampphase)->syscal_data->computed_tsys_applied[i], 1);
         CALLOC((*ampphase)->syscal_data->computed_tsys_applied[i][0], 1);
+	(*ampphase)->syscal_data->computed_tsys_applied[i][0][0] =
+	  cycle_data->computed_tsys_applied[syscal_if_idx][i][syscal_pol_idx];
         CALLOC((*ampphase)->syscal_data->gtp[i], 1);
         CALLOC((*ampphase)->syscal_data->gtp[i][0], 1);
         if (syscal_pol_idx == CAL_XX) {
@@ -1349,7 +1369,9 @@ void calculate_system_temperatures_cycle_data(struct cycle_data *cycle_data,
   int ***n_tp_array = NULL, aidx, iidx, nchannels, ifno, chan_low = -1, chan_high = -1;
   int reqpol[2], polnum, vidx;
   float ****tp_on_array = NULL, ****tp_off_array = NULL, ****tp_array = NULL;
-  float nhalfchan, chanwidth, rcheck;
+  float nhalfchan, chanwidth, rcheck, med_tp_on, med_tp_off, tp_on, tp_off;
+  float fs, fd, dx;
+  bool computed_tsys_applied = false;
   struct ampphase_options default_options;
   // Recalculate the system temperature from the data within the
   // specified tvchannel range, and with different options.
@@ -1452,6 +1474,58 @@ void calculate_system_temperatures_cycle_data(struct cycle_data *cycle_data,
     }
   }
 
+  // We've compiled all the information from the auto-correlations at this point.
+  // We can compute the system temperatures now, but before we do, we need to check
+  // if previously computed Tsys has been applied to the data. Since we'll be
+  // overwriting the computed Tsys numbers, we have to first reverse the application
+  // otherwise we'll have no way to reverse them later.
+  // We make only a simple check for this.
+  if (cycle_data->computed_tsys_applied[0][0][0] == SYSCAL_TSYS_APPLIED) {
+    computed_tsys_applied = true;
+    system_temperature_modifier(STM_REMOVE, cycle_data, scan_header_data);
+  }
+
+  // Now we're free to actually do the system temperature computations.
+  for (i = 0; i < cycle_data->num_cal_ifs; i++) {
+    ifno = cycle_data->cal_ifs[i];
+    for (j = 0; j < cycle_data->num_cal_ants; j++) {
+      for (k = CAL_XX; k <= CAL_YY; k++) {
+	if (options->averaging_method[ifno] & AVERAGETYPE_MEDIAN) {
+	  qsort(tp_on_array[j][i][k], n_tp_on_array[j][i][k], sizeof(float),
+		cmpfunc_real);
+	  qsort(tp_off_array[j][i][k], n_tp_off_array[j][i][k], sizeof(float),
+		cmpfunc_real);
+	  med_tp_on = fmedianf(tp_on_array[j][i][k], n_tp_on_array[j][i][k]);
+	  med_tp_off = fmedianf(tp_off_array[j][i][k], n_tp_off_array[j][i][k]);
+	  fs = 0.5 * (med_tp_on + med_tp_off);
+	  fd = med_tp_on - med_tp_off;
+	} else if (options->averaging_method[ifno] & AVERAGETYPE_MEAN) {
+	  tp_on = fsumf(tp_on_array[j][i][k], n_tp_on_array[j][i][k]);
+	  tp_off = fsumf(tp_off_array[j][i][k], n_tp_off_array[j][i][k]);
+	  fs = 0.5 * (tp_on + tp_off);
+	  fd = tp_on - tp_off;
+	}
+	dx = 99.995 * 99.995;
+	if (fd > (0.01 * fs)) {
+	  if ((k == CAL_XX) && (cycle_data->caljy_x[i][j] > 0)) {
+	    dx = (fs / fd) * cycle_data->caljy_x[i][j];
+	  } else if ((k == CAL_YY) && (cycle_data->caljy_y[i][j] > 0)) {
+	    dx = (fs / fd) * cycle_data->caljy_y[i][j];
+	  }
+	}
+	// Fill in the Tsys.
+	cycle_data->computed_tsys[i][j][k] = sqrtf(dx);
+      }
+    }
+  }
+
+  // If upon entry the computed Tsys was applied to the data, we now reapply the newly
+  // computed Tsys.
+  if (computed_tsys_applied == true) {
+    system_temperature_modifier(STM_APPLY_COMPUTED, cycle_data, scan_header_data);
+  }
+
+  // Free all the memory we've used.
   for (i = 0; i < cycle_data->num_cal_ants; i++) {
     for (j = 0; j < cycle_data->num_cal_ifs; j++) {
       for (k = CAL_XX; k <= CAL_YY; k++) {
@@ -1758,5 +1832,169 @@ void spectrum_data_compile_system_temperatures(struct spectrum_data *spectrum_da
   }
   REALLOC((*syscal_data)->if_num, (high_if + 1));
   (*syscal_data)->num_ifs = (high_if + 1);
+
+}
+
+/*!
+ *  \brief Routine to modify the raw visibilities of a cycle to account for
+ *         system temperature
+ *  \param action the magic number for what type of action this routine should do:
+ *                - STM_APPLY_CORRELATOR: apply the correlator Tsys
+ *                - STM_APPLY_COMPUTED: apply the computed Tsys
+ *                - STM_REMOVE: remove any applied Tsys
+ *  \param cycle_data the cycle data to be modified
+ *  \param scan_header_data the header of the scan this cycle_data comes from
+ */
+void system_temperature_modifier(int action,
+				 struct cycle_data *cycle_data,
+				 struct scan_header_data *scan_header_data) {
+  int i, j, k, bl, ant1_idx, ant2_idx, iidx, ifno, *ant1_polidx = NULL, *ant2_polidx = NULL;
+  int vidx, ***applied_target = NULL, applied_value = -1, polnum;
+  float rcheck, mfac = 1.0, ***tsys_target = NULL;
+  bool already_applied = false, needs_removal = false, modified = false;
+  
+  if ((action == STM_APPLY_CORRELATOR) || (action == STM_APPLY_COMPUTED)) {
+    // Check first if something has already been applied.
+    for (i = 0; i < cycle_data->num_cal_ifs; i++) {
+      for (j = 0; j < cycle_data->num_cal_ants; j++) {
+	for (k = 0; k < 2; k++) {
+	  if (((cycle_data->tsys_applied[i][j][k] == SYSCAL_TSYS_APPLIED) &&
+	       (action == STM_APPLY_CORRELATOR)) ||
+	      ((cycle_data->computed_tsys_applied[i][j][k] == SYSCAL_TSYS_APPLIED) &&
+	       (action == STM_APPLY_COMPUTED))) {
+	    // The action doesn't need to be done.
+	    already_applied = true;
+	  } else if (((cycle_data->tsys_applied[i][j][k] == SYSCAL_TSYS_APPLIED) &&
+		      (action == STM_APPLY_COMPUTED)) ||
+		     ((cycle_data->computed_tsys_applied[i][j][k] == SYSCAL_TSYS_APPLIED) &&
+		      (action == STM_APPLY_CORRELATOR))) {
+	    // The opposite system temperature needs to be removed.
+	    needs_removal = true;
+	  }
+	}
+      }
+    }
+
+    // Check for actions.
+    if ((already_applied == true) && (needs_removal == true)) {
+      // What??
+      fprintf(stderr, "[system_temperature_modifier] unusable system temperature arrays detected\n");
+      return;
+    }
+    if (already_applied == true) {
+      // Don't need to do anything.
+      return;
+    }
+    if (needs_removal == true) {
+      // Call ourselves to remove what's currently there.
+      system_temperature_modifier(STM_REMOVE, cycle_data, scan_header_data);
+    }
+  }
+
+  // Go through all the visibilities and make the appropriate computation.
+  for (i = 0; i < cycle_data->num_points; i++) {
+    bl = ants_to_base(cycle_data->ant1[i], cycle_data->ant2[i]);
+    if (bl < 0) {
+      continue;
+    }
+    // Work out where the system temperatures will be in our array.
+    ant1_idx = cycle_data->ant1[i] - 1;
+    ant2_idx = cycle_data->ant2[i] - 1;
+    ifno = cycle_data->if_no[i];
+    iidx = ifno - 1;
+    // Each polarisation value will need a different combination of antenna
+    // polarisations; we work these out now.
+    MALLOC(ant1_polidx, scan_header_data->if_num_stokes[ifno]);
+    MALLOC(ant2_polidx, scan_header_data->if_num_stokes[ifno]);
+    for (j = 0; j < scan_header_data->if_num_stokes[ifno]; j++) {
+      polnum = polarisation_number(scan_header_data->if_stokes_names[ifno][j]);
+      if (polnum == POL_XX) {
+	ant1_polidx[j] = CAL_XX;
+	ant2_polidx[j] = CAL_XX;
+      } else if (polnum == POL_YY) {
+	ant1_polidx[j] = CAL_YY;
+	ant2_polidx[j] = CAL_YY;
+      } else if (polnum == POL_XY) {
+	ant1_polidx[j] = CAL_XX;
+	ant2_polidx[j] = CAL_YY;
+      } else if (polnum == POL_YX) {
+	ant1_polidx[j] = CAL_YY;
+	ant2_polidx[j] = CAL_XX;
+      } else {
+	// We don't modify weird single polarisation stuff.
+	ant1_polidx[j] = -1;
+	ant2_polidx[j] = -1;
+      }
+    }
+
+    // Now make the modifications.
+    for (j = 0; j < scan_header_data->if_num_stokes[ifno]; j++) {
+      if ((ant1_polidx[k] == -1) || (ant2_polidx[k] == -1)) {
+	// Don't modify.
+	continue;
+      }
+      
+      if (action == STM_APPLY_CORRELATOR) {
+	mfac = sqrtf(cycle_data->tsys[iidx][ant1_idx][ant1_polidx[j]] *
+		     cycle_data->tsys[iidx][ant2_idx][ant2_polidx[j]]);
+      } else if (action == STM_APPLY_COMPUTED) {
+	mfac = sqrtf(cycle_data->computed_tsys[iidx][ant1_idx][ant1_polidx[j]] *
+		     cycle_data->computed_tsys[iidx][ant2_idx][ant2_polidx[j]]);
+      } else if (action == STM_REMOVE) {
+	// Work out which one has been applied.
+	if ((cycle_data->tsys_applied[iidx][ant1_idx][ant1_polidx[j]] == SYSCAL_TSYS_APPLIED) &&
+	    (cycle_data->tsys_applied[iidx][ant2_idx][ant2_polidx[j]] == SYSCAL_TSYS_APPLIED)) {
+	  tsys_target = cycle_data->tsys;
+	  applied_target = cycle_data->tsys_applied;
+	} else if ((cycle_data->computed_tsys_applied[iidx][ant1_idx][ant1_polidx[j]] ==
+		    SYSCAL_TSYS_APPLIED) &&
+		   (cycle_data->computed_tsys_applied[iidx][ant2_idx][ant2_polidx[j]] ==
+		    SYSCAL_TSYS_APPLIED)) {
+	  tsys_target = cycle_data->computed_tsys;
+	  applied_target = cycle_data->computed_tsys_applied;
+	}
+	mfac = 1.0 / sqrtf(tsys_target[iidx][ant1_idx][ant1_polidx[j]] *
+			   tsys_target[iidx][ant1_idx][ant1_polidx[j]]);
+      }
+      if ((mfac != mfac) || (mfac < 0)) {
+	continue;
+      }
+      for (k = 0; k < scan_header_data->if_num_channels[ifno]; k++) {
+	// Work out where our data is.
+	vidx = j + k * scan_header_data->if_num_stokes[ifno];
+	rcheck = crealf(cycle_data->vis[i][vidx]);
+	if (rcheck != rcheck) {
+	  // This is NaN, so don't do anything to it.
+	  continue;
+	}
+	cycle_data->vis[i][vidx] *= mfac;
+	modified = true;
+      }
+    }
+
+    FREE(ant1_polidx);
+    FREE(ant2_polidx);
+  }
+
+  if (modified == true) {
+    if (action == STM_APPLY_CORRELATOR) {
+      applied_target = cycle_data->tsys_applied;
+      applied_value = SYSCAL_TSYS_APPLIED;
+    } else if (action == STM_APPLY_COMPUTED) {
+      applied_target = cycle_data->computed_tsys_applied;
+      applied_value = SYSCAL_TSYS_APPLIED;
+    } else if (action == STM_REMOVE) {
+      applied_value = SYSCAL_TSYS_NOT_APPLIED;
+    }
+    if (applied_target != NULL) {
+      for (i = 0; i < cycle_data->num_cal_ifs; i++) {
+	for (j = 0; j < cycle_data->num_cal_ants; j++) {
+	  for (k = 0; k < 2; k++) {
+	    applied_target[i][j][k] = applied_value;
+	  }
+	}
+      }
+    }
+  }
 
 }

@@ -97,6 +97,25 @@
  */
 #define AVERAGETYPE_SCALAR 8
 
+/**
+ * Magic numbers for system temperature modifier.
+ */
+/*! \def STM_APPLY_CORRELATOR
+ *  \brief Apply the system temperatures that were measured by the correlator during
+ *         the observation to the raw complex visibilities
+ */
+#define STM_APPLY_CORRELATOR  1
+/*! \def STM_APPLY_COMPUTED
+ *  \brief Apply the system temperatures that were computed by this library to the 
+ *         raw complex visibilities
+ */
+#define STM_APPLY_COMPUTED    2
+/*! \def STM_REMOVE
+ *  \brief Remove the affect of whatever system temperature has been applied to the
+ *         raw complex visibilities
+ */
+#define STM_REMOVE            3
+
 /*! \struct ampphase_options
  *  \brief Structure to hold options controlling how to take raw data and produce
  *         more useful quantities like amplitude and phase.
@@ -1004,6 +1023,7 @@ struct vis_data {
 };
 
 float fmedianf(float *a, int n);
+float fsumf(float *a, int n);
 struct ampphase* prepare_ampphase(void);
 struct vis_quantities* prepare_vis_quantities(void);
 void free_ampphase(struct ampphase **ampphase);
@@ -1035,7 +1055,12 @@ int ampphase_average(struct ampphase *ampphase,
                      struct ampphase_options *options);
 bool ampphase_options_match(struct ampphase_options *a,
                             struct ampphase_options *b);
+void calculate_system_temperatures_cycle_data(struct cycle_data *cycle_data,
+					      struct scan_header_data *scan_header_data,
+					      struct ampphase_options *options);
 void calculate_system_temperatures(struct ampphase *ampphase,
                                    struct ampphase_options *options);
 void spectrum_data_compile_system_temperatures(struct spectrum_data *spectrum_data,
 					       struct syscal_data **syscal_data);
+void system_temperature_modifier(int action, struct cycle_data *cycle_data,
+				 struct scan_header_data *scan_header_data);

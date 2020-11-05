@@ -704,6 +704,8 @@ void data_reader(int read_type, int n_rpfits_files,
               if ((read_type & COMPUTE_VIS_PRODUCTS) ||
                   (spectrum_return)) {
                 // We need this cycle.
+		// Do a Tsys calculation.
+		calculate_system_temperatures_cycle_data(cycle_data, sh, ampphase_options);
                 // Allocate all the memory we need.
                 /* printf("cycle found!\n"); */
                 /* fprintf(stderr, "[data_reader] making a temporary spectrum...\n"); */
@@ -759,11 +761,11 @@ void data_reader(int read_type, int n_rpfits_files,
                     /* } else if (read_type & COMPUTE_VIS_PRODUCTS) { */
                     /*     printf("CONVERTED SPECTRUM FOR CYCLE IF %d POL %d AT MJD %.6f\n", */
                     /*            sh->if_label[idx_if], pols[idx_pol], cycle_mjd); */
-                    } else {
-                      // TODO: perhaps make the Tsys calculations an option for
-                      // when nobody cares.
-                      calculate_system_temperatures(temp_spectrum->spectrum[idx_if][idx_pol],
-                                                    local_ampphase_options);
+                    /* } else { */
+                    /*   // TODO: perhaps make the Tsys calculations an option for */
+                    /*   // when nobody cares. */
+                    /*   calculate_system_temperatures(temp_spectrum->spectrum[idx_if][idx_pol], */
+                    /*                                 local_ampphase_options); */
                     }
                     if ((read_type & COMPUTE_VIS_PRODUCTS) && (nocompute == false)) {
                       MALLOC(local_ampphase_options, 1);
