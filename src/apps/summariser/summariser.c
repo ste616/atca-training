@@ -1,14 +1,107 @@
-/**
- * ATCA Training Application: summariser.c
- * (C) Jamie Stevens CSIRO 2019
+/** \file summariser.c
+ *  \brief An application to summarise one or more RPFITS files
  *
- * This app summarises one or more RPFITS files.
+ * ATCA Training Application
+ * (C) Jamie Stevens CSIRO 2020
+ *
+ * This app summarises one or more RPFITS files, and can help interrogate data in those
+ * files, and can help debug the library.
  */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <argp.h>
 #include "atrpfits.h"
 #include "memory.h"
+
+const char *argp_program_version = "summariser 1.0";
+const char *arpg_program_bug_address = "<Jamie.Stevens@csiro.au>";
+
+static char summariser_doc[] = "RPFITS file summariser and inspector";
+static char summariser_args_doc[] = "[options] RPFITS_FILES...";
+
+/*! \def VERBOSITY_QUIET
+ *  \brief Magic number for the verbosity to indicate the least amount of output
+ *
+ * In this level we print information about: TODO
+ */
+#define VERBOSITY_QUIET   0
+/*! \def VERBOSITY_NORMAL
+ *  \brief Magic number for the verbosity to indicate the normal amount of output
+ *
+ * In this level we print information about: TODO
+ */
+#define VERBOSITY_NORMAL  1
+/*! \def VERBOSITY_HIGH
+ *  \brief Magic number for the verbosity to indicate a bit more output than normal
+ *
+ * In this level we print information about: TODO
+ */
+#define VERBOSITY_HIGH    2
+/*! \def VERBOSITY_HIGHEST
+ *  \brief Magic number for the verbosity to indicate the most amount of output
+ *
+ * In this level we print information about: TODO
+ */
+#define VERBOSITY_HIGHEST 3
+
+static struct argp_option summariser_options[] = {
+  { "verbose", 'v', 0, 0, "Increase verbosity of output" },
+  { "quiet", 'q', 0, 0, "Set verbosity to quiet" },
+  { 0 }
+};
+
+/*! \struct summariser_arguments
+ *  \brief The structure holding values representing the command line arguments
+ *         we were called with; filled by the argp library
+ */
+struct summariser_arguments {
+  /*! \var verbosity
+   *  \brief The verbosity level called for by the user
+   */
+  int verbosity;
+  /*! \var n_rpfits_files
+   *  \brief The number of RPFITS files that were specified by the user
+   */
+  int n_rpfits_files;
+  /*! \var rpfits_files
+   *  \brief The name of each RPFITS file that was specified by the user
+   *
+   * This array of strings has length `n_rpfits_files` and is indexed starting
+   * at 0. Each string has its own length (argp handles this) but is properly
+   * NULL terminated.
+   */
+  char **rpfits_files;
+};
+
+static error_t summariser_parse_opt(int key, char *arg, struct argp_state *state) {
+  struct summariser_arguments *arguments = state->input;
+
+  switch (key) {
+  case 'v':
+    if (arguments->verbosity < VERBOSITY_HIGHEST) {
+      arguments->verbosity += 1;
+    }
+    break;
+  case 'q':
+    arguments->verbosity = VERBOSITY_QUIET;
+    break;
+  case ARGP_KEY_ARG:
+    arguments->n_rpfits_files += 1;
+    REALLOC(arguments->rpfits_files, arguments->n_rpfits_files);
+    arguments->rpfits_files[arguments->n_rpfits_files - 1] = arg;
+    break;
+
+  default:
+    return ARGP_ERR_UNKNOWN;
+  }
+
+  return 0;
+}
+
+static struct argp argp = { summariser_options, summariser_parse_opt,
+			    summariser_args_doc, summariser_doc };
+
 
 int main(int argc, char *argv[]) {
   // The argument list should all be RPFITS files.
@@ -16,11 +109,28 @@ int main(int argc, char *argv[]) {
   int read_cycle = 1, nscans = 0;
   struct scan_data *scan_data = NULL, **all_scans = NULL;
   struct cycle_data *cycle_data = NULL;
+  struct summariser_arguments arguments;
+
+  // Set the defaults for the arguments.
+  arguments.n_rpfits_files = 0;
+  arguments.rpfits_files = NULL;
+  arguments.verbosity = VERBOSITY_NORMAL;
+
+  // Parse the arguments.
+  argp_parse(&argp, argc, argv, 0, 0, &arguments);
+
+  // Stop here if we don't have any RPFITS files.
+  if (arguments.n_rpfits_files == 0) {
+    fprintf(stderr, "NO RPFITS FILES SPECIFIED, EXITING\n");
+    return (-1);
+  }
   
-  for (k = 1; k < argc; k++) {
+  for (k = 0; k < arguments.n_rpfits_files; k++) {
     // Try to open the RPFITS file.
-    res = open_rpfits_file(argv[k]);
-    printf("Attempt to open RPFITS file %s, %d\n", argv[k], res);
+    res = open_rpfits_file(arguments.rpfits_files[k]);
+    if (arguments.verbosity >= VERBOSITY_NORMAL) {
+      printf("Attempt to open RPFITS file %s, %d\n", arguments.rpfits_files[k], res);
+    }
     keep_reading = 1;
     while (keep_reading) {
       // Make a new scan and add it to the list.
