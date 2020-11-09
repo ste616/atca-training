@@ -1,6 +1,8 @@
-/**
- * ATCA Training Library: common.c
- * (C) Jamie Stevens CSIRO 2019
+/** \file common.c
+ *  \brief Useful routines used throughout the codebase
+ *
+ * ATCA Training Library
+ * (C) Jamie Stevens CSIRO 2020
  *
  * This library contains functions that are useful for many of the
  * applications.
@@ -80,11 +82,14 @@ int find_if_name(struct scan_header_data *scan_header_data,
   return res;
 }
 
-
+/*!
+ *  \brief Generate HH:MM:SS label from a specified number of seconds
+ *  \param seconds the number of seconds
+ *  \param hourlabel this string will be filled by this routine, with either
+ *                   HH:MM:SS corresponding to the parameter \a seconds, or
+ *                   Dd HH:MM:SS if \a seconds > 86400
+ */
 void seconds_to_hourlabel(float seconds, char *hourlabel) {
-  // Take the number of seconds and give it back as
-  // HH:MM:SS (assuming there are 86400 seconds in a day).
-  // If greater than 86400, add "xd" at the start.
   int d, h, m, s;
   float dayseconds;
   
@@ -372,3 +377,171 @@ void stringappend(char **dest, const char *src) {
   strncat(*dest, src, l2);
 }
 
+/*!
+ *  \brief Convert an angle into a string representation
+ *  \param angle the angle to convert to a string
+ *  \param angle_string this string will be filled by this routine
+ *  \param conversion_type a bitwise OR combination of flags to direct how
+ *                         this routine will work
+ *                         - ATS_ANGLE_IN_DEGREES: the input angle is in degrees
+ *                         - ATS_ANGLE_IN_RADIANS: the input angle is in radians
+ *                         - ATS_ANGLE_IN_HOURS: the input angle is in hours
+ *                         - ATS_STRING_IN_DEGREES: the output string should be in
+ *                           degrees
+ *                         - ATS_STRING_IN_HOURS: the output string should be in hours
+ *                         - ATS_STRING_DECIMAL_MINUTES: only show minutes of arc 
+ *                           (or hours), and don't include seconds
+ *                         - ATS_STRING_SEP_COLON: use : as the separator between the
+ *                           string elements
+ *                         - ATS_STRING_SEP_SPACE: use a space as the separator between
+ *                           the string elements, or include a space along with the
+ *                           letters or symbols
+ *                         - ATS_STRING_SEP_LETTER: use hms or dms as the string element
+ *                           labels
+ *                         - ATS_STRING_SEP_SYMBOL: use d'" or h'" as the string element
+ *                           labels
+ *                         - ATS_STRING_ZERO_PAD_FIRST: always pad the hours to 2 figures,
+ *                           or degrees to 3 figures, using 0 at the front
+ *                         - ATS_STRING_ALWAYS_SIGN: always include the + if it is a
+ *                           positive angle
+ *  \param precision how many decimal places to include for the smallest element
+ */
+void angle_to_string(float angle, char *angle_string, int conversion_type,
+		     int precision) {
+  float out_angle, secondfloat, thirdfloat;
+  int firstint, secondint, secondlength, thirdlength;
+  bool isnegative;
+  char firstlabel[3], secondlabel[3], thirdlabel[2], oform_first[10];
+  char oform_second[10], oform_third[10], oform_all[30], signchar[2];
+  
+  // Begin by converting the angle to the output units.
+  out_angle = angle;
+  if (conversion_type & ATS_ANGLE_IN_DEGREES) {
+    if (conversion_type & ATS_STRING_IN_HOURS) {
+      out_angle /= 15.0;
+    }
+  } else if (conversion_type & ATS_ANGLE_IN_RADIANS) {
+    if (conversion_type & ATS_STRING_IN_DEGREES) {
+      out_angle *= (180.0 / M_PI);
+    } else if (conversion_type & ATS_STRING_IN_HOURS) {
+      out_angle *= (12.0 / M_PI);
+    }
+  } else if (conversion_type & ATS_ANGLE_IN_HOURS) {
+    if (conversion_type & ATS_STRING_IN_DEGREES) {
+      out_angle *= 15.0;
+    }
+  } else {
+    // We don't actually know for sure what the units are of the input angle,
+    // so we fail. TODO: we should probably return an error code.
+    return;
+  }
+
+  // Assign the labels (default is colon).
+  firstlabel[0] = ':'; firstlabel[1] = 0; firstlabel[2] = 0;
+  secondlabel[0] = ':'; secondlabel[1] = 0; secondlabel[2] = 0;
+  thirdlabel[0] = 0; thirdlabel[1] = 0;
+  if (conversion_type & ATS_STRING_IN_DEGREES) {
+    if (conversion_type & ATS_STRING_SEP_LETTER) {
+      firstlabel[0] = 'd';
+      secondlabel[0] = 'm';
+      thirdlabel[0] = 's';
+      if (conversion_type & ATS_STRING_SEP_SPACE) {
+	firstlabel[1] = ' ';
+	if (!(conversion_type & ATS_STRING_DECIMAL_MINUTES)) {
+	  secondlabel[1] = ' ';
+	} else {
+	  thirdlabel[0] = 0;
+	}
+      }
+    } else if (conversion_type & ATS_STRING_SEP_SYMBOL) {
+      firstlabel[0] = 'd';
+      secondlabel[0] = '\'';
+      thirdlabel[0]= '\"';
+      if (conversion_type & ATS_STRING_SEP_SPACE) {
+	firstlabel[1] = ' ';
+	if (!(conversion_type & ATS_STRING_DECIMAL_MINUTES)) {
+	  secondlabel[1] = ' ';
+	} else {
+	  thirdlabel[0] = 0;
+	}
+      }
+    } else if (conversion_type & ATS_STRING_SEP_SPACE) {
+      firstlabel[0] = ' ';
+      if (!(conversion_type & ATS_STRING_DECIMAL_MINUTES)) {
+	secondlabel[0] = ' ';
+      }
+    }
+  } else if (conversion_type & ATS_STRING_IN_HOURS) {
+    if (conversion_type & ATS_STRING_SEP_LETTER) {
+      firstlabel[0] = 'h';
+      secondlabel[0] = 'm';
+      thirdlabel[0] = 's';
+      if (conversion_type & ATS_STRING_SEP_SPACE) {
+	firstlabel[1] = ' ';
+	if (!(conversion_type & ATS_STRING_DECIMAL_MINUTES)) {
+	  secondlabel[1] = ' ';
+	} else {
+	  thirdlabel[0] = 0;
+	}
+      }
+    } else if (conversion_type & ATS_STRING_SEP_SYMBOL) {
+      firstlabel[0] = 'h';
+      secondlabel[0] = 'm';
+      thirdlabel[0]= 's';
+      if (conversion_type & ATS_STRING_SEP_SPACE) {
+	firstlabel[1] = ' ';
+	if (!(conversion_type & ATS_STRING_DECIMAL_MINUTES)) {
+	  secondlabel[1] = ' ';
+	} else {
+	  thirdlabel[0] = 0;
+	}
+      }
+    } else if (conversion_type & ATS_STRING_SEP_SPACE) {
+      firstlabel[0] = ' ';
+      if (!(conversion_type & ATS_STRING_DECIMAL_MINUTES)) {
+	secondlabel[0] = ' ';
+      }
+    }
+  }
+
+  // Make the computations.
+  isnegative = (out_angle < 0);
+  out_angle = fabsf(out_angle);
+  firstint = (int)floorf(out_angle);
+  secondfloat = (out_angle - (float)firstint) * 60.0;
+  secondint = (int)floorf(secondfloat);
+  thirdfloat = (secondfloat - (float)secondint) * 60.0;
+
+  // Make the string.
+  if (conversion_type & ATS_STRING_ZERO_PAD_FIRST) {
+    if (conversion_type & ATS_STRING_IN_DEGREES) {
+      strcpy(oform_first, "%03d%s");
+    } else if (conversion_type & ATS_STRING_IN_HOURS) {
+      strcpy(oform_first, "%02d%s");
+    }
+  }
+  if (conversion_type & ATS_STRING_DECIMAL_MINUTES) {
+    secondlength = 3 + precision;
+    snprintf(oform_second, 9, "%%0%d.%df%%s", secondlength, precision);
+    oform_third[0] = 0;
+  } else {
+    strcpy(oform_second, "%02d%s");
+    thirdlength = 3 + precision;
+    snprintf(oform_third, 9, "%%0%d.%df%%s", thirdlength, precision);
+  }
+  snprintf(oform_all, 29, "%%s%s%s%s", oform_first, oform_second, oform_third);
+  signchar[0] = 0; signchar[1] = 0;
+  if (isnegative) {
+    signchar[0] = '-';
+  } else if (conversion_type & ATS_STRING_ALWAYS_SIGN) {
+    signchar[0] = '+';
+  }
+  if (conversion_type & ATS_STRING_DECIMAL_MINUTES) {
+    sprintf(angle_string, oform_all, signchar, firstint, firstlabel, secondfloat,
+	    secondlabel);
+  } else {
+    sprintf(angle_string, oform_all, signchar, firstint, firstlabel, secondint,
+	    secondlabel, thirdfloat, thirdlabel);
+  }
+  
+}

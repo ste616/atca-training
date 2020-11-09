@@ -13,7 +13,7 @@ target_compile_options(atrpfits PRIVATE -Werror -Wall -Wextra)
 
 add_executable(summariser src/apps/summariser/summariser.c)
 set_target_properties(summariser PROPERTIES LINKER_LANGUAGE Fortran)
-target_link_libraries(summariser PUBLIC atrpfits rpfits)
+target_link_libraries(summariser PUBLIC atrpfits rpfits applib)
 target_compile_options(summariser PRIVATE -Werror -Wall -Wextra -Wno-missing-field-initializers)
 
 #add_executable(visplot src/apps/visplot/visplot.c)

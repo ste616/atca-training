@@ -22,9 +22,13 @@
  *  \brief Get the median value of a float array
  *  \param a the array of values
  *  \param n the number of values in the array
- *  \return the median value of the first \a n entries in the array \a a
+ *  \return the median value of the first \a n entries in the array \a a, or 0
+ *          if \a n == 0
  */
 float fmedianf(float *a, int n) {
+  if (n == 0) {
+    return 0;
+  }
   if (n % 2) {
     // Odd number of points.
     return (a[(n + 1) / 2]);

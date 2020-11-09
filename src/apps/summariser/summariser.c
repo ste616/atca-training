@@ -13,6 +13,7 @@
 #include <argp.h>
 #include "atrpfits.h"
 #include "memory.h"
+#include "common.h"
 
 const char *argp_program_version = "summariser 1.0";
 const char *arpg_program_bug_address = "<Jamie.Stevens@csiro.au>";
@@ -102,14 +103,17 @@ static error_t summariser_parse_opt(int key, char *arg, struct argp_state *state
 static struct argp argp = { summariser_options, summariser_parse_opt,
 			    summariser_args_doc, summariser_doc };
 
+#define SBUFSIZE 1024
 
 int main(int argc, char *argv[]) {
   // The argument list should all be RPFITS files.
   int i = 0, j = 0, k = 0, res = 0, keep_reading = 1, read_response = 0;
   int read_cycle = 1, nscans = 0;
+  char emsg[SBUFSIZE], rastring[SBUFSIZE], decstring[SBUFSIZE];
   struct scan_data *scan_data = NULL, **all_scans = NULL;
   struct cycle_data *cycle_data = NULL;
   struct summariser_arguments arguments;
+  struct ampphase_options ampphase_options;
 
   // Set the defaults for the arguments.
   arguments.n_rpfits_files = 0;
@@ -129,7 +133,9 @@ int main(int argc, char *argv[]) {
     // Try to open the RPFITS file.
     res = open_rpfits_file(arguments.rpfits_files[k]);
     if (arguments.verbosity >= VERBOSITY_NORMAL) {
-      printf("Attempt to open RPFITS file %s, %d\n", arguments.rpfits_files[k], res);
+      snprintf(emsg, SBUFSIZE, " error code %d", res);
+      printf("RPFITS file %s: %s\n", arguments.rpfits_files[k],
+	     ((res == 0) ? "OK" : emsg));
     }
     keep_reading = 1;
     while (keep_reading) {
@@ -140,13 +146,24 @@ int main(int argc, char *argv[]) {
 
       // Read in the scan header.
       read_response = read_scan_header(&(scan_data->header_data));
-      printf("scan has obs date %s, time %.1f\n",
-	     scan_data->header_data.obsdate,
-	     scan_data->header_data.ut_seconds);
-      printf("  type %s, source %s, calcode %s\n",
-	     scan_data->header_data.obstype,
-	     scan_data->header_data.source_name,
-	     scan_data->header_data.calcode);
+      if (arguments.verbosity >= VERBOSITY_NORMAL) {
+	seconds_to_hourlabel(scan_data->header_data.ut_seconds, emsg);
+	printf("\n\nScan %d at %s %s\n", nscans,
+	       scan_data->header_data.obsdate, emsg);
+      }
+      if (arguments.verbosity >= VERBOSITY_HIGH) {
+	angle_to_string(scan_data->header_data.rightascension_hours, rastring,
+			(ATS_ANGLE_IN_HOURS | ATS_STRING_IN_HOURS | ATS_STRING_SEP_LETTER |
+			 ATS_STRING_ZERO_PAD_FIRST), 1);
+	angle_to_string(scan_data->header_data.declination_degrees, decstring,
+			(ATS_ANGLE_IN_DEGREES | ATS_STRING_IN_DEGREES | ATS_STRING_SEP_LETTER |
+			 ATS_STRING_ALWAYS_SIGN), 1);
+			
+	printf("  Source %s [%s %s] (cc %s), Type %s\n",
+	       scan_data->header_data.source_name, rastring, decstring,
+	       scan_data->header_data.calcode,
+	       scan_data->header_data.obstype);
+      }
       printf("  coordinates RA = %.4f, Dec = %.4f\n",
 	     scan_data->header_data.rightascension_hours,
 	     scan_data->header_data.declination_degrees);
@@ -178,10 +195,14 @@ int main(int argc, char *argv[]) {
       if (read_response & READER_DATA_AVAILABLE) {
 	  // Now start reading the cycle data.
 	read_cycle = 1;
+	ampphase_options = ampphase_options_default();
 	while (read_cycle) {
 	  cycle_data = scan_add_cycle(scan_data);
 	  read_response = read_cycle_data(&(scan_data->header_data),
 					  cycle_data);
+	  // Compute the system temperatures.
+	  calculate_system_temperatures_cycle_data(cycle_data, &(scan_data->header_data),
+						   &ampphase_options);
 	  //fprintf(stderr, "found read response %d\n", read_response);
 	  /*printf("cycle has %d baselines\n", cycle_data->n_baselines);*/
 	  if (!(read_response & READER_DATA_AVAILABLE)) {
@@ -193,7 +214,9 @@ int main(int argc, char *argv[]) {
 	// No more data in this file.
 	keep_reading = 0;
       } // Otherwise we've probably hit another header.
-      printf("scan had %d cycles\n", scan_data->num_cycles);
+      if (arguments.verbosity >= VERBOSITY_NORMAL) {
+	printf(" Scan %d had %d cycles\n", nscans, scan_data->num_cycles);
+      }
 
     }
 
