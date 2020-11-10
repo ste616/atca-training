@@ -107,9 +107,12 @@ static struct argp argp = { summariser_options, summariser_parse_opt,
 
 int main(int argc, char *argv[]) {
   // The argument list should all be RPFITS files.
-  int i = 0, j = 0, k = 0, res = 0, keep_reading = 1, read_response = 0;
-  int read_cycle = 1, nscans = 0;
+  int i = 0, k = 0, res = 0, keep_reading = 1, read_response = 0;
+  int read_cycle = 1, nscans = 0, n_continuum = 0, n_zooms = 0;
+  int *continuum_bands = NULL, *zoom_bands = NULL;
+  float channel_width;
   char emsg[SBUFSIZE], rastring[SBUFSIZE], decstring[SBUFSIZE];
+  char station_string[STATION_NAME_LENGTH];
   struct scan_data *scan_data = NULL, **all_scans = NULL;
   struct cycle_data *cycle_data = NULL;
   struct summariser_arguments arguments;
@@ -151,7 +154,7 @@ int main(int argc, char *argv[]) {
 	printf("\n\nScan %d at %s %s\n", nscans,
 	       scan_data->header_data.obsdate, emsg);
       }
-      if (arguments.verbosity >= VERBOSITY_HIGH) {
+      if (arguments.verbosity >= VERBOSITY_NORMAL) {
 	angle_to_string(scan_data->header_data.rightascension_hours, rastring,
 			(ATS_ANGLE_IN_HOURS | ATS_STRING_IN_HOURS | ATS_STRING_SEP_LETTER |
 			 ATS_STRING_ZERO_PAD_FIRST), 1);
@@ -164,22 +167,77 @@ int main(int argc, char *argv[]) {
 	       scan_data->header_data.calcode,
 	       scan_data->header_data.obstype);
       }
-      printf("  coordinates RA = %.4f, Dec = %.4f\n",
-	     scan_data->header_data.rightascension_hours,
-	     scan_data->header_data.declination_degrees);
-      printf("  number of IFs = %d:\n", scan_data->header_data.num_ifs);
+
+      // Work out how many bands and of what type.
       for (i = 0; i < scan_data->header_data.num_ifs; i++) {
-	printf("   %d: num channels = %d, num stokes = %d, chain = %d (%s %s %s)\n",
-	       scan_data->header_data.if_label[i],
-	       scan_data->header_data.if_num_channels[i],
-	       scan_data->header_data.if_num_stokes[i],
-	       scan_data->header_data.if_chain[i],
-	       scan_data->header_data.if_name[i][0],
-	       scan_data->header_data.if_name[i][1],
-	       scan_data->header_data.if_name[i][2]);
-	printf("      ");
-	for (j = 0; j < scan_data->header_data.if_num_stokes[i]; j++) {
-	  printf("[%s] ", scan_data->header_data.if_stokes_names[i][j]);
+	channel_width = scan_data->header_data.if_bandwidth[i] /
+	  (float)(scan_data->header_data.if_num_channels[i]);
+	if (channel_width >= 1) {
+	  // Continuum resolution.
+	  n_continuum += 1;
+	  ARRAY_APPEND(continuum_bands, n_continuum, i);
+	} else {
+	  // Zoom resolution.
+	  n_zooms += 1;
+	  ARRAY_APPEND(zoom_bands, n_zooms, i);
+	}
+      }
+
+      if (arguments.verbosity >= VERBOSITY_NORMAL) {
+	printf("  # Continuum IFs = %d:\n", n_continuum);
+	for (i = 0; i < n_continuum; i++) {
+	  printf("   C%d: CF = %.1f BW = %.1f MHz # chan = %d, chain = %d (%s)\n",
+		 scan_data->header_data.if_label[continuum_bands[i]],
+		 scan_data->header_data.if_centre_freq[continuum_bands[i]],
+		 scan_data->header_data.if_bandwidth[continuum_bands[i]],
+		 scan_data->header_data.if_num_channels[continuum_bands[i]],
+		 scan_data->header_data.if_chain[continuum_bands[i]],
+		 scan_data->header_data.if_name[continuum_bands[i]][0]);
+	}
+      }
+      if (arguments.verbosity >= VERBOSITY_NORMAL) {
+	printf("  # Zoom IFS = %d", n_zooms);
+	if (arguments.verbosity >= VERBOSITY_HIGH) {
+	  printf(":");
+	  for (i = 0; i < n_zooms; i++) {
+	    printf("\n   Z%d: CF = %.1f BW = %.1f MHz # chan = %d, chain = %d (%s)",
+		   scan_data->header_data.if_label[zoom_bands[i]],
+		   scan_data->header_data.if_centre_freq[zoom_bands[i]],
+		   scan_data->header_data.if_bandwidth[zoom_bands[i]],
+		   scan_data->header_data.if_num_channels[zoom_bands[i]],
+		   scan_data->header_data.if_chain[zoom_bands[i]],
+		   scan_data->header_data.if_name[zoom_bands[i]][0]);
+	  }
+	}
+	printf("\n");
+      }
+      /* for (i = 0; i < scan_data->header_data.num_ifs; i++) { */
+      /* 	printf("   %d: num channels = %d, num stokes = %d, chain = %d (%s %s %s)\n", */
+      /* 	       scan_data->header_data.if_label[i], */
+      /* 	       scan_data->header_data.if_num_channels[i], */
+      /* 	       scan_data->header_data.if_num_stokes[i], */
+      /* 	       scan_data->header_data.if_chain[i], */
+      /* 	       scan_data->header_data.if_name[i][0], */
+      /* 	       scan_data->header_data.if_name[i][1], */
+      /* 	       scan_data->header_data.if_name[i][2]); */
+      /* 	printf("      "); */
+      /* 	for (j = 0; j < scan_data->header_data.if_num_stokes[i]; j++) { */
+      /* 	  printf("[%s] ", scan_data->header_data.if_stokes_names[i][j]); */
+      /* 	} */
+      /* 	printf("\n"); */
+      /* } */
+
+      if (arguments.verbosity >= VERBOSITY_HIGH) {
+	printf("  # antennas = %d", scan_data->header_data.num_ants);
+	for (i = 0; i < scan_data->header_data.num_ants; i++) {
+	  printf(" %s", scan_data->header_data.ant_name[i]);
+	  if (arguments.verbosity >= VERBOSITY_HIGHEST) {
+	    find_station(scan_data->header_data.ant_cartesian[i][0],
+			 scan_data->header_data.ant_cartesian[i][1],
+			 scan_data->header_data.ant_cartesian[i][2],
+			 station_string);
+	    printf(" [%s]", station_string);
+	  }
 	}
 	printf("\n");
       }

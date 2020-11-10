@@ -113,6 +113,27 @@
 #define ATS_STRING_ZERO_PAD_FIRST  1<<10
 #define ATS_STRING_ALWAYS_SIGN     1<<11
 
+/*! \def STATION_NAME_LENGTH
+ *  \brief The maximum length + 1 for all the names in the station_names array
+ */
+#define STATION_NAME_LENGTH 5
+/*! \def NUM_STATIONS
+ *  \brief The number of stations we know about
+ */
+#define NUM_STATIONS 45
+/*! \def FINDSTATION_FOUND
+ *  \brief Indication that a station was found matching the coordinates
+ *
+ * This is a possible return value from the find_station routine.
+ */
+#define FINDSTATION_FOUND 0
+/*! \def FINDSTATION_NOT_FOUND
+ *  \brief Indication that a station was not found matching the coordinates
+ *
+ * This is a possible return value from the find_station routine.
+ */
+#define FINDSTATION_NOT_FOUND 1
+
 // Our routine definitions.
 int interpret_array_string(char *array_string);
 int find_pol(struct ampphase ***cycle_ampphase, int npols, int ifnum, int poltype);
@@ -134,3 +155,4 @@ void mjd2cal(double mjd, int *year, int *month, int *day, float *ut_seconds);
 void stringappend(char **dest, const char *src);
 void angle_to_string(float angle, char *angle_string, int conversion_type,
 		     int precision);
+int find_station(float x, float y, float z, char *station_name);

@@ -17,6 +17,50 @@
 #include "common.h"
 #include "memory.h"
 
+/*! \var station_names
+ *  \brief All the station names we know about
+ *
+ * Along with the station_coord_* variables, this allows antenna station coordinates
+ * to be resolved into which station they were at.
+ */
+const char station_names[NUM_STATIONS][STATION_NAME_LENGTH] = {
+  "W0",   "W2",   "W4",   "W6",   "W8",   "W10",  "W12",  "W14",  "W16",  "W32",  "W45",
+  "W64",  "W84",  "W98",  "W100", "W102", "W104", "W106", "W109", "W110", "W111", "W112",
+  "W113", "W124", "W125", "W128", "W129", "W140", "W147", "W148", "W163", "W168", "W172",
+  "W173", "W182", "W189", "W190", "W195", "W196", "W392", "N2",   "N5",   "N7",   "N11",
+  "N14"
+};
+const float station_coordinate_X[NUM_STATIONS] = {
+  -4752438.459, -4752422.922, -4752407.385, -4752391.848, -4752376.311, -4752360.774, 
+  -4752345.237, -4752329.700, -4752314.163, -4752189.868, -4752088.877, -4751941.276, 
+  -4751785.907, -4751677.148, -4751661.611, -4751646.074, -4751630.537, -4751615.000, 
+  -4751591.695, -4751583.926, -4751576.158, -4751568.389, -4751560.621, -4751475.168, 
+  -4751467.399, -4751444.094, -4751436.325, -4751350.872, -4751296.492, -4751288.724, 
+  -4751172.197, -4751133.354, -4751102.281, -4751094.512, -4751024.596, -4750970.216, 
+  -4750962.448, -4750923.605, -4750915.837, -4749393.198, -4751628.291, -4751648.226, 
+  -4751661.517, -4751688.098, -4751708.034   
+};
+const float station_coordinate_Y[NUM_STATIONS] = {
+  2790321.299, 2790347.675, 2790374.052, 2790400.428, 2790426.804, 2790453.181,
+  2790479.557, 2790505.934, 2790532.310, 2790743.321, 2790914.767, 2791165.342,
+  2791429.106, 2791613.741, 2791640.117, 2791666.493, 2791692.870, 2791719.246,
+  2791758.810, 2791771.999, 2791785.187, 2791798.375, 2791811.563, 2791956.633,
+  2791969.821, 2792009.386, 2792022.574, 2792167.644, 2792259.961, 2792273.149,
+  2792470.972, 2792536.913, 2792589.666, 2792602.854, 2792721.547, 2792813.865,
+  2792827.053, 2792892.994, 2792906.182, 2795491.050, 2791727.075, 2791738.818,
+  2791746.647, 2791762.304, 2791774.047
+};
+const float station_coordinate_Z[NUM_STATIONS] = {
+  -3200483.747, -3200483.747, -3200483.747, -3200483.747, -3200483.747, -3200483.747,
+  -3200483.747, -3200483.747, -3200483.747, -3200483.747, -3200483.747, -3200483.747,
+  -3200483.747, -3200483.747, -3200483.747, -3200483.747, -3200483.747, -3200483.747,
+  -3200483.747, -3200483.747, -3200483.747, -3200483.747, -3200483.747, -3200483.747,
+  -3200483.747, -3200483.747, -3200483.747, -3200483.747, -3200483.747, -3200483.747,
+  -3200483.747, -3200483.747, -3200483.747, -3200483.747, -3200483.747, -3200483.747,
+  -3200483.747, -3200483.747, -3200483.747, -3200483.694, -3200457.305, -3200417.642,
+  -3200391.200, -3200338.316, -3200298.653  
+};
+
 int interpret_array_string(char *array_string) {
   // The array string should be a comma-separated list of antenna.
   int a = 0, r = 0;
@@ -544,4 +588,44 @@ void angle_to_string(float angle, char *angle_string, int conversion_type,
 	    secondlabel, thirdfloat, thirdlabel);
   }
   
+}
+
+/*!
+ *  \brief From an antenna's XYZ coordinates, determine which station it was
+ *         on
+ *  \param x the X coordinate of the antenna, in m
+ *  \param y the Y coordinate of the antenna, in m
+ *  \param z the Z coordinate of the antenna, in m
+ *  \param station_name this string (which must have available length of at least
+ *                      STATION_NAME_LENGTH) will be filled by this routine with 
+ *                      the name of the station corresponding to the supplied
+ *                      coordinates
+ *  \return an indication of whether a station was found or not, either:
+ *          - FINDSTATION_FOUND if a match was found
+ *          - FINDSTATION_NOT_FOUND if a match was not found
+ */
+int find_station(float x, float y, float z, char *station_name) {
+  int i, min_match;
+  float min_dist, diff_x, diff_y, diff_z, diff;
+
+  // Work out the minimum distance.
+  for (i = 0; i < NUM_STATIONS; i++) {
+    diff_x = x - station_coordinate_X[i];
+    diff_y = y - station_coordinate_Y[i];
+    diff_z = z - station_coordinate_Z[i];
+    diff = sqrtf(diff_x * diff_x + diff_y * diff_y + diff_z * diff_z);
+    if ((i == 0) || (diff < min_dist)) {
+      min_dist = diff;
+      min_match = i;
+    }
+  }
+
+  // Check this is small enough.
+  if (min_dist < 1) {
+    // Good enough match.
+    strncpy(station_name, station_names[min_match], STATION_NAME_LENGTH);
+    return FINDSTATION_FOUND;
+  }
+  station_name[0] = 0;
+  return FINDSTATION_NOT_FOUND;
 }
