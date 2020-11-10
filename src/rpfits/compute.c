@@ -1370,7 +1370,7 @@ void calculate_system_temperatures_cycle_data(struct cycle_data *cycle_data,
                                               struct scan_header_data *scan_header_data,
                                               struct ampphase_options *options) {
   int i, j, k, bl, bidx, ***n_tp_on_array = NULL, ***n_tp_off_array = NULL;
-  int aidx, iidx, nchannels, ifno, chan_low = -1, chan_high = -1;
+  int aidx, iidx, nchannels, ifno, chan_low = -1, chan_high = -1, ifsidx;
   int reqpol[2], polnum, vidx;
   float ****tp_on_array = NULL, ****tp_off_array = NULL;
   float nhalfchan, chanwidth, rcheck, med_tp_on, med_tp_off, tp_on, tp_off;
@@ -1499,29 +1499,30 @@ void calculate_system_temperatures_cycle_data(struct cycle_data *cycle_data,
   // Now we're free to actually do the system temperature computations.
   for (i = 0; i < cycle_data->num_cal_ifs; i++) {
     ifno = cycle_data->cal_ifs[i];
+    ifsidx = ifno - 1;
     for (j = 0; j < cycle_data->num_cal_ants; j++) {
       for (k = CAL_XX; k <= CAL_YY; k++) {
 	if (options->averaging_method[ifno] & AVERAGETYPE_MEDIAN) {
-	  qsort(tp_on_array[j][i][k], n_tp_on_array[j][i][k], sizeof(float),
+	  qsort(tp_on_array[j][ifsidx][k], n_tp_on_array[j][ifsidx][k], sizeof(float),
 		cmpfunc_real);
-	  qsort(tp_off_array[j][i][k], n_tp_off_array[j][i][k], sizeof(float),
+	  qsort(tp_off_array[j][ifsidx][k], n_tp_off_array[j][ifsidx][k], sizeof(float),
 		cmpfunc_real);
-	  med_tp_on = fmedianf(tp_on_array[j][i][k], n_tp_on_array[j][i][k]);
-	  med_tp_off = fmedianf(tp_off_array[j][i][k], n_tp_off_array[j][i][k]);
+	  med_tp_on = fmedianf(tp_on_array[j][ifsidx][k], n_tp_on_array[j][ifsidx][k]);
+	  med_tp_off = fmedianf(tp_off_array[j][ifsidx][k], n_tp_off_array[j][ifsidx][k]);
 	  fs = 0.5 * (med_tp_on + med_tp_off);
 	  fd = med_tp_on - med_tp_off;
 	} else if (options->averaging_method[ifno] & AVERAGETYPE_MEAN) {
-	  tp_on = fsumf(tp_on_array[j][i][k], n_tp_on_array[j][i][k]);
-	  tp_off = fsumf(tp_off_array[j][i][k], n_tp_off_array[j][i][k]);
+	  tp_on = fsumf(tp_on_array[j][ifsidx][k], n_tp_on_array[j][ifsidx][k]);
+	  tp_off = fsumf(tp_off_array[j][ifsidx][k], n_tp_off_array[j][ifsidx][k]);
 	  fs = 0.5 * (tp_on + tp_off);
 	  fd = tp_on - tp_off;
 	}
 	dx = 99.995 * 99.995;
 	if (fd > (0.01 * fs)) {
-	  if ((k == CAL_XX) && (cycle_data->caljy_x[i][j] > 0)) {
-	    dx = (fs / fd) * cycle_data->caljy_x[i][j];
-	  } else if ((k == CAL_YY) && (cycle_data->caljy_y[i][j] > 0)) {
-	    dx = (fs / fd) * cycle_data->caljy_y[i][j];
+	  if ((k == CAL_XX) && (cycle_data->caljy_x[ifsidx][j] > 0)) {
+	    dx = (fs / fd) * cycle_data->caljy_x[ifsidx][j];
+	  } else if ((k == CAL_YY) && (cycle_data->caljy_y[ifsidx][j] > 0)) {
+	    dx = (fs / fd) * cycle_data->caljy_y[ifsidx][j];
 	  }
 	}
 	// Fill in the Tsys.

@@ -107,7 +107,7 @@ static struct argp argp = { summariser_options, summariser_parse_opt,
 
 int main(int argc, char *argv[]) {
   // The argument list should all be RPFITS files.
-  int i = 0, k = 0, res = 0, keep_reading = 1, read_response = 0;
+  int i = 0, j = 0, k = 0, l = 0, res = 0, keep_reading = 1, read_response = 0;
   int read_cycle = 1, nscans = 0, n_continuum = 0, n_zooms = 0;
   int *continuum_bands = NULL, *zoom_bands = NULL;
   float channel_width;
@@ -170,7 +170,8 @@ int main(int argc, char *argv[]) {
       }
 
       // Work out how many bands and of what type.
-      for (i = 0; i < scan_data->header_data.num_ifs; i++) {
+      for (i = 0, n_continuum = 0, n_zooms = 0;
+	   i < scan_data->header_data.num_ifs; i++) {
 	channel_width = scan_data->header_data.if_bandwidth[i] /
 	  (float)(scan_data->header_data.if_num_channels[i]);
 	if (channel_width >= 1) {
@@ -255,6 +256,41 @@ int main(int argc, char *argv[]) {
 						   &ampphase_options);
 	  //fprintf(stderr, "found read response %d\n", read_response);
 	  /*printf("cycle has %d baselines\n", cycle_data->n_baselines);*/
+	  if (arguments.verbosity >= VERBOSITY_HIGHEST) {
+	    printf("    CALIBRATION # IFS = %d ANTS = %d\n",
+		   cycle_data->num_cal_ifs, cycle_data->num_cal_ants);
+	    for (i = 0; i < cycle_data->num_cal_ifs; i++) {
+	      for (k = CAL_XX; k <= CAL_YY; k++) {
+		for (l = 0; l < 2; l++) {
+		  printf("    ");
+		  if (l == 1) {
+		    printf("*");
+		  } else {
+		    printf(" ");
+		  }
+		  if (k == CAL_XX) {
+		    printf("%dXX:", cycle_data->cal_ifs[i]);
+		  } else if (k == CAL_YY) {
+		    printf("%dYY:", cycle_data->cal_ifs[i]);
+		  }
+		  for (j = 0; j < cycle_data->num_cal_ants; j++) {
+		    printf(" (%d)", cycle_data->cal_ants[j]);
+		    if (l == 0) {
+		      printf(" %.1f", cycle_data->tsys[i][j][k]);
+		    } else {
+		      printf(" %.1f", cycle_data->computed_tsys[i][j][k]);
+		    }
+		    if (k == CAL_XX) {
+		      printf(" [%.2f]", cycle_data->caljy_x[i][j]);
+		    } else if (k == CAL_YY) {
+		      printf(" [%.2f]", cycle_data->caljy_y[i][j]);
+		    }
+		  }
+		  printf("\n");
+		}
+	      }
+	    }
+	  }
 	  if (!(read_response & READER_DATA_AVAILABLE)) {
 	    read_cycle = 0;
 	  }
@@ -267,7 +303,8 @@ int main(int argc, char *argv[]) {
       if (arguments.verbosity >= VERBOSITY_NORMAL) {
 	printf(" Scan %d had %d cycles\n", nscans, scan_data->num_cycles);
       }
-
+      FREE(continuum_bands);
+      FREE(zoom_bands);
     }
 
     // Close it before moving on.
