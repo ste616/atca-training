@@ -112,11 +112,12 @@ int main(int argc, char *argv[]) {
   int *continuum_bands = NULL, *zoom_bands = NULL;
   float channel_width;
   char emsg[SBUFSIZE], rastring[SBUFSIZE], decstring[SBUFSIZE];
-  char station_string[STATION_NAME_LENGTH];
+  char sourcename[SBUFSIZE], scantype[BUFSIZE], antname[SBUFSIZE];
   struct scan_data *scan_data = NULL, **all_scans = NULL;
   struct cycle_data *cycle_data = NULL;
   struct summariser_arguments arguments;
   struct ampphase_options ampphase_options;
+  struct array_information *array_information = NULL;
 
   // Set the defaults for the arguments.
   arguments.n_rpfits_files = 0;
@@ -161,11 +162,11 @@ int main(int argc, char *argv[]) {
 	angle_to_string(scan_data->header_data.declination_degrees, decstring,
 			(ATS_ANGLE_IN_DEGREES | ATS_STRING_IN_DEGREES | ATS_STRING_SEP_LETTER |
 			 ATS_STRING_ALWAYS_SIGN), 1);
-			
+	strip_end_spaces(scan_data->header_data.source_name, sourcename, SBUFSIZE);
+	strip_end_spaces(scan_data->header_data.obstype, scantype, SBUFSIZE);
 	printf("  Source %s [%s %s] (cc %s), Type %s\n",
-	       scan_data->header_data.source_name, rastring, decstring,
-	       scan_data->header_data.calcode,
-	       scan_data->header_data.obstype);
+	       sourcename, rastring, decstring,
+	       scan_data->header_data.calcode, scantype);
       }
 
       // Work out how many bands and of what type.
@@ -206,7 +207,7 @@ int main(int argc, char *argv[]) {
 		   scan_data->header_data.if_bandwidth[zoom_bands[i]],
 		   scan_data->header_data.if_num_channels[zoom_bands[i]],
 		   scan_data->header_data.if_chain[zoom_bands[i]],
-		   scan_data->header_data.if_name[zoom_bands[i]][0]);
+		   scan_data->header_data.if_name[zoom_bands[i]][1]);
 	  }
 	}
 	printf("\n");
@@ -228,27 +229,18 @@ int main(int argc, char *argv[]) {
       /* } */
 
       if (arguments.verbosity >= VERBOSITY_HIGH) {
-	printf("  # antennas = %d", scan_data->header_data.num_ants);
+	printf("  %d antennas", scan_data->header_data.num_ants);
+	scan_header_to_array(&(scan_data->header_data),
+			     &array_information);
 	for (i = 0; i < scan_data->header_data.num_ants; i++) {
-	  printf(" %s", scan_data->header_data.ant_name[i]);
+	  strip_end_spaces(scan_data->header_data.ant_name[i], antname, SBUFSIZE);
+	  printf(" %s", antname);
 	  if (arguments.verbosity >= VERBOSITY_HIGHEST) {
-	    find_station(scan_data->header_data.ant_cartesian[i][0],
-			 scan_data->header_data.ant_cartesian[i][1],
-			 scan_data->header_data.ant_cartesian[i][2],
-			 station_string);
-	    printf(" [%s]", station_string);
+	    printf(" [%s]", array_information->station_name[i]);
 	  }
 	}
-	printf("\n");
-      }
-      printf("  number of antennas = %d:\n", scan_data->header_data.num_ants);
-      for (i = 0; i < scan_data->header_data.num_ants; i++) {
-	printf("   ant %d: station = %8s, [ X, Y, Z ] = [ %.2f, %.2f, %.2f ]\n",
-	       scan_data->header_data.ant_label[i],
-	       scan_data->header_data.ant_name[i],
-	       scan_data->header_data.ant_cartesian[i][0],
-	       scan_data->header_data.ant_cartesian[i][1],
-	       scan_data->header_data.ant_cartesian[i][2]);
+	printf("\n    ARRAY %s\n", array_information->array_configuration);
+	free_array_information(&array_information);
       }
       if (read_response & READER_DATA_AVAILABLE) {
 	  // Now start reading the cycle data.

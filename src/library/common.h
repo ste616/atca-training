@@ -133,6 +133,69 @@
  * This is a possible return value from the find_station routine.
  */
 #define FINDSTATION_NOT_FOUND 1
+/*! \def NUM_ARRAYS
+ *  \brief The number of arrays that we know about
+ */
+#define NUM_ARRAYS 24
+/*! \def ARRAY_NAME_LENGTH
+ *  \brief The maximum length + 1 for all the names in the array_names
+ *         array
+ */
+#define ARRAY_NAME_LENGTH 6
+/*! \def FINDARRAYCONFIG_FOUND
+ *  \brief Indication that an array configuration was found matching the
+ *         station names
+ *
+ * This is a possible return value from the find_array_configuration routine.
+ */
+#define FINDARRAYCONFIG_FOUND 2
+/*! \def FINDARRAYCONFIG_NOT_FOUND
+ *  \brief Indication that an array configuration was not found to match the
+ *         station names
+ *
+ * This is a possible return value from the find_array_configuration routine.
+ */
+#define FINDARRAYCONFIG_NOT_FOUND 3
+
+/*! \struct array_information
+ *  \brief Information about each antenna position, station and the array
+ *         configuration
+ */
+struct array_information {
+  /*! \var num_ants
+   *  \brief The number of antennas with information in this structure
+   */
+  int num_ants;
+  /*! \var X
+   *  \brief The X coordinate of each antenna, in m
+   *
+   * This array has length `num_ants` and is indexed starting at 0.
+   */
+  float *X;
+  /*! \var Y
+   *  \brief The Y coordinate of each antenna, in m
+   *
+   * This array has length `num_ants` and is indexed starting at 0.
+   */
+  float *Y;
+  /*! \var Z
+   *  \brief The Z coordinate of each antenna, in m
+   *
+   * This array has length `num_ants` and is indexed starting at 0.
+   */
+  float *Z;
+  /*! \var station_name
+   *  \brief The name of the station corresponding to the XYZ coordinates
+   *
+   * This array of strings has length `num_ants` and is indexed starting
+   * at 0. Each string should have length STATION_NAME_LENGTH.
+   */
+  char **station_name;
+  /*! \var array_configuration
+   *  \brief The name of the array configuration matching the station names
+   */
+  char array_configuration[ARRAY_NAME_LENGTH];
+};
 
 // Our routine definitions.
 int interpret_array_string(char *array_string);
@@ -156,3 +219,8 @@ void stringappend(char **dest, const char *src);
 void angle_to_string(float angle, char *angle_string, int conversion_type,
 		     int precision);
 int find_station(float x, float y, float z, char *station_name);
+int find_array_configuration(char **station_names, char *array_configuration);
+int scan_header_to_array(struct scan_header_data *scan_header_data,
+			 struct array_information **array_information);
+void free_array_information(struct array_information **array_information);
+void strip_end_spaces(char *s, char *r, size_t rlen);
