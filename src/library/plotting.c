@@ -1961,12 +1961,17 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
             for (bi = 0; bi < bn; bi++) {
               // Check if we actually proceed for this polarisation and bin
               // combination.
-              if ((isauto == YES) && (bi > 0) &&
+              if ((isauto == NO) && (bi > 0) &&
                   ((ampphase_if[polidx[rp]]->pol == POL_XY) ||
                    (ampphase_if[polidx[rp]]->pol == POL_YX))) {
                 // Don't plot the second bins for the cross-pols.
                 continue;
               }
+	      if ((isauto == YES) && (bi == 0) &&
+		  (ampphase_if[polidx[rp]]->pol == POL_XY)) {
+		// XY pol in the autos comes from when the noise diode is on, not off.
+		continue;
+	      }
               if ((isauto == YES) && (ampphase_if[polidx[rp]]->pol == POL_YX) &&
                   (!(plot_controls->plot_flags & PLOT_FLAG_POL_YX))) {
                 // Don't plot the YX bin in the autos without explicit instruction.

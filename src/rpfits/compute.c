@@ -1211,6 +1211,7 @@ int ampphase_average(struct ampphase *ampphase,
       // Reset our averaging counters.
       total_amplitude = 0;
       total_phase = 0;
+      total_delay = 0;
       total_complex = 0 + 0 * I;
       n_points = 0;
       for (j = 0; j < ampphase->f_nchannels[i][k]; j++) {
@@ -1230,6 +1231,7 @@ int ampphase_average(struct ampphase *ampphase,
                   options->delay_averaging[ampphase->window]);
           delavg_frequency[delavg_idx] += ampphase->f_frequency[i][k][j];
           delavg_raw[delavg_idx] += ampphase->f_raw[i][k][j];
+	  delavg_phase[delavg_idx] += ampphase->f_phase[i][k][j];
           delavg_n[delavg_idx] += 1;
         }
       }
@@ -1239,7 +1241,8 @@ int ampphase_average(struct ampphase *ampphase,
         for (j = 0; j < n_delavg_expected; j++) {
           if (delavg_n[j] > 0) {
             delavg_raw[j] /= (float)delavg_n[j];
-            delavg_phase[j] = cargf(delavg_raw[j]);
+            /* delavg_phase[j] = cargf(delavg_raw[j]); */
+	    delavg_phase[j] /= (float)delavg_n[j];
             delavg_frequency[j] /= (float)delavg_n[j];
           }
         }
