@@ -1083,7 +1083,7 @@ int main(int argc, char *argv[]) {
            info_rpfits_files[i]->filename, info_rpfits_files[i]->n_scans);
     for (j = 0; j < info_rpfits_files[i]->n_scans; j++) {
       printf("  scan %d (%s, %s) MJD range %.6f -> %.6f (%d c)\n", (j + 1),
-             info_rpfits_files[i]->scan_headers[j]->source_name,
+             info_rpfits_files[i]->scan_headers[j]->source_name[0],
              info_rpfits_files[i]->scan_headers[j]->obstype,
              info_rpfits_files[i]->scan_start_mjd[j],
              info_rpfits_files[i]->scan_end_mjd[j],

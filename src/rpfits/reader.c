@@ -205,18 +205,21 @@ void get_card_value(char *header_name, char *value, int value_maxlength) {
  * after the next header.
  */
 int read_scan_header(struct scan_header_data *scan_header_data) {
-  int keep_reading = READER_HEADER_AVAILABLE, this_jstat = 0, that_jstat = 0;
+  int keep_reading = READER_HEADER_AVAILABLE, this_jstat = 0;/* , that_jstat = 0; */
   int rpfits_result = 0;
-  int flag = 0, bin = 0, if_no = 0, sourceno = 0, baseline = 0;
+  /* int flag = 0, bin = 0, if_no = 0, sourceno = 0, baseline = 0; */
   int i = 0, j = 0, *nfound_chain = NULL, nfound_if = 0, zn = 0;
-  float ut = 0, u = 0, v = 0, w = 0;
+  /* float ut = 0, u = 0, v = 0, w = 0; */
   //char *ptr = NULL;
   
   this_jstat = JSTAT_READNEXTHEADER;
   // Get the cards so we can search for the scan type.
   param_.ncard = -1;
   rpfits_result = rpfitsin_(&this_jstat, NULL, NULL, NULL, NULL, NULL,
-			    NULL, NULL, NULL, NULL, NULL, NULL);
+  			    NULL, NULL, NULL, NULL, NULL, NULL);
+  /* rpfits_result = rpfitsin_(&this_jstat, NULL, NULL, &baseline, &ut, */
+  /* 			    &u, &v, &w, &flag, &bin, &if_no, &sourceno); */
+  /* printf("[read_scan_header] ut = %.6f after header read\n", ut); */
   if (this_jstat == JSTAT_SUCCESSFUL) {
     // We can read the data in this header.
 
@@ -224,20 +227,33 @@ int read_scan_header(struct scan_header_data *scan_header_data) {
     string_copy(names_.datobs, OBSDATE_LENGTH, scan_header_data->obsdate);
 
     // Read the data.
-    that_jstat = JSTAT_READDATA;
-    rpfits_result = rpfitsin_(&that_jstat, NULL, NULL, &baseline, &ut,
-			      &u, &v, &w, &flag, &bin, &if_no, &sourceno);
-
+    /* that_jstat = JSTAT_READDATA; */
+    /* rpfits_result = rpfitsin_(&that_jstat, NULL, NULL, &baseline, &ut, */
+    /* 			      &u, &v, &w, &flag, &bin, &if_no, &sourceno); */
+    /* printf("[scan_read] got read result %d %d for ut = %.6f baseline = %d\n", */
+    /* 	   rpfits_result, this_jstat, ut, baseline); */
+    
     // Put all the data into the structure.
-    scan_header_data->ut_seconds = ut;
+    // We set the time later when we actually read data.
+    scan_header_data->ut_seconds = -1;
+    
     get_card_value("SCANTYPE", scan_header_data->obstype, OBSTYPE_LENGTH);
-    string_copy(CALCODE(sourceno), CALCODE_LENGTH, scan_header_data->calcode);
     scan_header_data->cycle_time = param_.intime;
     
-    string_copy(SOURCENAME(sourceno), SOURCE_LENGTH, scan_header_data->source_name);
-    scan_header_data->rightascension_hours = RIGHTASCENSION(sourceno) * 180 /
-      (15 * M_PI);
-    scan_header_data->declination_degrees = DECLINATION(sourceno) * 180 / M_PI;
+    scan_header_data->num_sources = su_.n_su;
+    CALLOC(scan_header_data->source_name, scan_header_data->num_sources);
+    CALLOC(scan_header_data->rightascension_hours, scan_header_data->num_sources);
+    CALLOC(scan_header_data->declination_degrees, scan_header_data->num_sources);
+    for (i = 0; i < scan_header_data->num_sources; i++) {
+      if (i == 0) {
+	string_copy(CALCODE(i), CALCODE_LENGTH, scan_header_data->calcode);
+      }
+      CALLOC(scan_header_data->source_name[i], SOURCE_LENGTH);
+      string_copy(SOURCENAME(i), SOURCE_LENGTH, scan_header_data->source_name[i]);
+      scan_header_data->rightascension_hours[i] = RIGHTASCENSION(i) * 180 /
+	(15 * M_PI);
+      scan_header_data->declination_degrees[i] = DECLINATION(i) * 180 / M_PI;
+    }
 
     scan_header_data->num_ifs = if_.n_if;
     MALLOC(scan_header_data->if_centre_freq, scan_header_data->num_ifs);
@@ -610,7 +626,8 @@ int read_cycle_data(struct scan_header_data *scan_header_data,
     this_jstat = JSTAT_READDATA;
     rpfits_result = rpfitsin_(&this_jstat, vis, wgt, &baseline, &ut,
 			      &u, &v, &w, &flag, &bin, &if_no, &sourceno);
-    /* printf("got read result %d for ut = %.6f\n", rpfits_result, ut); */
+    printf("got read result %d %d for ut = %.6f baseline = %d\n", rpfits_result,
+	   this_jstat, ut, baseline);
     if (last_ut == -1) {
       // Set it here.
       last_ut = ut;
@@ -620,16 +637,14 @@ int read_cycle_data(struct scan_header_data *scan_header_data,
     // Check for success.
     if (this_jstat != JSTAT_SUCCESSFUL) {
       /* printf("this isn't right... %d\n", this_jstat); */
-      // Ignore illegal data.
       FREE(vis);
       FREE(wgt);
-      if (this_jstat == JSTAT_ILLEGALDATA) {
-        /* printf("got illegal data, %d\n", fg_.n_fg); */
-        continue;
-      }
       // Stop reading.
       read_data = 0;
-      if (this_jstat == JSTAT_ENDOFFILE) {
+      if (this_jstat == JSTAT_ILLEGALDATA) {
+        /* printf("got illegal data, %d\n", fg_.n_fg); */
+	rv = READER_DATA_AVAILABLE;
+      } else if (this_jstat == JSTAT_ENDOFFILE) {
         rv = READER_EXHAUSTED;
       } else if (this_jstat == JSTAT_FGTABLE) {
         // We've hit the end of this data.
@@ -642,6 +657,11 @@ int read_cycle_data(struct scan_header_data *scan_header_data,
     } else if (rpfits_result == 0) {
       fprintf(stderr, "While reading data, rpfitsin encountered an error\n");
     } else {
+      // Check if we need to set the header variables.
+      if (scan_header_data->ut_seconds < 0) {
+	scan_header_data->ut_seconds = ut;
+      }
+      
       // Check for a time change. The time has to change by at least 0.5
       // otherwise it's not really a cycle change.
       /* if ((baseline == -1) && (ut > (last_ut + 0.5))) { */

@@ -132,22 +132,34 @@ struct scan_header_data {
    * This parameter comes from the RPFITS variable `param_.intime`.
    */
   int cycle_time;
+  /*! \var num_sources
+   *  \brief The number of sources in this scan
+   *
+   * The number of sources is normally 1 for most scans, but can be
+   * larger if it's a mosaic.
+   */
+  int num_sources;
   /*! \var source_name
-   *  \brief The name of the source, supplied by the observer.
+   *  \brief The name of each source, supplied by the observer.
+   *
+   * This array of strings have length `num_sources`, and is indexed
+   * starting at 0. Each string has length SOURCE_LENGTH.
    *
    * The observer can name each scan whatever they like as the
    * source name, and this name is represented here.
    */
-  char source_name[SOURCE_LENGTH];
+  char **source_name;
   // Source coordinates.
   /*! \var rightascension_hours
-   *  \brief The right ascension of the correlated phase centre, in hours.
+   *  \brief The right ascension of the correlated phase centre, in hours,
+   *         for each source
    */
-  float rightascension_hours;
+  float *rightascension_hours;
   /*! \var declination_degrees
-   *  \brief The declination of the correlated phase centre, in degrees.
+   *  \brief The declination of the correlated phase centre, in degrees,
+   *         for each source
    */
-  float declination_degrees;
+  float *declination_degrees;
   // Frequency configuration.
   /*! \var num_ifs
    *  \brief The number of IFs stored in this scan.

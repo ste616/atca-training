@@ -775,12 +775,15 @@ void pack_scan_header_data(cmp_ctx_t *cmp, struct scan_header_data *a) {
   pack_write_string(cmp, a->calcode, CALCODE_LENGTH);
   pack_write_sint(cmp, a->cycle_time);
 
-  // Name of the source.
-  pack_write_string(cmp, a->source_name, SOURCE_LENGTH);
+  // The sources.
+  pack_write_sint(cmp, a->num_sources);
+  for (i = 0; i < a->num_sources; i++) {
+    pack_write_string(cmp, a->source_name[i], SOURCE_LENGTH);
+  }
 
   // Source coordinates.
-  pack_write_float(cmp, a->rightascension_hours);
-  pack_write_float(cmp, a->declination_degrees);
+  pack_writearray_float(cmp, a->num_sources, a->rightascension_hours);
+  pack_writearray_float(cmp, a->num_sources, a->declination_degrees);
 
   // Frequency configuration.
   pack_write_sint(cmp, a->num_ifs);
@@ -815,12 +818,19 @@ void unpack_scan_header_data(cmp_ctx_t *cmp, struct scan_header_data *a) {
   pack_read_string(cmp, a->calcode, CALCODE_LENGTH);
   pack_read_sint(cmp, &(a->cycle_time));
 
-  // Name of the source.
-  pack_read_string(cmp, a->source_name, SOURCE_LENGTH);
+  // The sources.
+  pack_read_sint(cmp, &(a->num_sources));
+  MALLOC(a->source_name, a->num_sources);
+  for (i = 0; i < a->num_sources; i++) {
+    MALLOC(a->source_name[i], SOURCE_LENGTH);
+    pack_read_string(cmp, a->source_name[i], SOURCE_LENGTH);
+  }
   
   // Source coordinates.
-  pack_read_float(cmp, &(a->rightascension_hours));
-  pack_read_float(cmp, &(a->declination_degrees));
+  MALLOC(a->rightascension_hours, a->num_sources);
+  pack_readarray_float(cmp, a->num_sources, a->rightascension_hours);
+  MALLOC(a->declination_degrees, a->num_sources);
+  pack_readarray_float(cmp, a->num_sources, a->declination_degrees);
   
   // Frequency configuration.
   pack_read_sint(cmp, &(a->num_ifs));

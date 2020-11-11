@@ -1499,6 +1499,7 @@ void calculate_system_temperatures_cycle_data(struct cycle_data *cycle_data,
   // Now we're free to actually do the system temperature computations.
   for (i = 0; i < cycle_data->num_cal_ifs; i++) {
     ifno = cycle_data->cal_ifs[i];
+    // The cal_ifs array is not necessarily in ascending IF order.
     ifsidx = ifno - 1;
     for (j = 0; j < cycle_data->num_cal_ants; j++) {
       for (k = CAL_XX; k <= CAL_YY; k++) {

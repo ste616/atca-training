@@ -1818,8 +1818,8 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
             cpglen(4, information_text, &information_text_width, &information_text_height);
             information_x_pos += information_text_width + 0.02;
             // The name of the source.
-            cpgptxt(information_x_pos, YPOS_LINE(0), 0, 0, scan_header_data->source_name);
-            cpglen(4, scan_header_data->source_name, &information_text_width,
+            cpgptxt(information_x_pos, YPOS_LINE(0), 0, 0, scan_header_data->source_name[0]);
+            cpglen(4, scan_header_data->source_name[0], &information_text_width,
                    &information_text_height);
             information_x_pos += information_text_width + 0.02;
             // Antennas on source.

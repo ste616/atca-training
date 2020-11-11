@@ -156,13 +156,13 @@ int main(int argc, char *argv[]) {
 	       scan_data->header_data.obsdate, emsg);
       }
       if (arguments.verbosity >= VERBOSITY_NORMAL) {
-	angle_to_string(scan_data->header_data.rightascension_hours, rastring,
+	angle_to_string(scan_data->header_data.rightascension_hours[0], rastring,
 			(ATS_ANGLE_IN_HOURS | ATS_STRING_IN_HOURS | ATS_STRING_SEP_LETTER |
 			 ATS_STRING_ZERO_PAD_FIRST), 1);
-	angle_to_string(scan_data->header_data.declination_degrees, decstring,
+	angle_to_string(scan_data->header_data.declination_degrees[0], decstring,
 			(ATS_ANGLE_IN_DEGREES | ATS_STRING_IN_DEGREES | ATS_STRING_SEP_LETTER |
 			 ATS_STRING_ALWAYS_SIGN), 1);
-	strip_end_spaces(scan_data->header_data.source_name, sourcename, SBUFSIZE);
+	strip_end_spaces(scan_data->header_data.source_name[0], sourcename, SBUFSIZE);
 	strip_end_spaces(scan_data->header_data.obstype, scantype, SBUFSIZE);
 	printf("  Source %s [%s %s] (cc %s), Type %s\n",
 	       sourcename, rastring, decstring,
@@ -173,7 +173,7 @@ int main(int argc, char *argv[]) {
       for (i = 0, n_continuum = 0, n_zooms = 0;
 	   i < scan_data->header_data.num_ifs; i++) {
 	channel_width = scan_data->header_data.if_bandwidth[i] /
-	  (float)(scan_data->header_data.if_num_channels[i]);
+	  (float)(scan_data->header_data.if_num_channels[i] - 1);
 	if (channel_width >= 1) {
 	  // Continuum resolution.
 	  n_continuum += 1;
