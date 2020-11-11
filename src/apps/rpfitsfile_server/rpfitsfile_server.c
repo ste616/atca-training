@@ -610,12 +610,14 @@ void data_reader(int read_type, int n_rpfits_files,
       }
       res = read_scan_header(sh);
       /* printf("[data_reader] read scan header\n"); */
-      if (sh->ut_seconds > 0) {
+      if (sh->num_sources > 0) {
         curr_header += 1;
         if (read_type & READ_SCAN_METADATA) {
           // Keep track of the times covered by each scan.
-          info_rpfits_files[i]->scan_start_mjd[n] =
-            info_rpfits_files[i]->scan_end_mjd[n] = date2mjd(sh->obsdate, sh->ut_seconds);
+          /* info_rpfits_files[i]->scan_start_mjd[n] = */
+          /*   info_rpfits_files[i]->scan_end_mjd[n] = date2mjd(sh->obsdate, sh->ut_seconds); */
+	  info_rpfits_files[i]->scan_start_mjd[n] =
+	    info_rpfits_files[i]->scan_end_mjd[n] = 0;
           info_rpfits_files[i]->n_cycles[n] = 0;
           info_rpfits_files[i]->cycle_mjd[n] = NULL;
           info_rpfits_files[i]->n_scans += 1;
@@ -665,11 +667,21 @@ void data_reader(int read_type, int n_rpfits_files,
             cycle_free = true;
             if (!(res & READER_DATA_AVAILABLE)) {
               keep_cycling = false;
+	      if (res == READER_EXHAUSTED) {
+		// No more data came from that read.
+		free_cycle_data(cycle_data);
+		FREE(cycle_data);
+		continue;
+	      }
             }
             // HERE WILL GO THE LOGIC TO WORK OUT IF WE WANT TO DO
             // SOMETHING WITH THIS CYCLE
             cycle_mjd = date2mjd(sh->obsdate, cycle_data->ut_seconds);
             if (read_type & READ_SCAN_METADATA) {
+	      // The early time of the scan is also now set.
+	      if (info_rpfits_files[i]->scan_start_mjd[n] == 0) {
+		info_rpfits_files[i]->scan_start_mjd[n] = cycle_mjd;
+	      }
               info_rpfits_files[i]->scan_end_mjd[n] = cycle_mjd;
               info_rpfits_files[i]->n_cycles[n] += 1;
               REALLOC(info_rpfits_files[i]->cycle_mjd[n], info_rpfits_files[i]->n_cycles[n]);
@@ -829,7 +841,19 @@ void data_reader(int read_type, int n_rpfits_files,
       if (res == READER_EXHAUSTED) {
         keep_reading = false;
       }
+
+      // Discard this "scan" if it didn't contain cycles.
+      if ((info_rpfits_files[i]->n_cycles[n] == 0) &&
+	  (read_type & READ_SCAN_METADATA)) {
+	REALLOC(info_rpfits_files[i]->scan_headers, n);
+	REALLOC(info_rpfits_files[i]->scan_start_mjd, n);
+	REALLOC(info_rpfits_files[i]->scan_end_mjd, n);
+	REALLOC(info_rpfits_files[i]->n_cycles, n);
+	REALLOC(info_rpfits_files[i]->cycle_mjd, n);
+	info_rpfits_files[i]->n_scans = n;
+      }
     }
+
     // If we get here we must have opened the RPFITS file.
     res = close_rpfits_file();
     if (res) {
@@ -837,8 +861,11 @@ void data_reader(int read_type, int n_rpfits_files,
               info_rpfits_files[i]->filename, res);
       return;
     }
+
+    
   }
 
+  
 }
 
 #define RPSENDBUFSIZE 104857600
@@ -963,7 +990,7 @@ int main(int argc, char *argv[]) {
   double *all_cycle_mjd = NULL;
   struct rpfits_file_information **info_rpfits_files = NULL;
   struct ampphase_options *ampphase_options = NULL, *client_options = NULL;
-  struct spectrum_data *spectrum_data, *child_spectrum_data = NULL;
+  struct spectrum_data *spectrum_data = NULL, *child_spectrum_data = NULL;
   struct vis_data *vis_data = NULL, *child_vis_data = NULL;
   FILE *fh = NULL;
   cmp_ctx_t cmp, child_cmp;

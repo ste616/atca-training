@@ -376,7 +376,8 @@ struct cycle_data* prepare_new_cycle_data(void) {
   cycle_data->wgt = NULL;
   cycle_data->bin = NULL;
   cycle_data->if_no = NULL;
-  cycle_data->source = NULL;
+  cycle_data->source_no = NULL;
+  /* cycle_data->source = NULL; */
   cycle_data->num_cal_ifs = 0;
   cycle_data->num_cal_ants = 0;
   cycle_data->cal_ifs = NULL;
@@ -486,6 +487,12 @@ void free_scan_header_data(struct scan_header_data *scan_header_data) {
   FREE(scan_header_data->ant_label);
   FREE(scan_header_data->ant_name);
   FREE(scan_header_data->ant_cartesian);
+  for (i = 0; i < scan_header_data->num_sources; i++) {
+    FREE(scan_header_data->source_name[i]);
+  }
+  FREE(scan_header_data->source_name);
+  FREE(scan_header_data->rightascension_hours);
+  FREE(scan_header_data->declination_degrees);
 }
 
 /**
@@ -510,12 +517,13 @@ void free_cycle_data(struct cycle_data *cycle_data) {
   FREE(cycle_data->flag);
   FREE(cycle_data->bin);
   FREE(cycle_data->if_no);
+  FREE(cycle_data->source_no);
   for (i = 0; i < cycle_data->num_points; i++) {
-    FREE(cycle_data->source[i]);
+    /* FREE(cycle_data->source[i]); */
     FREE(cycle_data->vis[i]);
     FREE(cycle_data->wgt[i]);
   }
-  FREE(cycle_data->source);
+  /* FREE(cycle_data->source); */
   FREE(cycle_data->vis_size);
   FREE(cycle_data->vis);
   FREE(cycle_data->wgt);
@@ -626,8 +634,8 @@ int read_cycle_data(struct scan_header_data *scan_header_data,
     this_jstat = JSTAT_READDATA;
     rpfits_result = rpfitsin_(&this_jstat, vis, wgt, &baseline, &ut,
 			      &u, &v, &w, &flag, &bin, &if_no, &sourceno);
-    printf("got read result %d %d for ut = %.6f baseline = %d\n", rpfits_result,
-	   this_jstat, ut, baseline);
+    /* printf("got read result %d %d for ut = %.6f baseline = %d\n", rpfits_result, */
+    /* 	   this_jstat, ut, baseline); */
     if (last_ut == -1) {
       // Set it here.
       last_ut = ut;
@@ -777,11 +785,12 @@ int read_cycle_data(struct scan_header_data *scan_header_data,
         ARRAY_APPEND(cycle_data->bin, cycle_data->num_points, bin);
         ARRAY_APPEND(cycle_data->if_no, cycle_data->num_points, if_no);
         ARRAY_APPEND(cycle_data->vis_size, cycle_data->num_points, vis_size);
-        // We have to do something special for the source name.
-        REALLOC(cycle_data->source, cycle_data->num_points);
-        MALLOC(cycle_data->source[cycle_data->num_points - 1], SOURCE_LENGTH);
-        string_copy(SOURCENAME(sourceno), SOURCE_LENGTH,
-                    cycle_data->source[cycle_data->num_points - 1]);
+        /* // We have to do something special for the source name. */
+        /* REALLOC(cycle_data->source, cycle_data->num_points); */
+        /* MALLOC(cycle_data->source[cycle_data->num_points - 1], SOURCE_LENGTH); */
+        /* string_copy(SOURCENAME(sourceno), SOURCE_LENGTH, */
+        /*             cycle_data->source[cycle_data->num_points - 1]); */
+	ARRAY_APPEND(cycle_data->source_no, cycle_data->num_points, sourceno);
         // Convert the vis array read into complex numbers.
         MALLOC(cvis, vis_size);
         for (i = 0; i < vis_size; i++) {

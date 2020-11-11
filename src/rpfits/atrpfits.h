@@ -501,7 +501,16 @@ struct cycle_data {
    * of `num_points` strings, each of length SOURCE_LENGTH, and is indexed
    * starting at 0. 
    */
-  char **source;
+  /* char **source; */
+  /*! \var source_no
+   *  \brief The index of the source for this cycle
+   *
+   * This array has length of `num_points`, and is indexed starting at 0.
+   *
+   * This source index corresponds with a source entry in the scan header's
+   * source table.
+   */
+  int *source_no;
 
   // Metadata.
   /*! \var num_cal_ifs
