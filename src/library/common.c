@@ -123,7 +123,12 @@ int find_pol(struct ampphase ***cycle_ampphase, int npols, int ifnum, int poltyp
   return -1;
 }
 
-
+/*!
+ *  \brief Find the index of the named IF
+ *  \param scan_header_data header information about the scan
+ *  \param name the name of the window you're searching for, something like f1 or z2
+ *  \return the index of the named IF in the header data, or -1 if it isn't found
+ */
 int find_if_name_nosafe(struct scan_header_data *scan_header_data,
                         char *name) {
   int res = -1, i, j;
@@ -140,14 +145,17 @@ int find_if_name_nosafe(struct scan_header_data *scan_header_data,
     }
   }
 
-  /* if (res < 0) { */
-  /*   res = 1; // For safety. */
-  /* } */
-
-  /* fprintf(stderr, "[find_if_name] found band %d %s\n", res, scan_header_data->if_name[res - 1][0]); */
   return res;
 }
 
+/*!
+ *  \brief Find the index of the named IF, ensuring a valid index is always
+ *         returned
+ *  \param scan_header_data header information about the scan
+ *  \param name the name of the window you're searching for, something like f1 or z2
+ *  \return the index of the named IF in the header data, or 1 (which is always
+ *          present) if the named IF isn't found
+ */
 int find_if_name(struct scan_header_data *scan_header_data,
                  char *name) {
   int res = find_if_name_nosafe(scan_header_data, name);

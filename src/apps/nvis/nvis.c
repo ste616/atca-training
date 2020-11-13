@@ -1,5 +1,8 @@
-/**
- * ATCA Training Library: nvis.c
+/** \file nvis.c
+ *  \brief New, completely recoded version of VIS, which works via network
+ *         transfer of data rather than via shared memory
+ *
+ * ATCA Training Library
  * (C) Jamie Stevens CSIRO 2020
  *
  * This is a new version of VIS, which can work with both a
@@ -33,13 +36,13 @@ const char *argp_program_version = "nvis 1.0";
 const char *argp_program_bug_address = "<Jamie.Stevens@csiro.au>";
 
 // Program documentation.
-static char doc[] = "new/network VIS";
+static char nvis_doc[] = "new/network VIS";
 
 // Argument description.
-static char args_doc[] = "[options]";
+static char nvis_args_doc[] = "[options]";
 
 // Our options.
-static struct argp_option options[] = {
+static struct argp_option nvis_options[] = {
   { "device", 'd', "PGPLOT_DEVICE", 0, "The PGPLOT device to use" },
   { "file", 'f', "FILE", 0, "Use an output file as the input" },
   { "port", 'p', "PORTNUM", 0,
@@ -53,7 +56,7 @@ static struct argp_option options[] = {
 #define MAXVISBANDS 2
 
 // The arguments structure.
-struct arguments {
+struct nvis_arguments {
   bool use_file;
   char input_file[VISBUFSIZE];
   char vis_device[VISBUFSIZE];
@@ -63,20 +66,21 @@ struct arguments {
 };
 
 // And some fun, totally necessary, global state variables.
-int action_required, server_type;
+int action_required, server_type, n_ampphase_options;
 int vis_device_number, data_selected_index;
 int xaxis_type, *yaxis_type, nxpanels, nypanels, nvisbands;
 int *visband_idx, tvchan_change_min, tvchan_change_max;
 char **visband, tvchan_visband[10];
 // Whether to order the baselines in length order (true/false).
 bool sort_baselines;
+float data_seconds;
 struct vis_plotcontrols vis_plotcontrols;
 struct panelspec vis_panelspec;
 struct vis_data vis_data;
-struct ampphase_options ampphase_options;
+struct ampphase_options **ampphase_options, *found_options;
 
-static error_t parse_opt(int key, char *arg, struct argp_state *state) {
-  struct arguments *arguments = state->input;
+static error_t nvis_parse_opt(int key, char *arg, struct argp_state *state) {
+  struct nvis_arguments *arguments = state->input;
 
   switch(key) {
   case 'd':
@@ -99,7 +103,7 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state) {
   return 0;
 }
 
-static struct argp argp = { options, parse_opt, args_doc, doc };
+static struct argp argp = { nvis_options, nvis_parse_opt, nvis_args_doc, nvis_doc };
 
 void read_data_from_file(char *filename, struct vis_data *vis_data) {
   FILE *fh = NULL;
@@ -254,15 +258,56 @@ int char_to_product(char pstring) {
   return -1;
 }
 
+/*!
+ *  \brief Find the index containing data closest to the currently set
+ *         nominated time
+ *  \return a positive (or 0) integer, representing the index of data near
+ *          the nominated time, or -1 if no sufficiently close data was found
+ *
+ * Upon entry to this routine, the global variable `data_seconds` should be
+ * set to be the UTC number of seconds past midnight of the base date that should
+ * be searched for in the global `vis_data`. If no sufficiently close data is found,
+ * this routine returns -1, and `data_seconds` is also set back to -1.
+ */
+int time_index() {
+  float close_time, delta_time;
+  int closeidx = 0, i;
+  
+  if (data_seconds < 0) {
+    // The caller hasn't set any time to search for.
+    return -1;
+  }
+
+  close_time = fabsf(vis_data.vis_quantities[0][0][0]->ut_seconds - data_seconds);
+  closeidx = 0;
+  for (i = 1; i < vis_data.nviscycles; i++) {
+    delta_time = fabsf(vis_data.vis_quantities[i][0][0]->ut_seconds -
+		       data_seconds);
+    if (delta_time < close_time) {
+      close_time = delta_time;
+      closeidx = i;
+    }
+  }
+
+  // Don't consider it a match if more than 10 minutes away.
+  if ((close_time < 600) && (closeidx >= 0) &&
+      (closeidx < vis_data.nviscycles)) {
+    return closeidx;
+  }
+  // Reset the time.
+  data_seconds = -1;
+  return -1;
+}
+
 // Callback function called for each line when accept-line
 // executed, EOF seen, or EOF character read.
 static void interpret_command(char *line) {
   char **line_els = NULL, *cycomma = NULL, delim[] = " ";
   char duration[VISBUFSIZE], historystart[VISBUFSIZE];
-  int nels, i, j, k, array_change_spec, nproducts, pr, closeidx = -1;
+  int nels, i, j, k, array_change_spec, nproducts, pr;
   int change_panel = PLOT_ALL_PANELS, iarg, plen = 0, temp_xaxis_type;
   int *temp_yaxis_type = NULL, temp_nypanels, idx_low, idx_high, ty;
-  float histlength, data_seconds = 0, delta_time = 0, close_time = 0;
+  float histlength;
   float limit_min, limit_max;
   struct vis_product **vis_products = NULL, *tproduct = NULL;
   bool products_selected, data_time_parsed = false, product_usable, succ = false;
@@ -375,29 +420,29 @@ static void interpret_command(char *line) {
       // Output a description of the data, at some time or for
       // the latest time.
       data_time_parsed = false;
-      closeidx = -1;
       if (nels == 2) {
         // The second element should be the time.
         data_time_parsed = string_to_seconds(line_els[1], &data_seconds);
         if (data_time_parsed) {
-          // Find the data with the right time.
-          close_time = fabsf(vis_data.vis_quantities[0][0][0]->ut_seconds -
-                             data_seconds);
-          closeidx = 0;
-          for (i = 1; i < vis_data.nviscycles; i++) {
-            delta_time = fabsf(vis_data.vis_quantities[i][0][0]->ut_seconds -
-                               data_seconds);
-            if (delta_time < close_time) {
-              close_time = delta_time;
-              closeidx = i;
-            }
-          }
+	  data_selected_index = time_index();
+          /* // Find the data with the right time. */
+          /* close_time = fabsf(vis_data.vis_quantities[0][0][0]->ut_seconds - */
+          /*                    data_seconds); */
+          /* closeidx = 0; */
+          /* for (i = 1; i < vis_data.nviscycles; i++) { */
+          /*   delta_time = fabsf(vis_data.vis_quantities[i][0][0]->ut_seconds - */
+          /*                      data_seconds); */
+          /*   if (delta_time < close_time) { */
+          /*     close_time = delta_time; */
+          /*     closeidx = i; */
+          /*   } */
+          /* } */
         }
       }
-      if ((closeidx >= 0) && (closeidx < vis_data.nviscycles)) {
-        // Change the data selection.
-        data_selected_index = closeidx;
-      }
+      /* if ((closeidx >= 0) && (closeidx < vis_data.nviscycles)) { */
+      /*   // Change the data selection. */
+      /*   data_selected_index = closeidx; */
+      /* } */
       
       action_required = ACTION_DESCRIBE_DATA;
     } else if (minmatch("calband", line_els[0], 4)) {
@@ -516,20 +561,22 @@ static void interpret_command(char *line) {
       // Change the delay averaging.
       if (nels == 2) {
         iarg = atoi(line_els[1]);
-        if (iarg >= 1) {
-          // Change the delay averaging for all the IFs.
-          for (i = 0; i < ampphase_options.num_ifs; i++) {
-            ampphase_options.delay_averaging[i] = iarg;
+        if ((iarg >= 1) && (found_options != NULL)) {
+          // Change the delay averaging for all the IFs, but only for
+	  // the currently selected options.
+	  for (i = 0; i < found_options->num_ifs; i++) {
+	    found_options->delay_averaging[i] = iarg;
           }
           action_required = ACTION_AMPPHASE_OPTIONS_CHANGED;
         }
       } else if (nels == 3) {
         // Change the delay averaging for the two IFs in the calband.
+	// That only works for the currently selected time.
         succ = false;
         for (i = 1; i < 3; i++) {
           iarg = atoi(line_els[i]);
-          if (iarg >= 1) {
-            ampphase_options.delay_averaging[visband_idx[i - 1]] = iarg;
+          if ((iarg >= 1) && (found_options != NULL)) {
+            found_options->delay_averaging[visband_idx[i - 1]] = iarg;
             succ = true;
           }
         }
@@ -547,32 +594,38 @@ static void interpret_command(char *line) {
           } else {
             k = i + 1;
           }
-          if (strncmp(line_els[k], "on", 2) == 0) {
-            // Turn median averaging on.
-            if (ampphase_options.averaging_method[visband_idx[i]] & AVERAGETYPE_MEAN) {
-              ampphase_options.averaging_method[visband_idx[i]] -= AVERAGETYPE_MEAN;
-            }
-            ampphase_options.averaging_method[visband_idx[i]] |= AVERAGETYPE_MEDIAN;
-          } else if (strncmp(line_els[k], "off", 3) == 0) {
-            // Turn mean averaging on.
-            if (ampphase_options.averaging_method[visband_idx[i]] & AVERAGETYPE_MEDIAN) {
-              ampphase_options.averaging_method[visband_idx[i]] -= AVERAGETYPE_MEDIAN;
-            }
-            ampphase_options.averaging_method[visband_idx[i]] |= AVERAGETYPE_MEAN;
-          }
+	  if (found_options != NULL) {
+	    if (strncmp(line_els[k], "on", 2) == 0) {
+	      // Turn median averaging on.
+	      if (found_options->averaging_method[visband_idx[i]] & AVERAGETYPE_MEAN) {
+		found_options->averaging_method[visband_idx[i]] -= AVERAGETYPE_MEAN;
+	      }
+	      found_options->averaging_method[visband_idx[i]] |= AVERAGETYPE_MEDIAN;
+	    } else if (strncmp(line_els[k], "off", 3) == 0) {
+	      // Turn mean averaging on.
+	      if (found_options->averaging_method[visband_idx[i]] & AVERAGETYPE_MEDIAN) {
+		found_options->averaging_method[visband_idx[i]] -= AVERAGETYPE_MEDIAN;
+	      }
+	      found_options->averaging_method[visband_idx[i]] |= AVERAGETYPE_MEAN;
+	    }
+	  }
         }
         action_required = ACTION_AMPPHASE_OPTIONS_CHANGED;
       } else {
         // Output the averaging type.
         printf(" Currently using averaging type:");
         for (i = 0; i < nvisbands; i++) {
-          if (ampphase_options.averaging_method[visband_idx[i]] & AVERAGETYPE_MEAN) {
-            printf(" MEAN");
-          } else if (ampphase_options.averaging_method[visband_idx[i]] & AVERAGETYPE_MEDIAN) {
-            printf(" MEDIAN");
-          } else {
-            printf(" UNKNOWN!");
-          }
+	  if (found_options != NULL) {
+	    if (found_options->averaging_method[visband_idx[i]] & AVERAGETYPE_MEAN) {
+	      printf(" MEAN");
+	    } else if (found_options->averaging_method[visband_idx[i]] & AVERAGETYPE_MEDIAN) {
+	      printf(" MEDIAN");
+	    } else {
+	      printf(" UNKNOWN!");
+	    }
+	  } else {
+	    printf(" NO OPTIONS FOUND!");
+	  }
         }
         printf("\n");
       }
@@ -593,10 +646,17 @@ static void interpret_command(char *line) {
     } else if (minmatch("onsource", line_els[0], 3)) {
       CHECKSIMULATOR;
       // Change whether we display data while off-source.
-      if (ampphase_options.include_flagged_data == YES) {
-        ampphase_options.include_flagged_data = NO;
-      } else {
-        ampphase_options.include_flagged_data = YES;
+      for (i = 0; i < n_ampphase_options; i++) {
+	if (i == 0) {
+	  if (ampphase_options[i]->include_flagged_data == YES) {
+	    ampphase_options[i]->include_flagged_data = NO;
+	  } else {
+	    ampphase_options[i]->include_flagged_data = YES;
+	  }
+	} else {
+	  ampphase_options[i]->include_flagged_data =
+	    ampphase_options[i - 1]->include_flagged_data;
+	}
       }
       action_required = ACTION_AMPPHASE_OPTIONS_CHANGED;
     } else {
@@ -651,8 +711,8 @@ static void interpret_command(char *line) {
 
 
 int main(int argc, char *argv[]) {
-  struct arguments arguments;
-  int i, j, r, bytes_received, nmesg = 0, fidx = 0, bidx = -1;
+  struct nvis_arguments arguments;
+  int i, j, r, bytes_received, nmesg = 0, bidx = -1;
   cmp_ctx_t cmp;
   cmp_mem_access_t mem;
   struct requests server_request;
@@ -666,7 +726,7 @@ int main(int argc, char *argv[]) {
   struct vis_quantities ***described_ptr = NULL;
   struct scan_header_data *described_hdr = NULL;
 
-  // Allocate some memory.
+  // Allocate and initialise some memory.
   MALLOC(mesgout, MAX_N_MESSAGES);
   for (i = 0; i < MAX_N_MESSAGES; i++) {
     CALLOC(mesgout[i], VISBUFSIZE);
@@ -682,6 +742,9 @@ int main(int argc, char *argv[]) {
       visband_idx[i] = 0;
     }
   }
+  n_ampphase_options = 0;
+  ampphase_options = NULL;
+  found_options = NULL;
 
   // Set the default for the arguments.
   arguments.use_file = false;
@@ -695,6 +758,7 @@ int main(int argc, char *argv[]) {
   nxpanels = 1;
   nypanels = 3;
   CALLOC(yaxis_type, nypanels);
+  data_seconds = -1;
   
   // Parse the arguments.
   argp_parse(&argp, argc, argv, 0, 0, &arguments);
@@ -768,18 +832,38 @@ int main(int argc, char *argv[]) {
       action_required -= ACTION_NEW_DATA_RECEIVED;
       action_required |= ACTION_VISBANDS_CHANGED;
       // Reset the selected index from the data.
-      data_selected_index = vis_data.nviscycles - 1;
+      if (data_seconds > 0) {
+	// We've already got a time setting, which we should try to keep
+	// if possible.
+	data_selected_index = time_index();
+      }
+      if (data_seconds <= 0) {
+	// Couldn't keep it, or has never been set.
+	data_selected_index = vis_data.nviscycles - 1;
+      }
       described_hdr = vis_data.header_data[data_selected_index];
-      // And get the ampphase_options from this selected index.
-      fidx = vis_data.num_ifs[data_selected_index];
-      copy_ampphase_options(&ampphase_options,
-                            vis_data.vis_quantities[data_selected_index][fidx - 1][0]->options);
-      // We will need to fill in all the tvchannels though...
-      for (i = 1; i < fidx; i++) {
-        ampphase_options.min_tvchannel[i] =
-          vis_data.vis_quantities[data_selected_index][i - 1][0]->options->min_tvchannel[i];
-        ampphase_options.max_tvchannel[i] =
-          vis_data.vis_quantities[data_selected_index][i - 1][0]->options->max_tvchannel[i];
+      found_options = find_ampphase_options(n_ampphase_options, ampphase_options,
+					    described_hdr);
+      // And get all the ampphase_options that were supplied.
+      /* fidx = vis_data.num_ifs[data_selected_index]; */
+      /* copy_ampphase_options(&ampphase_options, */
+      /*                       vis_data.vis_quantities[data_selected_index][fidx - 1][0]->options); */
+      /* // We will need to fill in all the tvchannels though... */
+      /* for (i = 1; i < fidx; i++) { */
+      /*   ampphase_options.min_tvchannel[i] = */
+      /*     vis_data.vis_quantities[data_selected_index][i - 1][0]->options->min_tvchannel[i]; */
+      /*   ampphase_options.max_tvchannel[i] = */
+      /*     vis_data.vis_quantities[data_selected_index][i - 1][0]->options->max_tvchannel[i]; */
+      /* } */
+      for (i = 0; i < n_ampphase_options; i++) {
+	free_ampphase_options(ampphase_options[i]);
+	FREE(ampphase_options[i]);
+      }
+      n_ampphase_options = vis_data.num_options;
+      REALLOC(ampphase_options, n_ampphase_options);
+      for (i = 0; i < n_ampphase_options; i++) {
+	CALLOC(ampphase_options[i], 1);
+	copy_ampphase_options(ampphase_options[i], vis_data.options[i]);
       }
     }
 
@@ -807,6 +891,8 @@ int main(int argc, char *argv[]) {
       // Describe the data.
       described_ptr = vis_data.vis_quantities[data_selected_index];
       described_hdr = vis_data.header_data[data_selected_index];
+      found_options = find_ampphase_options(n_ampphase_options, ampphase_options,
+					    described_hdr);
       seconds_to_hourlabel(described_ptr[0][0]->ut_seconds, htime);
       nmesg = 0;
       snprintf(mesgout[nmesg++], VISBUFSIZE, "DATA AT %s %s:\n",
@@ -838,29 +924,31 @@ int main(int argc, char *argv[]) {
 
     if (action_required & ACTION_AMPPHASE_OPTIONS_PRINT) {
       // Output the ampphase_options that were used for the
-      // computation of the data.
+      // computation of the data at the selected index.
       nmesg = 0;
       snprintf(mesgout[nmesg++], VISBUFSIZE, "VIS DATA COMPUTED WITH OPTIONS:\n");
       snprintf(mesgout[nmesg++], VISBUFSIZE, " PHASE UNITS: %s\n",
-               (ampphase_options.phase_in_degrees ? "degrees" : "radians"));
-      for (i = 1; i < ampphase_options.num_ifs; i++) {
-        snprintf(mesgout[nmesg++], VISBUFSIZE, " BAND F%d:\n", i);
+               (found_options->phase_in_degrees ? "degrees" : "radians"));
+      for (i = 1; i < found_options->num_ifs; i++) {
+        snprintf(mesgout[nmesg++], VISBUFSIZE, " BAND F%d CF %.1f BW %.1f NCHAN %d:\n",
+		 i, found_options->if_centre_freq[i], found_options->if_bandwidth[i],
+		 found_options->if_nchannels[i]);
         snprintf(mesgout[nmesg++], VISBUFSIZE, "   DELAY AVERAGING: %d\n",
-                 ampphase_options.delay_averaging[i]);
+                 found_options->delay_averaging[i]);
         snprintf(mesgout[nmesg++], VISBUFSIZE, "   AVERAGING METHOD: ");
-        if (ampphase_options.averaging_method[i] & AVERAGETYPE_VECTOR) {
+        if (found_options->averaging_method[i] & AVERAGETYPE_VECTOR) {
           snprintf(mesgout[nmesg++], VISBUFSIZE, "VECTOR ");
-        } else if (ampphase_options.averaging_method[i] & AVERAGETYPE_SCALAR) {
+        } else if (found_options->averaging_method[i] & AVERAGETYPE_SCALAR) {
           snprintf(mesgout[nmesg++], VISBUFSIZE, "SCALAR ");
         }
-        if (ampphase_options.averaging_method[i] & AVERAGETYPE_MEAN) {
+        if (found_options->averaging_method[i] & AVERAGETYPE_MEAN) {
           snprintf(mesgout[nmesg++], VISBUFSIZE, "MEAN");
-        } else if (ampphase_options.averaging_method[i] & AVERAGETYPE_MEDIAN) {
+        } else if (found_options->averaging_method[i] & AVERAGETYPE_MEDIAN) {
           snprintf(mesgout[nmesg++], VISBUFSIZE, "MEDIAN");
         }
         snprintf(mesgout[nmesg++], VISBUFSIZE, "\n   TVCHANNELS: %d - %d\n",
-                 ampphase_options.min_tvchannel[i],
-                 ampphase_options.max_tvchannel[i]);
+                 found_options->min_tvchannel[i],
+                 found_options->max_tvchannel[i]);
       }
       readline_print_messages(nmesg, mesgout);
       action_required -= ACTION_AMPPHASE_OPTIONS_PRINT;
@@ -876,8 +964,8 @@ int main(int argc, char *argv[]) {
         snprintf(mesgout[nmesg++], VISBUFSIZE, "Band %s not found in data.\n",
                  tvchan_visband);
       } else {
-        ampphase_options.min_tvchannel[bidx] = tvchan_change_min;
-        ampphase_options.max_tvchannel[bidx] = tvchan_change_max;
+        found_options->min_tvchannel[bidx] = tvchan_change_min;
+        found_options->max_tvchannel[bidx] = tvchan_change_max;
         action_required |= ACTION_AMPPHASE_OPTIONS_CHANGED;
       }
 
@@ -891,7 +979,10 @@ int main(int argc, char *argv[]) {
       server_request.request_type = REQUEST_COMPUTE_VISDATA;
       init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)VISBUFSIZE);
       pack_requests(&cmp, &server_request);
-      pack_ampphase_options(&cmp, &ampphase_options);
+      pack_write_sint(&cmp, n_ampphase_options);
+      for (i = 0; i < n_ampphase_options; i++) {
+	pack_ampphase_options(&cmp, ampphase_options[i]);
+      }
       socket_send_buffer(socket_peer, send_buffer, cmp_mem_access_get_pos(&mem));
       action_required -= ACTION_AMPPHASE_OPTIONS_CHANGED;
     }

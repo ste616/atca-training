@@ -1,5 +1,7 @@
-/**
- * ATCA Training Library: plotting.c
+/** \file plotting.c
+ *  \brief Routines used to make plots, and supporting routines
+ *
+ * ATCA Training Library
  * (C) Jamie Stevens CSIRO 2020
  *
  * This module contains functions that need to plot things with
@@ -13,6 +15,17 @@
 #include "cpgplot.h"
 #include "plotting.h"
 
+/*!
+ *  \brief Work out how many polarisations are needed for a plot
+ *  \param plotcontrols a structure set by the user to control how a plot should
+ *                      look and what information it should contain
+ *
+ * This routine is necessary since the `plot_options` variable in the
+ * spd_plotcontrols structure is a bitwise OR combination, so it not super
+ * easy to work out how many options have been included. This routine doesn't
+ * have a return value because it sets a value within the structure it is
+ * called with.
+ */
 void count_polarisations(struct spd_plotcontrols *plotcontrols) {
 
   plotcontrols->npols = 0;

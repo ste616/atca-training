@@ -146,6 +146,28 @@ struct ampphase_options {
    * actually the largest window number we know about plus 1.
    */
   int num_ifs;
+  /*! \var if_centre_freq
+   *  \brief The centre frequency of each IF we have information for, in MHz
+   *
+   * This array has size `num_ifs`, and is indexed starting at 1.
+   *
+   * Because a data set may have many different IF configurations, and the user
+   * may want different options for each, we need to keep a record of the IF
+   * configuration we apply to.
+   */
+  float *if_centre_freq;
+  /*! \var if_bandwidth
+   *  \brief The bandwidth of each IF we have information for, in MHz
+   *
+   * This array has size `num_ifs`, and is indexed starting at 1.
+   */
+  float *if_bandwidth;
+  /*! \var if_nchannels
+   *  \brief The number of channels in each IF we have information for
+   *
+   * This array has size `num_ifs`, and is indexed starting at 1.
+   */
+  int *if_nchannels;
   /*! \var min_tvchannel
    *  \brief The lowest numbered channel to include in the tvchannel range for
    *         each IF
@@ -1020,6 +1042,18 @@ struct vis_data {
    * This array of pointers has length `nviscycles`, and is indexed starting at 0.
    */
   struct syscal_data **syscal_data;
+  /*! \var num_options
+   *  \brief The number of options structures we know about, which were
+   *         present while these data were computed
+   */
+  int num_options;
+  /*! \var options
+   *  \brief An array of the options structures that were used to compute these
+   *         data
+   *
+   * This array has length `num_options`, and is indexed starting at 0.
+   */
+  struct ampphase_options **options;
 };
 
 float fmedianf(float *a, int n);
@@ -1034,6 +1068,9 @@ void set_default_ampphase_options(struct ampphase_options *options);
 void copy_ampphase_options(struct ampphase_options *dest,
                            struct ampphase_options *src);
 void free_ampphase_options(struct ampphase_options *options);
+struct ampphase_options* find_ampphase_options(int num_options,
+					       struct ampphase_options **options,
+					       struct scan_header_data *scan_header_data);
 void copy_metinfo(struct metinfo *dest,
                   struct metinfo *src);
 void copy_syscal_data(struct syscal_data *dest,
@@ -1046,8 +1083,8 @@ void add_tvchannels_to_options(struct ampphase_options *ampphase_options,
                                int window, int min_tvchannel, int max_tvchannel);
 int vis_ampphase(struct scan_header_data *scan_header_data,
                  struct cycle_data *cycle_data,
-                 struct ampphase **ampphase, int pol, int ifno,
-                 struct ampphase_options *options);
+                 struct ampphase **ampphase, int pol, int ifno, int *num_options,
+                 struct ampphase_options ***options);
 int cmpfunc_real(const void *a, const void *b);
 int cmpfunc_complex(const void *a, const void *b);
 int ampphase_average(struct ampphase *ampphase,

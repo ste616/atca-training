@@ -237,6 +237,9 @@ void pack_ampphase_options(cmp_ctx_t *cmp, struct ampphase_options *a) {
   pack_write_bool(cmp, a->phase_in_degrees);
   pack_write_sint(cmp, a->include_flagged_data);
   pack_write_sint(cmp, a->num_ifs);
+  pack_writearray_float(cmp, a->num_ifs, a->if_centre_freq);
+  pack_writearray_float(cmp, a->num_ifs, a->if_bandwidth);
+  pack_writearray_sint(cmp, a->num_ifs, a->if_nchannels);
   pack_writearray_sint(cmp, a->num_ifs, a->min_tvchannel);
   pack_writearray_sint(cmp, a->num_ifs, a->max_tvchannel);
   pack_writearray_sint(cmp, a->num_ifs, a->delay_averaging);
@@ -249,10 +252,16 @@ void unpack_ampphase_options(cmp_ctx_t *cmp, struct ampphase_options *a) {
   pack_read_bool(cmp, &(a->phase_in_degrees));
   pack_read_sint(cmp, &(a->include_flagged_data));
   pack_read_sint(cmp, &(a->num_ifs));
+  MALLOC(a->if_centre_freq, a->num_ifs);
+  MALLOC(a->if_bandwidth, a->num_ifs);
+  MALLOC(a->if_nchannels, a->num_ifs);
   MALLOC(a->min_tvchannel, a->num_ifs);
   MALLOC(a->max_tvchannel, a->num_ifs);
   MALLOC(a->delay_averaging, a->num_ifs);
   MALLOC(a->averaging_method, a->num_ifs);
+  pack_readarray_float(cmp, a->num_ifs, a->if_centre_freq);
+  pack_readarray_float(cmp, a->num_ifs, a->if_bandwidth);
+  pack_readarray_sint(cmp, a->num_ifs, a->if_nchannels);
   pack_readarray_sint(cmp, a->num_ifs, a->min_tvchannel);
   pack_readarray_sint(cmp, a->num_ifs, a->max_tvchannel);
   pack_readarray_sint(cmp, a->num_ifs, a->delay_averaging);
@@ -676,6 +685,11 @@ void pack_vis_data(cmp_ctx_t *cmp, struct vis_data *a) {
   for (i = 0; i < a->nviscycles; i++) {
     pack_syscal_data(cmp, a->syscal_data[i]);
   }
+  // And the options.
+  pack_write_sint(cmp, a->num_options);
+  for (i = 0; i < a->num_options; i++) {
+    pack_ampphase_options(cmp, a->options[i]);
+  }
 }
 
 void unpack_vis_data(cmp_ctx_t *cmp, struct vis_data *a) {
@@ -732,6 +746,13 @@ void unpack_vis_data(cmp_ctx_t *cmp, struct vis_data *a) {
   for (i = 0; i < a->nviscycles; i++) {
     MALLOC(a->syscal_data[i], 1);
     unpack_syscal_data(cmp, a->syscal_data[i]);
+  }
+  // And the options.
+  pack_read_sint(cmp, &(a->num_options));
+  MALLOC(a->options, a->num_options);
+  for (i = 0; i < a->num_options; i++) {
+    MALLOC(a->options[i], 1);
+    unpack_ampphase_options(cmp, a->options[i]);
   }
 }
 

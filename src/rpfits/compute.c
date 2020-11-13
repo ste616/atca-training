@@ -287,6 +287,9 @@ struct ampphase_options ampphase_options_default(void) {
   options.phase_in_degrees = true;
   options.include_flagged_data = 0;
   options.num_ifs = 0;
+  options.if_centre_freq = NULL;
+  options.if_bandwidth = NULL;
+  options.if_nchannels = NULL;
   options.min_tvchannel = NULL;
   options.max_tvchannel = NULL;
   options.delay_averaging = NULL;
@@ -307,6 +310,9 @@ void set_default_ampphase_options(struct ampphase_options *options) {
   options->phase_in_degrees = true;
   options->include_flagged_data = 0;
   options->num_ifs = 0;
+  options->if_centre_freq = NULL;
+  options->if_bandwidth = NULL;
+  options->if_nchannels = NULL;
   options->min_tvchannel = NULL;
   options->max_tvchannel = NULL;
   options->delay_averaging = NULL;
@@ -324,11 +330,17 @@ void copy_ampphase_options(struct ampphase_options *dest,
   STRUCTCOPY(src, dest, phase_in_degrees);
   STRUCTCOPY(src, dest, include_flagged_data);
   STRUCTCOPY(src, dest, num_ifs);
+  REALLOC(dest->if_centre_freq, dest->num_ifs);
+  REALLOC(dest->if_bandwidth, dest->num_ifs);
+  REALLOC(dest->if_nchannels, dest->num_ifs);
   REALLOC(dest->min_tvchannel, dest->num_ifs);
   REALLOC(dest->max_tvchannel, dest->num_ifs);
   REALLOC(dest->delay_averaging, dest->num_ifs);
   REALLOC(dest->averaging_method, dest->num_ifs);
   for (i = 0; i < dest->num_ifs; i++) {
+    STRUCTCOPY(src, dest, if_centre_freq[i]);
+    STRUCTCOPY(src, dest, if_bandwidth[i]);
+    STRUCTCOPY(src, dest, if_nchannels[i]);
     STRUCTCOPY(src, dest, min_tvchannel[i]);
     STRUCTCOPY(src, dest, max_tvchannel[i]);
     STRUCTCOPY(src, dest, delay_averaging[i]);
@@ -344,10 +356,51 @@ void copy_ampphase_options(struct ampphase_options *dest,
  * the structure, but will not free the structure memory.
  */
 void free_ampphase_options(struct ampphase_options *options) {
+  FREE(options->if_centre_freq);
+  FREE(options->if_bandwidth);
+  FREE(options->if_nchannels);
   FREE(options->min_tvchannel);
   FREE(options->max_tvchannel);
   FREE(options->delay_averaging);
   FREE(options->averaging_method);
+}
+
+/*!
+ *  \brief Find ampphase_options structure from an array that matches
+ *         the band configuration in the scan header
+ *  \param num_options the number of options structures in the array \a options
+ *  \param options an array of ampphase_options structures
+ *  \param scan_header_data the scan header data describing the band configuration
+ *                          you're seeeking
+ *  \return a pointer to the ampphase_options structure, or NULL if no match
+ *          was found
+ */
+struct ampphase_options* find_ampphase_options(int num_options,
+					       struct ampphase_options **options,
+					       struct scan_header_data *scan_header_data) {
+  int i, j;
+  bool all_bands_match = false;
+  struct ampphase_options *match = NULL;
+
+  for (i = 0; i < num_options; i++) {
+    if (options[i]->num_ifs == scan_header_data->num_ifs) {
+      all_bands_match = true;
+      for (j = 0; j < options[i]->num_ifs; j++) {
+	if ((options[i]->if_centre_freq[j] != scan_header_data->if_centre_freq[j]) ||
+	    (options[i]->if_bandwidth[j] != scan_header_data->if_bandwidth[j]) ||
+	    (options[i]->if_nchannels[j] != scan_header_data->if_num_channels[j])) {
+	  all_bands_match = false;
+	  break;
+	}
+      }
+      if (all_bands_match == true) {
+	match = options[i];
+	break;
+      }
+    }
+  }
+
+  return match;
 }
 
 /*!
@@ -608,7 +661,12 @@ void add_tvchannels_to_options(struct ampphase_options *ampphase_options,
  *                  this routine will allocate the memory for the output structure
  *  \param pol the polarisation to compute the data for; one of the magic numbers POL_*
  *  \param ifnum the window number to compute the data for; the first window is 1
- *  \param options the options to use when doing the computations
+ *  \param num_options the number of ampphase_options structures in the following
+ *                     array
+ *  \param options the array of options which can be used when doing the computations;
+ *                 this array will be searched for the options matching the band
+ *                 configuration present in the scan_header_data, and if no match is
+ *                 found, a new set of options will be added to this array
  *  \return an indication of whether the computations have worked:
  *          - -1 means that the specified `ifnum` or `pol` aren't in the raw data
  *          - 0 means the computations were successful
@@ -626,13 +684,14 @@ void add_tvchannels_to_options(struct ampphase_options *ampphase_options,
 int vis_ampphase(struct scan_header_data *scan_header_data,
                  struct cycle_data *cycle_data,
                  struct ampphase **ampphase,
-                 int pol, int ifnum,
-                 struct ampphase_options *options) {
+                 int pol, int ifnum, int *num_options,
+                 struct ampphase_options ***options) {
   int ap_created = 0, reqpol = -1, i = 0, polnum = -1, bl = -1, bidx = -1;
   int j = 0, jflag = 0, vidx = -1, cidx = -1, ifno, syscal_if_idx = -1;
   int syscal_pol_idx = -1;
   float rcheck = 0, chanwidth, firstfreq, nhalfchan;
-  struct ampphase_options default_options;
+  bool needs_new_options = false;
+  struct ampphase_options default_options, *band_options = NULL;
 
   // Check we know about the window number we were given.
   if ((ifnum < 1) || (ifnum > scan_header_data->num_ifs)) {
@@ -649,10 +708,42 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
     return -1;
   }
 
-  // Check for options.
-  default_options = ampphase_options_default();
-  if (options == NULL) {
-    options = &default_options;
+  // Try to find the correct options for this band.
+  band_options = find_ampphase_options(*num_options, *options,
+				       scan_header_data);
+  needs_new_options = (band_options == NULL);
+  /* for (i = 0; i < *num_options; i++) { */
+  /*   if ((*options)[i]->num_ifs == scan_header_data->num_ifs) { */
+  /*     all_bands_match = true; */
+  /*     for (j = 0; j < (*options)[i]->num_ifs; j++) { */
+  /* 	if (((*options)[i]->if_centre_freq[j] != scan_header_data->if_centre_freq[j]) || */
+  /* 	    ((*options)[i]->if_bandwidth[j] != scan_header_data->if_bandwidth[j]) || */
+  /* 	    ((*options)[i]->if_nchannels[j] != scan_header_data->if_num_channels[j])) { */
+  /* 	  all_bands_match = false; */
+  /* 	  break; */
+  /* 	} */
+  /*     } */
+  /*     if (all_bands_match == true) { */
+  /* 	// We've found a matching set of options. */
+  /* 	band_options = (*options)[i]; */
+  /* 	needs_new_options = false; */
+  /*     } */
+  /*   } */
+  /* } */
+
+  if (needs_new_options) {
+    default_options = ampphase_options_default();
+    *num_options += 1;
+    REALLOC(*options, *num_options);
+    CALLOC((*options)[*num_options - 1], 1);
+    (*options)[*num_options - 1] = &default_options;
+    band_options = (*options)[*num_options - 1];
+    /* if ((*options == NULL) || (*num_options == 0)) { */
+    /*   *num_options = 1; */
+    /* MALLOC(*options, *num_options); */
+    /* MALLOC((*options)[0], 1); */
+    /* needs_new_options = true; */
+    /* (*options)[0] = &default_options; */
   }
   
   // Determine which of the polarisations is the one requested.
@@ -675,7 +766,7 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
   }
   (*ampphase)->window = ifnum;
   (void)strncpy((*ampphase)->window_name, scan_header_data->if_name[ifno][1], 8);
-  (*ampphase)->options = options;
+  (*ampphase)->options = band_options;
   // Get the number of channels in this window.
   (*ampphase)->nchannels = scan_header_data->if_num_channels[ifno];
   
@@ -960,7 +1051,7 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
       (*ampphase)->amplitude[bidx][cidx][j] = cabsf(cycle_data->vis[i][vidx]);
       (*ampphase)->phase[bidx][cidx][j] = cargf(cycle_data->vis[i][vidx]);
       (*ampphase)->raw[bidx][cidx][j] = cycle_data->vis[i][vidx];
-      if (options->phase_in_degrees == true) {
+      if (band_options->phase_in_degrees == true) {
         (*ampphase)->phase[bidx][cidx][j] *= (180 / M_PI);
       }
       // Now assign the data to the arrays considering flagging.
