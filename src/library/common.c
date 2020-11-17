@@ -496,7 +496,7 @@ void angle_to_string(float angle, char *angle_string, int conversion_type,
   int firstint, secondint, secondlength, thirdlength;
   bool isnegative;
   char firstlabel[3], secondlabel[3], thirdlabel[2], oform_first[10];
-  char oform_second[10], oform_third[10], oform_all[30], signchar[2];
+  char oform_second[10], oform_third[10], oform_all[40], signchar[2];
   
   // Begin by converting the angle to the output units.
   out_angle = angle;
@@ -613,7 +613,7 @@ void angle_to_string(float angle, char *angle_string, int conversion_type,
     thirdlength = 3 + precision;
     snprintf(oform_third, 9, "%%0%d.%df%%s", thirdlength, precision);
   }
-  snprintf(oform_all, 29, "%%s%s%s%s", oform_first, oform_second, oform_third);
+  snprintf(oform_all, 39, "%%s%s%s%s", oform_first, oform_second, oform_third);
   signchar[0] = 0; signchar[1] = 0;
   if (isnegative) {
     signchar[0] = '-';
