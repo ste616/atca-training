@@ -1,5 +1,8 @@
-/**
- * ATCA Training Library: atnetworking.c
+/** \file atnetworking.c
+ *  \brief Networking routines to ensure smooth communication between all the
+ *         tools
+ *
+ * ATCA Training Library
  * (C) Jamie Stevens CSIRO 2020
  *
  * Some networking routines and definitions for all the tools.
@@ -160,19 +163,49 @@ const char *get_servertype_string(int type) {
   }
 }
 
-SOCKET find_client(struct client_sockets *clients,
-                   char *client_id) {
-  int i;
+/*!
+ *  \brief Find the client identified either by its ID or username
+ *  \param clients The client_sockets structure containing all the information
+ *                 about the clients
+ *  \param client_id The ID to search for, or zero-length string if not searching
+ *                   for client ID
+ *  \param client_username The username to search for, or zero-length string if
+ *                         not searching for client username
+ *  \param n_clients A pointer to a variable which upon exit will be filled with
+ *                   the number of matched clients
+ *  \param client_sockets A pointer to a variable which upon exit will be an
+ *                        array of length `n_clients`, with each element being
+ *                        the socket number of a matched client
+ *
+ * If searching for a client_id, there should only ever be a single match, since
+ * the library randomly generates client IDs. However, any number of clients may
+ * share a username.
+ */
+void find_client(struct client_sockets *clients,
+		 char *client_id, char *client_username,
+		 int *n_clients, SOCKET **client_sockets) {
+  int i, n = 0;
+  SOCKET *sockets = NULL;
+  
   for (i = 0; i < clients->num_sockets; i++) {
-    if (strncmp(clients->client_id[i], client_id, CLIENTIDLENGTH) == 0) {
-      return(clients->socket[i]);
+    if (((strlen(client_id) > 0) && (strlen(clients->client_id[i]) > 0) &&
+	 (strncmp(clients->client_id[i], client_id, CLIENTIDLENGTH) == 0)) ||
+	((strlen(client_username) > 0) && (strlen(clients->client_username[i]) > 0) &&
+	 (strncmp(clients->client_username[i], client_username, CLIENTIDLENGTH) == 0))) {
+      n += 1;
+      REALLOC(sockets, n);
+      sockets[n - 1] = clients->socket[i];
+      //return(clients->socket[i]);
     }
   }
-  return(-1);
+  //return(-1);
+
+  *n_clients = n;
+  *client_sockets = sockets;
 }
 
 void add_client(struct client_sockets *clients, char *client_id,
-                SOCKET socket) {
+		char *client_username, SOCKET socket) {
   int n;
   SOCKET check;
   // Check if we already know about it.
@@ -186,6 +219,8 @@ void add_client(struct client_sockets *clients, char *client_id,
     REALLOC(clients->client_id, n);
     MALLOC(clients->client_id[n - 1], CLIENTIDLENGTH);
     strncpy(clients->client_id[n - 1], client_id, CLIENTIDLENGTH);
+    CALLOC(clients->client_username[n - 1], CLIENTIDLENGTH);
+    strncpy(clients->client_username[n - 1], client_username, CLIENTIDLENGTH);
 
     clients->num_sockets = n;
   }
@@ -195,7 +230,9 @@ void free_client_sockets(struct client_sockets *clients) {
   int i;
   for (i = 0; i < clients->num_sockets; i++) {
     FREE(clients->client_id[i]);
+    FREE(clients->client_username[i]);
   }
   FREE(clients->socket);
   FREE(clients->client_id);
+  FREE(clients->client_username);
 }

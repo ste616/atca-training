@@ -905,6 +905,8 @@ void pack_requests(cmp_ctx_t *cmp, struct requests *a) {
   pack_write_sint(cmp, a->request_type);
   // The ID of the client.
   pack_write_string(cmp, a->client_id, CLIENTIDLENGTH);
+  // The username of the client.
+  pack_write_string(cmp, a->client_username, CLIENTIDLENGTH);
 }
 
 void unpack_requests(cmp_ctx_t *cmp, struct requests *a) {
@@ -912,6 +914,8 @@ void unpack_requests(cmp_ctx_t *cmp, struct requests *a) {
   pack_read_sint(cmp, &(a->request_type));
   // The ID of the client.
   pack_read_string(cmp, a->client_id, CLIENTIDLENGTH);
+  // The username of the client.
+  pack_read_string(cmp, a->client_username, CLIENTIDLENGTH);
 }
 
 void pack_responses(cmp_ctx_t *cmp, struct responses *a) {

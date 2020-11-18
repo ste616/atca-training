@@ -374,6 +374,45 @@ struct rpfits_file_information *new_rpfits_file(void) {
   return (rv);
 }
 
+/*! \struct client_ampphase_options
+ *  \brief Structure to hold the last-used ampphase_options set for each
+ *         different user or client
+ */
+struct client_ampphase_options {
+  /*! \var num_clients
+   *  \brief The number of clients we hold data for
+   */
+  int num_clients;
+  /*! \var client_id
+   *  \brief The ID of each of the clients
+   *
+   * This array of strings has size `num_clients`, and is indexed starting
+   * at 0. Each string has length CLIENTIDLENGTH.
+   */
+  char **client_id;
+  /*! \var client_username
+   *  \brief The username of each of the clients
+   *
+   * This array of strings has size `num_clients`, and is indexed starting
+   * at 0. Each string has length CLIENTIDLENGTH.
+   */
+  char **client_username;
+  /*! \var n_ampphase_options
+   *  \brief The number of ampphase_options provided by each client
+   *
+   * This array has size `num_clients`, and is indexed starting at 0.
+   */
+  int *n_ampphase_options;
+  /*! \var ampphase_options
+   *  \brief The set of ampphase_options provided by each client
+   *
+   * This 2-D array has size `num_clients` for the first index, and
+   * `n_ampphase_options[i]` for the second index, where `i` is the position
+   * along the first index. Both indices start at 0.
+   */
+  struct ampphase_options ***ampphase_options;
+};
+
 bool add_cache_spd_data(struct ampphase_options *options,
                         struct spectrum_data *data) {
   int i, n;
@@ -943,6 +982,55 @@ void add_client_spd_data(struct client_spd_data *client_spd_data,
   copy_spectrum_data(client_spd_data->spectrum_data[n], spectrum_data);
 }
 
+void add_client_ampphase_options(struct client_ampphase_options *client_ampphase_options,
+				 char *client_id, char *client_username,
+				 int n_ampphase_options,
+				 struct ampphase_options **ampphase_options) {
+  int i, j, n;
+  // This is the position to add this client data, by default at the end.
+  n = client_ampphase_options->num_clients;
+
+  // Check first to see if this client ID or username is already present.
+  for (i = 0; i < client_ampphase_options->num_clients; i++) {
+    if ((strncmp(client_ampphase_options->client_id[i], client_id, CLIENTIDLENGTH) == 0) ||
+	((strlen(client_ampphase_options->client_username[i]) > 0) &&
+	 (strlen(client_username) > 0) &&
+	 (strncmp(client_ampphase_options->client_username[i], client_username,
+		  CLIENTIDLENGTH) == 0))) {
+      // We will replace this data.
+      n = i;
+      break;
+    }
+  }
+
+  // Store the ampphase_options.
+  if (n >= client_ampphase_options->num_clients) {
+    REALLOC(client_ampphase_options->client_id, (n + 1));
+    REALLOC(client_ampphase_options->client_username, (n + 1));
+    REALLOC(client_ampphase_options->n_ampphase_options, (n + 1));
+    REALLOC(client_ampphase_options->ampphase_options, (n + 1));
+    for (j = client_ampphase_options->num_clients; j < (n + 1); j++) {
+      CALLOC(client_ampphase_options->client_id[j], CLIENTIDLENGTH);
+      CALLOC(client_ampphase_options->client_username[j], CLIENTIDLENGTH);
+      client_ampphase_options->n_ampphase_options[j] = 0;
+      client_ampphase_options->ampphase_options[j] = NULL;
+    }
+    client_ampphase_options->num_clients = (n + 1);
+  }
+  // Clear memory if we're overwriting something.
+  for (i = 0; i < client_ampphase_options->n_ampphase_options[n]; i++) {
+    free_ampphase_options(client_ampphase_options->ampphase_options[n][i]);
+    FREE(client_ampphase_options->ampphase_options[n][i]);
+  }
+  client_ampphase_options->n_ampphase_options[n] = n_ampphase_options;
+  CALLOC(client_ampphase_options->ampphase_options[n], n_ampphase_options);
+  for (i = 0; i < client_ampphase_options->n_ampphase_options[n]; i++) {
+    CALLOC(client_ampphase_options[n][i], 1);
+    copy_ampphase_options(client_ampphase_options->ampphase_options[n][i],
+			  ampphase_options[i]);
+  }
+}
+
 struct vis_data* get_client_vis_data(struct client_vis_data *client_vis_data,
                                      char *client_id) {
   // Return vis data associated with the specified client_id, or
@@ -983,13 +1071,14 @@ struct spectrum_data* get_client_spd_data(struct client_spd_data *client_spd_dat
 
 int main(int argc, char *argv[]) {
   struct rpfitsfile_server_arguments arguments;
-  int i, j, k, l, ri, rj, bytes_received, r, n_cycle_mjd = 0;
+  int i, j, k, l, ri, rj, bytes_received, r, n_cycle_mjd = 0, n_client_options;
+  int n_alert_sockets = 0;
   bool pointer_found = false, vis_cache_updated = false;
   bool spd_cache_updated = false, outside_mjd_range = false;
   double mjd_grab, earliest_mjd, latest_mjd, mjd_cycletime;
   double *all_cycle_mjd = NULL;
   struct rpfits_file_information **info_rpfits_files = NULL;
-  struct ampphase_options *ampphase_options = NULL, *client_options = NULL;
+  struct ampphase_options *ampphase_options = NULL, **client_options = NULL;
   struct spectrum_data *spectrum_data = NULL, *child_spectrum_data = NULL;
   struct vis_data *vis_data = NULL, *child_vis_data = NULL;
   FILE *fh = NULL;
@@ -999,7 +1088,7 @@ int main(int argc, char *argv[]) {
   char port_string[RPSBUFSIZE], address_buffer[RPSBUFSIZE];
   char *recv_buffer = NULL, *send_buffer = NULL, *child_send_buffer = NULL;
   SOCKET socket_listen, max_socket, loop_i, socket_client, child_socket;
-  SOCKET alert_socket;
+  SOCKET *alert_socket = NULL;
   fd_set master, reads;
   struct sockaddr_storage client_address;
   socklen_t client_len;
@@ -1011,6 +1100,7 @@ int main(int argc, char *argv[]) {
   struct client_spd_data client_spd_data;
   pid_t pid;
   struct client_sockets clients;
+  struct client_ampphase_options client_ampphase_options;
   struct file_instructions *testing_instructions = NULL, *file_instructions_ptr = NULL;
   
   // Set the defaults for the arguments.
@@ -1053,6 +1143,11 @@ int main(int argc, char *argv[]) {
   clients.num_sockets = 0;
   clients.socket = NULL;
   clients.client_id = NULL;
+  client_ampphase_options.num_clients = 0;
+  client_ampphase_options.client_id = NULL;
+  client_ampphase_options.client_username = NULL;
+  client_ampphase_options.n_ampphase_options = NULL;
+  client_ampphase_options.ampphase_options = NULL;
   
   // Set up our signal handler.
   signal(SIGINT, sighandler);
@@ -1304,8 +1399,19 @@ int main(int argc, char *argv[]) {
             } else if (client_request.request_type == REQUEST_COMPUTE_VISDATA) {
               // We've been asked to recompute vis data with a different set of options.
               // Get the options.
-              MALLOC(client_options, 1);
-              unpack_ampphase_options(&cmp, client_options);
+	      pack_read_sint(&cmp, &n_client_options);
+	      if (n_client_options > 0) {
+		MALLOC(client_options, n_client_options);
+		for (i = 0; i < n_client_options; i++) {
+		  CALLOC(client_options[i], 1);
+		  unpack_ampphase_options(&cmp, client_options[i]);
+		}
+		// Store all the options in our cache.
+		add_client_ampphase_options(&client_ampphase_options);
+					    
+	      }
+              //MALLOC(client_options, 1);
+              //unpack_ampphase_options(&cmp, client_options);
               // We're going to fork and compute in the background.
               pid = fork();
               if (pid == 0) {
@@ -1391,21 +1497,26 @@ int main(int argc, char *argv[]) {
               
               // Tell the client that their data is ready.
               // Find the client's socket.
-              alert_socket = find_client(&clients, client_request.client_id);
-              if (ISVALIDSOCKET(alert_socket)) {
-                // Craft a response.
-                client_response.response_type = RESPONSE_VISDATA_COMPUTED;
-                strncpy(client_response.client_id, client_request.client_id, CLIENTIDLENGTH);
-                MALLOC(send_buffer, JUSTRESPONSESIZE);
-                init_cmp_memory_buffer(&cmp, &mem, send_buffer, JUSTRESPONSESIZE);
-                pack_responses(&cmp, &client_response);
-                printf(" %s to client %s.\n",
-                       get_type_string(TYPE_RESPONSE, client_response.response_type),
-                       client_request.client_id);
-                bytes_sent = socket_send_buffer(alert_socket, send_buffer,
-                                                cmp_mem_access_get_pos(&mem));
-                FREE(send_buffer);
+              //alert_socket = find_client(&clients, client_request.client_id);
+	      find_client(&clients, client_request.client_id, "",
+			  &n_alert_sockets, &alert_socket);
+	      for (i = 0; i < n_alert_sockets; i++) {
+		if (ISVALIDSOCKET(alert_socket[i])) {
+		  // Craft a response.
+		  client_response.response_type = RESPONSE_VISDATA_COMPUTED;
+		  strncpy(client_response.client_id, client_request.client_id, CLIENTIDLENGTH);
+		  MALLOC(send_buffer, JUSTRESPONSESIZE);
+		  init_cmp_memory_buffer(&cmp, &mem, send_buffer, JUSTRESPONSESIZE);
+		  pack_responses(&cmp, &client_response);
+		  printf(" %s to client %s.\n",
+			 get_type_string(TYPE_RESPONSE, client_response.response_type),
+			 client_request.client_id);
+		  bytes_sent = socket_send_buffer(alert_socket[i], send_buffer,
+						  cmp_mem_access_get_pos(&mem));
+		  FREE(send_buffer);
+		}
               }
+	      FREE(alert_socket);
             } else if (client_request.request_type == REQUEST_SERVERTYPE) {
               // Tell the client we're a simulator or a tester, depending on how
               // we were started.
@@ -1736,6 +1847,19 @@ int main(int argc, char *argv[]) {
   FREE(client_spd_data.client_id);
   FREE(client_spd_data.spectrum_data);
   free_client_sockets(&clients);
+  for (i = 0; i < client_ampphase_options.num_clients; i++) {
+    FREE(client_ampphase_options.client_id[i]);
+    FREE(client_ampphase_options.client_username[i]);
+    for (j = 0; j < client_ampphase_options.n_ampphase_options[i]; j++) {
+      free_ampphase_options(client_ampphase_options.ampphase_options[i][j]);
+      FREE(client_ampphase_options.ampphase_options[i][j]);
+    }
+    FREE(client_ampphase_options.ampphase_options[i]);
+  }
+  FREE(client_ampphase_options.client_id);
+  FREE(client_ampphase_options.client_username);
+  FREE(client_ampphase_options.n_ampphase_options);
+  FREE(client_ampphase_options.ampphase_options);
   
   if (arguments.network_operation) {
     // Close our socket.

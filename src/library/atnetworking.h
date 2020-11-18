@@ -1,5 +1,8 @@
-/**
- * ATCA Training Library: atnetworking.h
+/** \file atnetworking.h
+ *  \brief Networking definitions to ensure smooth communication between all the
+ *         tools
+ *
+ * ATCA Training Library
  * (C) Jamie Stevens CSIRO 2020
  *
  * Some networking routines and definitions for all the tools.
@@ -42,12 +45,28 @@
 #define REQUEST_CYCLE_TIMES            11
 #define REQUEST_RESPONSE_USER_ID       12
 
-// This structure handles request headers.
+/*! \struct requests
+ *  \brief Structure to use when requesting data from a central server
+ */
 struct requests {
-  // The request type.
+  /*! \var request_type
+   *  \brief The request type magic number
+   *
+   * This is one of the REQUEST_* or CHILDREQUEST_* magic numbers defined
+   * in this header file.
+   */
   int request_type;
-  // The ID of the client.
+  /*! \var client_id
+   *  \brief The ID of the client
+   */
   char client_id[CLIENTIDLENGTH];
+  /*! \var client_username
+   *  \brief The username supplied to the client
+   *
+   * It should not be expected that this field be filled, since the tasks
+   * are able to be run without needing a username.
+   */
+  char client_username[CLIENTIDLENGTH];
 };
 
 // The types of response that can be given.
@@ -65,21 +84,56 @@ struct requests {
 #define RESPONSE_CYCLE_TIMES            12
 #define RESPONSE_REQUEST_USER_ID        13
 
-// This structure describes response headers.
+/*! \struct responses
+ *  \brief Structure to use when responding to a request
+ */
 struct responses {
-  // The response type.
+  /*! \var response_type
+   *  \brief The response type magic number
+   *
+   * This is one of the RESPONSE_* magic numbers defined in this header file.
+   */
   int response_type;
-  // The ID of the client that requested the new data, or
-  // all 0s if it's just new data.
+  /*! \var client_id
+   *  \brief The ID of the client that made the request
+   *
+   * If the response is to supply data previously requested, this ID will be
+   * that of the client that initiated the request. It may also be completely
+   * filled with 0s if the data being supplied is for all clients.
+   */
   char client_id[CLIENTIDLENGTH];
 };
 
-// This structure is for when a server needs to keep track
-// of which client is asking for what.
+/*! \struct client_sockets
+ *  \brief This structure is for when a server needs to keep track
+ *         of which client is asking for what
+ */
 struct client_sockets {
+  /*! \var num_sockets
+   *  \brief The number of sockets for which we store information
+   */
   int num_sockets;
+  /*! \var socket
+   *  \brief The socket number for each socket
+   *
+   * This array has size `num_sockets`, and is indexed starting at 0.
+   */
   SOCKET *socket;
+  /*! \var client_id
+   *  \brief The ID of the client connected to each socket
+   *
+   * This array of strings has size `num_sockets`, and is indexed starting at
+   * 0. Each string has length CLIENTIDLENGTH.
+   */
   char **client_id;
+  /*! \var client_username
+   *  \brief The username of the client connected to each socket
+   *
+   * This array of strings has size `num_sockets`, and is indexed starting at
+   * 0. Each string has length CLIENTIDLENGTH. If a client did not supply a
+   * username, the string will be entirely filled with 0s.
+   */
+  char **client_username;
 };
 
 #define JUSTRESPONSESIZE (10 * sizeof(struct responses))
@@ -90,7 +144,9 @@ bool prepare_client_connection(char *server_name, int port_number,
                                SOCKET *socket_peer, bool debugging);
 const char *get_type_string(int type, int id);
 const char *get_servertype_string(int type);
-SOCKET find_client(struct client_sockets *clients, char *client_id);
+void find_client(struct client_sockets *clients,
+		 char *client_id, char *client_username,
+		 int *n_clients, SOCKET **client_sockets);
 void add_client(struct client_sockets *clients, char *client_id,
-		SOCKET socket);
+		char *client_username, SOCKET socket);
 void free_client_sockets(struct client_sockets *clients);
