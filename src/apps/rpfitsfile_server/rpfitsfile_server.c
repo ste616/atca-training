@@ -321,9 +321,38 @@ void read_instruction_file(char *file, struct file_instructions **head) {
   
 }
 
+/*! \struct cache_vis_data
+ *  \brief Cache for vis data
+ *
+ * After computing vis data with some set of options, we store it in this
+ * cache structure so it can be recalled if the same set of options is
+ * requested.
+ */
 struct cache_vis_data {
+  /*! \var num_cache_vis_data
+   *  \brief The number of cache entries present in this structure
+   */
   int num_cache_vis_data;
-  struct ampphase_options **ampphase_options;
+  /*! \var num_options
+   *  \brief The number of options supplied for each cache entry
+   *
+   * This array has length `num_cache_vis_data`, and is indexed starting at 0.
+   */
+  int *num_options;
+  /*! \var ampphase_options
+   *  \brief The set of options supplied for each cache entry
+   *
+   * This 2-D array of pointers has length `num_cache_vis_data` on the
+   * first index, and `num_options[i]` for the second index, where `i` is the
+   * position along the first index. Both indices start at 0.
+   */
+  struct ampphase_options ***ampphase_options;
+  /*! \var vis_data
+   *  \brief The cached vis data entries
+   *
+   * This array of pointers has length `num_cache_vis_data`, and is indexed
+   * starting at 0.
+   */
   struct vis_data **vis_data;
 };
 
@@ -335,9 +364,38 @@ struct client_vis_data {
   struct vis_data **vis_data;
 };
 
+/*! \struct cache_spd_data
+ *  \brief Cache for SPD data
+ *
+ * After computing SPD data with some set of options, we store it in this
+ * cache structure so it can be recalled if the same set of options is
+ * requested.
+ */
 struct cache_spd_data {
+  /*! \var num_cache_spd_data
+   *  \brief The number of cache entries present in this structure
+   */
   int num_cache_spd_data;
-  struct ampphase_options **ampphase_options;
+  /*! \var num_options
+   *  \brief The number of options supplied for each cache entry
+   *
+   * This array has length `num_cache_spd_data`, and is indexed starting at 0.
+   */
+  int *num_options;
+  /*! \var ampphase_options
+   *  \brief The set of options supplied for each cache entry
+   *
+   * This 2-D array of pointers has length `num_cache_spd_data` on the first
+   * index, and `num_options[i]` for the second index, where `i` is the
+   * position along the first index. Both indices start at 0.
+   */
+  struct ampphase_options ***ampphase_options;
+  /*! \var spectrum_data
+   *  \brief The cached SPD data entries
+   *
+   * This array of pointers has length `num_cache_spd_data`, and is indexed
+   * starting at 0.
+   */
   struct spectrum_data **spectrum_data;
 };
 
@@ -413,34 +471,70 @@ struct client_ampphase_options {
   struct ampphase_options ***ampphase_options;
 };
 
-bool add_cache_spd_data(struct ampphase_options *options,
+/*!
+ *  \brief Add a SPD cache entry, labelled with a provided set of options
+ *  \param num_options the number of options in the set
+ *  \param options the set of options with which to label the SPD cache entry
+ *  \param data the data to store in the cache
+ *  \return an indication of whether the data was added to the cache; false
+ *          if an existing entry was found with the same options set, or true
+ *          if the set was added
+ */
+bool add_cache_spd_data(int num_options, struct ampphase_options **options,
                         struct spectrum_data *data) {
-  int i, n;
-  fprintf(stderr, "[add_cache_spd_data] trying to cache data at %s %.1f %d\n",
-          data->header_data->obsdate, data->spectrum[0][0]->ut_seconds,
-          options->phase_in_degrees);
+  int i, j, n;
+  bool match_found = false;
+
+  if (num_options == 0) {
+    // What??
+    return false;
+  }
+  
+  /* fprintf(stderr, "[add_cache_spd_data] trying to cache data at %s %.1f %d\n", */
+  /*         data->header_data->obsdate, data->spectrum[0][0]->ut_seconds, */
+  /*         options->phase_in_degrees); */
   // Check that we don't already know about the data.
   for (i = 0; i < cache_spd_data.num_cache_spd_data; i++) {
-    fprintf(stderr, "[add_cache_spd_data] checking cache entry %d %s %.1f %d\n",
-            i, cache_spd_data.spectrum_data[i]->header_data->obsdate,
-            cache_spd_data.spectrum_data[i]->spectrum[0][0]->ut_seconds,
-            cache_spd_data.ampphase_options[i]->phase_in_degrees);
+    /* fprintf(stderr, "[add_cache_spd_data] checking cache entry %d %s %.1f %d\n", */
+    /*         i, cache_spd_data.spectrum_data[i]->header_data->obsdate, */
+    /*         cache_spd_data.spectrum_data[i]->spectrum[0][0]->ut_seconds, */
+    /*         cache_spd_data.ampphase_options[i]->phase_in_degrees); */
+    if (cache_spd_data.num_options[i] != num_options) {
+      // Can't be this one.
+      continue;
+    }
     if ((strncmp(cache_spd_data.spectrum_data[i]->header_data->obsdate,
-                 data->header_data->obsdate, OBSDATE_LENGTH) == 0) &&
-        (cache_spd_data.spectrum_data[i]->spectrum[0][0]->ut_seconds ==
-         data->spectrum[0][0]->ut_seconds) &&
-        (options->phase_in_degrees ==
-         cache_spd_data.ampphase_options[i]->phase_in_degrees)) {
+		 data->header_data->obsdate, OBSDATE_LENGTH) != 0) ||
+	(cache_spd_data.spectrum_data[i]->spectrum[0][0]->ut_seconds !=
+	 data->spectrum[0][0]->ut_seconds)) {
+      // Not a match.
+      continue;
+    }
+    match_found = true;
+    for (j = 0; j < cache_vis_data.num_options[i]; j++) {
+      if (options[j]->phase_in_degrees !=
+	  cache_spd_data.ampphase_options[i][j]->phase_in_degrees) {
+	match_found = false;
+	break;
+      }
+    }
+    if (match_found) {
       fprintf(stderr, "[add_cache_spd_data] match found!\n");
       return false;
     }
   }
+
   // If we get here, this is new data.
   n = cache_spd_data.num_cache_spd_data + 1;
+  REALLOC(cache_spd_data.num_options, n);
   REALLOC(cache_spd_data.ampphase_options, n);
-  MALLOC(cache_spd_data.ampphase_options[n - 1], 1);
-  set_default_ampphase_options(cache_spd_data.ampphase_options[n - 1]);
-  copy_ampphase_options(cache_spd_data.ampphase_options[n - 1], options);
+  cache_spd_data.num_options[n - 1] = num_options;
+  MALLOC(cache_spd_data.ampphase_options[n - 1], num_options);
+  for (i = 0; i < num_options; i++) {
+    MALLOC(cache_spd_data.ampphase_options[n - 1][i], 1);
+    set_default_ampphase_options(cache_spd_data.ampphase_options[n - 1][i]);
+    copy_ampphase_options(cache_spd_data.ampphase_options[n - 1][i], options[i]);
+  }
   REALLOC(cache_spd_data.spectrum_data, n);
   MALLOC(cache_spd_data.spectrum_data[n - 1], 1);
   copy_spectrum_data(cache_spd_data.spectrum_data[n - 1], data);
@@ -449,23 +543,58 @@ bool add_cache_spd_data(struct ampphase_options *options,
   return true;
 }
 
-bool add_cache_vis_data(struct ampphase_options *options,
+/*!
+ *  \brief Add a vis cache entry, labelled with a provided set of options
+ *  \param num_options the number of options in the set
+ *  \param options the set of options with which to label the vis cache entry
+ *  \param data the data to store in the cache
+ *  \return an indication of whether the data was added to the cache; false
+ *          if an existing entry was found with the same options set, or true
+ *          if the set was added
+ */
+bool add_cache_vis_data(int num_options, struct ampphase_options **options,
                         struct vis_data *data) {
-  int i, n;
+  int i, j, n;
+  bool match_found = false;
+
+  if (num_options == 0) {
+    // What??
+    return false;
+  }
+
   // Check that we don't already know about the data.
   for (i = 0; i < cache_vis_data.num_cache_vis_data; i++) {
-    if (ampphase_options_match(options,
-                               cache_vis_data.ampphase_options[i])) {
+    if (cache_vis_data.num_options[i] != num_options) {
+      // Can't be this one.
+      continue;
+    }
+    match_found = true;
+    for (j = 0; j < cache_vis_data.num_options[i]; j++) {
+      if (ampphase_options_match(options[j],
+				 cache_vis_data.ampphase_options[i][j]) == false) {
+	// Not a perfect match.
+	match_found = false;
+	break;
+      }
+    }
+    if (match_found) {
+      // Don't need to add this data, we already have it.
       return false;
     }
   }
+
   // If we get here, this is new data.
   n = cache_vis_data.num_cache_vis_data + 1;
+  REALLOC(cache_vis_data.num_options, n);
   REALLOC(cache_vis_data.ampphase_options, n);
   REALLOC(cache_vis_data.vis_data, n);
-  MALLOC(cache_vis_data.ampphase_options[n - 1], 1);
-  set_default_ampphase_options(cache_vis_data.ampphase_options[n - 1]);
-  copy_ampphase_options(cache_vis_data.ampphase_options[n - 1], options);
+  cache_vis_data.num_options[n - 1] = num_options;
+  MALLOC(cache_vis_data.ampphase_options[n - 1], num_options);
+  for (i = 0; i < num_options; i++) {
+    MALLOC(cache_vis_data.ampphase_options[n - 1][i], 1);
+    set_default_ampphase_options(cache_vis_data.ampphase_options[n - 1][i]);
+    copy_ampphase_options(cache_vis_data.ampphase_options[n - 1][i], options[i]);
+  }
   MALLOC(cache_vis_data.vis_data[n - 1], 1);
   copy_vis_data(cache_vis_data.vis_data[n - 1], data);
   cache_vis_data.num_cache_vis_data = n;
@@ -507,12 +636,41 @@ bool get_cache_spd_data(struct ampphase_options *options,
   return false;
 }
 
-bool get_cache_vis_data(struct ampphase_options *options,
+/*!
+ *  \brief Search for a vis cache entry matching the provided set of options
+ *  \param num_options the number of options in the set
+ *  \param options the set of options to consider while searching
+ *  \param data a pointer to a data variable which, if a match is found will
+ *              be filled with the matching cache entry; if the pointer is
+ *              to NULL, the pointer will be redirected to the actual cache
+ *              entry, otherwise a copy of the data will be made
+ *  \return an indication of whether the search found a match; true if a
+ *          match was found, or false if not
+ */
+bool get_cache_vis_data(int num_options, struct ampphase_options **options,
                         struct vis_data **data) {
-  int i;
+  int i, j;
+  bool match_found = false;
+
+  if (num_options == 0) {
+    // No chance of a match.
+    return false;
+  }
   for (i = 0; i < cache_vis_data.num_cache_vis_data; i++) {
-    if (ampphase_options_match(options,
-                               cache_vis_data.ampphase_options[i])) {
+    if (cache_vis_data.num_options[i] != num_options) {
+      // Can't be this one.
+      continue;
+    }
+    match_found = true;
+    for (j = 0; j < cache_vis_data.num_options[i]; j++) {
+      if (ampphase_options_match(options[j],
+				 cache_vis_data.ampphase_options[i][j]) == false) {
+	// Not a perfect match.
+	match_found = false;
+	break;
+      }
+    }
+    if (match_found) {
       if (*data == NULL) {
         // Occurs in the child computer usually.
         *data = cache_vis_data.vis_data[i];
@@ -528,7 +686,8 @@ bool get_cache_vis_data(struct ampphase_options *options,
 
 void data_reader(int read_type, int n_rpfits_files,
                  double mjd_required, double mjd_low, double mjd_high,
-                 struct ampphase_options *ampphase_options,
+		 int *num_options,
+                 struct ampphase_options ***ampphase_options,
                  struct rpfits_file_information **info_rpfits_files,
                  struct spectrum_data **spectrum_data,
                  struct vis_data **vis_data) {
@@ -541,7 +700,7 @@ void data_reader(int read_type, int n_rpfits_files,
   struct scan_header_data *sh = NULL;
   struct cycle_data *cycle_data = NULL;
   struct spectrum_data *temp_spectrum = NULL;
-  struct ampphase_options *local_ampphase_options = NULL;
+  struct ampphase_options **local_ampphase_options = NULL;
 
   if (vis_data == NULL) {
     // Resist warnings.
@@ -557,7 +716,7 @@ void data_reader(int read_type, int n_rpfits_files,
     /*        (ampphase_options->phase_in_degrees ? "degrees" : "radians"), */
     /*        ampphase_options->delay_averaging, ampphase_options->averaging_method); */
 
-    cache_hit_vis_data = get_cache_vis_data(ampphase_options, vis_data);
+    cache_hit_vis_data = get_cache_vis_data(*num_options, *ampphase_options, vis_data);
     if (cache_hit_vis_data == false) {
       printf("[data_reader] no cache hit\n");
       if ((vis_data != NULL) && (*vis_data == NULL)) {
@@ -756,7 +915,8 @@ void data_reader(int read_type, int n_rpfits_files,
                   (spectrum_return)) {
                 // We need this cycle.
 		// Do a Tsys calculation.
-		calculate_system_temperatures_cycle_data(cycle_data, sh, ampphase_options);
+		calculate_system_temperatures_cycle_data(cycle_data, sh, num_options,
+							 ampphase_options);
                 // Allocate all the memory we need.
                 /* printf("cycle found!\n"); */
                 /* fprintf(stderr, "[data_reader] making a temporary spectrum...\n"); */
@@ -1127,9 +1287,11 @@ int main(int argc, char *argv[]) {
 
   // Reset our cache.
   cache_vis_data.num_cache_vis_data = 0;
+  cache_vis_data.num_options = NULL;
   cache_vis_data.ampphase_options = NULL;
   cache_vis_data.vis_data = NULL;
   cache_spd_data.num_cache_spd_data = 0;
+  cache_spd_data.num_options = NULL;
   cache_spd_data.ampphase_options = NULL;
   cache_spd_data.spectrum_data = NULL;
 
@@ -1355,7 +1517,8 @@ int main(int argc, char *argv[]) {
                    get_type_string(TYPE_REQUEST, client_request.request_type),
                    client_request.client_id);
             // Add this client to our list.
-            add_client(&clients, client_request.client_id, loop_i);
+            add_client(&clients, client_request.client_id,
+		       client_request.client_username, loop_i);
             if ((client_request.request_type == REQUEST_CURRENT_SPECTRUM) ||
                 (client_request.request_type == REQUEST_MJD_SPECTRUM) ||
                 (client_request.request_type == REQUEST_CURRENT_VISDATA) ||
@@ -1711,7 +1874,14 @@ int main(int argc, char *argv[]) {
               bytes_sent = socket_send_buffer(loop_i, send_buffer,
                                               cmp_mem_access_get_pos(&mem));
               FREE(send_buffer);
-            }
+            } else if (client_request.request_type == REQUEST_SUPPLY_USERNAME) {
+	      // We are being told that the username of this client has changed or
+	      // supplied.
+	      modify_client(&clients, client_request.client_id,
+			    client_request.client_username, -1);
+	      // We don't send any reply here.
+	      bytes_sent = 0;
+	    }
             printf(" Sent %ld bytes\n", bytes_sent);
             // Free our memory.
             FREE(send_buffer);
@@ -1748,12 +1918,15 @@ int main(int argc, char *argv[]) {
     }
     free_vis_data(cache_vis_data.vis_data[l]);
     FREE(cache_vis_data.vis_data[l]);
-    free_ampphase_options(cache_vis_data.ampphase_options[l]);
+    for (i = 0; i < cache_vis_data.num_options[l]; i++) {
+      free_ampphase_options(cache_vis_data.ampphase_options[l][i]);
+      FREE(cache_vis_data.ampphase_options[l][i]);
+    }
     FREE(cache_vis_data.ampphase_options[l]);
-
   }
   FREE(cache_vis_data.vis_data);
   FREE(cache_vis_data.ampphase_options);
+  FREE(cache_vis_data.num_options);
   // Do the same for the spectrum cache.
   for (l = 0; l < cache_spd_data.num_cache_spd_data; l++) {
     for (i = 0, pointer_found = false; i < arguments.n_rpfits_files; i++) {
@@ -1774,20 +1947,16 @@ int main(int argc, char *argv[]) {
     }
     free_spectrum_data(cache_spd_data.spectrum_data[l]);
     FREE(cache_spd_data.spectrum_data[l]);
-    free_ampphase_options(cache_spd_data.ampphase_options[l]);
+    for (i = 0; i < cache_spd_data.num_options[l]; i++) {
+      free_ampphase_options(cache_spd_data.ampphase_options[l][i]);
+      FREE(cache_spd_data.ampphase_options[l][i]);
+    }
     FREE(cache_spd_data.ampphase_options[l]);
   }
   FREE(cache_spd_data.spectrum_data);
   FREE(cache_spd_data.ampphase_options);
-  
+  FREE(cache_spd_data.num_options);
   // Free the spectrum memory.
-  /* for (i = 0; i < spectrum_data->num_ifs; i++) { */
-  /*   for (j = 0; j < spectrum_data->num_pols; j++) { */
-  /*     free_ampphase(&(spectrum_data->spectrum[i][j])); */
-  /*   } */
-  /*   FREE(spectrum_data->spectrum[i]); */
-  /* } */
-  /* FREE(spectrum_data->spectrum); */
   FREE(spectrum_data);
 
   // Free any testing instructions.

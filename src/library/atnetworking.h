@@ -43,10 +43,10 @@
 #define CHILDREQUEST_SPECTRUM_MJD       9
 #define REQUEST_TIMERANGE              10
 #define REQUEST_CYCLE_TIMES            11
-#define REQUEST_RESPONSE_USER_ID       12
+#define REQUEST_SUPPLY_USERNAME        12
 
 /*! \struct requests
- *  \brief Structure to use when requesting data from a central server
+ *  \brief Structure to use when communicating from a client to a central server
  */
 struct requests {
   /*! \var request_type
@@ -82,7 +82,7 @@ struct requests {
 #define RESPONSE_SPECTRUM_OUTSIDERANGE  10
 #define RESPONSE_TIMERANGE              11
 #define RESPONSE_CYCLE_TIMES            12
-#define RESPONSE_REQUEST_USER_ID        13
+#define RESPONSE_REQUEST_USERNAME       13
 
 /*! \struct responses
  *  \brief Structure to use when responding to a request
@@ -146,7 +146,9 @@ const char *get_type_string(int type, int id);
 const char *get_servertype_string(int type);
 void find_client(struct client_sockets *clients,
 		 char *client_id, char *client_username,
-		 int *n_clients, SOCKET **client_sockets);
+		 int *n_clients, SOCKET **client_sockets, int **indices);
 void add_client(struct client_sockets *clients, char *client_id,
 		char *client_username, SOCKET socket);
+void modify_client(struct client_sockets *clients, char *client_id,
+		   char *client_username, SOCKET socket);
 void free_client_sockets(struct client_sockets *clients);

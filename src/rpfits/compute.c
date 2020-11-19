@@ -1460,17 +1460,28 @@ bool ampphase_options_match(struct ampphase_options *a,
   return match;
 }
 
+/*!
+ *  \brief Compute system temperatures from raw data for a whole cycle
+ *  \param cycle_data the raw data and metadata for a cycle
+ *  \param scan_header_data the header information for the scan that the cycle is part of
+ *  \param num_options the number of ampphase_options structures in the following array
+ *  \param options the array of options which can be used when doing the computations;
+ *                 this array will be searched for the options matching the band
+ *                 configuration present in the \a scan_header_data, and if no match
+ *                 is found, a new set of options will be added to this array
+ */
 void calculate_system_temperatures_cycle_data(struct cycle_data *cycle_data,
                                               struct scan_header_data *scan_header_data,
-                                              struct ampphase_options *options) {
+					      int *num_options,
+                                              struct ampphase_options ***options) {
   int i, j, k, bl, bidx, ***n_tp_on_array = NULL, ***n_tp_off_array = NULL;
   int aidx, iidx, nchannels, ifno, chan_low = -1, chan_high = -1, ifsidx;
   int reqpol[2], polnum, vidx;
   float ****tp_on_array = NULL, ****tp_off_array = NULL;
   float nhalfchan, chanwidth, rcheck, med_tp_on, med_tp_off, tp_on, tp_off;
   float fs, fd, dx;
-  bool computed_tsys_applied = false;
-  struct ampphase_options default_options;
+  bool computed_tsys_applied = false, needs_new_options = false;
+  struct ampphase_options default_options, *band_options = NULL;
   // Recalculate the system temperature from the data within the
   // specified tvchannel range, and with different options.
 
@@ -1496,12 +1507,19 @@ void calculate_system_temperatures_cycle_data(struct cycle_data *cycle_data,
     }
   }
 
-  // Set some default options.
-  default_options = ampphase_options_default();
-  if (options == NULL) {
-    options = &default_options;
-  }
+  // Try to find the correct options for this band.
+  band_options = find_ampphase_options(*num_options, *options, scan_header_data);
+  needs_new_options = (band_options == NULL);
 
+  if (needs_new_options) {
+    default_options = ampphase_options_default();
+    *num_options += 1;
+    REALLOC(*options, *num_options);
+    CALLOC((*options)[*num_options - 1], 1);
+    (*options)[*num_options - 1] = &default_options;
+    band_options = (*options)[*num_options - 1];
+  }
+  
   for (i = 0; i < cycle_data->num_points; i++) {
     bl = ants_to_base(cycle_data->ant1[i], cycle_data->ant2[i]);
     if (bl < 0) {
@@ -1529,12 +1547,12 @@ void calculate_system_temperatures_cycle_data(struct cycle_data *cycle_data,
       nchannels = scan_header_data->if_num_channels[iidx];
       // Loop over the tvchannels.
       // But if our options don't know about the tvchannels, set them up now.
-      if ((ifno < options->num_ifs) &&
-	  (options->min_tvchannel[ifno] > 0) &&
-	  (options->max_tvchannel[ifno] > 0)) {
+      if ((ifno < band_options->num_ifs) &&
+	  (band_options->min_tvchannel[ifno] > 0) &&
+	  (band_options->max_tvchannel[ifno] > 0)) {
 	// We already have valid tvchannels.
-	chan_low = options->min_tvchannel[ifno];
-	chan_high = options->max_tvchannel[ifno];
+	chan_low = band_options->min_tvchannel[ifno];
+	chan_high = band_options->max_tvchannel[ifno];
       } else {
 	// Get default values for this type of IF.
 	nhalfchan = (nchannels % 2) == 1 ?
@@ -1544,7 +1562,7 @@ void calculate_system_temperatures_cycle_data(struct cycle_data *cycle_data,
 	default_tvchannels(nchannels, chanwidth * 1000,
 			   scan_header_data->if_centre_freq[iidx] * 1000,
 			   &chan_low, &chan_high);
-	add_tvchannels_to_options(options, ifno, chan_low, chan_high);
+	add_tvchannels_to_options(band_options, ifno, chan_low, chan_high);
       }
       // Find the polarisations we need in the data.
       for (j = 0; j < scan_header_data->if_num_stokes[iidx]; j++) {
@@ -1597,7 +1615,7 @@ void calculate_system_temperatures_cycle_data(struct cycle_data *cycle_data,
     ifsidx = ifno - 1;
     for (j = 0; j < cycle_data->num_cal_ants; j++) {
       for (k = CAL_XX; k <= CAL_YY; k++) {
-	if (options->averaging_method[ifno] & AVERAGETYPE_MEDIAN) {
+	if (band_options->averaging_method[ifno] & AVERAGETYPE_MEDIAN) {
 	  qsort(tp_on_array[j][ifsidx][k], n_tp_on_array[j][ifsidx][k], sizeof(float),
 		cmpfunc_real);
 	  qsort(tp_off_array[j][ifsidx][k], n_tp_off_array[j][ifsidx][k], sizeof(float),
@@ -1606,7 +1624,7 @@ void calculate_system_temperatures_cycle_data(struct cycle_data *cycle_data,
 	  med_tp_off = fmedianf(tp_off_array[j][ifsidx][k], n_tp_off_array[j][ifsidx][k]);
 	  fs = 0.5 * (med_tp_on + med_tp_off);
 	  fd = med_tp_on - med_tp_off;
-	} else if (options->averaging_method[ifno] & AVERAGETYPE_MEAN) {
+	} else if (band_options->averaging_method[ifno] & AVERAGETYPE_MEAN) {
 	  tp_on = fsumf(tp_on_array[j][ifsidx][k], n_tp_on_array[j][ifsidx][k]);
 	  tp_off = fsumf(tp_off_array[j][ifsidx][k], n_tp_off_array[j][ifsidx][k]);
 	  fs = 0.5 * (tp_on + tp_off);

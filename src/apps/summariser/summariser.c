@@ -109,14 +109,14 @@ int main(int argc, char *argv[]) {
   // The argument list should all be RPFITS files.
   int i = 0, j = 0, k = 0, l = 0, res = 0, keep_reading = 1, read_response = 0;
   int read_cycle = 1, nscans = 0, n_continuum = 0, n_zooms = 0;
-  int *continuum_bands = NULL, *zoom_bands = NULL;
+  int *continuum_bands = NULL, *zoom_bands = NULL, num_options = 0;
   float channel_width;
   char emsg[SBUFSIZE], rastring[SBUFSIZE], decstring[SBUFSIZE];
   char sourcename[SBUFSIZE], scantype[BUFSIZE], antname[SBUFSIZE];
   struct scan_data *scan_data = NULL, **all_scans = NULL;
   struct cycle_data *cycle_data = NULL;
   struct summariser_arguments arguments;
-  struct ampphase_options ampphase_options;
+  struct ampphase_options **ampphase_options = NULL;
   struct array_information *array_information = NULL;
 
   // Set the defaults for the arguments.
@@ -246,14 +246,14 @@ int main(int argc, char *argv[]) {
       if (read_response & READER_DATA_AVAILABLE) {
 	  // Now start reading the cycle data.
 	read_cycle = 1;
-	ampphase_options = ampphase_options_default();
+	//ampphase_options = ampphase_options_default();
 	while (read_cycle) {
 	  cycle_data = scan_add_cycle(scan_data);
 	  read_response = read_cycle_data(&(scan_data->header_data),
 					  cycle_data);
 	  // Compute the system temperatures.
 	  calculate_system_temperatures_cycle_data(cycle_data, &(scan_data->header_data),
-						   &ampphase_options);
+						   &num_options, &ampphase_options);
 	  //fprintf(stderr, "found read response %d\n", read_response);
 	  /*printf("cycle has %d baselines\n", cycle_data->n_baselines);*/
 	  if (arguments.verbosity >= VERBOSITY_HIGHEST) {

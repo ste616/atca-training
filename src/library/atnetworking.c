@@ -18,6 +18,18 @@
 #include <errno.h>
 #include "memory.h"
 
+/*!
+ *  \brief Send a buffer over the network socket
+ *  \param socket the already open network socket to use to send the data
+ *  \param buffer the byte buffer to send
+ *  \param buffer_length the number of bytes to send from \a buffer
+ *  \return the number of bytes that were successfully sent; if an error
+ *          occurs while sending, the return value should be negative
+ *
+ * This routine is here to normalise the sending process for variable-length
+ * buffers. Before the buffer itself is sent, the size of the buffer is
+ * sent over the socket so the receiver can anticipate how much data to expect.
+ */
 ssize_t socket_send_buffer(SOCKET socket, char *buffer, size_t buffer_length) {
   // Send the buffer with length buffer_length over the socket.
   ssize_t init_bytes_sent, bytes_sent;
@@ -37,6 +49,20 @@ ssize_t socket_send_buffer(SOCKET socket, char *buffer, size_t buffer_length) {
   return(bytes_sent);
 }
 
+/*!
+ *  \brief Receive a buffer from the network socket
+ *  \param socket the already open network socket to get the data from
+ *  \param buffer a pointer to a buffer variable in which to put the data
+ *  \param buffer_length a pointer to a variable that upon exit will contain
+ *                       the amount of data received and present in the \a buffer
+ *                       pointer
+ *  \return the number of bytes actually read from the socket; if an error occurs
+ *          while receiving, the return value should be negative
+ *
+ * This routine is here to normalise the receiving process for variable-length
+ * buffers. The size of the buffer to come is received first, and then this
+ * routine allocates enough memory to accept the data.
+ */
 ssize_t socket_recv_buffer(SOCKET socket, char **buffer, size_t *buffer_length) {
   // Read the buffer from the network socket, allocating the necessary space for it.
   ssize_t bytes_to_read, bytes_read, br;
@@ -105,6 +131,14 @@ bool prepare_client_connection(char *server_name, int port_number,
   return(true);
 }
 
+/*!
+ *  \brief Get a string representation of the type of request or response
+ *  \param type the type of magic number for translation purposes, one of
+ *              TYPE_REQUEST for request magic numbers, or TYPE_RESPONSE for
+ *              response magic numbers
+ *  \param id the magic number to stringify
+ *  \return a string indication of the magic number
+ */
 const char *get_type_string(int type, int id) {
   // Get a string representation of the type of request or response,
   // specified by type=TYPE_REQUEST or TYPE_RESPONSE, and
@@ -122,7 +156,7 @@ const char *get_type_string(int type, int id) {
 					  "CHILDREQUEST_SPECTRUM_MJD",
 					  "REQUEST_TIMERANGE",
 					  "REQUEST_CYCLE_TIMES",
-					  "REQUEST_RESPONSE_USER_ID"
+					  "REQUEST_SUPPLY_USERNAME"
   };
   const char* const response_strings[] = { "",
                                            "RESPONSE_CURRENT_SPECTRUM",
@@ -137,7 +171,7 @@ const char *get_type_string(int type, int id) {
 					   "RESPONSE_SPECTRUM_OUTSIDERANGE",
 					   "RESPONSE_TIMERANGE",
 					   "RESPONSE_CYCLE_TIMES",
-					   "RESPONSE_REQUEST_USER_ID"
+					   "RESPONSE_REQUEST_USERNAME"
   };
 
   if ((type == TYPE_REQUEST) && (id >= 0) && (id < max_request)) {
@@ -147,9 +181,13 @@ const char *get_type_string(int type, int id) {
     return response_strings[id];
   }
   return NULL;
-  
 }
 
+/*!
+ *  \brief Get a string representation of a server type magic number
+ *  \param type server type magic number, one of the SERVERTYPE_* definitions
+ *  \return a string indication of the magic number
+ */
 const char *get_servertype_string(int type) {
   // Get a string representation of the type of server.
   if (type == SERVERTYPE_SIMULATOR) {
@@ -165,17 +203,23 @@ const char *get_servertype_string(int type) {
 
 /*!
  *  \brief Find the client identified either by its ID or username
- *  \param clients The client_sockets structure containing all the information
+ *  \param clients the client_sockets structure containing all the information
  *                 about the clients
- *  \param client_id The ID to search for, or zero-length string if not searching
+ *  \param client_id the ID to search for, or zero-length string if not searching
  *                   for client ID
- *  \param client_username The username to search for, or zero-length string if
+ *  \param client_username the username to search for, or zero-length string if
  *                         not searching for client username
- *  \param n_clients A pointer to a variable which upon exit will be filled with
+ *  \param n_clients a pointer to a variable which upon exit will be filled with
  *                   the number of matched clients
- *  \param client_sockets A pointer to a variable which upon exit will be an
+ *  \param client_sockets a pointer to a variable which upon exit will be an
  *                        array of length `n_clients`, with each element being
- *                        the socket number of a matched client
+ *                        the socket number of a matched client; if you don't
+ *                        want this array to be formed, specify `client_sockets`
+ *                        as NULL
+ *  \param indices a pointer to a variable which upon exit will be an array of
+ *                  length `n_clients`, with each element bneing the index of
+ *                  the matches in the arrays in `clients`; if you don't want
+ *                  this array to be formed, specify `indices` as NULL
  *
  * If searching for a client_id, there should only ever be a single match, since
  * the library randomly generates client IDs. However, any number of clients may
@@ -183,8 +227,8 @@ const char *get_servertype_string(int type) {
  */
 void find_client(struct client_sockets *clients,
 		 char *client_id, char *client_username,
-		 int *n_clients, SOCKET **client_sockets) {
-  int i, n = 0;
+		 int *n_clients, SOCKET **client_sockets, int **indices) {
+  int i, n = 0, *local_indices = NULL;
   SOCKET *sockets = NULL;
   
   for (i = 0; i < clients->num_sockets; i++) {
@@ -194,23 +238,48 @@ void find_client(struct client_sockets *clients,
 	 (strncmp(clients->client_username[i], client_username, CLIENTIDLENGTH) == 0))) {
       n += 1;
       REALLOC(sockets, n);
+      REALLOC(local_indices, n);
       sockets[n - 1] = clients->socket[i];
+      local_indices[n - 1] = i;
       //return(clients->socket[i]);
     }
   }
   //return(-1);
 
   *n_clients = n;
-  *client_sockets = sockets;
+  if (client_sockets == NULL) {
+    FREE(sockets);
+  } else {
+    *client_sockets = sockets;
+  }
+  if (indices == NULL) {
+    FREE(local_indices);
+  } else {
+    *indices = local_indices;
+  }
 }
 
+/*!
+ *  \brief Add a client to a list
+ *  \param clients the `client_sockets` structure holding information about
+ *                 all the clients
+ *  \param client_id the ID string supplied by the client
+ *  \param client_username the username string supplied by the client
+ *  \param socket the socket number that the client has connected on
+ *
+ * This routine checks if the client has already been connected, but only
+ * while using the ID, since multiple clients can connect with the same
+ * username. If the client has already connected, it is not added again. If
+ * you need to change details about an already connected client, use
+ * `modify_client`.
+ */
 void add_client(struct client_sockets *clients, char *client_id,
 		char *client_username, SOCKET socket) {
-  int n;
-  SOCKET check;
+  int n, n_check;
+  SOCKET *check = NULL;
   // Check if we already know about it.
-  check = find_client(clients, client_id);
-  if (!ISVALIDSOCKET(check)) {
+  find_client(clients, client_id, "", &n_check, &check, NULL);
+  if (n_check == 0) {
     // Add this.
     n = clients->num_sockets + 1;
     REALLOC(clients->socket, n);
@@ -223,6 +292,33 @@ void add_client(struct client_sockets *clients, char *client_id,
     strncpy(clients->client_username[n - 1], client_username, CLIENTIDLENGTH);
 
     clients->num_sockets = n;
+  }
+  FREE(check);
+}
+
+/*!
+ *  \brief Modify an existing client
+ *  \param clients the `client_sockets` structure holding information about
+ *                 all the clients
+ *  \param client_id the ID string to find; this must be used since this
+ *                   routine can only alter a single client
+ *  \param client_username the username string to set in the client matching
+ *                         the ID `client_id`
+ *  \param socket the socket to set in the client matching the ID `client_id`,
+ *                but only if the socket is valid; if you don't want to modify
+ *                the existing socket, set this to a negative number
+ */
+void modify_client(struct client_sockets *clients, char *client_id,
+		   char *client_username, SOCKET socket) {
+  int n_check, *check = NULL;
+
+  find_client(clients, client_id, "", &n_check, NULL, &check);
+  if (n_check == 1) {
+    // We copy the new socket and username if they're valid.
+    if (ISVALIDSOCKET(socket)) {
+      clients->socket[check[0]] = socket;
+    }
+    strncpy(clients->client_username[check[0]], client_username, CLIENTIDLENGTH);
   }
 }
 

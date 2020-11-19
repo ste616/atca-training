@@ -49,6 +49,8 @@ static struct argp_option nvis_options[] = {
     "The port number on the server to connect to" },
   { "server", 's', "SERVER", 0,
     "The server name or address to connect to" },
+  { "username", 'u', "USERNAME", 0,
+    "The username to communicate to the server" },
   { 0 }
 };
 
@@ -63,6 +65,7 @@ struct nvis_arguments {
   int port_number;
   char server_name[VISBUFSIZE];
   bool network_operation;
+  char username[CLIENTIDLENGTH];
 };
 
 // And some fun, totally necessary, global state variables.
@@ -96,6 +99,9 @@ static error_t nvis_parse_opt(int key, char *arg, struct argp_state *state) {
   case 's':
     arguments->network_operation = true;
     strncpy(arguments->server_name, arg, VISBUFSIZE);
+    break;
+  case 'u':
+    strncpy(arguments->username, arg, CLIENTIDLENGTH);
     break;
   default:
     return ARGP_ERR_UNKNOWN;
@@ -167,6 +173,7 @@ static void sighandler(int sig) {
 #define ACTION_AMPPHASE_OPTIONS_PRINT    1<<7
 #define ACTION_USERNAME_OBTAINED         1<<8
 #define ACTION_TVCHANNELS_CHANGED        1<<9
+#define ACTION_SEND_USERNAME             1<<10
 
 // Make a shortcut to stop action for those actions which can only be
 // done by a simulator.
@@ -183,8 +190,7 @@ static void sighandler(int sig) {
   while(0)
 
 // Callback function called when the username prompt is displayed.
-#define USERNAME_SIZE 10
-char username[USERNAME_SIZE];
+char username[CLIENTIDLENGTH];
 int username_tries;
 static void interpret_username(char *line) {
   bool username_accepted = false, checkline = true;
@@ -197,7 +203,7 @@ static void interpret_username(char *line) {
   if (checkline && (*line)) {
     if (strlen(line) > 5) {
       // This is an acceptable username.
-      strncpy(username, line, USERNAME_SIZE);
+      strncpy(username, line, CLIENTIDLENGTH);
       action_required = ACTION_USERNAME_OBTAINED;
       username_accepted = true;
     }
@@ -753,6 +759,7 @@ int main(int argc, char *argv[]) {
   arguments.server_name[0] = 0;
   arguments.port_number = 8880;
   arguments.network_operation = false;
+  arguments.username[0] = 0;
 
   // And defaults for some of the parameters.
   nxpanels = 1;
@@ -784,6 +791,7 @@ int main(int argc, char *argv[]) {
     // Ask what type of server we're connecting to.
     server_request.request_type = REQUEST_SERVERTYPE;
     strncpy(server_request.client_id, client_id, CLIENTIDLENGTH);
+    strncpy(server_request.client_username, arguments.username, CLIENTIDLENGTH);
     init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)VISBUFSIZE);
     pack_requests(&cmp, &server_request);
     socket_send_buffer(socket_peer, send_buffer, cmp_mem_access_get_pos(&mem));
@@ -991,18 +999,25 @@ int main(int argc, char *argv[]) {
       // Change our prompt back.
       rl_callback_handler_remove();
       rl_callback_handler_install(prompt, interpret_command);
+      action_required -= ACTION_USERNAME_OBTAINED;
+      action_required |= ACTION_SEND_USERNAME;
+      // Store the username in the arguments.
+      strncpy(arguments.username, username, CLIENTIDLENGTH);
       // Print a message.
       nmesg = 1;
-      snprintf(mesgout[0], VISBUFSIZE, " Thankyou and hello %s\n", username);
+      snprintf(mesgout[0], VISBUFSIZE, " Thankyou and hello %s\n", arguments.username);
       readline_print_messages(nmesg, mesgout);
+    }
 
+    if (action_required & ACTION_SEND_USERNAME) {
       // Send the username back to the server.
-      server_request.request_type = REQUEST_RESPONSE_USER_ID;
+      server_request.request_type = REQUEST_SUPPLY_USERNAME;
+      strncpy(server_request.client_username, arguments.username, CLIENTIDLENGTH);
       init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)VISBUFSIZE);
       pack_requests(&cmp, &server_request);
-      pack_write_string(&cmp, username, USERNAME_SIZE);
+      pack_write_string(&cmp, arguments.username, CLIENTIDLENGTH);
       socket_send_buffer(socket_peer, send_buffer, cmp_mem_access_get_pos(&mem));
-      action_required -= ACTION_USERNAME_OBTAINED;
+      action_required -= ACTION_SEND_USERNAME;
     }
     
     if (action_required & ACTION_QUIT) {
@@ -1064,7 +1079,7 @@ int main(int argc, char *argv[]) {
         snprintf(mesgout[0], VISBUFSIZE, "Connected to %s server.\n",
                  get_servertype_string(server_type));
         readline_print_messages(nmesg, mesgout);
-      } else if (server_response.response_type == RESPONSE_REQUEST_USER_ID) {
+      } else if (server_response.response_type == RESPONSE_REQUEST_USERNAME) {
         // The server wants us to find out who the user is.
         // We want to change the prompt first.
         rl_callback_handler_remove();
