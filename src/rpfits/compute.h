@@ -1087,9 +1087,11 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
                  struct ampphase_options ***options);
 int cmpfunc_real(const void *a, const void *b);
 int cmpfunc_complex(const void *a, const void *b);
-int ampphase_average(struct ampphase *ampphase,
+int ampphase_average(struct scan_header_data *scan_header_data,
+		     struct ampphase *ampphase,
                      struct vis_quantities **vis_quantities,
-                     struct ampphase_options *options);
+		     int *num_options,
+                     struct ampphase_options ***options);
 bool ampphase_options_match(struct ampphase_options *a,
                             struct ampphase_options *b);
 void calculate_system_temperatures_cycle_data(struct cycle_data *cycle_data,

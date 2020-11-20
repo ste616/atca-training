@@ -602,27 +602,61 @@ bool add_cache_vis_data(int num_options, struct ampphase_options **options,
   return true;
 }
 
-bool get_cache_spd_data(struct ampphase_options *options,
+/*!
+ *  \brief Get a SPD cache entry, labelled with a provided set of options
+ *  \param num_options the number of options in the set
+ *  \param options the set of options to consider while searching
+ *  \param mjd the MJD of the cycle to search for
+ *  \param tol the tolerance on the MJD (in days) in assessing a match
+ *  \param data a pointer to a data variable which, if a match is found will
+ *              be filled with the matching cache entry; if the pointer is to
+ *              NULL, the pointer will be redirected to the actual cache
+ *              entry, otherwise a copy of the data will be made
+ *  \return an indication of whether the search found a match; true if a
+ *          match was found, or false if not
+ */
+bool get_cache_spd_data(int num_options, struct ampphase_options **options,
                         double mjd, double tol,
                         struct spectrum_data **data) {
-  int i;
+  int i, j;
   double tmjd;
-  fprintf(stderr, "[get_cache_spd_data] looking for MJD %.8f within %.8f, %d\n",
-          mjd, tol, options->phase_in_degrees);
+  bool match_found = false;
+  
+  if (num_options == 0) {
+    // No chance of a match.
+    return false;
+  }
+  /* fprintf(stderr, "[get_cache_spd_data] looking for MJD %.8f within %.8f, %d\n", */
+  /*         mjd, tol, options->phase_in_degrees); */
   for (i = 0; i < cache_spd_data.num_cache_spd_data; i++) {
+    if (cache_spd_data.num_options[i] != num_options) {
+      // Can't be this one.
+      continue;
+    }
     // Calculate MJD of this cache entry.
     tmjd = date2mjd(cache_spd_data.spectrum_data[i]->header_data->obsdate,
                     cache_spd_data.spectrum_data[i]->spectrum[0][0]->ut_seconds);
-    fprintf(stderr, "[get_cache_spd_data] cache entry %d MJD %.8f %d %d\n",
-            i, tmjd, (fabs(mjd - tmjd) <= tol),
-            cache_spd_data.ampphase_options[i]->phase_in_degrees);
-    if ((fabs(mjd - tmjd) <= tol) &&
-        (options->phase_in_degrees ==
-         cache_spd_data.ampphase_options[i]->phase_in_degrees)) {
-      fprintf(stderr, "[get_cache_spd_data] cache hit %s %.1f %d\n",
-              cache_spd_data.spectrum_data[i]->header_data->obsdate,
-              cache_spd_data.spectrum_data[i]->spectrum[0][0]->ut_seconds,
-              cache_spd_data.ampphase_options[i]->phase_in_degrees);
+    /* fprintf(stderr, "[get_cache_spd_data] cache entry %d MJD %.8f %d %d\n", */
+    /*         i, tmjd, (fabs(mjd - tmjd) <= tol), */
+    /*         cache_spd_data.ampphase_options[i]->phase_in_degrees); */
+    if (fabs(mjd - tmjd) > tol) {
+      // Not a good enough match.
+      continue;
+    }
+    match_found = true;
+    for (j = 0; j < cache_spd_data.num_options[i]; j++) {
+      if (ampphase_options_match(options[j],
+				 cache_spd_data.ampphase_options[i][j]) == false) {
+	// Not a perfect match.
+	match_found = false;
+	break;
+      }
+    }
+    if (match_found) {
+      /* fprintf(stderr, "[get_cache_spd_data] cache hit %s %.1f %d\n", */
+      /*         cache_spd_data.spectrum_data[i]->header_data->obsdate, */
+      /*         cache_spd_data.spectrum_data[i]->spectrum[0][0]->ut_seconds, */
+      /*         cache_spd_data.ampphase_options[i]->phase_in_degrees); */
       if (*data == NULL) {
         // Occurs in the child computer usually.
         *data = cache_spd_data.spectrum_data[i];
@@ -691,7 +725,7 @@ void data_reader(int read_type, int n_rpfits_files,
                  struct rpfits_file_information **info_rpfits_files,
                  struct spectrum_data **spectrum_data,
                  struct vis_data **vis_data) {
-  int i, res, n, calcres, curr_header, idx_if, idx_pol;
+  int i, j, res, n, calcres, curr_header, idx_if, idx_pol, local_num_options;
   int pols[4] = { POL_XX, POL_YY, POL_XY, POL_YX };
   bool open_file, keep_reading, header_free, read_cycles, keep_cycling;
   bool cycle_free, spectrum_return, vis_cycled, cache_hit_vis_data;
@@ -742,7 +776,7 @@ void data_reader(int read_type, int n_rpfits_files,
   if (read_type & GRAB_SPECTRUM) {
     // Check whether we have a cached product for this.
     half_cycle = (double)info_rpfits_files[0]->scan_headers[0]->cycle_time / (2.0 * 86400.0);
-    cache_hit_spectrum_data = get_cache_spd_data(ampphase_options, mjd_required,
+    cache_hit_spectrum_data = get_cache_spd_data(*num_options, *ampphase_options, mjd_required,
 						 half_cycle, spectrum_data);
     if (cache_hit_spectrum_data == true) {
       read_type -= GRAB_SPECTRUM;
@@ -958,14 +992,17 @@ void data_reader(int read_type, int n_rpfits_files,
                            temp_spectrum->num_pols);
                   }
                   for (idx_pol = 0; idx_pol < temp_spectrum->num_pols; idx_pol++) {
-                    MALLOC(local_ampphase_options, 1);
-                    set_default_ampphase_options(local_ampphase_options);
-                    copy_ampphase_options(local_ampphase_options, ampphase_options);
+		    local_num_options = *num_options;
+                    MALLOC(local_ampphase_options, local_num_options);
+		    for (j = 0; j < local_num_options; j++) {
+		      set_default_ampphase_options(local_ampphase_options[j]);
+		      copy_ampphase_options(local_ampphase_options[j], (*ampphase_options)[j]);
+		    }
                     /* fprintf(stderr, "[data_reader] calculating amp products\n"); */
                     calcres = vis_ampphase(sh, cycle_data,
                                            &(temp_spectrum->spectrum[idx_if][idx_pol]),
                                            pols[idx_pol], sh->if_label[idx_if],
-                                           local_ampphase_options);
+					   &local_num_options, &local_ampphase_options);
                     if (calcres < 0) {
                       fprintf(stderr, "CALCULATING AMP AND PHASE FAILED FOR IF %d POL %d, CODE %d\n",
                               sh->if_label[idx_if], pols[idx_pol], calcres);
@@ -979,15 +1016,27 @@ void data_reader(int read_type, int n_rpfits_files,
                     /*                                 local_ampphase_options); */
                     }
                     if ((read_type & COMPUTE_VIS_PRODUCTS) && (nocompute == false)) {
-                      MALLOC(local_ampphase_options, 1);
-                      set_default_ampphase_options(local_ampphase_options);
-                      copy_ampphase_options(local_ampphase_options, ampphase_options);
+                      /* MALLOC(local_ampphase_options, 1); */
+		      for (j = 0; j < local_num_options; j++) {
+			set_default_ampphase_options(local_ampphase_options[j]);
+			copy_ampphase_options(local_ampphase_options[j], (*ampphase_options)[j]);
+		      }
                       /* fprintf(stderr, "[data_reader] calculating vis products\n"); */
-                      ampphase_average(temp_spectrum->spectrum[idx_if][idx_pol],
+                      ampphase_average(sh, temp_spectrum->spectrum[idx_if][idx_pol],
                                        &((*vis_data)->vis_quantities[(*vis_data)->nviscycles][idx_if][idx_pol]),
-                                       local_ampphase_options);
+                                       &local_num_options, &local_ampphase_options);
                       // Copy the ampphase_options back.
-                      copy_ampphase_options(ampphase_options, local_ampphase_options);
+		      if (local_num_options > *num_options) {
+			// Something got added.
+			REALLOC(*ampphase_options, local_num_options);
+			for (j = *num_options; j < local_num_options; j++) {
+			  CALLOC((*ampphase_options)[j], 1);
+			}
+		      }
+		      *num_options = local_num_options;
+		      for (j = 0; j < *num_options; j++) {
+			copy_ampphase_options((*ampphase_options)[j], local_ampphase_options[j]);
+		      }
                       /* fprintf(stderr, "[data_reader] calculated vis products\n"); */
                       vis_cycled = true;
                     }
@@ -1142,6 +1191,23 @@ void add_client_spd_data(struct client_spd_data *client_spd_data,
   copy_spectrum_data(client_spd_data->spectrum_data[n], spectrum_data);
 }
 
+/*!
+ *  \brief Add a set of options from a client into a cache
+ *  \param client_ampphase_options the cache structure that holds information about
+ *                                 multiple clients
+ *  \param client_id the ID of the client to associate with the supplied options;
+ *                   only a single set of options may be cached against a single ID
+ *  \param client_username the username of the client to associate with the supplied
+ *                         options; only a single set of options may be cached against
+ *                         a single username
+ *  \param n_ampphase_options the number of options structures in the set
+ *  \param ampphase_options the set of options to store
+ *
+ * The ampphase_options cache exists so that if a user (as identified by a client
+ * username) is controlling multiple clients, but would like any changes they make
+ * to the options on one client to be reflected in the others, this can happen
+ * seamlessly.
+ */
 void add_client_ampphase_options(struct client_ampphase_options *client_ampphase_options,
 				 char *client_id, char *client_username,
 				 int n_ampphase_options,
@@ -1185,10 +1251,56 @@ void add_client_ampphase_options(struct client_ampphase_options *client_ampphase
   client_ampphase_options->n_ampphase_options[n] = n_ampphase_options;
   CALLOC(client_ampphase_options->ampphase_options[n], n_ampphase_options);
   for (i = 0; i < client_ampphase_options->n_ampphase_options[n]; i++) {
-    CALLOC(client_ampphase_options[n][i], 1);
+    CALLOC(client_ampphase_options->ampphase_options[n][i], 1);
     copy_ampphase_options(client_ampphase_options->ampphase_options[n][i],
 			  ampphase_options[i]);
   }
+}
+
+bool get_client_ampphase_options(struct client_ampphase_options *client_ampphase_options,
+				 char *client_id, char *client_username,
+				 int *n_ampphase_options,
+				 struct ampphase_options ***ampphase_options) {
+  int i, idx = -1;
+
+  // Find the correct client ID or username.
+  if (strlen(client_username) > 0) {
+    // We do a search by username.
+    for (i = 0; i < client_ampphase_options->num_clients; i++) {
+      if ((strlen(client_ampphase_options->client_username[i]) > 0) &&
+	  (strncmp(client_ampphase_options->client_username[i], client_username,
+		   CLIENTIDLENGTH) == 0)) {
+	// Found it.
+	idx = i;
+	break;
+      }
+    }
+  }
+  if ((strlen(client_username) == 0) || // If the username wasn't specified, or
+      (idx < 0)) { // if the username wasn't found in the previous search...
+    // Look for the client ID.
+    for (i = 0; i < client_ampphase_options->num_clients; i++) {
+      if (strncmp(client_ampphase_options->client_id[i], client_id, CLIENTIDLENGTH) == 0) {
+	idx = i;
+	break;
+      }
+    }
+  }
+
+  if (idx < 0) {
+    // No match.
+    return false;
+  }
+
+  // Copy the options.
+  *n_ampphase_options = client_ampphase_options->n_ampphase_options[idx];
+  MALLOC(*ampphase_options, *n_ampphase_options);
+  for (i = 0; i < *n_ampphase_options; i++) {
+    MALLOC((*ampphase_options)[i], 1);
+    copy_ampphase_options((*ampphase_options)[i],
+			  client_ampphase_options->ampphase_options[idx][i]);
+  }
+  return true;
 }
 
 struct vis_data* get_client_vis_data(struct client_vis_data *client_vis_data,
@@ -1232,13 +1344,13 @@ struct spectrum_data* get_client_spd_data(struct client_spd_data *client_spd_dat
 int main(int argc, char *argv[]) {
   struct rpfitsfile_server_arguments arguments;
   int i, j, k, l, ri, rj, bytes_received, r, n_cycle_mjd = 0, n_client_options;
-  int n_alert_sockets = 0;
+  int n_alert_sockets = 0, n_ampphase_options = 0;
   bool pointer_found = false, vis_cache_updated = false;
   bool spd_cache_updated = false, outside_mjd_range = false;
   double mjd_grab, earliest_mjd, latest_mjd, mjd_cycletime;
   double *all_cycle_mjd = NULL;
   struct rpfits_file_information **info_rpfits_files = NULL;
-  struct ampphase_options *ampphase_options = NULL, **client_options = NULL;
+  struct ampphase_options **ampphase_options = NULL, **client_options = NULL;
   struct spectrum_data *spectrum_data = NULL, *child_spectrum_data = NULL;
   struct vis_data *vis_data = NULL, *child_vis_data = NULL;
   FILE *fh = NULL;
@@ -1273,8 +1385,10 @@ int main(int argc, char *argv[]) {
   arguments.testing_instruction_files = NULL;
 
   // And the default for the calculator options.
-  MALLOC(ampphase_options, 1);
-  set_default_ampphase_options(ampphase_options);
+  /* MALLOC(ampphase_options, 1); */
+  /* set_default_ampphase_options(ampphase_options); */
+  n_ampphase_options = 0;
+  ampphase_options = NULL;
   
   // Parse the arguments.
   argp_parse(&argp, argc, argv, 0, 0, &arguments);
@@ -1343,7 +1457,8 @@ int main(int argc, char *argv[]) {
     info_rpfits_files[i] = new_rpfits_file();
     strncpy(info_rpfits_files[i]->filename, arguments.rpfits_files[i], RPSBUFSIZE);
   }
-  data_reader(READ_SCAN_METADATA, arguments.n_rpfits_files, 0.0, -1, -1, ampphase_options,
+  data_reader(READ_SCAN_METADATA, arguments.n_rpfits_files, 0.0, -1, -1,
+	      &n_ampphase_options, &ampphase_options,
               info_rpfits_files, &spectrum_data, &vis_data);
   // We can now work out which time range we cover and the cycle time.
   for (i = 0; i < arguments.n_rpfits_files; i++) {
@@ -1391,14 +1506,17 @@ int main(int argc, char *argv[]) {
   mjd_grab = info_rpfits_files[ri]->scan_start_mjd[rj] + 10.0 / 86400.0;
   printf(" grabbing from random scan %d from file %d, MJD %.6f\n", rj, ri, mjd_grab);
   data_reader(GRAB_SPECTRUM | COMPUTE_VIS_PRODUCTS, arguments.n_rpfits_files, mjd_grab, -1, -1,
-              ampphase_options, info_rpfits_files, &spectrum_data, &vis_data);
+              &n_ampphase_options, &ampphase_options, info_rpfits_files, &spectrum_data, &vis_data);
   // This first grab of the vis_data goes into the default client slot.
   add_client_vis_data(&client_vis_data, "DEFAULT", vis_data);
-  vis_cache_updated = add_cache_vis_data(ampphase_options, vis_data);
+  vis_cache_updated = add_cache_vis_data(n_ampphase_options, ampphase_options, vis_data);
   // Same with the spectrum_data.
   add_client_spd_data(&client_spd_data, "DEFAULT", spectrum_data);
-  spd_cache_updated = add_cache_spd_data(ampphase_options, spectrum_data);
-
+  spd_cache_updated = add_cache_spd_data(n_ampphase_options, ampphase_options, spectrum_data);
+  // And these are now the default ampphase options.
+  add_client_ampphase_options(&client_ampphase_options, "DEFAULT", "",
+			      n_ampphase_options, ampphase_options);
+  
   // Now go through any testing data specifications and store those.
   
   
@@ -1570,8 +1688,13 @@ int main(int argc, char *argv[]) {
 		  unpack_ampphase_options(&cmp, client_options[i]);
 		}
 		// Store all the options in our cache.
-		add_client_ampphase_options(&client_ampphase_options);
-					    
+		add_client_ampphase_options(&client_ampphase_options,
+					    client_request.client_id,
+					    client_request.client_username,
+					    n_client_options, client_options);
+	      } else {
+		// Get the client options from our cache.
+		
 	      }
               //MALLOC(client_options, 1);
               //unpack_ampphase_options(&cmp, client_options);
@@ -1586,7 +1709,8 @@ int main(int argc, char *argv[]) {
                 printf("CHILD STARTED! Computing data...\n");
                 
                 data_reader(COMPUTE_VIS_PRODUCTS, arguments.n_rpfits_files, mjd_grab, -1, -1,
-                            client_options, info_rpfits_files, &spectrum_data, &child_vis_data);
+			    &n_client_options, &client_options, info_rpfits_files,
+			    &spectrum_data, &child_vis_data);
                 // We send the data back to our parent over the network.
                 if (prepare_client_connection("localhost", arguments.port_number,
                                               &child_socket, false)) {
@@ -1615,7 +1739,10 @@ int main(int argc, char *argv[]) {
                 printf("CHILD IS FINISHED!\n");
                 exit(0);
               } else {
-                free_ampphase_options(client_options);
+		for (i = 0; i < n_client_options; i++) {
+		  free_ampphase_options(client_options[i]);
+		  FREE(client_options[i]);
+		}
                 FREE(client_options);
                 // Return a response saying that we are doing the computation.
                 MALLOC(send_buffer, JUSTRESPONSESIZE);
@@ -1996,7 +2123,10 @@ int main(int argc, char *argv[]) {
   FREE(info_rpfits_files);
   FREE(arguments.rpfits_files);
 
-  free_ampphase_options(ampphase_options);
+  for (i = 0; i < n_ampphase_options; i++) {
+    free_ampphase_options(ampphase_options[i]);
+    FREE(ampphase_options[i]);
+  }
   FREE(ampphase_options);
   FREE(vis_data);
 
