@@ -995,6 +995,7 @@ void data_reader(int read_type, int n_rpfits_files,
 		    local_num_options = *num_options;
                     MALLOC(local_ampphase_options, local_num_options);
 		    for (j = 0; j < local_num_options; j++) {
+		      CALLOC(local_ampphase_options[j], 1);
 		      set_default_ampphase_options(local_ampphase_options[j]);
 		      copy_ampphase_options(local_ampphase_options[j], (*ampphase_options)[j]);
 		    }
@@ -1303,6 +1304,7 @@ bool get_client_ampphase_options(struct client_ampphase_options *client_ampphase
   return true;
 }
 
+
 struct vis_data* get_client_vis_data(struct client_vis_data *client_vis_data,
                                      char *client_id) {
   // Return vis data associated with the specified client_id, or
@@ -1346,7 +1348,7 @@ int main(int argc, char *argv[]) {
   int i, j, k, l, ri, rj, bytes_received, r, n_cycle_mjd = 0, n_client_options;
   int n_alert_sockets = 0, n_ampphase_options = 0;
   bool pointer_found = false, vis_cache_updated = false;
-  bool spd_cache_updated = false, outside_mjd_range = false;
+  bool spd_cache_updated = false, outside_mjd_range = false, succ = false;
   double mjd_grab, earliest_mjd, latest_mjd, mjd_cycletime;
   double *all_cycle_mjd = NULL;
   struct rpfits_file_information **info_rpfits_files = NULL;
@@ -1660,6 +1662,27 @@ int main(int argc, char *argv[]) {
               // Now move to writing to the send buffer.
               init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)RPSENDBUFSIZE);
               pack_responses(&cmp, &client_response);
+	      // Return the ampphase options used here.
+	      if ((client_request.request_type == REQUEST_CURRENT_SPECTRUM) ||
+		  (client_request.request_type == REQUEST_CURRENT_VISDATA)) {
+		get_client_ampphase_options(&client_ampphase_options, "DEFAULT", "",
+					    &n_client_options, &client_options);
+	      } else if ((client_request.request_type == REQUEST_MJD_SPECTRUM) ||
+			 (client_request.request_type == REQUEST_COMPUTED_VISDATA)) {
+		succ = get_client_ampphase_options(&client_ampphase_options,
+						   client_request.client_id,
+						   client_request.client_username,
+						   &n_client_options, &client_options);
+		if (succ == false) {
+		  // Revert to defaults.
+		  get_client_ampphase_options(&client_ampphase_options, "DEFAULT", "",
+					      &n_client_options, &client_options);
+		}
+	      }
+	      pack_write_sint(&cmp, n_client_options);
+	      for (i = 0; i < n_client_options; i++) {
+		pack_ampphase_options(&cmp, client_options[i]);
+	      }
               if (client_request.request_type == REQUEST_CURRENT_SPECTRUM) {
                 pack_spectrum_data(&cmp, get_client_spd_data(&client_spd_data, "DEFAULT"));
               } else if (client_request.request_type == REQUEST_MJD_SPECTRUM) {
@@ -1677,6 +1700,12 @@ int main(int argc, char *argv[]) {
                      get_type_string(TYPE_RESPONSE, client_response.response_type),
                      client_request.client_id);
               bytes_sent = socket_send_buffer(loop_i, send_buffer, cmp_mem_access_get_pos(&mem));
+	      for (i = 0; i < n_client_options; i++) {
+		free_ampphase_options(client_options[i]);
+		FREE(client_options[i]);
+	      }
+	      FREE(client_options);
+	      n_client_options = 0;
             } else if (client_request.request_type == REQUEST_COMPUTE_VISDATA) {
               // We've been asked to recompute vis data with a different set of options.
               // Get the options.
@@ -1694,7 +1723,16 @@ int main(int argc, char *argv[]) {
 					    n_client_options, client_options);
 	      } else {
 		// Get the client options from our cache.
-		
+		succ = get_client_ampphase_options(&client_ampphase_options,
+						   client_request.client_id,
+						   client_request.client_username,
+						   &n_client_options, &client_options);
+		if (succ == false) {
+		  // Revert to using the default.
+		  get_client_ampphase_options(&client_ampphase_options,
+					      "DEFAULT", "", &n_client_options,
+					      &client_options);
+		}
 	      }
               //MALLOC(client_options, 1);
               //unpack_ampphase_options(&cmp, client_options);
@@ -1721,7 +1759,11 @@ int main(int argc, char *argv[]) {
                   init_cmp_memory_buffer(&child_cmp, &child_mem, child_send_buffer,
                                          (size_t)RPSENDBUFSIZE);
                   pack_requests(&child_cmp, &child_request);
-                  pack_ampphase_options(&child_cmp, client_options);
+		  // Send all the options structures we used.
+		  pack_write_sint(&child_cmp, n_client_options);
+		  for (i = 0; i < n_client_options; i++) {
+		    pack_ampphase_options(&child_cmp, client_options[i]);
+		  }
                   pack_vis_data(&child_cmp, child_vis_data);
                   printf("[CHILD] %s for client %s.\n",
                          get_type_string(TYPE_REQUEST, child_request.request_type),
@@ -1733,8 +1775,11 @@ int main(int argc, char *argv[]) {
                 // Don't bother with the response.
                 CLOSESOCKET(child_socket);
                 // Clean up.
-                free_ampphase_options(client_options);
-                FREE(client_options);
+		for (i = 0; i < n_client_options; i++) {
+		  free_ampphase_options(client_options[i]);
+		  FREE(client_options[i]);
+		}
+		FREE(client_options);
                 // Die.
                 printf("CHILD IS FINISHED!\n");
                 exit(0);
@@ -1744,6 +1789,7 @@ int main(int argc, char *argv[]) {
 		  FREE(client_options[i]);
 		}
                 FREE(client_options);
+		n_client_options = 0;
                 // Return a response saying that we are doing the computation.
                 MALLOC(send_buffer, JUSTRESPONSESIZE);
                 init_cmp_memory_buffer(&cmp, &mem, send_buffer, JUSTRESPONSESIZE);
@@ -1761,16 +1807,28 @@ int main(int argc, char *argv[]) {
               // We're getting vis data back from our child after the computation has
               // finished.
               fprintf(stderr, "[PARENT] unpacking ampphase options\n");
-              // Free the current ampphase options.
-              free_ampphase_options(ampphase_options);
-              unpack_ampphase_options(&cmp, ampphase_options);
+              // Free the current client ampphase options.
+	      for (i = 0; i < n_client_options; i++) {
+		free_ampphase_options(client_options[i]);
+		FREE(client_options[i]);
+	      }
+	      FREE(client_options);
+	      n_client_options = 0;
+	      // And read the new client options now.
+	      pack_read_sint(&cmp, &n_client_options);
+	      MALLOC(client_options, n_client_options);
+	      for (i = 0; i < n_client_options; i++) {
+		CALLOC(client_options[i], 1);
+		unpack_ampphase_options(&cmp, client_options[i]);
+	      }
               
               fprintf(stderr, "[PARENT] unpacking vis data\n");
               unpack_vis_data(&cmp, vis_data);
               
               // Add this data to our cache.
               fprintf(stderr, "[PARENT] adding data to cache\n");
-              vis_cache_updated = add_cache_vis_data(ampphase_options, vis_data);
+              vis_cache_updated = add_cache_vis_data(n_client_options,
+						     client_options, vis_data);
               if (vis_cache_updated == false) {
                 // The unpacked data can be freed.
                 // This includes the header data.
@@ -1781,7 +1839,7 @@ int main(int argc, char *argv[]) {
                 free_vis_data(vis_data);
                 // Now get the cached vis data so we don't repeatedly store
                 // new data into the client slot.
-                get_cache_vis_data(ampphase_options, &vis_data);
+                get_cache_vis_data(n_client_options, client_options, &vis_data);
               }
               add_client_vis_data(&client_vis_data, client_request.client_id, vis_data);
               
@@ -1789,7 +1847,7 @@ int main(int argc, char *argv[]) {
               // Find the client's socket.
               //alert_socket = find_client(&clients, client_request.client_id);
 	      find_client(&clients, client_request.client_id, "",
-			  &n_alert_sockets, &alert_socket);
+			  &n_alert_sockets, &alert_socket, NULL);
 	      for (i = 0; i < n_alert_sockets; i++) {
 		if (ISVALIDSOCKET(alert_socket[i])) {
 		  // Craft a response.
@@ -1828,7 +1886,7 @@ int main(int argc, char *argv[]) {
               if (arguments.testing_operation) {
                 // Also request the user name.
                 init_cmp_memory_buffer(&cmp, &mem, send_buffer, JUSTRESPONSESIZE);
-                client_response.response_type = RESPONSE_REQUEST_USER_ID;
+                client_response.response_type = RESPONSE_REQUEST_USERNAME;
                 pack_responses(&cmp, &client_response);
                 printf(" %s to client %s.\n",
                        get_type_string(TYPE_RESPONSE, client_response.response_type),
@@ -1844,8 +1902,12 @@ int main(int argc, char *argv[]) {
               pack_read_double(&cmp, &mjd_grab);
               printf(" Client has requested data at MJD %.8f\n", mjd_grab);
               // Get the options.
-              MALLOC(client_options, 1);
-              unpack_ampphase_options(&cmp, client_options);
+	      pack_read_sint(&cmp, &n_client_options);
+              MALLOC(client_options, n_client_options);
+	      for (i = 0; i < n_client_options; i++) {
+		CALLOC(client_options[i], 1);
+		unpack_ampphase_options(&cmp, client_options[i]);
+	      }
               // Check that this MJD is within the range we know about.
               outside_mjd_range = false;
               if ((mjd_grab < earliest_mjd) || (mjd_grab > latest_mjd)) {
@@ -1866,7 +1928,8 @@ int main(int argc, char *argv[]) {
                 printf("CHILD STARTED! Grabbing spectrum...\n");
                 
                 data_reader(GRAB_SPECTRUM, arguments.n_rpfits_files, mjd_grab, -1, -1,
-                            client_options, info_rpfits_files, &child_spectrum_data, NULL);
+			    &n_client_options, &client_options, info_rpfits_files,
+			    &child_spectrum_data, NULL);
                 // We send the data back to our parent over the network.
                 if (prepare_client_connection("localhost", arguments.port_number,
                                               &child_socket, false)) {
@@ -1884,7 +1947,10 @@ int main(int argc, char *argv[]) {
                           child_spectrum_data->spectrum[0][0]->ut_seconds,
                           mjd_grab);
                   pack_write_double(&child_cmp, mjd_grab);
-                  pack_ampphase_options(&child_cmp, client_options);
+		  pack_write_sint(&child_cmp, n_client_options);
+		  for (i = 0; i < n_client_options; i++) {
+		    pack_ampphase_options(&child_cmp, client_options[i]);
+		  }
                   pack_spectrum_data(&child_cmp, child_spectrum_data);
                   printf("[CHILD] %s for client %s.\n",
                          get_type_string(TYPE_REQUEST, child_request.request_type),
@@ -1896,14 +1962,21 @@ int main(int argc, char *argv[]) {
                 // Don't bother with the response.
                 CLOSESOCKET(child_socket);
                 // Clean up.
-                free_ampphase_options(client_options);
-                FREE(client_options);
+		for (i = 0; i < n_client_options; i++) {
+		  free_ampphase_options(client_options[i]);
+		  FREE(client_options[i]);
+		}
+		FREE(client_options);
                 // Die.
                 printf("CHILD IS FINISHED!\n");
                 exit(0);
               } else {
-                free_ampphase_options(client_options);
-                FREE(client_options);
+		for (i = 0; i < n_client_options; i++) {
+		  free_ampphase_options(client_options[i]);
+		  FREE(client_options[i]);
+		}
+		FREE(client_options);
+		n_client_options = 0;
                 // Return a response saying that we are doing the grab.
                 MALLOC(send_buffer, JUSTRESPONSESIZE);
                 init_cmp_memory_buffer(&cmp, &mem, send_buffer, JUSTRESPONSESIZE);
@@ -1923,16 +1996,27 @@ int main(int argc, char *argv[]) {
               }
             } else if (client_request.request_type == CHILDREQUEST_SPECTRUM_MJD) {
               // We're getting a spectrum back from our child after it was grabbed.
-              // Free the current ampphase options.
-              free_ampphase_options(ampphase_options);
+              // Free the current client ampphase options.
+	      for (i = 0; i < n_client_options; i++) {
+		free_ampphase_options(client_options[i]);
+		FREE(client_options[i]);
+	      }
+	      FREE(client_options);
+	      n_client_options = 0;
               pack_read_double(&cmp, &mjd_grab);
-              unpack_ampphase_options(&cmp, ampphase_options);
-              fprintf(stderr, " getting data from child for MJD %.8f, deg %d\n",
-                      mjd_grab, ampphase_options->phase_in_degrees);
+	      pack_read_sint(&cmp, &n_client_options);
+	      MALLOC(client_options, n_client_options);
+	      for (i = 0; i < n_client_options; i++) {
+		CALLOC(client_options[i], 1);
+		unpack_ampphase_options(&cmp, client_options[i]);
+	      }
+              /* fprintf(stderr, " getting data from child for MJD %.8f, deg %d\n", */
+              /*         mjd_grab, ampphase_options->phase_in_degrees); */
               unpack_spectrum_data(&cmp, spectrum_data);
               
               // Add this data to our cache.
-              spd_cache_updated = add_cache_spd_data(ampphase_options, spectrum_data);
+              spd_cache_updated = add_cache_spd_data(n_client_options,
+						     client_options, spectrum_data);
               if (spd_cache_updated == false) {
                 // The unpacked data can be freed.
                 free_scan_header_data(spectrum_data->header_data);
@@ -1940,7 +2024,8 @@ int main(int argc, char *argv[]) {
                 free_spectrum_data(spectrum_data);
                 // Now get the cached spectrum data.
                 fprintf(stderr, " matched data so grabbing cached data\n");
-                get_cache_spd_data(ampphase_options, mjd_grab, (mjd_cycletime / 2.0),
+                get_cache_spd_data(n_client_options, client_options,
+				   mjd_grab, (mjd_cycletime / 2.0),
                                    &spectrum_data);
               }
               fprintf(stderr, " associating data with client %s\n", client_request.client_id);
@@ -1948,22 +2033,25 @@ int main(int argc, char *argv[]) {
               
               // Tell the client that their data is ready.
               // Find the client's socket.
-              alert_socket = find_client(&clients, client_request.client_id);
-              if (ISVALIDSOCKET(alert_socket)) {
-                // Craft a response.
-                fprintf(stderr, " alerting client %s\n", client_request.client_id);
-                client_response.response_type = RESPONSE_SPECTRUM_LOADED;
-                strncpy(client_response.client_id, client_request.client_id, CLIENTIDLENGTH);
-                MALLOC(send_buffer, JUSTRESPONSESIZE);
-                init_cmp_memory_buffer(&cmp, &mem, send_buffer, JUSTRESPONSESIZE);
-                pack_responses(&cmp, &client_response);
-                printf(" %s to client %s.\n",
-                       get_type_string(TYPE_RESPONSE, client_response.response_type),
-                       client_request.client_id);
-                bytes_sent = socket_send_buffer(alert_socket, send_buffer,
-                                                cmp_mem_access_get_pos(&mem));
-                FREE(send_buffer);
-              }
+              find_client(&clients, client_request.client_id, "",
+			  &n_alert_sockets, &alert_socket, NULL);
+	      for (i = 0; i < n_alert_sockets; i++) {
+		if (ISVALIDSOCKET(alert_socket[i])) {
+		  // Craft a response.
+		  fprintf(stderr, " alerting client %s\n", client_request.client_id);
+		  client_response.response_type = RESPONSE_SPECTRUM_LOADED;
+		  strncpy(client_response.client_id, client_request.client_id, CLIENTIDLENGTH);
+		  MALLOC(send_buffer, JUSTRESPONSESIZE);
+		  init_cmp_memory_buffer(&cmp, &mem, send_buffer, JUSTRESPONSESIZE);
+		  pack_responses(&cmp, &client_response);
+		  printf(" %s to client %s.\n",
+			 get_type_string(TYPE_RESPONSE, client_response.response_type),
+			 client_request.client_id);
+		  bytes_sent = socket_send_buffer(alert_socket[i], send_buffer,
+						  cmp_mem_access_get_pos(&mem));
+		  FREE(send_buffer);
+		}
+	      }
             } else if (client_request.request_type == REQUEST_TIMERANGE) {
               // Something wants to know the time information like min/max
               // MJD and the cycle time.

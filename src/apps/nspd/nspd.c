@@ -502,6 +502,7 @@ int main(int argc, char *argv[]) {
   fd_set watchset, reads;
   int i, r, bytes_received, max_socket = -1, nmesg = 0, n_cycles = 0;
   int nlistlines = 0, mjd_year, mjd_month, mjd_day, min_dmjd_idx = -1;
+  int n_ampphase_options = 0;
   float mjd_utseconds;
   size_t recv_buffer_length;
   struct requests server_request;
@@ -513,7 +514,7 @@ int main(int argc, char *argv[]) {
   cmp_mem_access_t mem;
   double earliest_mjd, latest_mjd, mjd_cycletime, cmjd, min_dmjd, dmjd;
   double *all_cycle_mjd = NULL;
-  struct ampphase_options ampphase_options;
+  struct ampphase_options **ampphase_options = NULL;
   struct syscal_data *tsys_data;
 
   // Allocate some memory.
@@ -535,14 +536,14 @@ int main(int argc, char *argv[]) {
   nxpanels = 5;
   nypanels = 5;
 
-  // We display phase in degrees by default.
-  ampphase_options.phase_in_degrees = YES;
-  ampphase_options.include_flagged_data = NO;
-  ampphase_options.num_ifs = 0; // Doesn't matter.
-  ampphase_options.min_tvchannel = NULL;
-  ampphase_options.max_tvchannel = NULL;
-  ampphase_options.delay_averaging = NULL;
-  ampphase_options.averaging_method = NULL;
+  /* // We display phase in degrees by default. */
+  /* ampphase_options.phase_in_degrees = YES; */
+  /* ampphase_options.include_flagged_data = NO; */
+  /* ampphase_options.num_ifs = 0; // Doesn't matter. */
+  /* ampphase_options.min_tvchannel = NULL; */
+  /* ampphase_options.max_tvchannel = NULL; */
+  /* ampphase_options.delay_averaging = NULL; */
+  /* ampphase_options.averaging_method = NULL; */
   
   // Parse the arguments.
   argp_parse(&argp, argc, argv, 0, 0, &arguments);
@@ -721,7 +722,10 @@ int main(int argc, char *argv[]) {
         readline_print_messages(nmesg, mesgout);
         pack_write_double(&cmp, mjd_request);
         // We have to send along the ampphase options as well.
-        pack_ampphase_options(&cmp, &ampphase_options);
+	pack_write_sint(&cmp, n_ampphase_options);
+	for (i = 0; i < n_ampphase_options; i++) {
+	  pack_ampphase_options(&cmp, ampphase_options[i]);
+	}
         socket_send_buffer(socket_peer, send_buffer, cmp_mem_access_get_pos(&mem));
       }
     }
@@ -800,6 +804,21 @@ int main(int argc, char *argv[]) {
       // Check we're getting what we expect.
       if ((server_response.response_type == RESPONSE_CURRENT_SPECTRUM) ||
           (server_response.response_type == RESPONSE_LOADED_SPECTRUM)) {
+	// First the options. Free the old ones if we need to first.
+	if (n_ampphase_options > 0) {
+	  for (i = 0; i < n_ampphase_options; i++) {
+	    free_ampphase_options(ampphase_options[i]);
+	    FREE(ampphase_options[i]);
+	  }
+	  FREE(ampphase_options);
+	}
+	pack_read_sint(&cmp, &n_ampphase_options);
+	MALLOC(ampphase_options, n_ampphase_options);
+	for (i = 0; i < n_ampphase_options; i++) {
+	  CALLOC(ampphase_options[i], 1);
+	  unpack_ampphase_options(&cmp, ampphase_options[i]);
+	}
+	// And then get the spectrum data.
         unpack_spectrum_data(&cmp, &spectrum_data);
         // Refresh the plot next time through.
         action_required = ACTION_NEW_DATA_RECEIVED;

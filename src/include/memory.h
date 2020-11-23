@@ -92,7 +92,7 @@
       if ( !( (p) = realloc((p), sizeof(*(p)) * (n)) ) )  \
         {                                                 \
           perror(ERROR_REALLOC_MESSAGE);                  \
-          exit(EXIT_FAILURE);                             \
+          /*exit(EXIT_FAILURE);*/			  \
         }                                                 \
     }                                                     \
   while(0)

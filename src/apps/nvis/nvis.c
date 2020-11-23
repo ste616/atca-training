@@ -1063,6 +1063,20 @@ int main(int argc, char *argv[]) {
       // Check we're getting what we expect.
       if ((server_response.response_type == RESPONSE_CURRENT_VISDATA) ||
           (server_response.response_type == RESPONSE_COMPUTED_VISDATA)) {
+	// Receive the ampphase options first, and free old ones if we need to.
+	if (n_ampphase_options > 0) {
+	  for (i = 0; i < n_ampphase_options; i++) {
+	    free_ampphase_options(ampphase_options[i]);
+	    FREE(ampphase_options[i]);
+	  }
+	  FREE(ampphase_options);
+	}
+	pack_read_sint(&cmp, &n_ampphase_options);
+	MALLOC(ampphase_options, n_ampphase_options);
+	for (i = 0; i < n_ampphase_options; i++) {
+	  CALLOC(ampphase_options[i], 1);
+	  unpack_ampphase_options(&cmp, ampphase_options[i]);
+	}
         unpack_vis_data(&cmp, &vis_data);
         action_required = ACTION_NEW_DATA_RECEIVED;
       } else if (server_response.response_type == RESPONSE_VISDATA_COMPUTED) {
