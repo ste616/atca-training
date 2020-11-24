@@ -1294,7 +1294,8 @@ int ampphase_average(struct scan_header_data *scan_header_data,
 			      scan_header_data->if_bandwidth[ampphase->window - 1],
 			      ampphase->nchannels, min_tvchannel, max_tvchannel);
   }
-  (*vis_quantities)->options = band_options;
+  CALLOC((*vis_quantities)->options, 1);
+  copy_ampphase_options((*vis_quantities)->options, band_options);
   //n_expected = (options->max_tvchannel - options->min_tvchannel) + 1;
   n_expected = (max_tvchannel - min_tvchannel) + 1;
   /* fprintf(stderr, "[ampphase_average] allocating memory for %d samples\n", */
