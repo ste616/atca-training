@@ -1079,8 +1079,10 @@ void free_syscal_data(struct syscal_data *syscal_data);
 void default_tvchannels(int num_chan, float chan_width,
                         float centre_freq, int *min_tvchannel,
                         int *max_tvchannel);
-void add_tvchannels_to_options(struct ampphase_options *ampphase_options,
-                               int window, int min_tvchannel, int max_tvchannel);
+void add_tvchannels_to_options(struct ampphase_options *ampphase_options, int window,
+			       float window_centre_freq, float window_bandwidth,
+			       int window_nchannels,
+			       int min_tvchannel, int max_tvchannel);
 int vis_ampphase(struct scan_header_data *scan_header_data,
                  struct cycle_data *cycle_data,
                  struct ampphase **ampphase, int pol, int ifno, int *num_options,
@@ -1104,3 +1106,4 @@ void spectrum_data_compile_system_temperatures(struct spectrum_data *spectrum_da
 					       struct syscal_data **syscal_data);
 void system_temperature_modifier(int action, struct cycle_data *cycle_data,
 				 struct scan_header_data *scan_header_data);
+void print_options_set(int num_options, struct ampphase_options **options);

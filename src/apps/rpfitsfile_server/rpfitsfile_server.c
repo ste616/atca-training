@@ -782,6 +782,9 @@ void data_reader(int read_type, int n_rpfits_files,
       read_type -= GRAB_SPECTRUM;
     }
   }
+
+  /* printf("[data_reader] Entry to routine\n"); */
+  /* print_options_set(*num_options, *ampphase_options); */
   
   for (i = 0; i < n_rpfits_files; i++) {
     // HERE WILL GO ANY CHECKS TO SEE IF WE ACTUALLY WANT TO
@@ -951,6 +954,10 @@ void data_reader(int read_type, int n_rpfits_files,
 		// Do a Tsys calculation.
 		calculate_system_temperatures_cycle_data(cycle_data, sh, num_options,
 							 ampphase_options);
+
+		/* printf("[data_reader] system temperatures just calculated\n"); */
+		/* print_options_set(*num_options, *ampphase_options); */
+
                 // Allocate all the memory we need.
                 /* printf("cycle found!\n"); */
                 /* fprintf(stderr, "[data_reader] making a temporary spectrum...\n"); */

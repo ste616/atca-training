@@ -382,13 +382,19 @@ struct ampphase_options* find_ampphase_options(int num_options,
   bool all_bands_match = false;
   struct ampphase_options *match = NULL;
 
+  /* printf("[find_ampphase_options] searching set of %d options\n", num_options); */
+  
   for (i = 0; i < num_options; i++) {
-    if (options[i]->num_ifs == scan_header_data->num_ifs) {
+    /* printf(" options %d has %d windows, scan header has %d windows\n", i, */
+    /* 	   options[i]->num_ifs, scan_header_data->num_ifs); */
+    if ((options[i]->num_ifs - 1) == scan_header_data->num_ifs) {
       all_bands_match = true;
-      for (j = 0; j < options[i]->num_ifs; j++) {
-	if ((options[i]->if_centre_freq[j] != scan_header_data->if_centre_freq[j]) ||
-	    (options[i]->if_bandwidth[j] != scan_header_data->if_bandwidth[j]) ||
-	    (options[i]->if_nchannels[j] != scan_header_data->if_num_channels[j])) {
+      for (j = 1; j < options[i]->num_ifs; j++) {
+	/* printf("  MATCHING CF %.1f to %.1f\n", options[i]->if_centre_freq[j], */
+	/*        scan_header_data->if_centre_freq[j - 1]); */
+	if ((options[i]->if_centre_freq[j] != scan_header_data->if_centre_freq[j - 1]) ||
+	    (options[i]->if_bandwidth[j] != scan_header_data->if_bandwidth[j - 1]) ||
+	    (options[i]->if_nchannels[j] != scan_header_data->if_num_channels[j - 1])) {
 	  all_bands_match = false;
 	  break;
 	}
@@ -609,6 +615,9 @@ void default_tvchannels(int num_chan, float chan_width,
  *                          least as many windows required to accommodate the IF window
  *                          number specified as \a window
  *  \param window the IF number to add tvchannels for (starts at 1)
+ *  \param window_centre_freq the central sky frequency of the window, in MHz
+ *  \param window_bandwidth the bandwidth of the window, in MHz
+ *  \param window_nchannels the number of channels in the window
  *  \param min_tvchannel the minimum channel to use in the tvchannel range
  *  \param max_tvchannel the maximum channel to use in the tvchannel range
  *
@@ -616,14 +625,22 @@ void default_tvchannels(int num_chan, float chan_width,
  * into the ampphase_options structure. It takes care of putting in
  * defaults which get recognised as not being set if windows are missing.
  */
-void add_tvchannels_to_options(struct ampphase_options *ampphase_options,
-                               int window, int min_tvchannel, int max_tvchannel) {
+void add_tvchannels_to_options(struct ampphase_options *ampphase_options, int window,
+			       float window_centre_freq, float window_bandwidth,
+			       int window_nchannels,
+			       int min_tvchannel, int max_tvchannel) {
   int i, nwindow = window + 1;
   if (nwindow > ampphase_options->num_ifs) {
     // We have to reallocate the memory.
+    REALLOC(ampphase_options->if_centre_freq, nwindow);
+    REALLOC(ampphase_options->if_bandwidth, nwindow);
+    REALLOC(ampphase_options->if_nchannels, nwindow);
     REALLOC(ampphase_options->min_tvchannel, nwindow);
     REALLOC(ampphase_options->max_tvchannel, nwindow);
     for (i = ampphase_options->num_ifs; i < nwindow; i++) {
+      ampphase_options->if_centre_freq[i] = -1;
+      ampphase_options->if_bandwidth[i] = 0;
+      ampphase_options->if_nchannels[i] = 0;
       ampphase_options->min_tvchannel[i] = -1;
       ampphase_options->max_tvchannel[i] = -1;
     }
@@ -645,6 +662,11 @@ void add_tvchannels_to_options(struct ampphase_options *ampphase_options,
     ampphase_options->num_ifs = nwindow;
   }
 
+  // Set the band identifiers.
+  ampphase_options->if_centre_freq[window] = window_centre_freq;
+  ampphase_options->if_bandwidth[window] = window_bandwidth;
+  ampphase_options->if_nchannels[window] = window_nchannels;
+  
   // Set the tvchannels.
   ampphase_options->min_tvchannel[window] = min_tvchannel;
   ampphase_options->max_tvchannel[window] = max_tvchannel;
@@ -691,7 +713,7 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
   int syscal_pol_idx = -1;
   float rcheck = 0, chanwidth, firstfreq, nhalfchan;
   bool needs_new_options = false;
-  struct ampphase_options default_options, *band_options = NULL;
+  struct ampphase_options *band_options = NULL;
 
   // Check we know about the window number we were given.
   if ((ifnum < 1) || (ifnum > scan_header_data->num_ifs)) {
@@ -712,38 +734,19 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
   band_options = find_ampphase_options(*num_options, *options,
 				       scan_header_data);
   needs_new_options = (band_options == NULL);
-  /* for (i = 0; i < *num_options; i++) { */
-  /*   if ((*options)[i]->num_ifs == scan_header_data->num_ifs) { */
-  /*     all_bands_match = true; */
-  /*     for (j = 0; j < (*options)[i]->num_ifs; j++) { */
-  /* 	if (((*options)[i]->if_centre_freq[j] != scan_header_data->if_centre_freq[j]) || */
-  /* 	    ((*options)[i]->if_bandwidth[j] != scan_header_data->if_bandwidth[j]) || */
-  /* 	    ((*options)[i]->if_nchannels[j] != scan_header_data->if_num_channels[j])) { */
-  /* 	  all_bands_match = false; */
-  /* 	  break; */
-  /* 	} */
-  /*     } */
-  /*     if (all_bands_match == true) { */
-  /* 	// We've found a matching set of options. */
-  /* 	band_options = (*options)[i]; */
-  /* 	needs_new_options = false; */
-  /*     } */
-  /*   } */
-  /* } */
+
+  /* printf("[vis_ampphase] after finding options\n"); */
+  /* print_options_set(*num_options, *options); */
+  /* printf("[vis_ampphase] band options are\n"); */
+  /* print_options_set(1, &band_options); */
 
   if (needs_new_options) {
-    default_options = ampphase_options_default();
+    CALLOC(band_options, 1);
+    set_default_ampphase_options(band_options);
     *num_options += 1;
     REALLOC(*options, *num_options);
     CALLOC((*options)[*num_options - 1], 1);
-    (*options)[*num_options - 1] = &default_options;
-    band_options = (*options)[*num_options - 1];
-    /* if ((*options == NULL) || (*num_options == 0)) { */
-    /*   *num_options = 1; */
-    /* MALLOC(*options, *num_options); */
-    /* MALLOC((*options)[0], 1); */
-    /* needs_new_options = true; */
-    /* (*options)[0] = &default_options; */
+    (*options)[*num_options - 1] = band_options;
   }
   
   // Determine which of the polarisations is the one requested.
@@ -1287,7 +1290,9 @@ int ampphase_average(struct scan_header_data *scan_header_data,
                        (1000 * ampphase->frequency[(ampphase->nchannels + 1) / 2]),
                        &min_tvchannel, &max_tvchannel);
     add_tvchannels_to_options(band_options, ampphase->window,
-                              min_tvchannel, max_tvchannel);
+			      (scan_header_data->if_centre_freq[ampphase->window - 1] * 1000),
+			      (scan_header_data->if_bandwidth[ampphase->window - 1] * 1000),
+			      ampphase->nchannels, min_tvchannel, max_tvchannel);
   }
   (*vis_quantities)->options = band_options;
   //n_expected = (options->max_tvchannel - options->min_tvchannel) + 1;
@@ -1500,7 +1505,7 @@ void calculate_system_temperatures_cycle_data(struct cycle_data *cycle_data,
   float nhalfchan, chanwidth, rcheck, med_tp_on, med_tp_off, tp_on, tp_off;
   float fs, fd, dx;
   bool computed_tsys_applied = false, needs_new_options = false;
-  struct ampphase_options default_options, *band_options = NULL;
+  struct ampphase_options *band_options = NULL;
   // Recalculate the system temperature from the data within the
   // specified tvchannel range, and with different options.
 
@@ -1530,14 +1535,22 @@ void calculate_system_temperatures_cycle_data(struct cycle_data *cycle_data,
   band_options = find_ampphase_options(*num_options, *options, scan_header_data);
   needs_new_options = (band_options == NULL);
 
+  /* printf("[calculate_system_temperatures_cycle_data] after finding options\n"); */
+  /* print_options_set(*num_options, *options); */
+  /* printf("[calculate_system_temperatures_cycle_data] band options are\n"); */
+  /* print_options_set(1, &band_options); */
+  
   if (needs_new_options) {
-    default_options = ampphase_options_default();
+    CALLOC(band_options, 1);
+    set_default_ampphase_options(band_options);
     *num_options += 1;
     REALLOC(*options, *num_options);
-    CALLOC((*options)[*num_options - 1], 1);
-    (*options)[*num_options - 1] = &default_options;
+    (*options)[*num_options - 1] = band_options;
     band_options = (*options)[*num_options - 1];
   }
+
+  /* printf("[calculate_system_temperatures_cycle_data] after creating new options\n"); */
+  /* print_options_set(*num_options, *options); */
   
   for (i = 0; i < cycle_data->num_points; i++) {
     bl = ants_to_base(cycle_data->ant1[i], cycle_data->ant2[i]);
@@ -1581,8 +1594,12 @@ void calculate_system_temperatures_cycle_data(struct cycle_data *cycle_data,
 	default_tvchannels(nchannels, chanwidth * 1000,
 			   scan_header_data->if_centre_freq[iidx] * 1000,
 			   &chan_low, &chan_high);
-	add_tvchannels_to_options(band_options, ifno, chan_low, chan_high);
+	add_tvchannels_to_options(band_options, ifno,
+				  scan_header_data->if_centre_freq[iidx],
+				  scan_header_data->if_bandwidth[iidx],
+				  nchannels, chan_low, chan_high);
       }
+
       // Find the polarisations we need in the data.
       for (j = 0; j < scan_header_data->if_num_stokes[iidx]; j++) {
 	polnum = polarisation_number(scan_header_data->if_stokes_names[iidx][j]);
@@ -1616,6 +1633,9 @@ void calculate_system_temperatures_cycle_data(struct cycle_data *cycle_data,
     }
   }
 
+  /* printf("[calculate_system_temperatures_cycle_data] after checking for all IFs in all points\n"); */
+  /* print_options_set(*num_options, *options); */
+  
   // We've compiled all the information from the auto-correlations at this point.
   // We can compute the system temperatures now, but before we do, we need to check
   // if previously computed Tsys has been applied to the data. Since we'll be
@@ -2141,4 +2161,40 @@ void system_temperature_modifier(int action,
     }
   }
 
+}
+
+/*!
+ *  \brief Produce a description of the supplied set of options
+ *  \param num_options the number of structures in the set
+ *  \param options the set of options structures
+ */
+void print_options_set(int num_options,
+		       struct ampphase_options **options) {
+  int i, j;
+
+  if ((options == NULL) || (*options == NULL)) {
+    printf("[print_options_set] NULL passed as options set\n");
+    return;
+  }
+
+  printf("Options set has %d elements:\n", num_options);
+  for (i = 0; i < num_options; i++) {
+    printf("  SET %d:\n", i);
+    printf("     PHASE IN DEGREES: %s\n", ((options[i]->phase_in_degrees) ?
+					   "YES": "NO"));
+    printf("     INCLUDE FLAGGED: %s\n", ((options[i]->include_flagged_data) ?
+					  "YES" : "NO"));
+    printf("     # WINDOWS: %d\n", options[i]->num_ifs);
+    for (j = 1; j < options[i]->num_ifs; j++) {
+      printf("        CENTRE FREQ: %.1f MHz\n", options[i]->if_centre_freq[j]);
+      printf("        BANDWIDTH: %.1f MHz\n", options[i]->if_bandwidth[j]);
+      printf("        # CHANNELS: %d\n", options[i]->if_nchannels[j]);
+      printf("        TVCHAN RANGE: %d - %d\n",
+	     options[i]->min_tvchannel[j], options[i]->max_tvchannel[j]);
+      printf("        DELAY AVERAGING: %d\n",
+	     options[i]->delay_averaging[j]);
+      printf("        AVERAGING METHOD: %d\n",
+	     options[i]->averaging_method[j]);
+    }
+  }
 }
