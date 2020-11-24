@@ -288,6 +288,7 @@ void add_client(struct client_sockets *clients, char *client_id,
     REALLOC(clients->client_id, n);
     MALLOC(clients->client_id[n - 1], CLIENTIDLENGTH);
     strncpy(clients->client_id[n - 1], client_id, CLIENTIDLENGTH);
+    REALLOC(clients->client_username, n);
     CALLOC(clients->client_username[n - 1], CLIENTIDLENGTH);
     strncpy(clients->client_username[n - 1], client_username, CLIENTIDLENGTH);
 

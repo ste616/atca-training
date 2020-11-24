@@ -626,6 +626,10 @@ void copy_vis_data(struct vis_data *dest,
   // The number of cycles contained here.
   dest->nviscycles = src->nviscycles;
 
+  // The times.
+  dest->mjd_low = src->mjd_low;
+  dest->mjd_high = src->mjd_high;
+  
   // The header data for each cycle.
   dest->header_data = src->header_data;
 
@@ -643,6 +647,10 @@ void copy_vis_data(struct vis_data *dest,
 
   // And the calibration parameters.
   dest->syscal_data = src->syscal_data;
+
+  // And the options.
+  dest->num_options = src->num_options;
+  dest->options = src->options;
 }
 
 void pack_vis_data(cmp_ctx_t *cmp, struct vis_data *a) {

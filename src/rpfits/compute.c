@@ -1222,7 +1222,7 @@ int ampphase_average(struct scan_header_data *scan_header_data,
   float complex total_complex, *median_complex = NULL, average_complex;
   float complex *delavg_raw = NULL;
   bool needs_new_options = false;
-  struct ampphase_options default_options, *band_options = NULL;
+  struct ampphase_options *band_options = NULL;
   
   // Prepare the structure if required.
   if (*vis_quantities == NULL) {
@@ -1248,12 +1248,12 @@ int ampphase_average(struct scan_header_data *scan_header_data,
   needs_new_options = (band_options == NULL);
 
   if (needs_new_options) {
-    default_options = ampphase_options_default();
+    CALLOC(band_options, 1);
+    set_default_ampphase_options(band_options);
     *num_options += 1;
     REALLOC(*options, *num_options);
     CALLOC((*options)[*num_options - 1], 1);
-    (*options)[*num_options - 1] = &default_options;
-    band_options = (*options)[*num_options - 1];
+    (*options)[*num_options - 1] = band_options;
   }
   
   // Allocate the necessary arrays.
@@ -1290,8 +1290,8 @@ int ampphase_average(struct scan_header_data *scan_header_data,
                        (1000 * ampphase->frequency[(ampphase->nchannels + 1) / 2]),
                        &min_tvchannel, &max_tvchannel);
     add_tvchannels_to_options(band_options, ampphase->window,
-			      (scan_header_data->if_centre_freq[ampphase->window - 1] * 1000),
-			      (scan_header_data->if_bandwidth[ampphase->window - 1] * 1000),
+			      scan_header_data->if_centre_freq[ampphase->window - 1],
+			      scan_header_data->if_bandwidth[ampphase->window - 1],
 			      ampphase->nchannels, min_tvchannel, max_tvchannel);
   }
   (*vis_quantities)->options = band_options;
@@ -1590,7 +1590,7 @@ void calculate_system_temperatures_cycle_data(struct cycle_data *cycle_data,
 	nhalfchan = (nchannels % 2) == 1 ?
 	  (float)((nchannels - 1) / 2) : (float)(nchannels / 2);
 	chanwidth = scan_header_data->if_sideband[iidx] *
-	  scan_header_data->if_bandwidth[ifno] / (nhalfchan * 2);
+	  scan_header_data->if_bandwidth[iidx] / (nhalfchan * 2);
 	default_tvchannels(nchannels, chanwidth * 1000,
 			   scan_header_data->if_centre_freq[iidx] * 1000,
 			   &chan_low, &chan_high);

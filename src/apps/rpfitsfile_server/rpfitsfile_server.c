@@ -847,6 +847,10 @@ void data_reader(int read_type, int n_rpfits_files,
       /* printf("[data_reader] read scan header\n"); */
       if (sh->num_sources > 0) {
         curr_header += 1;
+	if (!(read_type & (READ_SCAN_METADATA)) &&
+	    (curr_header >= info_rpfits_files[i]->n_scans)) {
+	  continue;
+	}
         if (read_type & READ_SCAN_METADATA) {
           // Keep track of the times covered by each scan.
           /* info_rpfits_files[i]->scan_start_mjd[n] = */
@@ -1099,8 +1103,8 @@ void data_reader(int read_type, int n_rpfits_files,
       }
 
       // Discard this "scan" if it didn't contain cycles.
-      if ((info_rpfits_files[i]->n_cycles[n] == 0) &&
-	  (read_type & READ_SCAN_METADATA)) {
+      if ((read_type & READ_SCAN_METADATA) &&
+	  (info_rpfits_files[i]->n_cycles[n] == 0)) {
 	REALLOC(info_rpfits_files[i]->scan_headers, n);
 	REALLOC(info_rpfits_files[i]->scan_start_mjd, n);
 	REALLOC(info_rpfits_files[i]->scan_end_mjd, n);
@@ -1187,7 +1191,7 @@ void add_client_spd_data(struct client_spd_data *client_spd_data,
 
   // Store some spd data as identified by a client id.
   if (n >= client_spd_data->num_clients) {
-    fprintf(stderr, "[add_client_vis_data] making new client cache %s\n",
+    fprintf(stderr, "[add_client_spd_data] making new client cache %s\n",
 	    client_id);
     REALLOC(client_spd_data->client_id, (n + 1));
     MALLOC(client_spd_data->client_id[n], CLIENTIDLENGTH);
@@ -1352,7 +1356,7 @@ struct spectrum_data* get_client_spd_data(struct client_spd_data *client_spd_dat
 
 int main(int argc, char *argv[]) {
   struct rpfitsfile_server_arguments arguments;
-  int i, j, k, l, ri, rj, bytes_received, r, n_cycle_mjd = 0, n_client_options;
+  int i, j, k, l, ri, rj, bytes_received, r, n_cycle_mjd = 0, n_client_options = 0;
   int n_alert_sockets = 0, n_ampphase_options = 0;
   bool pointer_found = false, vis_cache_updated = false;
   bool spd_cache_updated = false, outside_mjd_range = false, succ = false;
@@ -1428,6 +1432,7 @@ int main(int argc, char *argv[]) {
   clients.num_sockets = 0;
   clients.socket = NULL;
   clients.client_id = NULL;
+  clients.client_username = NULL;
   client_ampphase_options.num_clients = 0;
   client_ampphase_options.client_id = NULL;
   client_ampphase_options.client_username = NULL;
