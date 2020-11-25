@@ -766,6 +766,8 @@ void data_reader(int read_type, int n_rpfits_files,
       (*vis_data)->vis_quantities = NULL;
       (*vis_data)->metinfo = NULL;
       (*vis_data)->syscal_data = NULL;
+      (*vis_data)->num_options = 0;
+      (*vis_data)->options = NULL;
     } else {
       printf("[data_reader] found cache hit\n");
       read_type -= COMPUTE_VIS_PRODUCTS;
@@ -849,6 +851,11 @@ void data_reader(int read_type, int n_rpfits_files,
         curr_header += 1;
 	if (!(read_type & (READ_SCAN_METADATA)) &&
 	    (curr_header >= info_rpfits_files[i]->n_scans)) {
+	  // We need to do some memory freeing if required.
+	  if (header_free == true) {
+	    free_scan_header_data(sh);
+	    FREE(sh);
+	  }
 	  continue;
 	}
         if (read_type & READ_SCAN_METADATA) {
@@ -1030,6 +1037,7 @@ void data_reader(int read_type, int n_rpfits_files,
                     if ((read_type & COMPUTE_VIS_PRODUCTS) && (nocompute == false)) {
                       /* MALLOC(local_ampphase_options, 1); */
 		      for (j = 0; j < local_num_options; j++) {
+			free_ampphase_options(local_ampphase_options[j]);
 			set_default_ampphase_options(local_ampphase_options[j]);
 			copy_ampphase_options(local_ampphase_options[j], (*ampphase_options)[j]);
 		      }
@@ -1045,6 +1053,10 @@ void data_reader(int read_type, int n_rpfits_files,
 			  CALLOC((*ampphase_options)[j], 1);
 			}
 		      }
+		      // Free the options we were sent.
+		      for (j = 0; j < *num_options; j++) {
+			free_ampphase_options((*ampphase_options)[j]);
+		      }
 		      *num_options = local_num_options;
 		      for (j = 0; j < *num_options; j++) {
 			copy_ampphase_options((*ampphase_options)[j], local_ampphase_options[j]);
@@ -1052,6 +1064,12 @@ void data_reader(int read_type, int n_rpfits_files,
                       /* fprintf(stderr, "[data_reader] calculated vis products\n"); */
                       vis_cycled = true;
                     }
+		    // Free our local ampphase options.
+		    for (j = 0; j < local_num_options; j++) {
+		      free_ampphase_options(local_ampphase_options[j]);
+		      FREE(local_ampphase_options[j]);
+		    }
+		    FREE(local_ampphase_options);
                   }
                 }
                 if (vis_cycled) {
@@ -1094,10 +1112,6 @@ void data_reader(int read_type, int n_rpfits_files,
       } else {
         header_free = true;
       }
-      if (header_free) {
-        free_scan_header_data(sh);
-        FREE(sh);
-      }
       if (res == READER_EXHAUSTED) {
         keep_reading = false;
       }
@@ -1105,12 +1119,20 @@ void data_reader(int read_type, int n_rpfits_files,
       // Discard this "scan" if it didn't contain cycles.
       if ((read_type & READ_SCAN_METADATA) &&
 	  (info_rpfits_files[i]->n_cycles[n] == 0)) {
+	// We also need to deallocate the scan header.
+	header_free = true;
+	// Change the size of the arrays.
 	REALLOC(info_rpfits_files[i]->scan_headers, n);
 	REALLOC(info_rpfits_files[i]->scan_start_mjd, n);
 	REALLOC(info_rpfits_files[i]->scan_end_mjd, n);
 	REALLOC(info_rpfits_files[i]->n_cycles, n);
 	REALLOC(info_rpfits_files[i]->cycle_mjd, n);
 	info_rpfits_files[i]->n_scans = n;
+      }
+
+      if (header_free) {
+        free_scan_header_data(sh);
+        FREE(sh);
       }
     }
 

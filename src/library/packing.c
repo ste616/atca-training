@@ -791,6 +791,12 @@ void free_vis_data(struct vis_data *vis_data) {
   FREE(vis_data->num_pols);
   FREE(vis_data->metinfo);
   FREE(vis_data->syscal_data);
+
+  for (i = 0; i < vis_data->num_options; i++) {
+    free_ampphase_options(vis_data->options[i]);
+    FREE(vis_data->options[i]);
+  }
+  FREE(vis_data->options);
 }
 
 void pack_scan_header_data(cmp_ctx_t *cmp, struct scan_header_data *a) {
