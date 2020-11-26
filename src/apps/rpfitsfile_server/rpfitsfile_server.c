@@ -1051,7 +1051,21 @@ void data_reader(int read_type, int n_rpfits_files,
 			REALLOC(*ampphase_options, local_num_options);
 			for (j = *num_options; j < local_num_options; j++) {
 			  CALLOC((*ampphase_options)[j], 1);
+			  copy_ampphase_options((*ampphase_options)[j],
+						local_ampphase_options[j]);
 			}
+		      }
+		      // And copy them to the vis data structure as well.
+		      for (j = 0; j < (*vis_data)->num_options; j++) {
+			free_ampphase_options((*vis_data)->options[j]);
+			FREE((*vis_data)->options[j]);
+		      }
+		      (*vis_data)->num_options = local_num_options;
+		      REALLOC((*vis_data)->options, (*vis_data)->num_options);
+		      for (j = 0; j < (*vis_data)->num_options; j++) {
+			CALLOC((*vis_data)->options[j], 1);
+			copy_ampphase_options((*vis_data)->options[j],
+					      local_ampphase_options[j]);
 		      }
 		      // Free the options we were sent.
 		      for (j = 0; j < *num_options; j++) {
