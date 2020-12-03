@@ -14,6 +14,7 @@
 #include <string.h>
 #include <complex.h>
 #include <stdbool.h>
+#include <stdarg.h>
 #include "atrpfits.h"
 #include "memory.h"
 #include "compute.h"
@@ -2166,37 +2167,103 @@ void system_temperature_modifier(int action,
 }
 
 /*!
+ *  \brief Add a formatted string to the end of another string, or print
+ *         it to the screen
+ *  \param o the string to add to, or NULL if you want the output to go to
+ *           the screen
+ *  \param olen the maximum length available in the \a o variable
+ *  \param fmt the printf-compatible format specifier
+ *  \param ... the arguments required by \a fmt
+ */
+void info_print(char *o, int olen, char *fmt, ...) {
+  int tmp_len;
+  char tmp_string[TMPSTRINGLEN];
+  va_list ap;
+
+  va_start(ap, fmt);
+  tmp_len = vsnprintf(tmp_string, TMPSTRINGLEN, fmt, ap);
+  va_end(ap);
+
+  if ((o != NULL) && (((int)strlen(o) + tmp_len) < olen)) {
+    strncat(o, tmp_string, tmp_len);
+  } else {
+    printf("%s", tmp_string);
+  }
+  
+}
+
+/*!
  *  \brief Produce a description of the supplied set of options
  *  \param num_options the number of structures in the set
  *  \param options the set of options structures
+ *  \param output if not set to NULL, put the output in this string instead of
+ *                printing it to screen
+ *  \param output_length the maximum length of the string that can fit in \a output
  */
 void print_options_set(int num_options,
-		       struct ampphase_options **options) {
+		       struct ampphase_options **options, char *output,
+		       int output_length) {
   int i, j;
 
+  // Initialise the strings.
+  if (output != NULL) {
+    output[0] = 0;
+  }
+  
   if ((options == NULL) || (*options == NULL)) {
-    printf("[print_options_set] NULL passed as options set\n");
+    info_print(output, output_length, "[print_options_set] NULL passed as options set\n");
     return;
   }
 
-  printf("Options set has %d elements:\n", num_options);
+  info_print(output, output_length, "Options set has %d elements:\n", num_options);
   for (i = 0; i < num_options; i++) {
-    printf("  SET %d:\n", i);
-    printf("     PHASE IN DEGREES: %s\n", ((options[i]->phase_in_degrees) ?
-					   "YES": "NO"));
-    printf("     INCLUDE FLAGGED: %s\n", ((options[i]->include_flagged_data) ?
-					  "YES" : "NO"));
-    printf("     # WINDOWS: %d\n", options[i]->num_ifs);
+    info_print(output, output_length, "  SET %d:\n", i);
+    info_print(output, output_length, "     PHASE IN DEGREES: %s\n",
+	       ((options[i]->phase_in_degrees) ? "YES": "NO"));
+    info_print(output, output_length, "     INCLUDE FLAGGED: %s\n",
+	       ((options[i]->include_flagged_data) ? "YES" : "NO"));
+    info_print(output, output_length, "     # WINDOWS: %d\n", options[i]->num_ifs);
     for (j = 1; j < options[i]->num_ifs; j++) {
-      printf("        CENTRE FREQ: %.1f MHz\n", options[i]->if_centre_freq[j]);
-      printf("        BANDWIDTH: %.1f MHz\n", options[i]->if_bandwidth[j]);
-      printf("        # CHANNELS: %d\n", options[i]->if_nchannels[j]);
-      printf("        TVCHAN RANGE: %d - %d\n",
+      info_print(output, output_length, "        CENTRE FREQ: %.1f MHz\n",
+		 options[i]->if_centre_freq[j]);
+      info_print(output, output_length, "        BANDWIDTH: %.1f MHz\n",
+		 options[i]->if_bandwidth[j]);
+      info_print(output, output_length, "        # CHANNELS: %d\n",
+		 options[i]->if_nchannels[j]);
+      info_print(output, output_length, "        TVCHAN RANGE: %d - %d\n",
 	     options[i]->min_tvchannel[j], options[i]->max_tvchannel[j]);
-      printf("        DELAY AVERAGING: %d\n",
+      info_print(output, output_length, "        DELAY AVERAGING: %d\n",
 	     options[i]->delay_averaging[j]);
-      printf("        AVERAGING METHOD: %d\n",
+      info_print(output, output_length, "        AVERAGING METHOD: %d\n",
 	     options[i]->averaging_method[j]);
     }
+  }
+}
+
+
+/*!
+ *  \brief Produce a description of the supplied header
+ *  \param header_data the scan header data structure to summarise
+ *  \param output if not set to NULL, put the output in this string
+ *                instead of printing it to screen
+ *  \param output_length the maximum length of the string that can fit in \a output
+ */
+void print_information_scan_header(struct scan_header_data *header_data,
+				   char *output, int output_length) {
+  int i;
+
+  // Initialise the strings.
+  if (output != NULL) {
+    output[0] = 0;
+  }
+  
+  // Print out the number of IFs.
+  info_print(output, output_length, " NUMBER OF WINDOWS: %d\n", header_data->num_ifs);
+
+  // Each IF now.
+  for (i = 0; i < header_data->num_ifs; i++) {
+    info_print(output, output_length, " IF %d: CF %.1f MHz BW %.1f MHz NCHAN %d\n",
+	       (i + 1), header_data->if_centre_freq[i],
+	       header_data->if_bandwidth[i], header_data->if_num_channels[i]);
   }
 }

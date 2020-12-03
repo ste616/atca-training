@@ -75,7 +75,11 @@ ssize_t socket_recv_buffer(SOCKET socket, char **buffer, size_t *buffer_length) 
     return(bytes_read);
   }
   // Allocate the necessary memory.
-  MALLOC(*buffer, bytes_to_read + 1);
+  if (bytes_to_read > 0) {
+    MALLOC(*buffer, bytes_to_read + 1);
+  } else {
+    bytes_to_read = 0;
+  }
   bytes_read = 0;
   while ((bytes_read < bytes_to_read) &&
          (br = recv(socket, *buffer + bytes_read, bytes_to_read - bytes_read, 0))) {

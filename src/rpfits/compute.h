@@ -11,6 +11,7 @@
 
 #pragma once
 #include <stdbool.h>
+#include <stdarg.h>
 #include "atrpfits.h"
 
 /**
@@ -115,6 +116,11 @@
  *         raw complex visibilities
  */
 #define STM_REMOVE            3
+/*! \def TMPSTRINGLEN
+ *  \brief The maximum length string that can be added in a single call to the
+ *         info_print routine
+ */
+#define TMPSTRINGLEN 100
 
 /*! \struct ampphase_options
  *  \brief Structure to hold options controlling how to take raw data and produce
@@ -1106,4 +1112,8 @@ void spectrum_data_compile_system_temperatures(struct spectrum_data *spectrum_da
 					       struct syscal_data **syscal_data);
 void system_temperature_modifier(int action, struct cycle_data *cycle_data,
 				 struct scan_header_data *scan_header_data);
-void print_options_set(int num_options, struct ampphase_options **options);
+void info_print(char *o, int olen, char *fmt, ...);
+void print_options_set(int num_options, struct ampphase_options **options,
+		       char *output, int output_length);
+void print_information_scan_header(struct scan_header_data *header_data,
+				   char *output, int output_length);

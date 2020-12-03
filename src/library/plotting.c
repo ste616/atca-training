@@ -918,13 +918,40 @@ float fracwidth(struct panelspec *panelspec,
   return (dlx / dx);
 }
 
+/*!
+ *  \brief Make a VIS-type plot, including all annotations
+ *  \param cycle_vis_quantities the data to put on the plot; this should be a 3-D array
+ *                              of structure pointers, where the first index is over
+ *                              all the cycles, the second index is over the windows
+ *                              in each cycle, and the third index is over the polarisations
+ *  \param ncycles the number of cycles (the first index) in \a cycle_vis_quantities
+ *  \param cycle_numifs an array specifying how many windows are in each cycle; should have
+ *                      length \a ncycles; each element should correspond to the length of
+ *                      the second index of \a cycle_vis_quantities
+ *  \param npols the number of polarisations (the third index) in \a cycle_vis_quantities
+ *  \param sort_baselines an indicator of whether to sort the baselines according to length
+ *                        (set to true), or not (set to false)
+ *  \param panelspec a structure that specifies how to divide up the PGPLOT view surface
+ *  \param plot_controls specification of the plots to make and how to plot them
+ *  \param header_data an array of scan header structure pointers, to specify the scan
+ *                     metadata for each cycle; this should have length \a ncycles
+ *  \param metinfo an array of `metinfo` structure pointers, to specify the weather metadata
+ *                 for each cycle; this should have length \a ncycles
+ *  \param syscal_data an array of `syscal_data` structure pointers, to specify the
+ *                     system calibration metadata for each cycle; this should have length
+ *                     \a ncycles
+ *  \param num_times the number of time indicator lines to plot
+ *  \param times an array of times to indicate on the plot by vertical dashed lines;
+ *               this should have length \a num_times
+ */
 void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
                    int ncycles, int *cycle_numifs, int npols,
                    bool sort_baselines,
                    struct panelspec *panelspec,
                    struct vis_plotcontrols *plot_controls,
                    struct scan_header_data **header_data,
-                   struct metinfo **metinfo, struct syscal_data **syscal_data) {
+                   struct metinfo **metinfo, struct syscal_data **syscal_data,
+		   int num_times, float *times) {
   bool show_tsys_legend = false;
   int nants = 0, i = 0, n_vis_lines = 0, j = 0, k = 0, p = 0;
   int singleant = 0, l = 0, m = 0, n = 0, ii, connidx = 0;
@@ -933,7 +960,7 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
   int n_tsys_vis_lines = 0, n_meta_vis_lines = 0, dbrk, *antprod = NULL, nls = 1;
   float ****plot_lines = NULL, min_x, max_x, min_y, max_y;
   float cxpos, dxpos, labtotalwidth, labspacing, dy, maxwidth, twidth;
-  float padlabel = 0.01, cch;
+  float padlabel = 0.01, cch, timeline_x[2], timeline_y[2];
   float ***antlines = NULL;
   char xopts[BUFSIZE], yopts[BUFSIZE], panellabel[BUFSIZE], panelunits[BUFSIZE];
   char antstring[BUFSIZE], bandstring[BUFSIZE];
@@ -1619,6 +1646,18 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
       }
       cpgline((n_plot_lines[i][j] - connidx),
               plot_lines[i][j][0] + connidx, plot_lines[i][j][1] + connidx);
+    }
+    // Plot any time indicators.
+    for (j = 0; j < num_times; j++) {
+      cpgsci(4);
+      cpgsls(2);
+
+      if ((times[j] >= min_x) && (times[j] <= max_x)) {
+	timeline_x[0] = timeline_x[1] = times[j];
+	timeline_y[0] = min_y;
+	timeline_y[1] = max_y;
+	cpgline(2, timeline_x, timeline_y);
+      }
     }
     if ((i == 0) && (show_tsys_legend)) {
       // Make some legend lines.

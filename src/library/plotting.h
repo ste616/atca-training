@@ -1,5 +1,7 @@
-/**
- * ATCA Training Library: plotting.h
+/** \file plotting.h
+ *  \brief Structures and magic numbers used to make plots
+ *
+ * ATCA Training Library
  * (C) Jamie Stevens CSIRO 2020
  *
  * This module contains functions that need to plot things with
@@ -238,7 +240,8 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
                    struct panelspec *panelspec,
                    struct vis_plotcontrols *plot_controls,
                    struct scan_header_data **header_data,
-                   struct metinfo **metinfo, struct syscal_data **syscal_data);
+                   struct metinfo **metinfo, struct syscal_data **syscal_data,
+		   int num_times, float *times);
 void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspec,
                    struct spd_plotcontrols *plot_controls,
                    struct scan_header_data *scan_header_data,

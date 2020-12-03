@@ -718,7 +718,7 @@ static void interpret_command(char *line) {
 
 int main(int argc, char *argv[]) {
   struct nvis_arguments arguments;
-  int i, j, r, bytes_received, nmesg = 0, bidx = -1;
+  int i, j, r, bytes_received, nmesg = 0, bidx = -1, num_timelines = 0;
   cmp_ctx_t cmp;
   cmp_mem_access_t mem;
   struct requests server_request;
@@ -726,9 +726,11 @@ int main(int argc, char *argv[]) {
   SOCKET socket_peer, max_socket = -1;
   char *recv_buffer = NULL, send_buffer[VISBUFSIZE], htime[20];
   char **mesgout = NULL, client_id[CLIENTIDLENGTH];
+  char header_string[VISBUFSIZE];
   fd_set watchset, reads;
   bool vis_device_opened = false;
   size_t recv_buffer_length;
+  float *timelines = NULL;
   struct vis_quantities ***described_ptr = NULL;
   struct scan_header_data *described_hdr = NULL;
 
@@ -840,18 +842,30 @@ int main(int argc, char *argv[]) {
       action_required -= ACTION_NEW_DATA_RECEIVED;
       action_required |= ACTION_VISBANDS_CHANGED;
       // Reset the selected index from the data.
+      nmesg = 0;
+      snprintf(mesgout[nmesg++], VISBUFSIZE, " new data arrives\n");
       if (data_seconds > 0) {
 	// We've already got a time setting, which we should try to keep
 	// if possible.
 	data_selected_index = time_index();
+	snprintf(mesgout[nmesg++], VISBUFSIZE, " time %.2f has selected index %d\n",
+		 data_seconds, data_selected_index);
       }
       if (data_seconds <= 0) {
 	// Couldn't keep it, or has never been set.
 	data_selected_index = vis_data.nviscycles - 1;
+	snprintf(mesgout[nmesg++], VISBUFSIZE, " last index selected %d\n",
+		 data_selected_index);
       }
       described_hdr = vis_data.header_data[data_selected_index];
+      print_information_scan_header(described_hdr, header_string, VISBUFSIZE);
+      snprintf(mesgout[nmesg++], VISBUFSIZE, " header at index:\n%s\n", header_string);
       found_options = find_ampphase_options(n_ampphase_options, ampphase_options,
 					    described_hdr);
+      print_options_set(1, &found_options, header_string, VISBUFSIZE);
+      snprintf(mesgout[nmesg++], VISBUFSIZE, "%s", header_string);
+      readline_print_messages(nmesg, mesgout);
+      
       // And get all the ampphase_options that were supplied.
       /* fidx = vis_data.num_ifs[data_selected_index]; */
       /* copy_ampphase_options(&ampphase_options, */
@@ -863,16 +877,16 @@ int main(int argc, char *argv[]) {
       /*   ampphase_options.max_tvchannel[i] = */
       /*     vis_data.vis_quantities[data_selected_index][i - 1][0]->options->max_tvchannel[i]; */
       /* } */
-      for (i = 0; i < n_ampphase_options; i++) {
-	free_ampphase_options(ampphase_options[i]);
-	FREE(ampphase_options[i]);
-      }
-      n_ampphase_options = vis_data.num_options;
-      REALLOC(ampphase_options, n_ampphase_options);
-      for (i = 0; i < n_ampphase_options; i++) {
-	CALLOC(ampphase_options[i], 1);
-	copy_ampphase_options(ampphase_options[i], vis_data.options[i]);
-      }
+      /* for (i = 0; i < n_ampphase_options; i++) { */
+      /* 	free_ampphase_options(ampphase_options[i]); */
+      /* 	FREE(ampphase_options[i]); */
+      /* } */
+      /* n_ampphase_options = vis_data.num_options; */
+      /* REALLOC(ampphase_options, n_ampphase_options); */
+      /* for (i = 0; i < n_ampphase_options; i++) { */
+      /* 	CALLOC(ampphase_options[i], 1); */
+      /* 	copy_ampphase_options(ampphase_options[i], vis_data.options[i]); */
+      /* } */
     }
 
     if (action_required & ACTION_VISBANDS_CHANGED) {
@@ -887,11 +901,21 @@ int main(int argc, char *argv[]) {
     }
 
     if (action_required & ACTION_REFRESH_PLOT) {
+      if (data_seconds > 0) {
+	num_timelines = 1;
+	MALLOC(timelines, num_timelines);
+	timelines[0] = data_seconds;
+	/* nmesg = 0; */
+	/* snprintf(mesgout[nmesg++], VISBUFSIZE, "Time line at %.2f\n", timelines[0]); */
+	/* readline_print_messages(nmesg, mesgout); */
+      }
       // Let's make a plot.
       make_vis_plot(vis_data.vis_quantities, vis_data.nviscycles,
                     vis_data.num_ifs, 4, sort_baselines,
                     &vis_panelspec, &vis_plotcontrols, vis_data.header_data,
-                    vis_data.metinfo, vis_data.syscal_data);
+                    vis_data.metinfo, vis_data.syscal_data, num_timelines, timelines);
+      FREE(timelines);
+      num_timelines = 0;
       action_required -= ACTION_REFRESH_PLOT;
     }
 
@@ -1079,6 +1103,11 @@ int main(int argc, char *argv[]) {
 	}
         unpack_vis_data(&cmp, &vis_data);
         action_required = ACTION_NEW_DATA_RECEIVED;
+	nmesg = 0;
+	snprintf(mesgout[nmesg++], VISBUFSIZE, " Data received\n");
+	print_options_set(n_ampphase_options, ampphase_options, header_string, VISBUFSIZE);
+	snprintf(mesgout[nmesg++], VISBUFSIZE, "%s", header_string);
+	readline_print_messages(nmesg, mesgout);
       } else if (server_response.response_type == RESPONSE_VISDATA_COMPUTED) {
         // We're being told new data is available after we asked for a new
         // computation. We request this new data.

@@ -1296,6 +1296,9 @@ void add_client_ampphase_options(struct client_ampphase_options *client_ampphase
     free_ampphase_options(client_ampphase_options->ampphase_options[n][i]);
     FREE(client_ampphase_options->ampphase_options[n][i]);
   }
+  // Store the metadata.
+  strncpy(client_ampphase_options->client_id[n], client_id, CLIENTIDLENGTH);
+  strncpy(client_ampphase_options->client_username[n], client_username, CLIENTIDLENGTH);
   client_ampphase_options->n_ampphase_options[n] = n_ampphase_options;
   CALLOC(client_ampphase_options->ampphase_options[n], n_ampphase_options);
   for (i = 0; i < client_ampphase_options->n_ampphase_options[n]; i++) {
@@ -1344,7 +1347,7 @@ bool get_client_ampphase_options(struct client_ampphase_options *client_ampphase
   *n_ampphase_options = client_ampphase_options->n_ampphase_options[idx];
   MALLOC(*ampphase_options, *n_ampphase_options);
   for (i = 0; i < *n_ampphase_options; i++) {
-    MALLOC((*ampphase_options)[i], 1);
+    CALLOC((*ampphase_options)[i], 1);
     copy_ampphase_options((*ampphase_options)[i],
 			  client_ampphase_options->ampphase_options[idx][i]);
   }
