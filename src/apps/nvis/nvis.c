@@ -426,11 +426,14 @@ static void interpret_command(char *line) {
       // Output a description of the data, at some time or for
       // the latest time.
       data_time_parsed = false;
+      action_required = ACTION_DESCRIBE_DATA;
       if (nels == 2) {
         // The second element should be the time.
         data_time_parsed = string_to_seconds(line_els[1], &data_seconds);
         if (data_time_parsed) {
 	  data_selected_index = time_index();
+	  // We'll also want to plot where this time is.
+	  action_required |= ACTION_REFRESH_PLOT;
           /* // Find the data with the right time. */
           /* close_time = fabsf(vis_data.vis_quantities[0][0][0]->ut_seconds - */
           /*                    data_seconds); */
@@ -450,7 +453,6 @@ static void interpret_command(char *line) {
       /*   data_selected_index = closeidx; */
       /* } */
       
-      action_required = ACTION_DESCRIBE_DATA;
     } else if (minmatch("calband", line_els[0], 4)) {
       // We can change which bands get plotted as aa/bb/ab and cc/dd/cd.
       if (nels > 1) {
@@ -889,36 +891,6 @@ int main(int argc, char *argv[]) {
       /* } */
     }
 
-    if (action_required & ACTION_VISBANDS_CHANGED) {
-      // TODO: Check that the visbands are actually present in the data.
-      change_vis_plotcontrols_visbands(&vis_plotcontrols, nvisbands, visband);
-      // Update the visband indices.
-      for (i = 0; i < nvisbands; i++) {
-        visband_idx[i] = find_if_name(described_hdr, visband[i]);
-      }
-      action_required -= ACTION_VISBANDS_CHANGED;
-      action_required |= ACTION_REFRESH_PLOT;
-    }
-
-    if (action_required & ACTION_REFRESH_PLOT) {
-      if (data_seconds > 0) {
-	num_timelines = 1;
-	MALLOC(timelines, num_timelines);
-	timelines[0] = data_seconds;
-	/* nmesg = 0; */
-	/* snprintf(mesgout[nmesg++], VISBUFSIZE, "Time line at %.2f\n", timelines[0]); */
-	/* readline_print_messages(nmesg, mesgout); */
-      }
-      // Let's make a plot.
-      make_vis_plot(vis_data.vis_quantities, vis_data.nviscycles,
-                    vis_data.num_ifs, 4, sort_baselines,
-                    &vis_panelspec, &vis_plotcontrols, vis_data.header_data,
-                    vis_data.metinfo, vis_data.syscal_data, num_timelines, timelines);
-      FREE(timelines);
-      num_timelines = 0;
-      action_required -= ACTION_REFRESH_PLOT;
-    }
-
     if (action_required & ACTION_DESCRIBE_DATA) {
       // Describe the data.
       described_ptr = vis_data.vis_quantities[data_selected_index];
@@ -953,6 +925,37 @@ int main(int argc, char *argv[]) {
       readline_print_messages(nmesg, mesgout);
       action_required -= ACTION_DESCRIBE_DATA;
     }
+    
+    if (action_required & ACTION_VISBANDS_CHANGED) {
+      // TODO: Check that the visbands are actually present in the data.
+      change_vis_plotcontrols_visbands(&vis_plotcontrols, nvisbands, visband);
+      // Update the visband indices.
+      for (i = 0; i < nvisbands; i++) {
+        visband_idx[i] = find_if_name(described_hdr, visband[i]);
+      }
+      action_required -= ACTION_VISBANDS_CHANGED;
+      action_required |= ACTION_REFRESH_PLOT;
+    }
+
+    if (action_required & ACTION_REFRESH_PLOT) {
+      if (data_seconds > 0) {
+	num_timelines = 1;
+	MALLOC(timelines, num_timelines);
+	timelines[0] = data_seconds;
+	/* nmesg = 0; */
+	/* snprintf(mesgout[nmesg++], VISBUFSIZE, "Time line at %.2f\n", timelines[0]); */
+	/* readline_print_messages(nmesg, mesgout); */
+      }
+      // Let's make a plot.
+      make_vis_plot(vis_data.vis_quantities, vis_data.nviscycles,
+                    vis_data.num_ifs, 4, sort_baselines,
+                    &vis_panelspec, &vis_plotcontrols, vis_data.header_data,
+                    vis_data.metinfo, vis_data.syscal_data, num_timelines, timelines);
+      FREE(timelines);
+      num_timelines = 0;
+      action_required -= ACTION_REFRESH_PLOT;
+    }
+
 
     if (action_required & ACTION_AMPPHASE_OPTIONS_PRINT) {
       // Output the ampphase_options that were used for the

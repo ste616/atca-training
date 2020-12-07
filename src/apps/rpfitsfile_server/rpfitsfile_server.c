@@ -1396,7 +1396,7 @@ struct spectrum_data* get_client_spd_data(struct client_spd_data *client_spd_dat
 int main(int argc, char *argv[]) {
   struct rpfitsfile_server_arguments arguments;
   int i, j, k, l, ri, rj, bytes_received, r, n_cycle_mjd = 0, n_client_options = 0;
-  int n_alert_sockets = 0, n_ampphase_options = 0;
+  int n_alert_sockets = 0, n_ampphase_options = 0, *client_indices = NULL;
   bool pointer_found = false, vis_cache_updated = false;
   bool spd_cache_updated = false, outside_mjd_range = false, succ = false;
   double mjd_grab, earliest_mjd, latest_mjd, mjd_cycletime;
@@ -1853,6 +1853,31 @@ int main(int argc, char *argv[]) {
                 bytes_sent = socket_send_buffer(loop_i, send_buffer,
                                                 cmp_mem_access_get_pos(&mem));
                 FREE(send_buffer);
+		// Now send a message to other clients of the same user, to let them
+		// know new data with different options is being generated.
+		find_client(&clients, client_request.client_id,
+			    client_request.client_username, &n_alert_sockets,
+			    &alert_socket, &client_indices);
+		for (i = 0; i < n_alert_sockets; i++) {
+		  if (alert_socket[i] != loop_i) {
+		    // Don't send the message to the client already connected.
+		    client_response.response_type = RESPONSE_USERREQUEST_VISDATA;
+		    strncpy(client_response.client_id,
+			    clients.client_id[client_indices[i]], CLIENTIDLENGTH);
+		    MALLOC(send_buffer, JUSTRESPONSESIZE);
+		    init_cmp_memory_buffer(&cmp, &mem, send_buffer, JUSTRESPONSESIZE);
+		    pack_responses(&cmp, &client_response);
+		    printf(" %s to client %s.\n",
+			   get_type_string(TYPE_RESPONSE, client_response.response_type),
+			   client_response.client_id);
+		    bytes_sent = socket_send_buffer(alert_socket[i], send_buffer,
+						    cmp_mem_access_get_pos(&mem));
+		    FREE(send_buffer);
+		  }
+		}
+		// Free the client list.
+		FREE(alert_socket);
+		FREE(client_indices);
               }
             } else if (client_request.request_type == CHILDREQUEST_VISDATA_COMPUTED) {
               // We're getting vis data back from our child after the computation has
@@ -1954,10 +1979,25 @@ int main(int argc, char *argv[]) {
               printf(" Client has requested data at MJD %.8f\n", mjd_grab);
               // Get the options.
 	      pack_read_sint(&cmp, &n_client_options);
-              MALLOC(client_options, n_client_options);
-	      for (i = 0; i < n_client_options; i++) {
-		CALLOC(client_options[i], 1);
-		unpack_ampphase_options(&cmp, client_options[i]);
+	      if (n_client_options > 0) {
+		// The options were supplied by the user.
+		MALLOC(client_options, n_client_options);
+		for (i = 0; i < n_client_options; i++) {
+		  CALLOC(client_options[i], 1);
+		  unpack_ampphase_options(&cmp, client_options[i]);
+		}
+	      } else {
+		// Try to get the options that this user has used before.
+		succ = get_client_ampphase_options(&client_ampphase_options,
+						   client_request.client_id,
+						   client_request.client_username,
+						   &n_client_options, &client_options);
+		if (succ == false) {
+		  // No good, so we use the default options.
+		  get_client_ampphase_options(&client_ampphase_options,
+					      "DEFAULT", "", &n_client_options,
+					      &client_options);
+		}
 	      }
               // Check that this MJD is within the range we know about.
               outside_mjd_range = false;

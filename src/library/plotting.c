@@ -58,7 +58,8 @@ int cmpfunc_baseline_length(const void *a, const void *b) {
 
 
 void change_spd_plotcontrols(struct spd_plotcontrols *plotcontrols,
-                             int *xaxis_type, int *yaxis_type, int *pols) {
+                             int *xaxis_type, int *yaxis_type, int *pols,
+			     int *decorations) {
   // Change some values.
   if (xaxis_type != NULL) {
     // There can only be one x-axis type.
@@ -111,6 +112,13 @@ void change_spd_plotcontrols(struct spd_plotcontrols *plotcontrols,
     plotcontrols->plot_options |= *pols;
   }
 
+  if (decorations != NULL) {
+    if (plotcontrols->plot_options & PLOT_TVCHANNELS) {
+      plotcontrols->plot_options -= PLOT_TVCHANNELS;
+    }
+    plotcontrols->plot_options |= *decorations;
+  }
+  
 }
 
 int change_spd_plotflags(struct spd_plotcontrols *plotcontrols,
@@ -142,7 +150,7 @@ int change_spd_plotflags(struct spd_plotcontrols *plotcontrols,
 
 void init_spd_plotcontrols(struct spd_plotcontrols *plotcontrols,
 			   int xaxis_type, int yaxis_type, int pols,
-			   int pgplot_device) {
+			   int decorations, int pgplot_device) {
   int i;
 
   // Initialise the plotcontrols structure.
@@ -178,6 +186,12 @@ void init_spd_plotcontrols(struct spd_plotcontrols *plotcontrols,
 
   plotcontrols->interactive = YES;
 
+  // Set our decorations.
+  if (decorations == DEFAULT) {
+    decorations = PLOT_TVCHANNELS;
+  }
+  plotcontrols->plot_options |= decorations;
+  
   // Keep the PGPLOT device.
   plotcontrols->pgplot_device = pgplot_device;
 }
@@ -1727,6 +1741,7 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
   float information_text_height, xaxis_min, xaxis_max, yaxis_min, yaxis_max, theight;
   float ylog_min, ylog_max, pollab_height, pollab_xlen, pollab_ylen, pollab_padding;
   float *plot_xvalues = NULL, *plot_yvalues = NULL, maxlen_tsys;
+  float tvchan_yvals[2], tvchan_xvals[2], tvchans[2];
   char ptitle[BIGBUFSIZE], ptype[BUFSIZE], ftype[BUFSIZE], poltitle[BUFSIZE];
   char information_text[BUFSIZE], ***systemp_strings = NULL;
   struct ampphase **ampphase_if = NULL;
@@ -2089,6 +2104,37 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
               cpgsci(pc);
               cpgline(ampphase_if[polidx[rp]]->f_nchannels[i][bi],
                       plot_xvalues, plot_yvalues);
+
+	      // Store the tvchannel ranges here while we know we're accessing valid data.
+	      if (plot_controls->plot_options & PLOT_TVCHANNELS) {
+		if (plot_controls->plot_options & PLOT_CHANNEL) {
+		  tvchans[0] = (float)ampphase_if[polidx[rp]]->options->min_tvchannel[idxif + 1];
+		  tvchans[1] = (float)ampphase_if[polidx[rp]]->options->max_tvchannel[idxif + 1];
+		} else if (plot_controls->plot_options & PLOT_FREQUENCY) {
+		  // Have to find the frequency of the channels.
+		  for (j = ampphase_if[polidx[rp]]->options->min_tvchannel[idxif + 1] - 1;
+		       ((j < ampphase_if[polidx[rp]]->nchannels) &&
+			(j <= ampphase_if[polidx[rp]]->options->min_tvchannel[idxif + 1] + 1));
+		       j++) {
+		    if ((int)ampphase_if[polidx[rp]]->channel[j] ==
+			ampphase_if[polidx[rp]]->options->min_tvchannel[idxif + 1]) {
+		      tvchans[0] = ampphase_if[polidx[rp]]->frequency[j];
+		      break;
+		    }
+		  }
+		  for (j = ampphase_if[polidx[rp]]->options->max_tvchannel[idxif + 1] - 1;
+		       ((j < ampphase_if[polidx[rp]]->nchannels) &&
+			(j <= ampphase_if[polidx[rp]]->options->max_tvchannel[idxif + 1] + 1));
+		       j++) {
+		    if ((int)ampphase_if[polidx[rp]]->channel[j] ==
+			ampphase_if[polidx[rp]]->options->max_tvchannel[idxif + 1]) {
+		      tvchans[1] = ampphase_if[polidx[rp]]->frequency[j];
+		      break;
+		    }
+		  }
+		}
+	      }
+
               // Add the polarisation label.
               switch (ampphase_if[polidx[rp]]->pol) {
               case POL_XX:
@@ -2118,6 +2164,18 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
               pc++;
             }
           }
+	  if (plot_controls->plot_options & PLOT_TVCHANNELS) {
+	    // Show the tvchannel range.
+	    cpgsls(2);
+	    cpgsci(7);
+	    tvchan_yvals[0] = yaxis_min;
+	    tvchan_yvals[1] = yaxis_max;
+	    for (j = 0; j < 2; j++) {
+	      tvchan_xvals[0] = tvchan_xvals[1] = tvchans[j];
+	      cpgline(2, tvchan_xvals, tvchan_yvals);
+	    }
+	    cpgsls(1);
+	  }
           
           FREE(plot_xvalues);
           FREE(plot_yvalues);

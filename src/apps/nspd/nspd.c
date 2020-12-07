@@ -35,25 +35,26 @@ const char *argp_program_version = "nspd 1.0";
 const char *argp_program_bug_address = "<Jamie.Stevens@csiro.au>";
 
 // Program documentation.
-static char doc[] = "new/network SPD";
+static char nspd_doc[] = "new/network SPD";
 
 // Argument description.
-static char args_doc[] = "[options]";
+static char nspd_args_doc[] = "[options]";
 
 // Our options.
-static struct argp_option options[] = {
+static struct argp_option nspd_options[] = {
   { "device", 'd', "PGPLOT_DEVICE", 0, "The PGPLOT device to use" },
   { "debug", 'D', 0, 0, "Output debugging information" },
   { "file", 'f', "FILE", 0, "Use an output file as the input" },
   { "port", 'p', "PORTNUM", 0, "The port number on the server to connect to" },
   { "server", 's', "SERVER", 0, "The server name or address to connect to" },
+  { "username", 'u', "USERNAME", 0, "The username to communicate to the server" },
   { 0 }
 };
 
 #define SPDBUFSIZE 1024
 
 // The arguments structure.
-struct arguments {
+struct nspd_arguments {
   bool use_file;
   bool debugging_output;
   char input_file[SPDBUFSIZE];
@@ -61,12 +62,13 @@ struct arguments {
   int port_number;
   char server_name[SPDBUFSIZE];
   bool network_operation;
+  char username[CLIENTIDLENGTH];
 };
 
 // And some fun, totally necessary, global state variables.
 int action_required, server_type;
 int spd_device_number;
-int xaxis_type, yaxis_type, plot_pols, yaxis_scaling, nxpanels, nypanels;
+int xaxis_type, yaxis_type, plot_pols, yaxis_scaling, nxpanels, nypanels, plot_decorations;
 double mjd_request, mjd_base;
 struct spd_plotcontrols spd_plotcontrols;
 struct panelspec spd_panelspec;
@@ -78,8 +80,8 @@ struct spectrum_data spectrum_data;
 // The number of information lines to use on the plot.
 #define NUM_INFO_LINES 4
 
-static error_t parse_opt(int key, char *arg, struct argp_state *state) {
-  struct arguments *arguments = state->input;
+static error_t nspd_parse_opt(int key, char *arg, struct argp_state *state) {
+  struct nspd_arguments *arguments = state->input;
 
   switch (key) {
   case 'd':
@@ -107,7 +109,7 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state) {
   return 0;
 }
 
-static struct argp argp = { options, parse_opt, args_doc, doc };
+static struct argp argp = { nspd_options, nspd_parse_opt, nspd_args_doc, nspd_doc };
 
 void read_data_from_file(char *filename, struct spectrum_data *spectrum_data) {
   FILE *fh = NULL;
@@ -171,6 +173,7 @@ static void sighandler(int sig) {
 #define ACTION_CYCLE_BACKWARD      1<<5
 #define ACTION_LIST_CYCLES         1<<6
 #define ACTION_TIME_REQUEST        1<<7
+#define ACTION_OMIT_OPTIONS        1<<8
 
 // Make a shortcut to stop action for those actions which can only be
 // done by a simulator.
@@ -195,7 +198,7 @@ static void interpret_command(char *line) {
   int if_num_spec[MAXIFS], yaxis_change_type, array_change_spec;
   int flag_change, flag_change_mode, change_nxpanels, change_nypanels;
   bool pols_selected = false, if_selected = false, range_valid = false;
-  bool mjdr_timeparsed;
+  bool mjdr_timeparsed, decorations_changed = false;
   float range_limit_low, range_limit_high, range_swap, mjdr_seconds;
   double mjdr_base;
   
@@ -263,7 +266,7 @@ static void interpret_command(char *line) {
       }
       if (pols_selected) {
         // Reset the polarisations.
-        change_spd_plotcontrols(&spd_plotcontrols, NULL, NULL, &pols_specified);
+        change_spd_plotcontrols(&spd_plotcontrols, NULL, NULL, &pols_specified, NULL);
         action_required = ACTION_REFRESH_PLOT;
       }
       if (if_selected) {
@@ -281,7 +284,7 @@ static void interpret_command(char *line) {
       } else if (xaxis_type == PLOT_CHANNEL) {
         xaxis_type = PLOT_FREQUENCY;
       }
-      change_spd_plotcontrols(&spd_plotcontrols, &xaxis_type, NULL, NULL);
+      change_spd_plotcontrols(&spd_plotcontrols, &xaxis_type, NULL, NULL, NULL);
       action_required = ACTION_REFRESH_PLOT;
     } else if ((minmatch("phase", line_els[0], 1)) ||
                (minmatch("amplitude", line_els[0], 1)) ||
@@ -328,7 +331,7 @@ static void interpret_command(char *line) {
         yaxis_type = PLOT_IMAG;
         yaxis_change_type = yaxis_type | yaxis_scaling;
       }
-      change_spd_plotcontrols(&spd_plotcontrols, NULL, &yaxis_change_type, NULL);
+      change_spd_plotcontrols(&spd_plotcontrols, NULL, &yaxis_change_type, NULL, NULL);
       action_required = ACTION_REFRESH_PLOT;
     } else if ((minmatch("scale", line_els[0], 3)) &&
                (nels == 2)) {
@@ -342,7 +345,7 @@ static void interpret_command(char *line) {
         yaxis_change_type = yaxis_type | yaxis_scaling;
       }
       if (yaxis_change_type >= 0) {
-        change_spd_plotcontrols(&spd_plotcontrols, NULL, &yaxis_change_type, NULL);
+        change_spd_plotcontrols(&spd_plotcontrols, NULL, &yaxis_change_type, NULL, NULL);
         action_required = ACTION_REFRESH_PLOT;
       }
     } else if (minmatch("array", line_els[0], 3)) {
@@ -451,6 +454,39 @@ static void interpret_command(char *line) {
         action_required |= ACTION_TIME_REQUEST;
         /* fprintf(stderr, " PARSED REQUESTED TIME AS %.8f\n", mjd_request); */
       }
+    } else if (minmatch("show", line_els[0], 3)) {
+      // Change the plot decorations.
+      if (nels > 1) {
+	// Read what they want to show.
+	if (minmatch("tvchannels", line_els[1], 4)) {
+	  // Show the tvchannel decorations.
+	  plot_decorations |= PLOT_TVCHANNELS;
+	  decorations_changed = true;
+	}
+
+	if (decorations_changed) {
+	  change_spd_plotcontrols(&spd_plotcontrols, NULL, NULL, NULL,
+				  &plot_decorations);
+	  action_required = ACTION_REFRESH_PLOT;
+	}
+      }
+    } else if (minmatch("hide", line_els[0], 3)) {
+      if (nels > 1) {
+	// Read what they want to hide.
+	if (minmatch("tvchannels", line_els[1], 4)) {
+	  // Hide the tvchannel decorations.
+	  if (plot_decorations & PLOT_TVCHANNELS) {
+	    plot_decorations -= PLOT_TVCHANNELS;
+	    decorations_changed = true;
+	  }
+	}
+
+	if (decorations_changed) {
+	  change_spd_plotcontrols(&spd_plotcontrols, NULL, NULL, NULL,
+				  &plot_decorations);
+	  action_required = ACTION_REFRESH_PLOT;
+	}
+      }
     }
     FREE(line_els);
   }
@@ -496,7 +532,7 @@ void reconcile_spd_plotcontrols(struct spectrum_data *spectrum_data,
 }
 
 int main(int argc, char *argv[]) {
-  struct arguments arguments;
+  struct nspd_arguments arguments;
   bool spd_device_opened = false, action_proceed = false;
   struct spd_plotcontrols spd_alteredcontrols;
   fd_set watchset, reads;
@@ -531,6 +567,7 @@ int main(int argc, char *argv[]) {
   arguments.server_name[0] = 0;
   arguments.port_number = 8880;
   arguments.network_operation = false;
+  arguments.username[0] = 0;
 
   // And defaults for some of the parameters.
   nxpanels = 5;
@@ -567,6 +604,7 @@ int main(int argc, char *argv[]) {
     // Ask what type of server we're connecting to.
     server_request.request_type = REQUEST_SERVERTYPE;
     strncpy(server_request.client_id, client_id, CLIENTIDLENGTH);
+    strncpy(server_request.client_username, arguments.username, CLIENTIDLENGTH);
     init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)SPDBUFSIZE);
     pack_requests(&cmp, &server_request);
     socket_send_buffer(socket_peer, send_buffer, cmp_mem_access_get_pos(&mem));
@@ -599,8 +637,9 @@ int main(int argc, char *argv[]) {
   yaxis_type = PLOT_AMPLITUDE;
   yaxis_scaling = PLOT_AMPLITUDE_LINEAR;
   plot_pols = PLOT_POL_XX | PLOT_POL_YY;
+  plot_decorations = PLOT_TVCHANNELS;
   init_spd_plotcontrols(&spd_plotcontrols, xaxis_type, yaxis_type | yaxis_scaling,
-                        plot_pols, spd_device_number);
+                        plot_pols, plot_decorations, spd_device_number);
   // The number of pols is set by the data though, not the selection.
   //action_required = ACTION_NEW_DATA_RECEIVED;
   //action_required = ACTION_CHANGE_PLOT_SURFACE;
@@ -721,10 +760,17 @@ int main(int argc, char *argv[]) {
         snprintf(mesgout[0], SPDBUFSIZE, " Requesting data at MJD %.8f\n", mjd_request);
         readline_print_messages(nmesg, mesgout);
         pack_write_double(&cmp, mjd_request);
-        // We have to send along the ampphase options as well.
-	pack_write_sint(&cmp, n_ampphase_options);
-	for (i = 0; i < n_ampphase_options; i++) {
-	  pack_ampphase_options(&cmp, ampphase_options[i]);
+	if (action_required & ACTION_OMIT_OPTIONS) {
+	  // We will not send any options, so that options being used by our
+	  // user in some other client will be used automatically by the server.
+	  pack_write_sint(&cmp, 0);
+	  action_required -= ACTION_OMIT_OPTIONS;
+	} else {
+	  // We have to send along the ampphase options as well.
+	  pack_write_sint(&cmp, n_ampphase_options);
+	  for (i = 0; i < n_ampphase_options; i++) {
+	    pack_ampphase_options(&cmp, ampphase_options[i]);
+	  }
 	}
         socket_send_buffer(socket_peer, send_buffer, cmp_mem_access_get_pos(&mem));
       }
@@ -872,6 +918,11 @@ int main(int argc, char *argv[]) {
         snprintf(mesgout[0], SPDBUFSIZE, " Received information about %d cycles.\n",
                  n_cycles);
         readline_print_messages(nmesg, mesgout);
+      } else if (server_response.response_type == RESPONSE_USERREQUEST_VISDATA) {
+	// Another NVIS client the same user is controlling has requested data with
+	// different options, so we re-request the same data we're viewing now but
+	// with those same new options.
+	action_required = ACTION_TIME_REQUEST | ACTION_OMIT_OPTIONS;
       }
       // Free the socket buffer memory.
       FREE(recv_buffer);

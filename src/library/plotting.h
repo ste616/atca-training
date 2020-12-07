@@ -31,6 +31,7 @@
 #define PLOT_TIME                 1<<12
 #define PLOT_REAL                 1<<13
 #define PLOT_IMAG                 1<<14
+#define PLOT_TVCHANNELS           1<<15
 
 #define PLOT_FLAG_POL_XX             1<<1
 #define PLOT_FLAG_POL_YY             1<<2
@@ -193,12 +194,13 @@ struct vis_line {
 void count_polarisations(struct spd_plotcontrols *plotcontrols);
 int cmpfunc_baseline_length(const void *a, const void *b);
 void change_spd_plotcontrols(struct spd_plotcontrols *plotcontrols,
-                             int *xaxis_type, int *yaxis_type, int *pols);
+                             int *xaxis_type, int *yaxis_type, int *pols,
+			     int *decorations);
 int change_spd_plotflags(struct spd_plotcontrols *plotcontrols,
                          long int changed_flags, int add_remove);
 void init_spd_plotcontrols(struct spd_plotcontrols *plotcontrols,
                            int xaxis_type, int yaxis_type, int pols,
-                           int pgplot_device);
+                           int dectorations, int pgplot_device);
 void change_vis_plotcontrols_visbands(struct vis_plotcontrols *plotcontrols,
                                       int nvisbands, char **visbands);
 void change_vis_plotcontrols_limits(struct vis_plotcontrols *plotcontrols,

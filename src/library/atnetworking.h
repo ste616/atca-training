@@ -32,11 +32,56 @@
 #define TYPE_RESPONSE   2
 
 // The types of request that can be made.
+/*! \def REQUEST_CURRENT_SPECTRUM
+ *  \brief Client requests the default spectrum and the options used to
+ *         compute it
+ *
+ * The server will respond with RESPONSE_CURRENT_SPECTRUM and supply the
+ * data and the associated options.
+ */
 #define REQUEST_CURRENT_SPECTRUM        1
+/*! \def REQUEST_CURRENT_VISDATA
+ *  \brief Client requests the default vis data, and the options used to
+ *         compute them
+ *
+ * The server will respond with RESPONSE_CURRENT_VISDATA and supply the data
+ * and the associated options.
+ */
 #define REQUEST_CURRENT_VISDATA         2
+/*! \def REQUEST_COMPUTE_VISDATA
+ *  \brief Client requests that new vis data is computed using some specified
+ *         options
+ *
+ * When sending this request, the client may supply a set of options to use
+ * during the computations. If no options are supplied, the last options
+ * associated with the client's username will be used. If no such options set
+ * is known, the last options associated with this client will be used. If this
+ * is also not available, the default set of options will be used.
+ *
+ * The server will return with RESPONSE_VISDATA_COMPUTING to indicate the
+ * call was successful.
+ */
 #define REQUEST_COMPUTE_VISDATA         3
+/*! \def REQUEST_COMPUTED_VISDATA
+ *  \brief Client requests that the vis data that was previously requested be
+ *         supplied
+ *
+ * After a call with REQUEST_COMPUTE_VISDATA, the server will return
+ * RESPONSE_VISDATA_COMPUTED when this data has been computed. This request should
+ * then be made, and the data will be returned with RESPONSE_COMPUTED_VISDATA.
+ */
 #define REQUEST_COMPUTED_VISDATA        4
+/*! \def CHILDREQUEST_VISDATA_COMPUTED
+ *  \brief A server-internal call to indicate that the child process used to
+ *         compute the data is ready to transmit the computed data to the main
+ *         process
+ */
 #define CHILDREQUEST_VISDATA_COMPUTED   5
+/*! \def REQUEST_SERVERTYPE
+ *  \brief Client requests the server identify the features it supports
+ *
+ * The server will return with RESPONSE_SERVERTYPE.
+ */
 #define REQUEST_SERVERTYPE              6
 #define REQUEST_SPECTRUM_MJD            7
 #define REQUEST_MJD_SPECTRUM            8
@@ -83,6 +128,7 @@ struct requests {
 #define RESPONSE_TIMERANGE              11
 #define RESPONSE_CYCLE_TIMES            12
 #define RESPONSE_REQUEST_USERNAME       13
+#define RESPONSE_USERREQUEST_VISDATA    14
 
 /*! \struct responses
  *  \brief Structure to use when responding to a request
