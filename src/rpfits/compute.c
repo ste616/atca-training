@@ -295,7 +295,9 @@ struct ampphase_options ampphase_options_default(void) {
   options.max_tvchannel = NULL;
   options.delay_averaging = NULL;
   options.averaging_method = NULL;
-
+  options.systemp_reverse_online = false;
+  options.systemp_apply_computed = false;
+  
   return options;
 }
 
@@ -318,6 +320,8 @@ void set_default_ampphase_options(struct ampphase_options *options) {
   options->max_tvchannel = NULL;
   options->delay_averaging = NULL;
   options->averaging_method = NULL;
+  options->systemp_reverse_online = false;
+  options->systemp_apply_computed = false;
 }
 
 /*!
@@ -347,6 +351,8 @@ void copy_ampphase_options(struct ampphase_options *dest,
     STRUCTCOPY(src, dest, delay_averaging[i]);
     STRUCTCOPY(src, dest, averaging_method[i]);
   }
+  STRUCTCOPY(src, dest, systemp_reverse_online);
+  STRUCTCOPY(src, dest, systemp_apply_computed);
 }
 
 /*!
@@ -1471,7 +1477,9 @@ bool ampphase_options_match(struct ampphase_options *a,
 
   if ((a->phase_in_degrees == b->phase_in_degrees) &&
       (a->include_flagged_data == b->include_flagged_data) &&
-      (a->num_ifs == b->num_ifs)) {
+      (a->num_ifs == b->num_ifs) &&
+      (a->systemp_reverse_online == b->systemp_reverse_online) &&
+      (a->systemp_apply_computed == b->systemp_apply_computed)) {
     // Looks good so far, now check the tvchannels.
     match = true;
     for (i = 0; i < a->num_ifs; i++) {
@@ -1692,6 +1700,20 @@ void calculate_system_temperatures_cycle_data(struct cycle_data *cycle_data,
     system_temperature_modifier(STM_APPLY_COMPUTED, cycle_data, scan_header_data);
   }
 
+  // Work out from the options what to do about correcting the visibilities.
+  if (band_options->systemp_reverse_online) {
+    if (band_options->systemp_apply_computed) {
+      // Apply the computed Tsys.
+      system_temperature_modifier(STM_APPLY_COMPUTED, cycle_data, scan_header_data);
+    } else {
+      // We are being asked to remove all calibration.
+      system_temperature_modifier(STM_REMOVE, cycle_data, scan_header_data);
+    }
+  } else {
+    // The user wants to apply the online Tsys.
+    system_temperature_modifier(STM_APPLY_CORRELATOR, cycle_data, scan_header_data);
+  }
+  
   // Free all the memory we've used.
   for (i = 0; i < cycle_data->num_cal_ants; i++) {
     for (j = 0; j < cycle_data->num_cal_ifs; j++) {
@@ -2193,6 +2215,50 @@ void info_print(char *o, int olen, char *fmt, ...) {
 }
 
 /*!
+ *  \brief Produce a text description of an averaging type magic number
+ *  \param averaging_type a bitwise-OR combination of the AVERAGETYPE_*
+ *                        magic numbers
+ *  \param output the variable to store the string output
+ *  \param output_length the maximum length of the string that can fit in
+ *                       \a output
+ */
+void averaging_type_string(int averaging_type, char *output,
+			   int output_length) {
+  int ol;
+  char scavec[7], meanmed[7];
+  
+  // Initialise the string.
+  output[0] = 0;
+  ol = 0;
+
+  if (averaging_type & AVERAGETYPE_VECTOR) {
+    strcpy(scavec, "VECTOR");
+    ol += 6;
+  } else if (averaging_type & AVERAGETYPE_SCALAR) {
+    strcpy(scavec, "SCALAR");
+    ol += 6;
+  } else {
+    strcpy(scavec, "ERROR");
+    ol += 5;
+  }
+
+  if (averaging_type & AVERAGETYPE_MEAN) {
+    strcpy(meanmed, "MEAN");
+    ol += 4;
+  } else if (averaging_type & AVERAGETYPE_MEDIAN) {
+    strcpy(meanmed, "MEDIAN");
+    ol += 6;
+  } else {
+    strcpy(meanmed, "ERROR");
+    ol += 5;
+  }
+
+  ol += 2; // For the space and the end character.
+  ol = (ol < output_length) ? ol : output_length;
+  snprintf(output, ol, "%s %s", scavec, meanmed);
+}
+
+/*!
  *  \brief Produce a description of the supplied set of options
  *  \param num_options the number of structures in the set
  *  \param options the set of options structures
@@ -2204,6 +2270,7 @@ void print_options_set(int num_options,
 		       struct ampphase_options **options, char *output,
 		       int output_length) {
   int i, j;
+  char avtype[20];
 
   // Initialise the strings.
   if (output != NULL) {
@@ -2222,6 +2289,14 @@ void print_options_set(int num_options,
 	       ((options[i]->phase_in_degrees) ? "YES": "NO"));
     info_print(output, output_length, "     INCLUDE FLAGGED: %s\n",
 	       ((options[i]->include_flagged_data) ? "YES" : "NO"));
+    info_print(output, output_length, "     TSYS CORRECTION:");
+    if ((options[i]->systemp_reverse_online == true) &&
+	(options[i]->systemp_apply_computed == false)) {
+      info_print(output, output_length, " NONE\n");
+    } else {
+      info_print(output, output_length, " %s\n",
+		 ((options[i]->systemp_reverse_online == false) ? "ONLINE" : "COMPUTED"));
+    }
     info_print(output, output_length, "     # WINDOWS: %d\n", options[i]->num_ifs);
     for (j = 1; j < options[i]->num_ifs; j++) {
       info_print(output, output_length, "        CENTRE FREQ: %.1f MHz\n",
@@ -2234,8 +2309,9 @@ void print_options_set(int num_options,
 	     options[i]->min_tvchannel[j], options[i]->max_tvchannel[j]);
       info_print(output, output_length, "        DELAY AVERAGING: %d\n",
 	     options[i]->delay_averaging[j]);
-      info_print(output, output_length, "        AVERAGING METHOD: %d\n",
-	     options[i]->averaging_method[j]);
+      averaging_type_string(options[i]->averaging_method[j], avtype, 20);
+      info_print(output, output_length, "        AVERAGING METHOD: %s\n",
+		 avtype);
     }
   }
 }

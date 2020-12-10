@@ -484,6 +484,7 @@ bool add_cache_spd_data(int num_options, struct ampphase_options **options,
                         struct spectrum_data *data) {
   int i, j, n;
   bool match_found = false;
+  char details[RPSBUFSIZE], time[RPSBUFSIZE];
 
   if (num_options == 0) {
     // What??
@@ -512,19 +513,35 @@ bool add_cache_spd_data(int num_options, struct ampphase_options **options,
     }
     match_found = true;
     for (j = 0; j < cache_vis_data.num_options[i]; j++) {
-      if (options[j]->phase_in_degrees !=
-	  cache_spd_data.ampphase_options[i][j]->phase_in_degrees) {
+      /* if (options[j]->phase_in_degrees != */
+      /* 	  cache_spd_data.ampphase_options[i][j]->phase_in_degrees) { */
+      if (ampphase_options_match(options[j],
+				 cache_spd_data.ampphase_options[i][j]) == false) {
 	match_found = false;
 	break;
       }
     }
     if (match_found) {
-      fprintf(stderr, "[add_cache_spd_data] match found!\n");
+      /* fprintf(stderr, "[add_cache_spd_data] match found!\n"); */
+      print_options_set(num_options, options, details, RPSBUFSIZE);
+      angle_to_string((24.0 * data->spectrum[0][0]->ut_seconds / 86400.0),
+		      time, ATS_ANGLE_IN_HOURS | ATS_STRING_IN_HOURS |
+		      ATS_STRING_SEP_COLON | ATS_STRING_ZERO_PAD_FIRST, 0);
+      fprintf(stderr, "[add_cache_spd_data] found SPD match for data at "
+	      "time %s %s with options:\n%s", data->header_data->obsdate,
+	      time, details);
       return false;
     }
   }
 
   // If we get here, this is new data.
+  print_options_set(num_options, options, details, RPSBUFSIZE);
+  angle_to_string((24.0 * data->spectrum[0][0]->ut_seconds / 86400.0),
+		  time, ATS_ANGLE_IN_HOURS | ATS_STRING_IN_HOURS |
+		  ATS_STRING_SEP_COLON | ATS_STRING_ZERO_PAD_FIRST, 0);
+  fprintf(stderr, "[add_cache_spd_data] adding SPD cache entry for data at "
+	  "time %s %s with options:\n%s", data->header_data->obsdate,
+	  time, details);
   n = cache_spd_data.num_cache_spd_data + 1;
   REALLOC(cache_spd_data.num_options, n);
   REALLOC(cache_spd_data.ampphase_options, n);
@@ -1806,6 +1823,8 @@ int main(int argc, char *argv[]) {
                   // We have a connection.
                   child_request.request_type = CHILDREQUEST_VISDATA_COMPUTED;
                   strncpy(child_request.client_id, client_request.client_id, CLIENTIDLENGTH);
+		  strncpy(child_request.client_username, client_request.client_username,
+			  CLIENTIDLENGTH);
                   MALLOC(child_send_buffer, RPSENDBUFSIZE);
                   init_cmp_memory_buffer(&child_cmp, &child_mem, child_send_buffer,
                                          (size_t)RPSENDBUFSIZE);
@@ -1853,31 +1872,6 @@ int main(int argc, char *argv[]) {
                 bytes_sent = socket_send_buffer(loop_i, send_buffer,
                                                 cmp_mem_access_get_pos(&mem));
                 FREE(send_buffer);
-		// Now send a message to other clients of the same user, to let them
-		// know new data with different options is being generated.
-		find_client(&clients, client_request.client_id,
-			    client_request.client_username, &n_alert_sockets,
-			    &alert_socket, &client_indices);
-		for (i = 0; i < n_alert_sockets; i++) {
-		  if (alert_socket[i] != loop_i) {
-		    // Don't send the message to the client already connected.
-		    client_response.response_type = RESPONSE_USERREQUEST_VISDATA;
-		    strncpy(client_response.client_id,
-			    clients.client_id[client_indices[i]], CLIENTIDLENGTH);
-		    MALLOC(send_buffer, JUSTRESPONSESIZE);
-		    init_cmp_memory_buffer(&cmp, &mem, send_buffer, JUSTRESPONSESIZE);
-		    pack_responses(&cmp, &client_response);
-		    printf(" %s to client %s.\n",
-			   get_type_string(TYPE_RESPONSE, client_response.response_type),
-			   client_response.client_id);
-		    bytes_sent = socket_send_buffer(alert_socket[i], send_buffer,
-						    cmp_mem_access_get_pos(&mem));
-		    FREE(send_buffer);
-		  }
-		}
-		// Free the client list.
-		FREE(alert_socket);
-		FREE(client_indices);
               }
             } else if (client_request.request_type == CHILDREQUEST_VISDATA_COMPUTED) {
               // We're getting vis data back from our child after the computation has
@@ -1941,6 +1935,33 @@ int main(int argc, char *argv[]) {
 		}
               }
 	      FREE(alert_socket);
+	      
+	      // Now send a message to other clients of the same user, to let them
+	      // know new data with different options is being generated.
+	      find_client(&clients, client_request.client_id,
+			  client_request.client_username, &n_alert_sockets,
+			  &alert_socket, &client_indices);
+	      for (i = 0; i < n_alert_sockets; i++) {
+		if (strncmp(clients.client_id[client_indices[i]],
+			    client_request.client_id, CLIENTIDLENGTH) != 0) {
+		  // Don't send the message to the client already connected.
+		  client_response.response_type = RESPONSE_USERREQUEST_VISDATA;
+		  strncpy(client_response.client_id,
+			  clients.client_id[client_indices[i]], CLIENTIDLENGTH);
+		  MALLOC(send_buffer, JUSTRESPONSESIZE);
+		  init_cmp_memory_buffer(&cmp, &mem, send_buffer, JUSTRESPONSESIZE);
+		  pack_responses(&cmp, &client_response);
+		  printf(" %s to client %s.\n",
+			 get_type_string(TYPE_RESPONSE, client_response.response_type),
+			 client_response.client_id);
+		  bytes_sent = socket_send_buffer(alert_socket[i], send_buffer,
+						  cmp_mem_access_get_pos(&mem));
+		  FREE(send_buffer);
+		}
+	      }
+	      // Free the client list.
+	      FREE(alert_socket);
+	      FREE(client_indices);
             } else if (client_request.request_type == REQUEST_SERVERTYPE) {
               // Tell the client we're a simulator or a tester, depending on how
               // we were started.

@@ -208,6 +208,18 @@ struct ampphase_options {
    */
   int *averaging_method;
 
+  /*! \var systemp_reverse_online
+   *  \brief Flag to instruct the library to reverse the system temperature
+   *         corrections made by the correlator during the observations
+   *         (if set to true)
+   */
+  bool systemp_reverse_online;
+
+  /*! \var systemp_apply_computed
+   *  \brief Flag to instruct the library to correct the data according to
+   *         the system temperatures computed by this library (if set to true)
+   */
+  bool systemp_apply_computed;
 };
 
 /*! \struct metinfo
@@ -1113,6 +1125,8 @@ void spectrum_data_compile_system_temperatures(struct spectrum_data *spectrum_da
 void system_temperature_modifier(int action, struct cycle_data *cycle_data,
 				 struct scan_header_data *scan_header_data);
 void info_print(char *o, int olen, char *fmt, ...);
+void averaging_type_string(int averaging_type, char *output,
+			   int output_length);
 void print_options_set(int num_options, struct ampphase_options **options,
 		       char *output, int output_length);
 void print_information_scan_header(struct scan_header_data *header_data,

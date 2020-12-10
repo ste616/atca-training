@@ -14,15 +14,36 @@
 #include "atnetworking.h"
 
 // Some definitions for the packing routines.
+/*!
+ *  \brief Produce an error message and exit the process
+ *  \param msg the error message to output
+ *
+ * This routine is used in the packing routines to emit useful error messages.
+ */
 void error_and_exit(const char *msg) {
   fprintf(stderr, "PACKING ERROR %s\n\n", msg);
   exit(EXIT_FAILURE);
 }
 
+/*!
+ *  \brief Read a number of bytes from a file handle
+ *  \param data a pointer to the variable in which to store the data
+ *  \param sz the number of bytes to read
+ *  \param fh the file handle to read from
+ *  \return true, if the number of bytes requested were able to be read from
+ *          \a fh, or false otherwise
+ */
 bool read_bytes(void *data, size_t sz, FILE *fh) {
   return fread(data, sizeof(uint8_t), sz, fh) == (sz * sizeof(uint8_t));
 }
 
+/*!
+ *  \brief Read a number of bytes from the CMP file
+ *  \param ctx the CMP stream, which should have been initialised to read from
+ *             a file
+ *  \param data a pointer to the varaible in which to store the data
+ *  \param limit the maximum number of bytes that can be read into \a data
+ */
 bool file_reader(cmp_ctx_t *ctx, void *data, size_t limit) {
   return read_bytes(data, limit, (FILE *)ctx->buf);
 }
@@ -244,6 +265,8 @@ void pack_ampphase_options(cmp_ctx_t *cmp, struct ampphase_options *a) {
   pack_writearray_sint(cmp, a->num_ifs, a->max_tvchannel);
   pack_writearray_sint(cmp, a->num_ifs, a->delay_averaging);
   pack_writearray_sint(cmp, a->num_ifs, a->averaging_method);
+  pack_write_bool(cmp, a->systemp_reverse_online);
+  pack_write_bool(cmp, a->systemp_apply_computed);
 }
 
 void unpack_ampphase_options(cmp_ctx_t *cmp, struct ampphase_options *a) {
@@ -266,6 +289,8 @@ void unpack_ampphase_options(cmp_ctx_t *cmp, struct ampphase_options *a) {
   pack_readarray_sint(cmp, a->num_ifs, a->max_tvchannel);
   pack_readarray_sint(cmp, a->num_ifs, a->delay_averaging);
   pack_readarray_sint(cmp, a->num_ifs, a->averaging_method);
+  pack_read_bool(cmp, &(a->systemp_reverse_online));
+  pack_read_bool(cmp, &(a->systemp_apply_computed));
 }
 
 void pack_ampphase(cmp_ctx_t *cmp, struct ampphase *a) {

@@ -101,7 +101,9 @@ static error_t nspd_parse_opt(int key, char *arg, struct argp_state *state) {
     arguments->network_operation = true;
     strncpy(arguments->server_name, arg, SPDBUFSIZE);
     break;
-
+  case 'u':
+    strncpy(arguments->username, arg, CLIENTIDLENGTH);
+    break;
   default:
     return ARGP_ERR_UNKNOWN;
   }
@@ -657,6 +659,8 @@ int main(int argc, char *argv[]) {
                         spectrum_data.spectrum[0][0]->ut_seconds);
         nmesg = 1;
         snprintf(mesgout[0], SPDBUFSIZE, " Data has MJD %.8f\n", cmjd);
+	// Store this as if we had requested that MJD.
+	mjd_request = cmjd;
         readline_print_messages(nmesg, mesgout);
       }
     }

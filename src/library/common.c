@@ -605,12 +605,12 @@ void angle_to_string(float angle, char *angle_string, int conversion_type,
     }
   }
   if (conversion_type & ATS_STRING_DECIMAL_MINUTES) {
-    secondlength = 3 + precision;
+    secondlength = (precision > 0) ? 3 + precision : 2;
     snprintf(oform_second, 9, "%%0%d.%df%%s", secondlength, precision);
     oform_third[0] = 0;
   } else {
     strcpy(oform_second, "%02d%s");
-    thirdlength = 3 + precision;
+    thirdlength = (precision > 0) ? 3 + precision : 2;
     snprintf(oform_third, 9, "%%0%d.%df%%s", thirdlength, precision);
   }
   snprintf(oform_all, 39, "%%s%s%s%s", oform_first, oform_second, oform_third);
