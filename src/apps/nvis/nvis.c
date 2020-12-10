@@ -70,7 +70,7 @@ struct nvis_arguments {
 
 // And some fun, totally necessary, global state variables.
 int action_required, server_type, n_ampphase_options;
-int vis_device_number, data_selected_index;
+int vis_device_number, data_selected_index, tsys_apply;
 int xaxis_type, *yaxis_type, nxpanels, nypanels, nvisbands;
 int *visband_idx, tvchan_change_min, tvchan_change_max;
 char **visband, tvchan_visband[10];
@@ -174,6 +174,7 @@ static void sighandler(int sig) {
 #define ACTION_USERNAME_OBTAINED         1<<8
 #define ACTION_TVCHANNELS_CHANGED        1<<9
 #define ACTION_SEND_USERNAME             1<<10
+#define ACTION_TSYSCORR_CHANGED          1<<11
 
 // Make a shortcut to stop action for those actions which can only be
 // done by a simulator.
@@ -667,6 +668,31 @@ static void interpret_command(char *line) {
 	}
       }
       action_required = ACTION_AMPPHASE_OPTIONS_CHANGED;
+    } else if (minmatch("tsys", line_els[0], 4)) {
+      // Tell the simulator to recompute visibilities based on some
+      // version of the system temperature.
+      tsys_apply = -1;
+      if (nels == 2) {
+	CHECKSIMULATOR;
+	// The user should supply a flag as to which Tsys to use.
+	if (minmatch("off", line_els[1], 3)) {
+	  // Don't correct visibilites, and reverse any corrections already made.
+	  tsys_apply = STM_REMOVE;
+	} else if (minmatch("correlator", line_els[1], 3)) {
+	  // Use the systemp values calculated by the correlator to correct
+	  // the visibilities.
+	  tsys_apply = STM_APPLY_CORRELATOR;
+	} else if (minmatch("computed", line_els[1], 4)) {
+	  // Use the systemp values calculated by our library to correct
+	  // the visibilities.
+	  tsys_apply = STM_APPLY_COMPUTED;
+	}
+      }
+      if (tsys_apply > -1) {
+	action_required = ACTION_TSYSCORR_CHANGED;
+      } else {
+	action_required = ACTION_AMPPHASE_OPTIONS_PRINT;
+      }
     } else {
       if (nels == 1) {
         // We try to interpret the string as the panels to show.
@@ -962,29 +988,30 @@ int main(int argc, char *argv[]) {
       // computation of the data at the selected index.
       nmesg = 0;
       snprintf(mesgout[nmesg++], VISBUFSIZE, "VIS DATA COMPUTED WITH OPTIONS:\n");
-      snprintf(mesgout[nmesg++], VISBUFSIZE, " PHASE UNITS: %s\n",
-               (found_options->phase_in_degrees ? "degrees" : "radians"));
-      for (i = 1; i < found_options->num_ifs; i++) {
-        snprintf(mesgout[nmesg++], VISBUFSIZE, " BAND F%d CF %.1f BW %.1f NCHAN %d:\n",
-		 i, found_options->if_centre_freq[i], found_options->if_bandwidth[i],
-		 found_options->if_nchannels[i]);
-        snprintf(mesgout[nmesg++], VISBUFSIZE, "   DELAY AVERAGING: %d\n",
-                 found_options->delay_averaging[i]);
-        snprintf(mesgout[nmesg++], VISBUFSIZE, "   AVERAGING METHOD: ");
-        if (found_options->averaging_method[i] & AVERAGETYPE_VECTOR) {
-          snprintf(mesgout[nmesg++], VISBUFSIZE, "VECTOR ");
-        } else if (found_options->averaging_method[i] & AVERAGETYPE_SCALAR) {
-          snprintf(mesgout[nmesg++], VISBUFSIZE, "SCALAR ");
-        }
-        if (found_options->averaging_method[i] & AVERAGETYPE_MEAN) {
-          snprintf(mesgout[nmesg++], VISBUFSIZE, "MEAN");
-        } else if (found_options->averaging_method[i] & AVERAGETYPE_MEDIAN) {
-          snprintf(mesgout[nmesg++], VISBUFSIZE, "MEDIAN");
-        }
-        snprintf(mesgout[nmesg++], VISBUFSIZE, "\n   TVCHANNELS: %d - %d\n",
-                 found_options->min_tvchannel[i],
-                 found_options->max_tvchannel[i]);
-      }
+      print_options_set(1, &found_options, mesgout[nmesg++], VISBUFSIZE);
+      /* snprintf(mesgout[nmesg++], VISBUFSIZE, " PHASE UNITS: %s\n", */
+      /*          (found_options->phase_in_degrees ? "degrees" : "radians")); */
+      /* for (i = 1; i < found_options->num_ifs; i++) { */
+      /*   snprintf(mesgout[nmesg++], VISBUFSIZE, " BAND F%d CF %.1f BW %.1f NCHAN %d:\n", */
+      /* 		 i, found_options->if_centre_freq[i], found_options->if_bandwidth[i], */
+      /* 		 found_options->if_nchannels[i]); */
+      /*   snprintf(mesgout[nmesg++], VISBUFSIZE, "   DELAY AVERAGING: %d\n", */
+      /*            found_options->delay_averaging[i]); */
+      /*   snprintf(mesgout[nmesg++], VISBUFSIZE, "   AVERAGING METHOD: "); */
+      /*   if (found_options->averaging_method[i] & AVERAGETYPE_VECTOR) { */
+      /*     snprintf(mesgout[nmesg++], VISBUFSIZE, "VECTOR "); */
+      /*   } else if (found_options->averaging_method[i] & AVERAGETYPE_SCALAR) { */
+      /*     snprintf(mesgout[nmesg++], VISBUFSIZE, "SCALAR "); */
+      /*   } */
+      /*   if (found_options->averaging_method[i] & AVERAGETYPE_MEAN) { */
+      /*     snprintf(mesgout[nmesg++], VISBUFSIZE, "MEAN"); */
+      /*   } else if (found_options->averaging_method[i] & AVERAGETYPE_MEDIAN) { */
+      /*     snprintf(mesgout[nmesg++], VISBUFSIZE, "MEDIAN"); */
+      /*   } */
+      /*   snprintf(mesgout[nmesg++], VISBUFSIZE, "\n   TVCHANNELS: %d - %d\n", */
+      /*            found_options->min_tvchannel[i], */
+      /*            found_options->max_tvchannel[i]); */
+      /* } */
       readline_print_messages(nmesg, mesgout);
       action_required -= ACTION_AMPPHASE_OPTIONS_PRINT;
     }
@@ -1006,6 +1033,27 @@ int main(int argc, char *argv[]) {
 
       readline_print_messages(nmesg, mesgout);
       action_required -= ACTION_TVCHANNELS_CHANGED;
+    }
+
+    if (action_required & ACTION_TSYSCORR_CHANGED) {
+      // Change the way the Tsys should be applied to the data.
+      switch (tsys_apply) {
+      case STM_REMOVE:
+	found_options->systemp_reverse_online = true;
+	found_options->systemp_apply_computed = false;
+	break;
+      case STM_APPLY_CORRELATOR:
+	found_options->systemp_reverse_online = false;
+	found_options->systemp_apply_computed = false;
+	break;
+      case STM_APPLY_COMPUTED:
+	found_options->systemp_reverse_online = true;
+	found_options->systemp_apply_computed = true;
+	break;
+      }
+      action_required |= ACTION_AMPPHASE_OPTIONS_CHANGED;
+
+      action_required -= ACTION_TSYSCORR_CHANGED;
     }
     
     if (action_required & ACTION_AMPPHASE_OPTIONS_CHANGED) {

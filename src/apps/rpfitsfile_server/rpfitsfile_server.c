@@ -1962,6 +1962,8 @@ int main(int argc, char *argv[]) {
 	      // Free the client list.
 	      FREE(alert_socket);
 	      FREE(client_indices);
+	      FREE(client_options);
+	      n_client_options = 0;
             } else if (client_request.request_type == REQUEST_SERVERTYPE) {
               // Tell the client we're a simulator or a tester, depending on how
               // we were started.

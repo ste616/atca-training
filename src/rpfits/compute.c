@@ -2093,10 +2093,10 @@ void system_temperature_modifier(int action,
     iidx = ifno - 1;
     // Each polarisation value will need a different combination of antenna
     // polarisations; we work these out now.
-    MALLOC(ant1_polidx, scan_header_data->if_num_stokes[ifno]);
-    MALLOC(ant2_polidx, scan_header_data->if_num_stokes[ifno]);
-    for (j = 0; j < scan_header_data->if_num_stokes[ifno]; j++) {
-      polnum = polarisation_number(scan_header_data->if_stokes_names[ifno][j]);
+    MALLOC(ant1_polidx, scan_header_data->if_num_stokes[iidx]);
+    MALLOC(ant2_polidx, scan_header_data->if_num_stokes[iidx]);
+    for (j = 0; j < scan_header_data->if_num_stokes[iidx]; j++) {
+      polnum = polarisation_number(scan_header_data->if_stokes_names[iidx][j]);
       if (polnum == POL_XX) {
 	ant1_polidx[j] = CAL_XX;
 	ant2_polidx[j] = CAL_XX;
@@ -2117,8 +2117,8 @@ void system_temperature_modifier(int action,
     }
 
     // Now make the modifications.
-    for (j = 0; j < scan_header_data->if_num_stokes[ifno]; j++) {
-      if ((ant1_polidx[k] == -1) || (ant2_polidx[k] == -1)) {
+    for (j = 0; j < scan_header_data->if_num_stokes[iidx]; j++) {
+      if ((ant1_polidx[j] == -1) || (ant2_polidx[j] == -1)) {
 	// Don't modify.
 	continue;
       }
@@ -2148,9 +2148,9 @@ void system_temperature_modifier(int action,
       if ((mfac != mfac) || (mfac < 0)) {
 	continue;
       }
-      for (k = 0; k < scan_header_data->if_num_channels[ifno]; k++) {
+      for (k = 0; k < scan_header_data->if_num_channels[iidx]; k++) {
 	// Work out where our data is.
-	vidx = j + k * scan_header_data->if_num_stokes[ifno];
+	vidx = j + k * scan_header_data->if_num_stokes[iidx];
 	rcheck = crealf(cycle_data->vis[i][vidx]);
 	if (rcheck != rcheck) {
 	  // This is NaN, so don't do anything to it.
@@ -2295,7 +2295,7 @@ void print_options_set(int num_options,
       info_print(output, output_length, " NONE\n");
     } else {
       info_print(output, output_length, " %s\n",
-		 ((options[i]->systemp_reverse_online == false) ? "ONLINE" : "COMPUTED"));
+		 ((options[i]->systemp_reverse_online == false) ? "CORRELATOR" : "COMPUTED"));
     }
     info_print(output, output_length, "     # WINDOWS: %d\n", options[i]->num_ifs);
     for (j = 1; j < options[i]->num_ifs; j++) {
