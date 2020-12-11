@@ -512,7 +512,7 @@ bool add_cache_spd_data(int num_options, struct ampphase_options **options,
       continue;
     }
     match_found = true;
-    for (j = 0; j < cache_vis_data.num_options[i]; j++) {
+    for (j = 0; j < cache_spd_data.num_options[i]; j++) {
       /* if (options[j]->phase_in_degrees != */
       /* 	  cache_spd_data.ampphase_options[i][j]->phase_in_degrees) { */
       if (ampphase_options_match(options[j],
@@ -1313,6 +1313,7 @@ void add_client_ampphase_options(struct client_ampphase_options *client_ampphase
     free_ampphase_options(client_ampphase_options->ampphase_options[n][i]);
     FREE(client_ampphase_options->ampphase_options[n][i]);
   }
+  FREE(client_ampphase_options->ampphase_options[n]);
   // Store the metadata.
   strncpy(client_ampphase_options->client_id[n], client_id, CLIENTIDLENGTH);
   strncpy(client_ampphase_options->client_username[n], client_username, CLIENTIDLENGTH);
@@ -1962,6 +1963,10 @@ int main(int argc, char *argv[]) {
 	      // Free the client list.
 	      FREE(alert_socket);
 	      FREE(client_indices);
+	      for (i = 0; i < n_client_options; i++) {
+		free_ampphase_options(client_options[i]);
+		FREE(client_options[i]);
+	      }
 	      FREE(client_options);
 	      n_client_options = 0;
             } else if (client_request.request_type == REQUEST_SERVERTYPE) {
@@ -2050,6 +2055,8 @@ int main(int argc, char *argv[]) {
                   // We have a connection.
                   child_request.request_type = CHILDREQUEST_SPECTRUM_MJD;
                   strncpy(child_request.client_id, client_request.client_id, CLIENTIDLENGTH);
+		  strncpy(child_request.client_username, client_request.client_username,
+			  CLIENTIDLENGTH);
                   MALLOC(child_send_buffer, RPSENDBUFSIZE);
                   init_cmp_memory_buffer(&child_cmp, &child_mem, child_send_buffer,
                                          (size_t)RPSENDBUFSIZE);
@@ -2166,6 +2173,14 @@ int main(int argc, char *argv[]) {
 		  FREE(send_buffer);
 		}
 	      }
+	      FREE(alert_socket);
+	      n_alert_sockets = 0;
+	      for (i = 0; i < n_client_options; i++) {
+		free_ampphase_options(client_options[i]);
+		FREE(client_options[i]);
+	      }
+	      FREE(client_options);
+	      n_client_options = 0;
             } else if (client_request.request_type == REQUEST_TIMERANGE) {
               // Something wants to know the time information like min/max
               // MJD and the cycle time.
