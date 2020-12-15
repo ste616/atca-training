@@ -21,14 +21,33 @@
 
 /*!
  *  \brief Get the median value of a float array
- *  \param a the array of values
+ *  \param a the array of values, which must be sorted before calling
  *  \param n the number of values in the array
  *  \return the median value of the first \a n entries in the array \a a, or 0
- *          if \a n == 0
+ *          if \a n <= 0
  */
 float fmedianf(float *a, int n) {
-  if (n == 0) {
+  if (n <= 0) {
     return 0;
+  }
+  if (n % 2) {
+    // Odd number of points.
+    return (a[(n + 1) / 2]);
+  } else {
+    return ((a[n / 2] + a[(n / 2) + 1]) / 2.0);
+  }
+}
+
+/*!
+ *  \brief Get the median value of a float complex array
+ *  \param a the array of values, which must be sorted before calling
+ *  \param n the number of values in the array
+ *  \return the median value of the first \a n entries in the array \a a, or 0
+ *          if \a n <= 0
+ */
+float complex fcmedianfc(float complex *a, int n) {
+  if (n <= 0) {
+    return (0 + 0 * I);
   }
   if (n % 2) {
     // Odd number of points.
@@ -52,6 +71,50 @@ float fsumf(float *a, int n) {
   }
 
   return (r);
+}
+
+/*!
+ *  \brief Get the total sum of a float complex array
+ *  \param a the array of values
+ *  \param n the number of values in the array
+ *  \return the total sum of the first \a n entries in the array \a a
+ */
+float complex fcsumfc(float complex *a, int n) {
+  float complex r = 0 + 0 * I;
+  int i;
+  for (i = 0; i < n; i++) {
+    r += a[i];
+  }
+
+  return (r);
+}
+
+/*!
+ *  \brief Get the mean value of a float array
+ *  \param a the array of values
+ *  \param n the number of values in the array
+ *  \return the mean value of the first \a n entries in the array \a a, or 0
+ *          if \a n <= 0
+ */
+float fmeanf(float *a, int n) {
+  if (n <= 0) {
+    return 0;
+  }
+  return (fsumf(a, n) / (float)n);
+}
+
+/*!
+ *  \brief Get the mean value of a float complex array
+ *  \param a the array of values
+ *  \param n the number of values in the array
+ *  \return the mean value of the first \a n entries in the array \a a, or 0
+ *          if \a n <= 0
+ */
+float complex fcmeanfc(float complex *a, int n) {
+  if (n <= 0) {
+    return (0 + 0 * I);
+  }
+  return (fcsumfc(a, n) / (float)n);
 }
 
 /*!
@@ -2342,4 +2405,358 @@ void print_information_scan_header(struct scan_header_data *header_data,
 	       (i + 1), header_data->if_centre_freq[i],
 	       header_data->if_bandwidth[i], header_data->if_num_channels[i]);
   }
+}
+
+/*!
+ *  \brief Perform averaging over some ampphase data
+ *  \param ampphase the data before averaging
+ *  \param avg_ampphase upon exit this will contain the averaged data
+ *  \param averaging the number of channels to average together
+ *  \param averaging_type bitwise-OR combination of AVERAGETYPE_* magic numbers
+ *                        specifying how the average should be computed
+ */
+void chanaverage_ampphase(struct ampphase *ampphase, struct ampphase *avg_ampphase,
+			  int averaging, int averaging_type) {
+  int n_delavg_expected, i, j, k, l, n_points;
+  int n_unflagged_points, chan_index, unflagged_index;
+  float *median_array_amplitude = NULL, *median_array_phase = NULL;
+  float *median_array_channel = NULL, *median_array_frequency = NULL;
+  float *median_unflagged_frequency = NULL, *median_unflagged_channel = NULL;
+  float *median_unflagged_amplitude = NULL, *median_unflagged_phase = NULL;
+  float checkval;
+  float complex *median_array_raw = NULL, *median_unflagged_raw = NULL;
+  
+  // Make the arrays required.
+  if (averaging < 1) {
+    averaging = 1;
+  }
+  n_delavg_expected = (int)ceilf((float)ampphase->nchannels / (float)averaging);
+  if (n_delavg_expected < 1) {
+    n_delavg_expected = 1;
+  }
+  CALLOC(median_array_amplitude, averaging);
+  CALLOC(median_array_phase, averaging);
+  CALLOC(median_array_raw, averaging);
+  CALLOC(median_array_channel, averaging);
+  CALLOC(median_array_frequency, averaging);
+  CALLOC(median_unflagged_amplitude, averaging);
+  CALLOC(median_unflagged_phase, averaging);
+  CALLOC(median_unflagged_raw, averaging);
+  CALLOC(median_unflagged_channel, averaging);
+  CALLOC(median_unflagged_frequency, averaging);
+  
+  // Set the quantities in the output.
+  avg_ampphase->nchannels = n_delavg_expected;
+  STRUCTCOPY(ampphase, avg_ampphase, nbaselines);
+  CALLOC(avg_ampphase->baseline, ampphase->nbaselines);
+  CALLOC(avg_ampphase->nbins, ampphase->nbaselines);
+  CALLOC(avg_ampphase->flagged_bad, ampphase->nbaselines);
+  for (i = 0; i < ampphase->nbaselines; i++) {
+    STRUCTCOPY(ampphase, avg_ampphase, baseline[i]);
+    STRUCTCOPY(ampphase, avg_ampphase, nbins[i]);
+    CALLOC(avg_ampphase->flagged_bad[i], ampphase->nbins[i]);
+    for (j = 0; j < ampphase->nbins[i]; j++) {
+      STRUCTCOPY(ampphase, avg_ampphase, flagged_bad[i][j]);
+    }
+  }
+  STRUCTCOPY(ampphase, avg_ampphase, pol);
+  STRUCTCOPY(ampphase, avg_ampphase, window);
+  strncpy(avg_ampphase->window_name, ampphase->window_name, 8);
+  strncpy(avg_ampphase->obsdate, ampphase->obsdate, OBSDATE_LENGTH);
+  STRUCTCOPY(ampphase, avg_ampphase, ut_seconds);
+  strncpy(avg_ampphase->scantype, ampphase->scantype, OBSTYPE_LENGTH);
+
+  // Copy the metadata.
+  CALLOC(avg_ampphase->options, 1);
+  copy_ampphase_options(avg_ampphase->options, ampphase->options);
+  copy_metinfo(&(avg_ampphase->metinfo), &(ampphase->metinfo));
+  CALLOC(avg_ampphase->syscal_data, 1);
+  copy_syscal_data(avg_ampphase->syscal_data, ampphase->syscal_data);
+
+  // Set initial defaults for the global maxima and minima.
+  avg_ampphase->min_amplitude_global = INFINITY;
+  avg_ampphase->max_amplitude_global = -INFINITY;
+  avg_ampphase->min_phase_global = INFINITY;
+  avg_ampphase->max_phase_global = -INFINITY;
+  
+  // Allocate some memory.
+  CALLOC(avg_ampphase->weight, ampphase->nbaselines);
+  CALLOC(avg_ampphase->amplitude, ampphase->nbaselines);
+  CALLOC(avg_ampphase->phase, ampphase->nbaselines);
+  CALLOC(avg_ampphase->raw, ampphase->nbaselines);
+  CALLOC(avg_ampphase->f_nchannels, ampphase->nbaselines);
+  CALLOC(avg_ampphase->f_channel, ampphase->nbaselines);
+  CALLOC(avg_ampphase->f_frequency, ampphase->nbaselines);
+  CALLOC(avg_ampphase->f_weight, ampphase->nbaselines);
+  CALLOC(avg_ampphase->f_amplitude, ampphase->nbaselines);
+  CALLOC(avg_ampphase->f_phase, ampphase->nbaselines);
+  CALLOC(avg_ampphase->f_raw, ampphase->nbaselines);
+  CALLOC(avg_ampphase->min_amplitude, ampphase->nbaselines);
+  CALLOC(avg_ampphase->max_amplitude, ampphase->nbaselines);
+  CALLOC(avg_ampphase->min_phase, ampphase->nbaselines);
+  CALLOC(avg_ampphase->max_phase, ampphase->nbaselines);
+  CALLOC(avg_ampphase->min_real, ampphase->nbaselines);
+  CALLOC(avg_ampphase->max_real, ampphase->nbaselines);
+  CALLOC(avg_ampphase->min_imag, ampphase->nbaselines);
+  CALLOC(avg_ampphase->max_imag, ampphase->nbaselines);
+  CALLOC(avg_ampphase->channel, n_delavg_expected);
+  CALLOC(avg_ampphase->frequency, n_delavg_expected);
+  
+  // The averaging loop.
+  for (i = 0; i < ampphase->nbaselines; i++) {
+
+    // Set initial defaults for the baseline maxima and minima.
+    avg_ampphase->min_amplitude[i] = INFINITY;
+    avg_ampphase->max_amplitude[i] = -INFINITY;
+    avg_ampphase->min_phase[i] = INFINITY;
+    avg_ampphase->max_phase[i] = -INFINITY;
+    avg_ampphase->min_real[i] = INFINITY;
+    avg_ampphase->max_real[i] = -INFINITY;
+    avg_ampphase->min_imag[i] = INFINITY;
+    avg_ampphase->max_imag[i] = -INFINITY;
+    
+    // Allocate required memory.
+    CALLOC(avg_ampphase->weight[i], ampphase->nbins[i]);
+    CALLOC(avg_ampphase->amplitude[i], ampphase->nbins[i]);
+    CALLOC(avg_ampphase->phase[i], ampphase->nbins[i]);
+    CALLOC(avg_ampphase->raw[i], ampphase->nbins[i]);
+    CALLOC(avg_ampphase->f_nchannels[i], ampphase->nbins[i]);
+    CALLOC(avg_ampphase->f_channel[i], ampphase->nbins[i]);
+    CALLOC(avg_ampphase->f_frequency[i], ampphase->nbins[i]);
+    CALLOC(avg_ampphase->f_weight[i], ampphase->nbins[i]);
+    CALLOC(avg_ampphase->f_amplitude[i], ampphase->nbins[i]);
+    CALLOC(avg_ampphase->f_phase[i], ampphase->nbins[i]);
+    CALLOC(avg_ampphase->f_raw[i], ampphase->nbins[i]);
+    
+    for (j = 0; j < ampphase->nbins[i]; j++) {
+
+      // Allocate required memory for the normal arrays.
+      CALLOC(avg_ampphase->weight[i][j], avg_ampphase->nchannels);
+      CALLOC(avg_ampphase->amplitude[i][j], avg_ampphase->nchannels);
+      CALLOC(avg_ampphase->phase[i][j], avg_ampphase->nchannels);
+      CALLOC(avg_ampphase->raw[i][j], avg_ampphase->nchannels);
+      // We allocate the unflagged arrays large to begin with, we can always
+      // lower their size later.
+      CALLOC(avg_ampphase->f_channel[i][j], avg_ampphase->nchannels);
+      CALLOC(avg_ampphase->f_frequency[i][j], avg_ampphase->nchannels);
+      CALLOC(avg_ampphase->f_weight[i][j], avg_ampphase->nchannels);
+      CALLOC(avg_ampphase->f_amplitude[i][j], avg_ampphase->nchannels);
+      CALLOC(avg_ampphase->f_phase[i][j], avg_ampphase->nchannels);
+      CALLOC(avg_ampphase->f_raw[i][j], avg_ampphase->nchannels);
+      
+      // We traverse all the channels in the original structure, with a stride
+      // of the averaging parameter.
+      for (k = 0, chan_index = 0, unflagged_index = 0; k < ampphase->nchannels;
+	   k += averaging, chan_index++) {
+	n_points = 0;
+	n_unflagged_points = 0;
+	if (averaging == 1) {
+	  // Special case where we can just copy everything over.
+	  STRUCTCOPY(ampphase, avg_ampphase, weight[i][j][k]);
+	  STRUCTCOPY(ampphase, avg_ampphase, amplitude[i][j][k]);
+	  STRUCTCOPY(ampphase, avg_ampphase, phase[i][j][k]);
+	  STRUCTCOPY(ampphase, avg_ampphase, raw[i][j][k]);
+	  if (k == 0) {
+	    STRUCTCOPY(ampphase, avg_ampphase, f_nchannels[i][j]);
+	    if (j == 0) {
+	      STRUCTCOPY(ampphase, avg_ampphase, min_amplitude[i]);
+	      STRUCTCOPY(ampphase, avg_ampphase, max_amplitude[i]);
+	      STRUCTCOPY(ampphase, avg_ampphase, min_phase[i]);
+	      STRUCTCOPY(ampphase, avg_ampphase, max_phase[i]);
+	      STRUCTCOPY(ampphase, avg_ampphase, min_real[i]);
+	      STRUCTCOPY(ampphase, avg_ampphase, max_real[i]);
+	      STRUCTCOPY(ampphase, avg_ampphase, min_imag[i]);
+	      STRUCTCOPY(ampphase, avg_ampphase, max_imag[i]);
+	    }
+	  }
+	  if (k < ampphase->f_nchannels[i][j]) {
+	    STRUCTCOPY(ampphase, avg_ampphase, f_channel[i][j][k]);
+	    STRUCTCOPY(ampphase, avg_ampphase, f_frequency[i][j][k]);
+	    STRUCTCOPY(ampphase, avg_ampphase, f_weight[i][j][k]);
+	    STRUCTCOPY(ampphase, avg_ampphase, f_amplitude[i][j][k]);
+	    STRUCTCOPY(ampphase, avg_ampphase, f_phase[i][j][k]);
+	    STRUCTCOPY(ampphase, avg_ampphase, f_raw[i][j][k]);
+	  }
+	} else {
+	  for (l = 0; l < averaging; l++) {
+	    // Easy to use all the channels regardless of the flagging.
+	    median_array_amplitude[n_points] = ampphase->amplitude[i][j][k + l];
+	    median_array_phase[n_points] = ampphase->phase[i][j][k + l];
+	    median_array_raw[n_points] = ampphase->raw[i][j][k + l];
+	    median_array_channel[n_points] = ampphase->channel[k + l];
+	    median_array_frequency[n_points] = ampphase->frequency[k + l];
+	    n_points++;
+	  }
+	  // Find the unflagged channels required.
+	  while ((ampphase->f_channel[i][j][unflagged_index] >= k) &&
+		 (ampphase->f_channel[i][j][unflagged_index] < (k + l))) {
+	    median_unflagged_amplitude[n_unflagged_points] =
+	      ampphase->f_amplitude[i][j][unflagged_index];
+	    median_unflagged_phase[n_unflagged_points] =
+	      ampphase->f_phase[i][j][unflagged_index];
+	    median_unflagged_raw[n_unflagged_points] =
+	      ampphase->f_raw[i][j][unflagged_index];
+	    median_unflagged_channel[n_unflagged_points] =
+	      ampphase->f_channel[i][j][unflagged_index];
+	    median_unflagged_frequency[n_unflagged_points] =
+	      ampphase->f_frequency[i][j][unflagged_index];
+	    n_unflagged_points++;
+	    unflagged_index++;
+	  }
+	  // Set the averaged values.
+	  if (n_points > 0) {
+	    if (averaging_type & AVERAGETYPE_MEAN) {
+	      avg_ampphase->raw[i][j][chan_index] = fcmeanfc(median_array_raw, n_points);
+	      avg_ampphase->channel[chan_index] = (int)fmeanf(median_array_channel, n_points);
+	      avg_ampphase->frequency[chan_index] = fmeanf(median_array_frequency, n_points);
+	      if (averaging_type & AVERAGETYPE_SCALAR) {
+		avg_ampphase->amplitude[i][j][chan_index] =
+		  fmeanf(median_array_amplitude, n_points);
+		avg_ampphase->phase[i][j][chan_index] =
+		  fmeanf(median_array_phase, n_points);
+	      } else if (averaging_type & AVERAGETYPE_VECTOR) {
+		avg_ampphase->amplitude[i][j][chan_index] =
+		  cabsf(avg_ampphase->raw[i][j][chan_index]);
+		avg_ampphase->phase[i][j][chan_index] =
+		  cargf(avg_ampphase->raw[i][j][chan_index]);
+	      }
+	    } else if (averaging_type & AVERAGETYPE_MEDIAN) {
+	      // Work out the channel and frequency first.
+	      qsort(median_array_channel, n_points, sizeof(float), cmpfunc_real);
+	      qsort(median_array_frequency, n_points, sizeof(float), cmpfunc_real);
+	      avg_ampphase->channel[chan_index] =
+		(int)fmedianf(median_array_channel, n_points);
+	      avg_ampphase->frequency[chan_index] =
+		fmedianf(median_array_frequency, n_points);
+
+	      qsort(median_array_raw, n_points, sizeof(float complex), cmpfunc_complex);
+	      avg_ampphase->raw[i][j][chan_index] =
+		fcmedianfc(median_array_raw, n_points);
+	      if (averaging_type & AVERAGETYPE_SCALAR) {
+		qsort(median_array_amplitude, n_points, sizeof(float), cmpfunc_real);
+		qsort(median_array_phase, n_points, sizeof(float), cmpfunc_real);
+		avg_ampphase->amplitude[i][j][chan_index] =
+		  fmedianf(median_array_amplitude, n_points);
+		avg_ampphase->phase[i][j][chan_index] =
+		  fmedianf(median_array_amplitude, n_points);
+	      } else if (averaging_type & AVERAGETYPE_VECTOR) {
+		avg_ampphase->amplitude[i][j][chan_index] =
+		  cabsf(avg_ampphase->raw[i][j][chan_index]);
+		avg_ampphase->phase[i][j][chan_index] =
+		cargf(avg_ampphase->raw[i][j][chan_index]);
+	      }
+	    }
+	  }
+	  if (n_unflagged_points > 0) {
+	    if (averaging_type & AVERAGETYPE_MEAN) {
+	      avg_ampphase->f_raw[i][j][avg_ampphase->f_nchannels[i][j]] =
+		fcmeanfc(median_unflagged_raw, n_unflagged_points);
+	      avg_ampphase->f_channel[i][j][avg_ampphase->f_nchannels[i][j]] =
+		(int)fmeanf(median_unflagged_channel, n_unflagged_points);
+	      avg_ampphase->f_frequency[i][j][avg_ampphase->f_nchannels[i][j]] =
+		fmeanf(median_unflagged_frequency, n_unflagged_points);
+	      if (averaging_type & AVERAGETYPE_SCALAR) {
+		avg_ampphase->f_amplitude[i][j][avg_ampphase->f_nchannels[i][j]] =
+		  fmeanf(median_unflagged_amplitude, n_unflagged_points);
+		avg_ampphase->f_phase[i][j][avg_ampphase->f_nchannels[i][j]] =
+		  fmeanf(median_unflagged_phase, n_unflagged_points);
+	      } else if (averaging_type & AVERAGETYPE_VECTOR) {
+		avg_ampphase->f_amplitude[i][j][avg_ampphase->f_nchannels[i][j]] =
+		  cabsf(avg_ampphase->f_raw[i][j][avg_ampphase->f_nchannels[i][j]]);
+		avg_ampphase->f_phase[i][j][avg_ampphase->f_nchannels[i][j]] =
+		  cargf(avg_ampphase->f_raw[i][j][avg_ampphase->f_nchannels[i][j]]);
+	      }
+	    } else if (averaging_type & AVERAGETYPE_MEDIAN) {
+	      qsort(median_unflagged_channel, n_unflagged_points, sizeof(float), cmpfunc_real);
+	      qsort(median_unflagged_frequency, n_unflagged_points, sizeof(float),
+		    cmpfunc_real);
+	      avg_ampphase->f_channel[i][j][avg_ampphase->f_nchannels[i][j]] =
+		(int)fmedianf(median_unflagged_channel, n_unflagged_points);
+	      avg_ampphase->f_frequency[i][j][avg_ampphase->f_nchannels[i][j]] =
+		fmedianf(median_unflagged_frequency, n_unflagged_points);
+
+	      qsort(median_unflagged_raw, n_unflagged_points, sizeof(float complex),
+		    cmpfunc_complex);
+	      avg_ampphase->f_raw[i][j][avg_ampphase->f_nchannels[i][j]] =
+		fcmedianfc(median_unflagged_raw, n_unflagged_points);
+	      if (averaging_type & AVERAGETYPE_SCALAR) {
+		qsort(median_unflagged_amplitude, n_unflagged_points, sizeof(float),
+		      cmpfunc_real);
+		qsort(median_unflagged_phase, n_unflagged_points, sizeof(float),
+		      cmpfunc_real);
+		avg_ampphase->f_amplitude[i][j][avg_ampphase->f_nchannels[i][j]] =
+		  fmedianf(median_unflagged_amplitude, n_unflagged_points);
+		avg_ampphase->f_phase[i][j][avg_ampphase->f_nchannels[i][j]] =
+		  fmedianf(median_unflagged_phase, n_unflagged_points);
+	      } else if (averaging_type & AVERAGETYPE_VECTOR) {
+		avg_ampphase->f_amplitude[i][j][avg_ampphase->f_nchannels[i][j]] =
+		  cabsf(avg_ampphase->f_raw[i][j][avg_ampphase->f_nchannels[i][j]]);
+		avg_ampphase->f_phase[i][j][avg_ampphase->f_nchannels[i][j]] =
+		  cargf(avg_ampphase->f_raw[i][j][avg_ampphase->f_nchannels[i][j]]);
+	      }
+	    }
+	    // That's a successful unflagged channel.
+	    // Update the maxima and minima.
+	    checkval = crealf(avg_ampphase->f_raw[i][j][avg_ampphase->f_nchannels[i][j]]);
+	    if (checkval < avg_ampphase->min_real[i]) {
+	      avg_ampphase->min_real[i] = checkval;
+	    }
+	    if (checkval > avg_ampphase->max_real[i]) {
+	      avg_ampphase->max_real[i] = checkval;
+	    }
+	    checkval = cimagf(avg_ampphase->f_raw[i][j][avg_ampphase->f_nchannels[i][j]]);
+	    if (checkval < avg_ampphase->min_imag[i]) {
+	      avg_ampphase->min_imag[i] = checkval;
+	    }
+	    if (checkval > avg_ampphase->max_imag[i]) {
+	      avg_ampphase->max_imag[i] = checkval;
+	    }
+	    if (avg_ampphase->f_amplitude[i][j][avg_ampphase->f_nchannels[i][j]] <
+		avg_ampphase->min_amplitude_global) {
+	      avg_ampphase->min_amplitude_global =
+		avg_ampphase->f_amplitude[i][j][avg_ampphase->f_nchannels[i][j]];
+	    }
+	    if (avg_ampphase->f_amplitude[i][j][avg_ampphase->f_nchannels[i][j]] >
+		avg_ampphase->max_amplitude_global) {
+	      avg_ampphase->max_amplitude_global =
+		avg_ampphase->f_amplitude[i][j][avg_ampphase->f_nchannels[i][j]];
+	    }
+	    if (avg_ampphase->f_amplitude[i][j][avg_ampphase->f_nchannels[i][j]] <
+		avg_ampphase->min_amplitude[i]) {
+	      avg_ampphase->min_amplitude[i] =
+		avg_ampphase->f_amplitude[i][j][avg_ampphase->f_nchannels[i][j]];
+	    }
+	    if (avg_ampphase->f_amplitude[i][j][avg_ampphase->f_nchannels[i][j]] >
+		avg_ampphase->max_amplitude[i]) {
+	      avg_ampphase->max_amplitude[i] =
+		avg_ampphase->f_amplitude[i][j][avg_ampphase->f_nchannels[i][j]];
+	    }
+	    if (avg_ampphase->f_phase[i][j][avg_ampphase->f_nchannels[i][j]] <
+		avg_ampphase->min_phase_global) {
+	      avg_ampphase->min_phase_global =
+		avg_ampphase->f_phase[i][j][avg_ampphase->f_nchannels[i][j]];
+	    }
+	    if (avg_ampphase->f_phase[i][j][avg_ampphase->f_nchannels[i][j]] >
+		avg_ampphase->max_phase_global) {
+	      avg_ampphase->max_phase_global =
+		avg_ampphase->f_phase[i][j][avg_ampphase->f_nchannels[i][j]];
+	    }
+	    if (avg_ampphase->f_phase[i][j][avg_ampphase->f_nchannels[i][j]] <
+		avg_ampphase->min_phase[i]) {
+	      avg_ampphase->min_phase[i] =
+		avg_ampphase->f_phase[i][j][avg_ampphase->f_nchannels[i][j]];
+	    }
+	    if (avg_ampphase->f_phase[i][j][avg_ampphase->f_nchannels[i][j]] >
+		avg_ampphase->max_phase[i]) {
+	      avg_ampphase->max_phase[i] =
+		avg_ampphase->f_phase[i][j][avg_ampphase->f_nchannels[i][j]];
+	    }
+	    // Go to the next channel.
+	    avg_ampphase->f_nchannels[i][j] += 1;
+	  }
+	} // CALLOC makes everything 0 by default, for when n_points <= 0.
+      }
+    }
+  }
+				 
 }

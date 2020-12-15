@@ -14,6 +14,7 @@
 #include "memory.h"
 #include "cpgplot.h"
 #include "plotting.h"
+#include "compute.h"
 
 /*!
  *  \brief Work out how many polarisations are needed for a plot
@@ -1744,7 +1745,7 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
   float tvchan_yvals[2], tvchan_xvals[2], tvchans[2];
   char ptitle[BIGBUFSIZE], ptype[BUFSIZE], ftype[BUFSIZE], poltitle[BUFSIZE];
   char information_text[BUFSIZE], ***systemp_strings = NULL;
-  struct ampphase **ampphase_if = NULL;
+  struct ampphase **ampphase_if = NULL, avg_ampphase;
 
   // Definitions of some magic numbers that we use.
   // The height above the top axis for the plot title.
@@ -2025,6 +2026,13 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
           
           pc = 1;
           for (rp = 0; rp < npols; rp++) {
+	    // Do some averaging if the user wants us to plot the averaged data.
+	    if (plot_controls->plot_options & PLOT_AVERAGED_DATA) {
+	      chanaverage_ampphase(ampphase_if[polidx[rp]], &avg_ampphase,
+				   ampphase_if[polidx[rp]]->options->delay_averaging[idxif + 1],
+				   ampphase_if[polidx[rp]]->options->averaging_method[idxif + 1]);
+	    }
+	    
             for (bi = 0; bi < bn; bi++) {
               // Check if we actually proceed for this polarisation and bin
               // combination.
@@ -2104,6 +2112,55 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
               cpgsci(pc);
               cpgline(ampphase_if[polidx[rp]]->f_nchannels[i][bi],
                       plot_xvalues, plot_yvalues);
+	      // Check if the user wants to display the averaged data.
+	      if (plot_controls->plot_options & PLOT_AVERAGED_DATA) {
+		// Remake the plot values again with the averaged data.
+		for (ri = 0, rj = avg_ampphase.f_nchannels[i][bi] - 1;
+		     ri < avg_ampphase.f_nchannels[i][bi]; ri++, rj--) {
+		  if (inverted == YES) {
+		    // Swap the frequencies.
+		    if (rp == 0) {
+		      plot_xvalues[ri] = avg_ampphase.f_frequency[i][bi][rj];
+		    }
+		    if (plot_controls->plot_options & PLOT_AMPLITUDE) {
+		      if (plot_controls->plot_options & PLOT_AMPLITUDE_LOG) {
+			LOGAMP(avg_ampphase.f_amplitude[i][bi][rj], ylog_max,
+			       plot_yvalues[ri]);
+		      } else {
+			plot_yvalues[ri] = avg_ampphase.f_amplitude[i][bi][rj];
+		      }
+		    } else if (plot_controls->plot_options & PLOT_PHASE) {
+		      plot_yvalues[ri] = avg_ampphase.f_phase[i][bi][rj];
+		    } else if (plot_controls->plot_options & PLOT_REAL) {
+		      plot_yvalues[ri] = crealf(avg_ampphase.f_raw[i][bi][rj]);
+		    } else if (plot_controls->plot_options & PLOT_IMAG) {
+		      plot_yvalues[ri] = cimagf(avg_ampphase.f_raw[i][bi][rj]);
+		    }
+		  } else {
+		    if (plot_controls->plot_options & PLOT_FREQUENCY) {
+		      plot_xvalues[ri] = avg_ampphase.f_frequency[i][bi][ri];
+		    } else if (plot_controls->plot_options & PLOT_CHANNEL) {
+		      plot_xvalues[ri] = avg_ampphase.f_channel[i][bi][ri];
+		    }
+		    if (plot_controls->plot_options & PLOT_AMPLITUDE) {
+		      if (plot_controls->plot_options & PLOT_AMPLITUDE_LOG) {
+			LOGAMP(avg_ampphase.f_amplitude[i][bi][ri], ylog_max,
+			       plot_yvalues[ri]);
+		      } else {
+			plot_yvalues[ri] = avg_ampphase.f_amplitude[i][bi][ri];
+		      }
+		    } else if (plot_controls->plot_options & PLOT_PHASE) {
+		      plot_yvalues[ri] = avg_ampphase.f_phase[i][bi][ri];
+		    } else if (plot_controls->plot_options & PLOT_REAL) {
+		      plot_yvalues[ri] = crealf(avg_ampphase.f_raw[i][bi][ri]);
+		    } else if (plot_controls->plot_options & PLOT_IMAG) {
+		      plot_yvalues[ri] = cimagf(avg_ampphase.f_raw[i][bi][ri]);
+		    }
+		  }
+		}
+		cpgsci(pc + 3);
+		cpgline(avg_ampphase.f_nchannels[i][bi], plot_xvalues, plot_yvalues);
+	      }
 
 	      // Store the tvchannel ranges here while we know we're accessing valid data.
 	      if (plot_controls->plot_options & PLOT_TVCHANNELS) {
@@ -2163,6 +2220,10 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
               
               pc++;
             }
+	    // Free memory if required.
+	    if (plot_controls->plot_options & PLOT_AVERAGED_DATA) {
+	      free_ampphase(&avg_ampphase);
+	    }
           }
 	  if (plot_controls->plot_options & PLOT_TVCHANNELS) {
 	    // Show the tvchannel range.

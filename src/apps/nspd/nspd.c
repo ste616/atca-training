@@ -29,7 +29,7 @@
 #include "plotting.h"
 #include "atnetworking.h"
 #include "atreadline.h"
-
+#include "compute.h"
 
 const char *argp_program_version = "nspd 1.0";
 const char *argp_program_bug_address = "<Jamie.Stevens@csiro.au>";
@@ -464,6 +464,10 @@ static void interpret_command(char *line) {
 	  // Show the tvchannel decorations.
 	  plot_decorations |= PLOT_TVCHANNELS;
 	  decorations_changed = true;
+	} else if (minmatch("averaged", line_els[1], 2)) {
+	  // Show the averaged channels.
+	  plot_decorations |= PLOT_AVERAGED_DATA;
+	  decorations_changed = true;
 	}
 
 	if (decorations_changed) {
@@ -479,6 +483,12 @@ static void interpret_command(char *line) {
 	  // Hide the tvchannel decorations.
 	  if (plot_decorations & PLOT_TVCHANNELS) {
 	    plot_decorations -= PLOT_TVCHANNELS;
+	    decorations_changed = true;
+	  }
+	} else if (minmatch("averaged", line_els[1], 2)) {
+	  // Hide the averaged channels.
+	  if (plot_decorations & PLOT_AVERAGED_DATA) {
+	    plot_decorations -= PLOT_AVERAGED_DATA;
 	    decorations_changed = true;
 	  }
 	}

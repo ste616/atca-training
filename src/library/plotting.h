@@ -32,6 +32,7 @@
 #define PLOT_REAL                 1<<13
 #define PLOT_IMAG                 1<<14
 #define PLOT_TVCHANNELS           1<<15
+#define PLOT_AVERAGED_DATA        1<<16
 
 #define PLOT_FLAG_POL_XX             1<<1
 #define PLOT_FLAG_POL_YY             1<<2

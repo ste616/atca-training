@@ -1075,7 +1075,11 @@ struct vis_data {
 };
 
 float fmedianf(float *a, int n);
+float complex fcmedianfc(float complex *a, int n);
 float fsumf(float *a, int n);
+float complex fcsumfc(float complex *a, int n);
+float fmeanf(float *a, int n);
+float complex fcmeanfc(float complex *a, int n);
 struct ampphase* prepare_ampphase(void);
 struct vis_quantities* prepare_vis_quantities(void);
 void free_ampphase(struct ampphase **ampphase);
@@ -1131,3 +1135,5 @@ void print_options_set(int num_options, struct ampphase_options **options,
 		       char *output, int output_length);
 void print_information_scan_header(struct scan_header_data *header_data,
 				   char *output, int output_length);
+void chanaverage_ampphase(struct ampphase *ampphase, struct ampphase *avg_ampphase,
+			  int averaging, int averaging_type);
