@@ -176,6 +176,7 @@ static void sighandler(int sig) {
 #define ACTION_SEND_USERNAME             1<<10
 #define ACTION_TSYSCORR_CHANGED          1<<11
 #define ACTION_OMIT_OPTIONS              1<<12
+#define ACTION_UNKNOWN_COMMAND           1<<13
 
 // Make a shortcut to stop action for those actions which can only be
 // done by a simulator.
@@ -436,24 +437,8 @@ static void interpret_command(char *line) {
 	  data_selected_index = time_index();
 	  // We'll also want to plot where this time is.
 	  action_required |= ACTION_REFRESH_PLOT;
-          /* // Find the data with the right time. */
-          /* close_time = fabsf(vis_data.vis_quantities[0][0][0]->ut_seconds - */
-          /*                    data_seconds); */
-          /* closeidx = 0; */
-          /* for (i = 1; i < vis_data.nviscycles; i++) { */
-          /*   delta_time = fabsf(vis_data.vis_quantities[i][0][0]->ut_seconds - */
-          /*                      data_seconds); */
-          /*   if (delta_time < close_time) { */
-          /*     close_time = delta_time; */
-          /*     closeidx = i; */
-          /*   } */
-          /* } */
         }
       }
-      /* if ((closeidx >= 0) && (closeidx < vis_data.nviscycles)) { */
-      /*   // Change the data selection. */
-      /*   data_selected_index = closeidx; */
-      /* } */
       
     } else if (minmatch("calband", line_els[0], 4)) {
       // We can change which bands get plotted as aa/bb/ab and cc/dd/cd.
@@ -731,9 +716,13 @@ static void interpret_command(char *line) {
                                          temp_nypanels, temp_yaxis_type,
                                          &vis_panelspec);
           action_required = ACTION_REFRESH_PLOT;
-        }
+        } else {
+	  action_required = ACTION_UNKNOWN_COMMAND;
+	}
         // And free our memory.
         FREE(temp_yaxis_type);
+      } else {
+	action_required = ACTION_UNKNOWN_COMMAND;
       }
     }
     
@@ -1061,6 +1050,13 @@ int main(int argc, char *argv[]) {
       pack_write_string(&cmp, arguments.username, CLIENTIDLENGTH);
       socket_send_buffer(socket_peer, send_buffer, cmp_mem_access_get_pos(&mem));
       action_required -= ACTION_SEND_USERNAME;
+    }
+
+    if (action_required & ACTION_UNKNOWN_COMMAND) {
+      nmesg = 0;
+      snprintf(mesgout[nmesg++], VISBUFSIZE, "  UNKNOWN COMMAND!\n");
+      readline_print_messages(nmesg, mesgout);
+      action_required -= ACTION_UNKNOWN_COMMAND;
     }
     
     if (action_required & ACTION_QUIT) {

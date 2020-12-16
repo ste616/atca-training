@@ -177,6 +177,7 @@ static void sighandler(int sig) {
 #define ACTION_LIST_CYCLES               1<<6
 #define ACTION_TIME_REQUEST              1<<7
 #define ACTION_OMIT_OPTIONS              1<<8
+#define ACTION_UNKNOWN_COMMAND           1<<9
 
 // Make a shortcut to stop action for those actions which can only be
 // done by a simulator.
@@ -526,6 +527,8 @@ static void interpret_command(char *line) {
 	  fprintf(stderr, "Couldn't find %s\n", line_els[1]);
 	}
       }
+    } else {
+      action_required = ACTION_UNKNOWN_COMMAND;
     }
     FREE(line_els);
   }
@@ -835,6 +838,13 @@ int main(int argc, char *argv[]) {
       action_required -= ACTION_LIST_CYCLES;
     }
 
+    if (action_required & ACTION_UNKNOWN_COMMAND) {
+      nmesg = 0;
+      snprintf(mesgout[nmesg++], SPDBUFSIZE, "  UNKNOWN COMMAND!\n");
+      readline_print_messages(nmesg, mesgout);
+      action_required -= ACTION_UNKNOWN_COMMAND;
+    }
+    
     if (action_required & ACTION_QUIT) {
       break;
     }
