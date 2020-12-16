@@ -872,27 +872,27 @@ int main(int argc, char *argv[]) {
       action_required |= ACTION_VISBANDS_CHANGED;
       // Reset the selected index from the data.
       nmesg = 0;
-      snprintf(mesgout[nmesg++], VISBUFSIZE, " new data arrives\n");
+      /* snprintf(mesgout[nmesg++], VISBUFSIZE, " new data arrives\n"); */
       if (data_seconds > 0) {
 	// We've already got a time setting, which we should try to keep
 	// if possible.
 	data_selected_index = time_index();
-	snprintf(mesgout[nmesg++], VISBUFSIZE, " time %.2f has selected index %d\n",
-		 data_seconds, data_selected_index);
+	/* snprintf(mesgout[nmesg++], VISBUFSIZE, " time %.2f has selected index %d\n", */
+	/* 	 data_seconds, data_selected_index); */
       }
       if (data_seconds <= 0) {
 	// Couldn't keep it, or has never been set.
 	data_selected_index = vis_data.nviscycles - 1;
-	snprintf(mesgout[nmesg++], VISBUFSIZE, " last index selected %d\n",
-		 data_selected_index);
+	/* snprintf(mesgout[nmesg++], VISBUFSIZE, " last index selected %d\n", */
+	/* 	 data_selected_index); */
       }
       described_hdr = vis_data.header_data[data_selected_index];
       print_information_scan_header(described_hdr, header_string, VISBUFSIZE);
-      snprintf(mesgout[nmesg++], VISBUFSIZE, " header at index:\n%s\n", header_string);
+      /* snprintf(mesgout[nmesg++], VISBUFSIZE, " header at index:\n%s\n", header_string); */
       found_options = find_ampphase_options(n_ampphase_options, ampphase_options,
 					    described_hdr);
-      print_options_set(1, &found_options, header_string, VISBUFSIZE);
-      snprintf(mesgout[nmesg++], VISBUFSIZE, "%s", header_string);
+      /* print_options_set(1, &found_options, header_string, VISBUFSIZE); */
+      /* snprintf(mesgout[nmesg++], VISBUFSIZE, "%s", header_string); */
       readline_print_messages(nmesg, mesgout);
       
     }
@@ -1009,6 +1009,10 @@ int main(int argc, char *argv[]) {
 	break;
       }
       action_required |= ACTION_AMPPHASE_OPTIONS_CHANGED;
+      // Ensure we send our options.
+      if (action_required & ACTION_OMIT_OPTIONS) {
+	action_required -= ACTION_OMIT_OPTIONS;
+      }
 
       action_required -= ACTION_TSYSCORR_CHANGED;
     }
@@ -1090,9 +1094,9 @@ int main(int argc, char *argv[]) {
         action_required = ACTION_QUIT;
         continue;
       }
-      nmesg = 1;
-      snprintf(mesgout[0], VISBUFSIZE, "Received %d bytes\n", bytes_received);
-      readline_print_messages(nmesg, mesgout);
+      /* nmesg = 1; */
+      /* snprintf(mesgout[0], VISBUFSIZE, "Received %d bytes\n", bytes_received); */
+      /* readline_print_messages(nmesg, mesgout); */
       init_cmp_memory_buffer(&cmp, &mem, recv_buffer, recv_buffer_length);
       unpack_responses(&cmp, &server_response);
       // Ignore this if we somehow get a message not addressed to us.
@@ -1118,11 +1122,11 @@ int main(int argc, char *argv[]) {
 	}
         unpack_vis_data(&cmp, &vis_data);
         action_required = ACTION_NEW_DATA_RECEIVED;
-	nmesg = 0;
-	snprintf(mesgout[nmesg++], VISBUFSIZE, " Data received\n");
-	print_options_set(n_ampphase_options, ampphase_options, header_string, VISBUFSIZE);
-	snprintf(mesgout[nmesg++], VISBUFSIZE, "%s", header_string);
-	readline_print_messages(nmesg, mesgout);
+	/* nmesg = 0; */
+	/* snprintf(mesgout[nmesg++], VISBUFSIZE, " Data received\n"); */
+	/* print_options_set(n_ampphase_options, ampphase_options, header_string, VISBUFSIZE); */
+	/* snprintf(mesgout[nmesg++], VISBUFSIZE, "%s", header_string); */
+	/* readline_print_messages(nmesg, mesgout); */
       } else if (server_response.response_type == RESPONSE_VISDATA_COMPUTED) {
         // We're being told new data is available after we asked for a new
         // computation. We request this new data.

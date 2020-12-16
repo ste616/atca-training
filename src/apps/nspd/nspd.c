@@ -671,8 +671,6 @@ int main(int argc, char *argv[]) {
   init_spd_plotcontrols(&spd_plotcontrols, xaxis_type, yaxis_type | yaxis_scaling,
                         plot_pols, plot_decorations, spd_device_number);
   // The number of pols is set by the data though, not the selection.
-  //action_required = ACTION_NEW_DATA_RECEIVED;
-  //action_required = ACTION_CHANGE_PLOT_SURFACE;
   action_required = 0;
   while(true) {
     reads = watchset;
@@ -685,11 +683,11 @@ int main(int argc, char *argv[]) {
       if (spectrum_data.header_data != NULL) {
         cmjd = date2mjd(spectrum_data.header_data->obsdate,
                         spectrum_data.spectrum[0][0]->ut_seconds);
-        nmesg = 1;
-        snprintf(mesgout[0], SPDBUFSIZE, " Data has MJD %.8f\n", cmjd);
+        /* nmesg = 1; */
+        /* snprintf(mesgout[0], SPDBUFSIZE, " Data has MJD %.8f\n", cmjd); */
 	// Store this as if we had requested that MJD.
 	mjd_request = cmjd;
-        readline_print_messages(nmesg, mesgout);
+        /* readline_print_messages(nmesg, mesgout); */
       }
     }
     
@@ -788,9 +786,9 @@ int main(int argc, char *argv[]) {
         server_request.request_type = REQUEST_SPECTRUM_MJD;
         init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)SPDBUFSIZE);
         pack_requests(&cmp, &server_request);
-        nmesg = 1;
-        snprintf(mesgout[0], SPDBUFSIZE, " Requesting data at MJD %.8f\n", mjd_request);
-        readline_print_messages(nmesg, mesgout);
+        /* nmesg = 1; */
+        /* snprintf(mesgout[0], SPDBUFSIZE, " Requesting data at MJD %.8f\n", mjd_request); */
+        /* readline_print_messages(nmesg, mesgout); */
         pack_write_double(&cmp, mjd_request);
 	if (action_required & ACTION_OMIT_OPTIONS) {
 	  // We will not send any options, so that options being used by our
@@ -897,18 +895,18 @@ int main(int argc, char *argv[]) {
 	  unpack_ampphase_options(&cmp, ampphase_options[i]);
 	}
 	// Print out the options.
-	nmesg = 0;
-	snprintf(mesgout[nmesg++], SPDBUFSIZE, "OPTIONS RECEIVED:\n");
-	print_options_set(n_ampphase_options, ampphase_options, mesgout[nmesg++],
-			  SPDBUFSIZE);
+	/* nmesg = 0; */
+	/* snprintf(mesgout[nmesg++], SPDBUFSIZE, "OPTIONS RECEIVED:\n"); */
+	/* print_options_set(n_ampphase_options, ampphase_options, mesgout[nmesg++], */
+	/* 		  SPDBUFSIZE); */
 	// And then get the spectrum data.
         unpack_spectrum_data(&cmp, &spectrum_data);
 	// Find the options relevant to the displayed data.
 	found_options = find_ampphase_options(n_ampphase_options, ampphase_options,
 					      spectrum_data.header_data);
-	snprintf(mesgout[nmesg++], SPDBUFSIZE, "RELEVANT OPTIONS:\n");
-	print_options_set(1, &found_options, mesgout[nmesg++], SPDBUFSIZE);
-	readline_print_messages(nmesg, mesgout);
+	/* snprintf(mesgout[nmesg++], SPDBUFSIZE, "RELEVANT OPTIONS:\n"); */
+	/* print_options_set(1, &found_options, mesgout[nmesg++], SPDBUFSIZE); */
+	/* readline_print_messages(nmesg, mesgout); */
         // Refresh the plot next time through.
         action_required = ACTION_NEW_DATA_RECEIVED;
       } else if (server_response.response_type == RESPONSE_SERVERTYPE) {
@@ -934,12 +932,12 @@ int main(int argc, char *argv[]) {
         pack_read_double(&cmp, &mjd_cycletime);
         pack_read_double(&cmp, &earliest_mjd);
         pack_read_double(&cmp, &latest_mjd);
-        nmesg = 3;
-        snprintf(mesgout[0], SPDBUFSIZE, " Server earliest MJD %.8f\n", earliest_mjd);
-        snprintf(mesgout[1], SPDBUFSIZE, " Server   latest MJD %.8f\n", latest_mjd);
-        snprintf(mesgout[2], SPDBUFSIZE, " Data cycle time %.1f sec\n",
-                 (mjd_cycletime * 86400.0));
-        readline_print_messages(nmesg, mesgout);
+        /* nmesg = 3; */
+        /* snprintf(mesgout[0], SPDBUFSIZE, " Server earliest MJD %.8f\n", earliest_mjd); */
+        /* snprintf(mesgout[1], SPDBUFSIZE, " Server   latest MJD %.8f\n", latest_mjd); */
+        /* snprintf(mesgout[2], SPDBUFSIZE, " Data cycle time %.1f sec\n", */
+        /*          (mjd_cycletime * 86400.0)); */
+        /* readline_print_messages(nmesg, mesgout); */
         mjd_base = floor(earliest_mjd);
       } else if (server_response.response_type == RESPONSE_SPECTRUM_OUTSIDERANGE) {
         // We couldn't get a new spectrum.
@@ -957,10 +955,10 @@ int main(int argc, char *argv[]) {
         pack_read_sint(&cmp, &n_cycles);
         REALLOC(all_cycle_mjd, n_cycles);
         pack_readarray_double(&cmp, n_cycles, all_cycle_mjd);
-        nmesg = 1;
-        snprintf(mesgout[0], SPDBUFSIZE, " Received information about %d cycles.\n",
-                 n_cycles);
-        readline_print_messages(nmesg, mesgout);
+        /* nmesg = 1; */
+        /* snprintf(mesgout[0], SPDBUFSIZE, " Received information about %d cycles.\n", */
+        /*          n_cycles); */
+        /* readline_print_messages(nmesg, mesgout); */
       } else if (server_response.response_type == RESPONSE_USERREQUEST_VISDATA) {
 	// Another NVIS client the same user is controlling has requested data with
 	// different options, so we re-request the same data we're viewing now but
