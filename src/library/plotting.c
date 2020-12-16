@@ -45,6 +45,14 @@ void count_polarisations(struct spd_plotcontrols *plotcontrols) {
 
 }
 
+/*!
+ *  \brief Sorting routine for vis_line structures by increasing baseline length
+ *  \param a a vis_line structure
+ *  \param b another vis_line structure
+ *  \return - -1 if the baseline length of a < b
+ *          - 1 if the baseline length of a > b
+ *          - 0 if the two baseline lengths are identical
+ */
 int cmpfunc_baseline_length(const void *a, const void *b) {
   // This routine is responsible for sorting the vis_line structures
   // in increasing baseline length.
@@ -56,7 +64,16 @@ int cmpfunc_baseline_length(const void *a, const void *b) {
   return 0;
 }
 
-
+/*!
+ *  \brief Transform routine which takes some line colour and returns a colour
+ *         that should be used to overplot the averaged version of that line
+ *  \param plot_colour the PGPLOT colour index used to plot the normal line
+ *  \return the PGPLOT colour index which should be used to overplot the
+ *          averaged data
+ */
+int plot_colour_averaging(int plot_colour) {
+  return (plot_colour + 5);
+}
 
 void change_spd_plotcontrols(struct spd_plotcontrols *plotcontrols,
                              int *xaxis_type, int *yaxis_type, int *pols,
@@ -2159,8 +2176,9 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
 		    }
 		  }
 		}
-		cpgsci(pc + 3);
+		cpgsci(plot_colour_averaging(pc));
 		cpgline(avg_ampphase->f_nchannels[i][bi], plot_xvalues, plot_yvalues);
+		cpgsci(pc);
 	      }
 
 	      // Store the tvchannel ranges here while we know we're accessing valid data.
@@ -2218,7 +2236,37 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
               cpgmtxt("B", pollab_height, panel_plotted[px][py], 0.0, poltitle);
               cpglen(5, poltitle, &pollab_xlen, &pollab_ylen);
               panel_plotted[px][py] += pollab_xlen * pollab_padding;
-              
+
+	      // Add another polarisation label if we've overplotted the
+	      // averaged line.
+	      if (plot_controls->plot_options & PLOT_AVERAGED_DATA) {
+		switch(ampphase_if[polidx[rp]]->pol) {
+		case POL_XX:
+		  strcpy(poltitle, "AAv");
+		  if ((isauto) && (bi > 0)) {
+		    strcpy(poltitle, "aav");
+		  }
+		  break;
+		case POL_YY:
+		  strcpy(poltitle, "BBv");
+		  if ((isauto) && (bi > 0)) {
+		    strcpy(poltitle, "bbv");
+		  }
+		  break;
+		case POL_XY:
+		  strcpy(poltitle, "ABv");
+		  break;
+		case POL_YX:
+		  strcpy(poltitle, "BAv");
+		  break;
+		}
+		cpgsci(plot_colour_averaging(pc));
+		cpgmtxt("B", pollab_height, panel_plotted[px][py], 0.0, poltitle);
+		cpgsci(pc);
+		cpglen(5, poltitle, &pollab_xlen, &pollab_ylen);
+		panel_plotted[px][py] += pollab_xlen * pollab_padding;
+	      }
+	      
               pc++;
             }
 	    // Free memory if required.

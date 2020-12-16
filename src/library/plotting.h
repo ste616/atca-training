@@ -194,6 +194,7 @@ struct vis_line {
 
 void count_polarisations(struct spd_plotcontrols *plotcontrols);
 int cmpfunc_baseline_length(const void *a, const void *b);
+int plot_colour_averaing(int plot_colour);
 void change_spd_plotcontrols(struct spd_plotcontrols *plotcontrols,
                              int *xaxis_type, int *yaxis_type, int *pols,
 			     int *decorations);
