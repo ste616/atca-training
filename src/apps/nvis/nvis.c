@@ -175,6 +175,7 @@ static void sighandler(int sig) {
 #define ACTION_TVCHANNELS_CHANGED        1<<9
 #define ACTION_SEND_USERNAME             1<<10
 #define ACTION_TSYSCORR_CHANGED          1<<11
+#define ACTION_OMIT_OPTIONS              1<<12
 
 // Make a shortcut to stop action for those actions which can only be
 // done by a simulator.
@@ -894,27 +895,6 @@ int main(int argc, char *argv[]) {
       snprintf(mesgout[nmesg++], VISBUFSIZE, "%s", header_string);
       readline_print_messages(nmesg, mesgout);
       
-      // And get all the ampphase_options that were supplied.
-      /* fidx = vis_data.num_ifs[data_selected_index]; */
-      /* copy_ampphase_options(&ampphase_options, */
-      /*                       vis_data.vis_quantities[data_selected_index][fidx - 1][0]->options); */
-      /* // We will need to fill in all the tvchannels though... */
-      /* for (i = 1; i < fidx; i++) { */
-      /*   ampphase_options.min_tvchannel[i] = */
-      /*     vis_data.vis_quantities[data_selected_index][i - 1][0]->options->min_tvchannel[i]; */
-      /*   ampphase_options.max_tvchannel[i] = */
-      /*     vis_data.vis_quantities[data_selected_index][i - 1][0]->options->max_tvchannel[i]; */
-      /* } */
-      /* for (i = 0; i < n_ampphase_options; i++) { */
-      /* 	free_ampphase_options(ampphase_options[i]); */
-      /* 	FREE(ampphase_options[i]); */
-      /* } */
-      /* n_ampphase_options = vis_data.num_options; */
-      /* REALLOC(ampphase_options, n_ampphase_options); */
-      /* for (i = 0; i < n_ampphase_options; i++) { */
-      /* 	CALLOC(ampphase_options[i], 1); */
-      /* 	copy_ampphase_options(ampphase_options[i], vis_data.options[i]); */
-      /* } */
     }
 
     if (action_required & ACTION_DESCRIBE_DATA) {
@@ -989,29 +969,6 @@ int main(int argc, char *argv[]) {
       nmesg = 0;
       snprintf(mesgout[nmesg++], VISBUFSIZE, "VIS DATA COMPUTED WITH OPTIONS:\n");
       print_options_set(1, &found_options, mesgout[nmesg++], VISBUFSIZE);
-      /* snprintf(mesgout[nmesg++], VISBUFSIZE, " PHASE UNITS: %s\n", */
-      /*          (found_options->phase_in_degrees ? "degrees" : "radians")); */
-      /* for (i = 1; i < found_options->num_ifs; i++) { */
-      /*   snprintf(mesgout[nmesg++], VISBUFSIZE, " BAND F%d CF %.1f BW %.1f NCHAN %d:\n", */
-      /* 		 i, found_options->if_centre_freq[i], found_options->if_bandwidth[i], */
-      /* 		 found_options->if_nchannels[i]); */
-      /*   snprintf(mesgout[nmesg++], VISBUFSIZE, "   DELAY AVERAGING: %d\n", */
-      /*            found_options->delay_averaging[i]); */
-      /*   snprintf(mesgout[nmesg++], VISBUFSIZE, "   AVERAGING METHOD: "); */
-      /*   if (found_options->averaging_method[i] & AVERAGETYPE_VECTOR) { */
-      /*     snprintf(mesgout[nmesg++], VISBUFSIZE, "VECTOR "); */
-      /*   } else if (found_options->averaging_method[i] & AVERAGETYPE_SCALAR) { */
-      /*     snprintf(mesgout[nmesg++], VISBUFSIZE, "SCALAR "); */
-      /*   } */
-      /*   if (found_options->averaging_method[i] & AVERAGETYPE_MEAN) { */
-      /*     snprintf(mesgout[nmesg++], VISBUFSIZE, "MEAN"); */
-      /*   } else if (found_options->averaging_method[i] & AVERAGETYPE_MEDIAN) { */
-      /*     snprintf(mesgout[nmesg++], VISBUFSIZE, "MEDIAN"); */
-      /*   } */
-      /*   snprintf(mesgout[nmesg++], VISBUFSIZE, "\n   TVCHANNELS: %d - %d\n", */
-      /*            found_options->min_tvchannel[i], */
-      /*            found_options->max_tvchannel[i]); */
-      /* } */
       readline_print_messages(nmesg, mesgout);
       action_required -= ACTION_AMPPHASE_OPTIONS_PRINT;
     }
@@ -1062,9 +1019,16 @@ int main(int argc, char *argv[]) {
       server_request.request_type = REQUEST_COMPUTE_VISDATA;
       init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)VISBUFSIZE);
       pack_requests(&cmp, &server_request);
-      pack_write_sint(&cmp, n_ampphase_options);
-      for (i = 0; i < n_ampphase_options; i++) {
-	pack_ampphase_options(&cmp, ampphase_options[i]);
+      if (action_required & ACTION_OMIT_OPTIONS) {
+	// Some other client has changed the options, and we tell the server
+	// to use those options.
+	pack_write_sint(&cmp, 0);
+	action_required -= ACTION_OMIT_OPTIONS;
+      } else {
+	pack_write_sint(&cmp, n_ampphase_options);
+	for (i = 0; i < n_ampphase_options; i++) {
+	  pack_ampphase_options(&cmp, ampphase_options[i]);
+	}
       }
       socket_send_buffer(socket_peer, send_buffer, cmp_mem_access_get_pos(&mem));
       action_required -= ACTION_AMPPHASE_OPTIONS_CHANGED;
@@ -1184,6 +1148,11 @@ int main(int argc, char *argv[]) {
         snprintf(mesgout[0], VISBUFSIZE, "PLEASE INPUT ATNF USER NAME\n");
         // Change the prompt.
         readline_print_messages(nmesg, mesgout);
+      } else if (server_response.response_type == RESPONSE_USERREQUEST_SPECTRUM) {
+	// Another NSPD client the same user is controlling has requested data with
+	// different options, so we re-request the same data we're viewing now but
+	// with those same new options.
+	action_required = ACTION_AMPPHASE_OPTIONS_CHANGED | ACTION_OMIT_OPTIONS;
       }
       FREE(recv_buffer);
     }

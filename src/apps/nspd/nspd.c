@@ -67,12 +67,13 @@ struct nspd_arguments {
 
 // And some fun, totally necessary, global state variables.
 int action_required, server_type;
-int spd_device_number;
+int spd_device_number, n_ampphase_options;
 int xaxis_type, yaxis_type, plot_pols, yaxis_scaling, nxpanels, nypanels, plot_decorations;
 double mjd_request, mjd_base;
 struct spd_plotcontrols spd_plotcontrols;
 struct panelspec spd_panelspec;
 struct spectrum_data spectrum_data;
+struct ampphase_options **ampphase_options, *found_options;
 
 // The maximum number of divisions supported on the plot.
 #define MAX_XPANELS 6
@@ -167,15 +168,15 @@ static void sighandler(int sig) {
   }
 }
 
-#define ACTION_REFRESH_PLOT        1<<0
-#define ACTION_QUIT                1<<1
-#define ACTION_CHANGE_PLOTSURFACE  1<<2
-#define ACTION_NEW_DATA_RECEIVED   1<<3
-#define ACTION_CYCLE_FORWARD       1<<4
-#define ACTION_CYCLE_BACKWARD      1<<5
-#define ACTION_LIST_CYCLES         1<<6
-#define ACTION_TIME_REQUEST        1<<7
-#define ACTION_OMIT_OPTIONS        1<<8
+#define ACTION_REFRESH_PLOT              1<<0
+#define ACTION_QUIT                      1<<1
+#define ACTION_CHANGE_PLOTSURFACE        1<<2
+#define ACTION_NEW_DATA_RECEIVED         1<<3
+#define ACTION_CYCLE_FORWARD             1<<4
+#define ACTION_CYCLE_BACKWARD            1<<5
+#define ACTION_LIST_CYCLES               1<<6
+#define ACTION_TIME_REQUEST              1<<7
+#define ACTION_OMIT_OPTIONS              1<<8
 
 // Make a shortcut to stop action for those actions which can only be
 // done by a simulator.
@@ -196,7 +197,7 @@ static void sighandler(int sig) {
 static void interpret_command(char *line) {
   char **line_els = NULL, *cvt = NULL, *cycomma = NULL;
   char delim[] = " ";
-  int nels = -1, i, j, k, pols_specified, if_no;
+  int nels = -1, i, j, k, pols_specified, if_no, iarg, bidx;
   int if_num_spec[MAXIFS], yaxis_change_type, array_change_spec;
   int flag_change, flag_change_mode, change_nxpanels, change_nypanels;
   bool pols_selected = false, if_selected = false, range_valid = false;
@@ -499,6 +500,32 @@ static void interpret_command(char *line) {
 	  action_required = ACTION_REFRESH_PLOT;
 	}
       }
+    } else if (minmatch("delavg", line_els[0], 5)) {
+      CHECKSIMULATOR;
+      // Change the delay averaging.
+      if (nels == 2) {
+	iarg = atoi(line_els[1]);
+	if ((iarg >= 1) && (found_options != NULL)) {
+	  // Change the delay averaging for all the IFs, but only for
+	  // the currently displayed options.
+	  for (i = 0; i < found_options->num_ifs; i++) {
+	    found_options->delay_averaging[i] = iarg;
+	  }
+	  action_required = ACTION_TIME_REQUEST;
+	}
+      } else if (nels == 3) {
+	// The first argument should be the name of the band to change.
+	bidx = find_if_name_nosafe(spectrum_data.header_data, line_els[1]);
+	if (bidx >= 0) {
+	  iarg = atoi(line_els[2]);
+	  if ((iarg >= 1) && (found_options != NULL)) {
+	    found_options->delay_averaging[bidx] = iarg;
+	    action_required = ACTION_TIME_REQUEST;
+	  }
+	} else {
+	  fprintf(stderr, "Couldn't find %s\n", line_els[1]);
+	}
+      }
     }
     FREE(line_els);
   }
@@ -550,7 +577,6 @@ int main(int argc, char *argv[]) {
   fd_set watchset, reads;
   int i, r, bytes_received, max_socket = -1, nmesg = 0, n_cycles = 0;
   int nlistlines = 0, mjd_year, mjd_month, mjd_day, min_dmjd_idx = -1;
-  int n_ampphase_options = 0;
   float mjd_utseconds;
   size_t recv_buffer_length;
   struct requests server_request;
@@ -562,7 +588,6 @@ int main(int argc, char *argv[]) {
   cmp_mem_access_t mem;
   double earliest_mjd, latest_mjd, mjd_cycletime, cmjd, min_dmjd, dmjd;
   double *all_cycle_mjd = NULL;
-  struct ampphase_options **ampphase_options = NULL;
   struct syscal_data *tsys_data;
 
   // Allocate some memory.
@@ -584,16 +609,9 @@ int main(int argc, char *argv[]) {
   // And defaults for some of the parameters.
   nxpanels = 5;
   nypanels = 5;
+  n_ampphase_options = 0;
+  ampphase_options = NULL;
 
-  /* // We display phase in degrees by default. */
-  /* ampphase_options.phase_in_degrees = YES; */
-  /* ampphase_options.include_flagged_data = NO; */
-  /* ampphase_options.num_ifs = 0; // Doesn't matter. */
-  /* ampphase_options.min_tvchannel = NULL; */
-  /* ampphase_options.max_tvchannel = NULL; */
-  /* ampphase_options.delay_averaging = NULL; */
-  /* ampphase_options.averaging_method = NULL; */
-  
   // Parse the arguments.
   argp_parse(&argp, argc, argv, 0, 0, &arguments);
 
@@ -818,7 +836,7 @@ int main(int argc, char *argv[]) {
       
       action_required -= ACTION_LIST_CYCLES;
     }
-    
+
     if (action_required & ACTION_QUIT) {
       break;
     }
@@ -878,8 +896,19 @@ int main(int argc, char *argv[]) {
 	  CALLOC(ampphase_options[i], 1);
 	  unpack_ampphase_options(&cmp, ampphase_options[i]);
 	}
+	// Print out the options.
+	nmesg = 0;
+	snprintf(mesgout[nmesg++], SPDBUFSIZE, "OPTIONS RECEIVED:\n");
+	print_options_set(n_ampphase_options, ampphase_options, mesgout[nmesg++],
+			  SPDBUFSIZE);
 	// And then get the spectrum data.
         unpack_spectrum_data(&cmp, &spectrum_data);
+	// Find the options relevant to the displayed data.
+	found_options = find_ampphase_options(n_ampphase_options, ampphase_options,
+					      spectrum_data.header_data);
+	snprintf(mesgout[nmesg++], SPDBUFSIZE, "RELEVANT OPTIONS:\n");
+	print_options_set(1, &found_options, mesgout[nmesg++], SPDBUFSIZE);
+	readline_print_messages(nmesg, mesgout);
         // Refresh the plot next time through.
         action_required = ACTION_NEW_DATA_RECEIVED;
       } else if (server_response.response_type == RESPONSE_SERVERTYPE) {

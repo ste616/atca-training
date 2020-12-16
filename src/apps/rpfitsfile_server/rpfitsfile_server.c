@@ -1415,7 +1415,7 @@ int main(int argc, char *argv[]) {
   struct rpfitsfile_server_arguments arguments;
   int i, j, k, l, ri, rj, bytes_received, r, n_cycle_mjd = 0, n_client_options = 0;
   int n_alert_sockets = 0, n_ampphase_options = 0, *client_indices = NULL;
-  bool pointer_found = false, vis_cache_updated = false;
+  bool pointer_found = false, vis_cache_updated = false, notify_required = false;
   bool spd_cache_updated = false, outside_mjd_range = false, succ = false;
   double mjd_grab, earliest_mjd, latest_mjd, mjd_cycletime;
   double *all_cycle_mjd = NULL;
@@ -1790,6 +1790,8 @@ int main(int argc, char *argv[]) {
 					    client_request.client_id,
 					    client_request.client_username,
 					    n_client_options, client_options);
+		// And we will have to provide a notification later.
+		notify_required = true;
 	      } else {
 		// Get the client options from our cache.
 		succ = get_client_ampphase_options(&client_ampphase_options,
@@ -1802,9 +1804,10 @@ int main(int argc, char *argv[]) {
 					      "DEFAULT", "", &n_client_options,
 					      &client_options);
 		}
+		// No notification will be necessary.
+		notify_required = false;
 	      }
-              //MALLOC(client_options, 1);
-              //unpack_ampphase_options(&cmp, client_options);
+
               // We're going to fork and compute in the background.
               pid = fork();
               if (pid == 0) {
@@ -1835,6 +1838,9 @@ int main(int argc, char *argv[]) {
 		  for (i = 0; i < n_client_options; i++) {
 		    pack_ampphase_options(&child_cmp, client_options[i]);
 		  }
+		  // Next we indicate if a notification is required.
+		  pack_write_bool(&child_cmp, notify_required);
+		  // Now pack the data.
                   pack_vis_data(&child_cmp, child_vis_data);
                   printf("[CHILD] %s for client %s.\n",
                          get_type_string(TYPE_REQUEST, child_request.request_type),
@@ -1892,12 +1898,15 @@ int main(int argc, char *argv[]) {
 		CALLOC(client_options[i], 1);
 		unpack_ampphase_options(&cmp, client_options[i]);
 	      }
-              
-              fprintf(stderr, "[PARENT] unpacking vis data\n");
+	      // The child indicates whether this request requires us to notify
+	      // other clients.
+	      pack_read_bool(&cmp, &notify_required);
+              /* fprintf(stderr, "[PARENT] unpacking vis data\n"); */
+	      // And now get the data.
               unpack_vis_data(&cmp, vis_data);
               
               // Add this data to our cache.
-              fprintf(stderr, "[PARENT] adding data to cache\n");
+              /* fprintf(stderr, "[PARENT] adding data to cache\n"); */
               vis_cache_updated = add_cache_vis_data(n_client_options,
 						     client_options, vis_data);
               if (vis_cache_updated == false) {
@@ -1936,39 +1945,42 @@ int main(int argc, char *argv[]) {
 		}
               }
 	      FREE(alert_socket);
-	      
-	      // Now send a message to other clients of the same user, to let them
-	      // know new data with different options is being generated.
-	      find_client(&clients, client_request.client_id,
-			  client_request.client_username, &n_alert_sockets,
-			  &alert_socket, &client_indices);
-	      for (i = 0; i < n_alert_sockets; i++) {
-		if (strncmp(clients.client_id[client_indices[i]],
-			    client_request.client_id, CLIENTIDLENGTH) != 0) {
-		  // Don't send the message to the client already connected.
-		  client_response.response_type = RESPONSE_USERREQUEST_VISDATA;
-		  strncpy(client_response.client_id,
-			  clients.client_id[client_indices[i]], CLIENTIDLENGTH);
-		  MALLOC(send_buffer, JUSTRESPONSESIZE);
-		  init_cmp_memory_buffer(&cmp, &mem, send_buffer, JUSTRESPONSESIZE);
-		  pack_responses(&cmp, &client_response);
-		  printf(" %s to client %s.\n",
-			 get_type_string(TYPE_RESPONSE, client_response.response_type),
-			 client_response.client_id);
-		  bytes_sent = socket_send_buffer(alert_socket[i], send_buffer,
-						  cmp_mem_access_get_pos(&mem));
-		  FREE(send_buffer);
+
+	      if (notify_required) {
+		// Now send a message to other clients of the same user, to let them
+		// know new data with different options is being generated.
+		find_client(&clients, client_request.client_id,
+			    client_request.client_username, &n_alert_sockets,
+			    &alert_socket, &client_indices);
+		for (i = 0; i < n_alert_sockets; i++) {
+		  if (strncmp(clients.client_id[client_indices[i]],
+			      client_request.client_id, CLIENTIDLENGTH) != 0) {
+		    // Don't send the message to the client already connected.
+		    client_response.response_type = RESPONSE_USERREQUEST_VISDATA;
+		    strncpy(client_response.client_id,
+			    clients.client_id[client_indices[i]], CLIENTIDLENGTH);
+		    MALLOC(send_buffer, JUSTRESPONSESIZE);
+		    init_cmp_memory_buffer(&cmp, &mem, send_buffer, JUSTRESPONSESIZE);
+		    pack_responses(&cmp, &client_response);
+		    printf(" %s to client %s.\n",
+			   get_type_string(TYPE_RESPONSE, client_response.response_type),
+			   client_response.client_id);
+		    bytes_sent = socket_send_buffer(alert_socket[i], send_buffer,
+						    cmp_mem_access_get_pos(&mem));
+		    FREE(send_buffer);
+		  }
 		}
+		// Free the client list.
+		FREE(alert_socket);
+		FREE(client_indices);
 	      }
-	      // Free the client list.
-	      FREE(alert_socket);
-	      FREE(client_indices);
 	      for (i = 0; i < n_client_options; i++) {
 		free_ampphase_options(client_options[i]);
 		FREE(client_options[i]);
 	      }
 	      FREE(client_options);
 	      n_client_options = 0;
+	      n_alert_sockets = 0;
             } else if (client_request.request_type == REQUEST_SERVERTYPE) {
               // Tell the client we're a simulator or a tester, depending on how
               // we were started.
@@ -2014,6 +2026,13 @@ int main(int argc, char *argv[]) {
 		  CALLOC(client_options[i], 1);
 		  unpack_ampphase_options(&cmp, client_options[i]);
 		}
+		// Store all the options in our cache.
+		add_client_ampphase_options(&client_ampphase_options,
+					    client_request.client_id,
+					    client_request.client_username,
+					    n_client_options, client_options);
+		// And we will have to provide a notification later.
+		notify_required = true;
 	      } else {
 		// Try to get the options that this user has used before.
 		succ = get_client_ampphase_options(&client_ampphase_options,
@@ -2026,6 +2045,8 @@ int main(int argc, char *argv[]) {
 					      "DEFAULT", "", &n_client_options,
 					      &client_options);
 		}
+		// No notification will be necessary.
+		notify_required = false;
 	      }
               // Check that this MJD is within the range we know about.
               outside_mjd_range = false;
@@ -2072,6 +2093,9 @@ int main(int argc, char *argv[]) {
 		  for (i = 0; i < n_client_options; i++) {
 		    pack_ampphase_options(&child_cmp, client_options[i]);
 		  }
+		  // Next we indicate if a notification is required.
+		  pack_write_bool(&child_cmp, notify_required);
+		  // Now pack the data.
                   pack_spectrum_data(&child_cmp, child_spectrum_data);
                   printf("[CHILD] %s for client %s.\n",
                          get_type_string(TYPE_REQUEST, child_request.request_type),
@@ -2131,6 +2155,7 @@ int main(int argc, char *argv[]) {
 		CALLOC(client_options[i], 1);
 		unpack_ampphase_options(&cmp, client_options[i]);
 	      }
+	      pack_read_bool(&cmp, &notify_required);
               /* fprintf(stderr, " getting data from child for MJD %.8f, deg %d\n", */
               /*         mjd_grab, ampphase_options->phase_in_degrees); */
               unpack_spectrum_data(&cmp, spectrum_data);
@@ -2175,12 +2200,42 @@ int main(int argc, char *argv[]) {
 	      }
 	      FREE(alert_socket);
 	      n_alert_sockets = 0;
+
+	      if (notify_required) {
+		// Now send a message to other clients of the same user, to let them
+		// know new data with different options is being generated.
+		find_client(&clients, client_request.client_id,
+			    client_request.client_username, &n_alert_sockets,
+			    &alert_socket, &client_indices);
+		for (i = 0; i < n_alert_sockets; i++) {
+		  if (strncmp(clients.client_id[client_indices[i]],
+			      client_request.client_id, CLIENTIDLENGTH) != 0) {
+		    // Don't send the message to the client already connected.
+		    client_response.response_type = RESPONSE_USERREQUEST_SPECTRUM;
+		    strncpy(client_response.client_id,
+			    clients.client_id[client_indices[i]], CLIENTIDLENGTH);
+		    MALLOC(send_buffer, JUSTRESPONSESIZE);
+		    init_cmp_memory_buffer(&cmp, &mem, send_buffer, JUSTRESPONSESIZE);
+		    pack_responses(&cmp, &client_response);
+		    printf(" %s to client %s.\n",
+			   get_type_string(TYPE_RESPONSE, client_response.response_type),
+			   client_response.client_id);
+		    bytes_sent = socket_send_buffer(alert_socket[i], send_buffer,
+						    cmp_mem_access_get_pos(&mem));
+		    FREE(send_buffer);
+		  }
+		}
+		// Free everything.
+		FREE(alert_socket);
+		FREE(client_indices);
+	      }
 	      for (i = 0; i < n_client_options; i++) {
 		free_ampphase_options(client_options[i]);
 		FREE(client_options[i]);
 	      }
 	      FREE(client_options);
 	      n_client_options = 0;
+	      n_alert_sockets = 0;
             } else if (client_request.request_type == REQUEST_TIMERANGE) {
               // Something wants to know the time information like min/max
               // MJD and the cycle time.

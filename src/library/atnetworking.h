@@ -129,6 +129,7 @@ struct requests {
 #define RESPONSE_CYCLE_TIMES            12
 #define RESPONSE_REQUEST_USERNAME       13
 #define RESPONSE_USERREQUEST_VISDATA    14
+#define RESPONSE_USERREQUEST_SPECTRUM   15
 
 /*! \struct responses
  *  \brief Structure to use when responding to a request

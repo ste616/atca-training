@@ -147,7 +147,7 @@ const char *get_type_string(int type, int id) {
   // Get a string representation of the type of request or response,
   // specified by type=TYPE_REQUEST or TYPE_RESPONSE, and
   // id being one of the definitions in the header.
-  int max_request = 13, max_response = 15;
+  int max_request = 13, max_response = 16;
   const char* const request_strings[] = { "",
                                           "REQUEST_CURRENT_SPECTRUM",
                                           "REQUEST_CURRENT_VISDATA",
@@ -176,7 +176,8 @@ const char *get_type_string(int type, int id) {
 					   "RESPONSE_TIMERANGE",
 					   "RESPONSE_CYCLE_TIMES",
 					   "RESPONSE_REQUEST_USERNAME",
-					   "RESPONSE_USERREQUEST_VISDATA"
+					   "RESPONSE_USERREQUEST_VISDATA",
+					   "RESPONSE_USERREQUEST_SPECTRUM"
   };
 
   if ((type == TYPE_REQUEST) && (id >= 0) && (id < max_request)) {
