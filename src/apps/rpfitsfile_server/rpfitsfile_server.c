@@ -1429,6 +1429,7 @@ int main(int argc, char *argv[]) {
   struct addrinfo hints, *bind_address;
   char port_string[RPSBUFSIZE], address_buffer[RPSBUFSIZE];
   char *recv_buffer = NULL, *send_buffer = NULL, *child_send_buffer = NULL;
+  char removed_id[CLIENTIDLENGTH], removed_username[CLIENTIDLENGTH];
   SOCKET socket_listen, max_socket, loop_i, socket_client, child_socket;
   SOCKET *alert_socket = NULL;
   fd_set master, reads;
@@ -1690,11 +1691,16 @@ int main(int argc, char *argv[]) {
             // Get the requests structure.
             bytes_received = socket_recv_buffer(loop_i, &recv_buffer, &recv_buffer_length);
             if (bytes_received < 1) {
-              printf("Closing connection, no data received.\n");
-              // The connection failed.
+              // The connection failed. Delete the client from our list and clean up.
+	      remove_client(&clients, loop_i, removed_id, removed_username);
               FD_CLR(loop_i, &master);
               CLOSESOCKET(loop_i);
               FREE(recv_buffer);
+              printf("Closing connection to client %s (%s), no data received.\n",
+		     removed_id, removed_username);
+
+	      // Remove any client-specific cache data.
+	      
               continue;
             }
             printf("Received %d bytes.\n", bytes_received);
@@ -1732,42 +1738,36 @@ int main(int argc, char *argv[]) {
               init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)RPSENDBUFSIZE);
               pack_responses(&cmp, &client_response);
 	      // Return the ampphase options used here.
-	      /* if ((client_request.request_type == REQUEST_CURRENT_SPECTRUM) || */
-	      /* 	  (client_request.request_type == REQUEST_CURRENT_VISDATA)) { */
-	      /* 	get_client_ampphase_options(&client_ampphase_options, "DEFAULT", "", */
-	      /* 				    &n_client_options, &client_options); */
-	      /* } else if ((client_request.request_type == REQUEST_MJD_SPECTRUM) || */
-	      /* 		 (client_request.request_type == REQUEST_COMPUTED_VISDATA)) { */
-	      succ = get_client_ampphase_options(&client_ampphase_options,
-						 client_request.client_id,
-						 client_request.client_username,
-						 &n_client_options, &client_options);
-	      if (succ == false) {
-		// Revert to defaults.
+	      if ((client_request.request_type == REQUEST_CURRENT_SPECTRUM) ||
+		  (client_request.request_type == REQUEST_CURRENT_VISDATA)) {
 		get_client_ampphase_options(&client_ampphase_options, "DEFAULT", "",
 					    &n_client_options, &client_options);
+	      } else if ((client_request.request_type == REQUEST_MJD_SPECTRUM) ||
+			 (client_request.request_type == REQUEST_COMPUTED_VISDATA)) {
+		succ = get_client_ampphase_options(&client_ampphase_options,
+						   client_request.client_id,
+						   client_request.client_username,
+						   &n_client_options, &client_options);
+		if (succ == false) {
+		  // Revert to defaults.
+		  get_client_ampphase_options(&client_ampphase_options, "DEFAULT", "",
+					      &n_client_options, &client_options);
+		}
 	      }
-	      /* } */
 	      pack_write_sint(&cmp, n_client_options);
 	      for (i = 0; i < n_client_options; i++) {
 		pack_ampphase_options(&cmp, client_options[i]);
 	      }
-	      if (((succ) && (client_request.request_type == REQUEST_CURRENT_SPECTRUM)) ||
-		  (client_request.request_type == REQUEST_MJD_SPECTRUM)) {
-		// Return the client or user data.
+              if (client_request.request_type == REQUEST_CURRENT_SPECTRUM) {
+                pack_spectrum_data(&cmp, get_client_spd_data(&client_spd_data, "DEFAULT"));
+              } else if (client_request.request_type == REQUEST_MJD_SPECTRUM) {
                 pack_spectrum_data(&cmp, get_client_spd_data(&client_spd_data,
                                                              client_request.client_id));
-	      } else if (client_request.request_type == REQUEST_CURRENT_SPECTRUM) {
-		// No known user or client, send the default data.
-                pack_spectrum_data(&cmp, get_client_spd_data(&client_spd_data, "DEFAULT"));
-	      } else if (((succ) && (client_request.request_type == REQUEST_CURRENT_VISDATA)) ||
-			 (client_request.request_type == REQUEST_COMPUTED_VISDATA)) {
-		// Return the client or user data.
+              } else if (client_request.request_type == REQUEST_CURRENT_VISDATA) {
+                pack_vis_data(&cmp, get_client_vis_data(&client_vis_data, "DEFAULT"));
+              } else if (client_request.request_type == REQUEST_COMPUTED_VISDATA) {
                 pack_vis_data(&cmp, get_client_vis_data(&client_vis_data,
                                                         client_request.client_id));
-              } else if (client_request.request_type == REQUEST_CURRENT_VISDATA) {
-		// No known user or client, send the default data.
-                pack_vis_data(&cmp, get_client_vis_data(&client_vis_data, "DEFAULT"));
               }
               
               // Send this data.

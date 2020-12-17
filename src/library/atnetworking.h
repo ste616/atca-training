@@ -198,4 +198,6 @@ void add_client(struct client_sockets *clients, char *client_id,
 		char *client_username, SOCKET socket);
 void modify_client(struct client_sockets *clients, char *client_id,
 		   char *client_username, SOCKET socket);
+void remove_client(struct client_sockets *clients, SOCKET socket,
+		   char *client_id, char *client_username);
 void free_client_sockets(struct client_sockets *clients);

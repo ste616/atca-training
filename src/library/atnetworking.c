@@ -376,6 +376,63 @@ void modify_client(struct client_sockets *clients, char *client_id,
 }
 
 /*!
+ *  \brief Remove a client from the list, identified by a socket number
+ *  \param clients the client_sockets structure holding information about
+ *                 all the clients
+ *  \param socket the socket number the client had connected on
+ *  \param client_id upon exit, if this pointer is not set to NULL, this
+ *                   variable will be filled with the ID of the removed client
+ *  \param client_username upon exit, if this pointer is not set to NULL, this
+ *                         variable will be filled with the username of
+ *                         the removed client
+ */
+void remove_client(struct client_sockets *clients, SOCKET socket,
+		   char *client_id, char *client_username) {
+  int i, cidx;
+  // Find the index of the client first.
+  for (i = 0, cidx = -1; i < clients->num_sockets; i++) {
+    if (clients->socket[i] == socket) {
+      // Found the client.
+      cidx = i;
+      // Copy the ID and username if we can.
+      if (client_id != NULL) {
+	strncpy(client_id, clients->client_id[i], CLIENTIDLENGTH);
+      }
+      if (client_username != NULL) {
+	strncpy(client_username, clients->client_username[i], CLIENTIDLENGTH);
+      }
+      break;
+    }
+  }
+
+  if (cidx >= 0) {
+    if (cidx < (clients->num_sockets - 1)) {
+      // We have to do data shifting.
+      for (i = (cidx + 1); i < clients->num_sockets; i++) {
+	clients->socket[i - 1] = clients->socket[i];
+	strncpy(clients->client_id[i - 1], clients->client_id[i], CLIENTIDLENGTH);
+	strncpy(clients->client_username[i - 1], clients->client_username[i],
+		CLIENTIDLENGTH);
+      }
+    }
+    // Reallocate the arrays.
+    clients->num_sockets -= 1;
+    FREE(clients->client_id[clients->num_sockets]);
+    FREE(clients->client_username[clients->num_sockets]);
+    if (clients->num_sockets > 0) {
+      REALLOC(clients->socket, clients->num_sockets);
+      REALLOC(clients->client_id, clients->num_sockets);
+      REALLOC(clients->client_username, clients->num_sockets);
+    } else {
+      // No more clients, free everything.
+      FREE(clients->socket);
+      FREE(clients->client_id);
+      FREE(clients->client_username);
+    }
+  }
+}
+
+/*!
  *  \brief Free memory used in a client_sockets structure, but does not
  *         free the structure memory itself
  *  \param clients the structure to free memory within
