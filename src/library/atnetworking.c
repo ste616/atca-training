@@ -18,6 +18,17 @@
 #include <errno.h>
 #include "memory.h"
 
+/*! \def HEADER_LENGTH
+ *  \brief This is the length of the header string indicating the request
+ *         comes from our routines
+ */
+#define HEADER_LENGTH 5
+
+/*! \var header_string
+ *  \brief The header string indicating the request comes from our routines
+ */
+const char *header_string = "ATNET";
+
 /*!
  *  \brief Send a buffer over the network socket
  *  \param socket the already open network socket to use to send the data
@@ -32,8 +43,17 @@
  */
 ssize_t socket_send_buffer(SOCKET socket, char *buffer, size_t buffer_length) {
   // Send the buffer with length buffer_length over the socket.
-  ssize_t init_bytes_sent, bytes_sent;
-
+  ssize_t init_bytes_sent, bytes_sent, header_bytes_sent;
+  
+  // Send a header to indicate who we are. This is here so that random
+  // connections to our port do not force us to attempt to read invalid
+  // data.
+  header_bytes_sent = send(socket, header_string, (size_t)HEADER_LENGTH, 0);
+  if (header_bytes_sent < HEADER_LENGTH) {
+    fprintf(stderr, "UNABLE TO SEND HEADER!\n");
+    return(header_bytes_sent);
+  }
+  
   // Send the size of the data first.
   init_bytes_sent = send(socket, &buffer_length, sizeof(size_t), 0);
   if (init_bytes_sent < 0) {
@@ -65,13 +85,29 @@ ssize_t socket_send_buffer(SOCKET socket, char *buffer, size_t buffer_length) {
  */
 ssize_t socket_recv_buffer(SOCKET socket, char **buffer, size_t *buffer_length) {
   // Read the buffer from the network socket, allocating the necessary space for it.
-  ssize_t bytes_to_read, bytes_read, br;
+  ssize_t bytes_to_read, bytes_read, br, header_bytes_read;
+  char header_received[HEADER_LENGTH];
   
-  // Read the size of the data first.
+  // Try to get the header first.
+  header_bytes_read = recv(socket, header_received, (size_t)HEADER_LENGTH, 0);
+  if (header_bytes_read <= 0) {
+    // The socket was closed.
+    fprintf(stderr, "Connection closed by peer.\n");
+    return (header_bytes_read);
+  }
+    
+  if ((header_bytes_read < HEADER_LENGTH) ||
+      (strncmp(header_received, header_string, HEADER_LENGTH) != 0)) {
+    // We didn't receive the header we were expecting.
+    fprintf(stderr, "Connected client did not send correct header, disconnecting.\n");
+    return (0);
+  }
+  
+  // Read the size of the data to come now.
   bytes_read = recv(socket, &bytes_to_read, sizeof(ssize_t), 0);
   if (bytes_read <= 0) {
     // The socket was closed.
-    fprintf(stderr, "Connection closed by peer.\n");
+    fprintf(stderr, "Connection closed by peer before size indication.\n");
     return(bytes_read);
   }
   // Allocate the necessary memory.
@@ -94,6 +130,16 @@ ssize_t socket_recv_buffer(SOCKET socket, char **buffer, size_t *buffer_length) 
   return(bytes_read);
 }
 
+/*!
+ *  \brief Prepare a connection from the client to the server
+ *  \param server_name the host name or address of the server
+ *  \param port_number the port number to connect to
+ *  \param socket_peer a pointer to the variable that will store the
+ *                     socket number we create
+ *  \param debugging a flag which specifies whether to output status
+ *                   messages (true) or not (false)
+ *  \return true if socket is correctly connected, false otherwise
+ */
 bool prepare_client_connection(char *server_name, int port_number,
                                SOCKET *socket_peer, bool debugging) {
   // Prepare a connection from the client to the server.
@@ -329,6 +375,11 @@ void modify_client(struct client_sockets *clients, char *client_id,
   }
 }
 
+/*!
+ *  \brief Free memory used in a client_sockets structure, but does not
+ *         free the structure memory itself
+ *  \param clients the structure to free memory within
+ */
 void free_client_sockets(struct client_sockets *clients) {
   int i;
   for (i = 0; i < clients->num_sockets; i++) {

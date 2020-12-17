@@ -1732,36 +1732,42 @@ int main(int argc, char *argv[]) {
               init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)RPSENDBUFSIZE);
               pack_responses(&cmp, &client_response);
 	      // Return the ampphase options used here.
-	      if ((client_request.request_type == REQUEST_CURRENT_SPECTRUM) ||
-		  (client_request.request_type == REQUEST_CURRENT_VISDATA)) {
+	      /* if ((client_request.request_type == REQUEST_CURRENT_SPECTRUM) || */
+	      /* 	  (client_request.request_type == REQUEST_CURRENT_VISDATA)) { */
+	      /* 	get_client_ampphase_options(&client_ampphase_options, "DEFAULT", "", */
+	      /* 				    &n_client_options, &client_options); */
+	      /* } else if ((client_request.request_type == REQUEST_MJD_SPECTRUM) || */
+	      /* 		 (client_request.request_type == REQUEST_COMPUTED_VISDATA)) { */
+	      succ = get_client_ampphase_options(&client_ampphase_options,
+						 client_request.client_id,
+						 client_request.client_username,
+						 &n_client_options, &client_options);
+	      if (succ == false) {
+		// Revert to defaults.
 		get_client_ampphase_options(&client_ampphase_options, "DEFAULT", "",
 					    &n_client_options, &client_options);
-	      } else if ((client_request.request_type == REQUEST_MJD_SPECTRUM) ||
-			 (client_request.request_type == REQUEST_COMPUTED_VISDATA)) {
-		succ = get_client_ampphase_options(&client_ampphase_options,
-						   client_request.client_id,
-						   client_request.client_username,
-						   &n_client_options, &client_options);
-		if (succ == false) {
-		  // Revert to defaults.
-		  get_client_ampphase_options(&client_ampphase_options, "DEFAULT", "",
-					      &n_client_options, &client_options);
-		}
 	      }
+	      /* } */
 	      pack_write_sint(&cmp, n_client_options);
 	      for (i = 0; i < n_client_options; i++) {
 		pack_ampphase_options(&cmp, client_options[i]);
 	      }
-              if (client_request.request_type == REQUEST_CURRENT_SPECTRUM) {
-                pack_spectrum_data(&cmp, get_client_spd_data(&client_spd_data, "DEFAULT"));
-              } else if (client_request.request_type == REQUEST_MJD_SPECTRUM) {
+	      if (((succ) && (client_request.request_type == REQUEST_CURRENT_SPECTRUM)) ||
+		  (client_request.request_type == REQUEST_MJD_SPECTRUM)) {
+		// Return the client or user data.
                 pack_spectrum_data(&cmp, get_client_spd_data(&client_spd_data,
                                                              client_request.client_id));
-              } else if (client_request.request_type == REQUEST_CURRENT_VISDATA) {
-                pack_vis_data(&cmp, get_client_vis_data(&client_vis_data, "DEFAULT"));
-              } else if (client_request.request_type == REQUEST_COMPUTED_VISDATA) {
+	      } else if (client_request.request_type == REQUEST_CURRENT_SPECTRUM) {
+		// No known user or client, send the default data.
+                pack_spectrum_data(&cmp, get_client_spd_data(&client_spd_data, "DEFAULT"));
+	      } else if (((succ) && (client_request.request_type == REQUEST_CURRENT_VISDATA)) ||
+			 (client_request.request_type == REQUEST_COMPUTED_VISDATA)) {
+		// Return the client or user data.
                 pack_vis_data(&cmp, get_client_vis_data(&client_vis_data,
                                                         client_request.client_id));
+              } else if (client_request.request_type == REQUEST_CURRENT_VISDATA) {
+		// No known user or client, send the default data.
+                pack_vis_data(&cmp, get_client_vis_data(&client_vis_data, "DEFAULT"));
               }
               
               // Send this data.
