@@ -638,6 +638,7 @@ int main(int argc, char *argv[]) {
     server_request.request_type = REQUEST_SERVERTYPE;
     strncpy(server_request.client_id, client_id, CLIENTIDLENGTH);
     strncpy(server_request.client_username, arguments.username, CLIENTIDLENGTH);
+    server_request.client_type = CLIENTTYPE_NSPD;
     init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)SPDBUFSIZE);
     pack_requests(&cmp, &server_request);
     socket_send_buffer(socket_peer, send_buffer, cmp_mem_access_get_pos(&mem));

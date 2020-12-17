@@ -1415,6 +1415,7 @@ int main(int argc, char *argv[]) {
   struct rpfitsfile_server_arguments arguments;
   int i, j, k, l, ri, rj, bytes_received, r, n_cycle_mjd = 0, n_client_options = 0;
   int n_alert_sockets = 0, n_ampphase_options = 0, *client_indices = NULL;
+  int removed_client_type;
   bool pointer_found = false, vis_cache_updated = false, notify_required = false;
   bool spd_cache_updated = false, outside_mjd_range = false, succ = false;
   double mjd_grab, earliest_mjd, latest_mjd, mjd_cycletime;
@@ -1427,7 +1428,7 @@ int main(int argc, char *argv[]) {
   cmp_ctx_t cmp, child_cmp;
   cmp_mem_access_t mem, child_mem;
   struct addrinfo hints, *bind_address;
-  char port_string[RPSBUFSIZE], address_buffer[RPSBUFSIZE];
+  char port_string[RPSBUFSIZE], address_buffer[RPSBUFSIZE], clienttype_string[RPSBUFSIZE];
   char *recv_buffer = NULL, *send_buffer = NULL, *child_send_buffer = NULL;
   char removed_id[CLIENTIDLENGTH], removed_username[CLIENTIDLENGTH];
   SOCKET socket_listen, max_socket, loop_i, socket_client, child_socket;
@@ -1692,12 +1693,14 @@ int main(int argc, char *argv[]) {
             bytes_received = socket_recv_buffer(loop_i, &recv_buffer, &recv_buffer_length);
             if (bytes_received < 1) {
               // The connection failed. Delete the client from our list and clean up.
-	      remove_client(&clients, loop_i, removed_id, removed_username);
+	      remove_client(&clients, loop_i, removed_id, removed_username,
+			    &removed_client_type);
               FD_CLR(loop_i, &master);
               CLOSESOCKET(loop_i);
               FREE(recv_buffer);
-              printf("Closing connection to client %s (%s), no data received.\n",
-		     removed_id, removed_username);
+	      client_type_string(removed_client_type, clienttype_string);
+              printf("Closing connection to %s client %s (%s), no data received.\n",
+		     clienttype_string, removed_id, removed_username);
 
 	      // Remove any client-specific cache data.
 	      
@@ -1708,12 +1711,14 @@ int main(int argc, char *argv[]) {
             unpack_requests(&cmp, &client_request);
 
             // Do what we've been asked to do.
-            printf(" %s from client %s.\n",
+	    client_type_string(client_request.client_type, clienttype_string);
+            printf(" %s from %s client %s.\n",
                    get_type_string(TYPE_REQUEST, client_request.request_type),
-                   client_request.client_id);
+                   clienttype_string, client_request.client_id);
             // Add this client to our list.
             add_client(&clients, client_request.client_id,
-		       client_request.client_username, loop_i);
+		       client_request.client_username,
+		       client_request.client_type, loop_i);
             if ((client_request.request_type == REQUEST_CURRENT_SPECTRUM) ||
                 (client_request.request_type == REQUEST_MJD_SPECTRUM) ||
                 (client_request.request_type == REQUEST_CURRENT_VISDATA) ||

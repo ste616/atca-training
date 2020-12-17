@@ -28,6 +28,9 @@
 #define SERVERTYPE_CORRELATOR 2
 #define SERVERTYPE_TESTING    3
 
+#define CLIENTTYPE_NSPD 1
+#define CLIENTTYPE_NVIS 2
+
 #define TYPE_REQUEST    1
 #define TYPE_RESPONSE   2
 
@@ -112,6 +115,11 @@ struct requests {
    * are able to be run without needing a username.
    */
   char client_username[CLIENTIDLENGTH];
+  /*! \var client_type
+   *  \brief The type of client making the request, one of the CLIENTTYPE_*
+   *         magic numbers
+   */
+  int client_type;
 };
 
 // The types of response that can be given.
@@ -181,6 +189,13 @@ struct client_sockets {
    * username, the string will be entirely filled with 0s.
    */
   char **client_username;
+  /*! \var client_type
+   *  \brief The type of client connected to each socket, one of the
+   *         CLIENTTYPE_* magic numbers
+   *
+   * This array has size `num_sockets`, and is indexed starting at 0.
+   */
+  int *client_type;
 };
 
 #define JUSTRESPONSESIZE (10 * sizeof(struct responses))
@@ -195,9 +210,10 @@ void find_client(struct client_sockets *clients,
 		 char *client_id, char *client_username,
 		 int *n_clients, SOCKET **client_sockets, int **indices);
 void add_client(struct client_sockets *clients, char *client_id,
-		char *client_username, SOCKET socket);
+		char *client_username, int client_type, SOCKET socket);
 void modify_client(struct client_sockets *clients, char *client_id,
 		   char *client_username, SOCKET socket);
 void remove_client(struct client_sockets *clients, SOCKET socket,
-		   char *client_id, char *client_username);
+		   char *client_id, char *client_username, int *client_type);
 void free_client_sockets(struct client_sockets *clients);
+void client_type_string(int client_type, char *type_string);

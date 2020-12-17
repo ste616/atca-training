@@ -939,6 +939,11 @@ void unpack_scan_header_data(cmp_ctx_t *cmp, struct scan_header_data *a) {
   
 }
 
+/*!
+ *  \brief Pack a requests structure into the CMP buffer
+ *  \param cmp the CMP buffer object
+ *  \param a the requests structure
+ */
 void pack_requests(cmp_ctx_t *cmp, struct requests *a) {
   // The request type.
   pack_write_sint(cmp, a->request_type);
@@ -946,8 +951,16 @@ void pack_requests(cmp_ctx_t *cmp, struct requests *a) {
   pack_write_string(cmp, a->client_id, CLIENTIDLENGTH);
   // The username of the client.
   pack_write_string(cmp, a->client_username, CLIENTIDLENGTH);
+  // The type of client.
+  pack_write_sint(cmp, a->client_type);
 }
 
+/*!
+ *  \brief Read a requests structure from the CMP buffer
+ *  \param cmp the CMP buffer object
+ *  \param a the requests structure, which must already be allocated
+ *           before passing it
+ */
 void unpack_requests(cmp_ctx_t *cmp, struct requests *a) {
   // The request type
   pack_read_sint(cmp, &(a->request_type));
@@ -955,6 +968,8 @@ void unpack_requests(cmp_ctx_t *cmp, struct requests *a) {
   pack_read_string(cmp, a->client_id, CLIENTIDLENGTH);
   // The username of the client.
   pack_read_string(cmp, a->client_username, CLIENTIDLENGTH);
+  // The type of client.
+  pack_read_sint(cmp, &(a->client_type));
 }
 
 void pack_responses(cmp_ctx_t *cmp, struct responses *a) {

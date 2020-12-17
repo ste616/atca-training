@@ -317,6 +317,7 @@ void find_client(struct client_sockets *clients,
  *                 all the clients
  *  \param client_id the ID string supplied by the client
  *  \param client_username the username string supplied by the client
+ *  \param client_type the type of client, one of the CLIENTTYPE_* magic numbers
  *  \param socket the socket number that the client has connected on
  *
  * This routine checks if the client has already been connected, but only
@@ -326,7 +327,7 @@ void find_client(struct client_sockets *clients,
  * `modify_client`.
  */
 void add_client(struct client_sockets *clients, char *client_id,
-		char *client_username, SOCKET socket) {
+		char *client_username, int client_type, SOCKET socket) {
   int n, n_check;
   SOCKET *check = NULL;
   // Check if we already know about it.
@@ -343,6 +344,8 @@ void add_client(struct client_sockets *clients, char *client_id,
     REALLOC(clients->client_username, n);
     CALLOC(clients->client_username[n - 1], CLIENTIDLENGTH);
     strncpy(clients->client_username[n - 1], client_username, CLIENTIDLENGTH);
+    REALLOC(clients->client_type, n);
+    clients->client_type[n - 1] = client_type;
 
     clients->num_sockets = n;
   }
@@ -385,9 +388,12 @@ void modify_client(struct client_sockets *clients, char *client_id,
  *  \param client_username upon exit, if this pointer is not set to NULL, this
  *                         variable will be filled with the username of
  *                         the removed client
+ *  \param client_type upon exit, if this pointer is not set to NULL, this
+ *                     variable will be filled with the client type of the
+ *                     removed client
  */
 void remove_client(struct client_sockets *clients, SOCKET socket,
-		   char *client_id, char *client_username) {
+		   char *client_id, char *client_username, int *client_type) {
   int i, cidx;
   // Find the index of the client first.
   for (i = 0, cidx = -1; i < clients->num_sockets; i++) {
@@ -401,6 +407,9 @@ void remove_client(struct client_sockets *clients, SOCKET socket,
       if (client_username != NULL) {
 	strncpy(client_username, clients->client_username[i], CLIENTIDLENGTH);
       }
+      if (client_type != NULL) {
+	*client_type = clients->client_type[i];
+      }
       break;
     }
   }
@@ -413,6 +422,7 @@ void remove_client(struct client_sockets *clients, SOCKET socket,
 	strncpy(clients->client_id[i - 1], clients->client_id[i], CLIENTIDLENGTH);
 	strncpy(clients->client_username[i - 1], clients->client_username[i],
 		CLIENTIDLENGTH);
+	clients->client_type[i - 1] = clients->client_type[i];
       }
     }
     // Reallocate the arrays.
@@ -423,11 +433,13 @@ void remove_client(struct client_sockets *clients, SOCKET socket,
       REALLOC(clients->socket, clients->num_sockets);
       REALLOC(clients->client_id, clients->num_sockets);
       REALLOC(clients->client_username, clients->num_sockets);
+      REALLOC(clients->client_type, clients->num_sockets);
     } else {
       // No more clients, free everything.
       FREE(clients->socket);
       FREE(clients->client_id);
       FREE(clients->client_username);
+      FREE(clients->client_type);
     }
   }
 }
@@ -446,4 +458,25 @@ void free_client_sockets(struct client_sockets *clients) {
   FREE(clients->socket);
   FREE(clients->client_id);
   FREE(clients->client_username);
+  FREE(clients->client_type);
+}
+
+/*!
+ *  \brief Return a string representation of the client type
+ *  \param client_type one of the CLIENTTYPE_* magic numbers
+ *  \param type_string upon exit this variable will be filled with the
+ *                     string representation of the client type
+ */
+void client_type_string(int client_type, char *type_string) {
+
+  switch (client_type) {
+  case CLIENTTYPE_NSPD:
+    snprintf(type_string, 5, "NSPD");
+    break;
+  case CLIENTTYPE_NVIS:
+    snprintf(type_string, 5, "NVIS");
+    break;
+  default:
+    snprintf(type_string, 8, "UNKNOWN");
+  }
 }
