@@ -41,17 +41,30 @@ bool read_bytes(void *data, size_t sz, FILE *fh) {
  *  \brief Read a number of bytes from the CMP file
  *  \param ctx the CMP stream, which should have been initialised to read from
  *             a file
- *  \param data a pointer to the varaible in which to store the data
+ *  \param data a pointer to the variable in which to store the data
  *  \param limit the maximum number of bytes that can be read into \a data
  */
 bool file_reader(cmp_ctx_t *ctx, void *data, size_t limit) {
   return read_bytes(data, limit, (FILE *)ctx->buf);
 }
 
+/*!
+ *  \brief Skip some number of bytes in the CMP file
+ *  \param ctx the CMP stream, which should have been initialised to read from
+ *             a file
+ *  \param count the number of bytes to skip forward from the current position
+ */
 bool file_skipper(cmp_ctx_t *ctx, size_t count) {
   return fseek((FILE *)ctx->buf, count, SEEK_CUR);
 }
 
+/*!
+ *  \brief Write a number of bytes to a file handle
+ *  \param ctx the CMP stream, which should have been initialised to read from
+ *             a file
+ *  \param data a pointer to the variable containing the data to write
+ *  \param count the number of bytes to write from \a data
+ */
 size_t file_writer(cmp_ctx_t *ctx, const void *data, size_t count) {
   return fwrite(data, sizeof(uint8_t), count, (FILE *)ctx->buf);
 }
@@ -62,65 +75,135 @@ size_t file_writer(cmp_ctx_t *ctx, const void *data, size_t count) {
 
 // Boolean.
 // Reader.
+/*!
+ *  \brief Read a boolean value from the data stream
+ *  \param cmp the CMP stream
+ *  \param value a pointer to the variable in which the value read from the
+ *               stream will be stored
+ */
 void pack_read_bool(cmp_ctx_t *cmp, bool *value) {
   if (!cmp_read_bool(cmp, value)) CMPERROR(cmp);
 }
 // Writer.
+/*!
+ *  \brief Write a boolean value into the data stream
+ *  \param cmp the CMP stream
+ *  \param value the value to encode into the stream
+ */
 void pack_write_bool(cmp_ctx_t *cmp, bool value) {
   if (!cmp_write_bool(cmp, value)) CMPERROR(cmp);
 }
 
 // Signed integer.
 // Reader.
+/*!
+ *  \brief Read a signed integer value from the data stream
+ *  \param cmp the CMP stream
+ *  \param value a pointer to the variable in which the value read from the
+ *               stream will be stored
+ */
 void pack_read_sint(cmp_ctx_t *cmp, int *value) {
   int64_t v;
   if (!cmp_read_sinteger(cmp, &v)) CMPERROR(cmp);
   *value = (int)v;
 }
 // Writer.
+/*!
+ *  \brief Write a signed integer value into the data stream
+ *  \param cmp the CMP stream
+ *  \param value the value to encode into the stream
+ */
 void pack_write_sint(cmp_ctx_t *cmp, int value) {
   if (!cmp_write_sint(cmp, value)) CMPERROR(cmp);
 }
 
 // Unsigned integer.
 // Reader.
+/*!
+ *  \brief Read an unsigned integer value from the data stream
+ *  \param cmp the CMP stream
+ *  \param value a pointer to the variable in which the value read from the
+ *               stream will be stored
+ */
 void pack_read_uint(cmp_ctx_t *cmp, unsigned int *value) {
   uint64_t v;
   if (!cmp_read_uinteger(cmp, &v)) CMPERROR(cmp);
   *value = (unsigned int)v;
 }
 // Writer.
+/*!
+ *  \brief Write an unsigned integer value into the data stream
+ *  \param cmp the CMP stream
+ *  \param value the value to encode into the stream
+ */
 void pack_write_uint(cmp_ctx_t *cmp, unsigned int value) {
   if (!cmp_write_uint(cmp, value)) CMPERROR(cmp);
 }
 
 // Float.
 // Reader.
+/*!
+ *  \brief Read a floating-point value from the data stream
+ *  \param cmp the CMP stream
+ *  \param value a pointer to the variable in which the value read from the
+ *               stream will be stored
+ */
 void pack_read_float(cmp_ctx_t *cmp, float *value) {
   if (!cmp_read_float(cmp, value)) CMPERROR(cmp);
 }
 // Writer.
+/*!
+ *  \brief Write a floating-point value into the data stream
+ *  \param cmp the CMP stream
+ *  \param value the value to encode into the stream
+ */
 void pack_write_float(cmp_ctx_t *cmp, float value) {
   if (!cmp_write_float(cmp, value)) CMPERROR(cmp);
 }
 
 // Double.
 // Reader.
+/*!
+ *  \brief Read a double-precision floating-point value from the data stream
+ *  \param cmp the CMP stream
+ *  \param value a pointer to the variable in which the value read from the
+ *               stream will be stored
+ */
 void pack_read_double(cmp_ctx_t *cmp, double *value) {
   if (!cmp_read_double(cmp, value)) CMPERROR(cmp);
 }
 // Writer.
+/*!
+ *  \brief Write a double-precision floating-point value into the data stream
+ *  \param cmp the CMP stream
+ *  \param value the value to encode into the stream
+ */
 void pack_write_double(cmp_ctx_t *cmp, double value) {
   if (!cmp_write_double(cmp, value)) CMPERROR(cmp);
 }
 
 // String.
 // Reader.
+/*!
+ *  \brief Read a string value from the data stream
+ *  \param cmp the CMP stream
+ *  \param value a pointer to the variable in which the value read from the
+ *               stream will be stored
+ *  \param maxlength the maximum length of string to read, in bytes
+ */
 void pack_read_string(cmp_ctx_t *cmp, char *value, int maxlength) {
   uint32_t string_size = (uint32_t)maxlength;
   if (!cmp_read_str(cmp, value, &string_size)) CMPERROR(cmp);
 }
 // Writer.
+/*!
+ *  \brief Write a string value into the data stream
+ *  \param cmp the CMP stream
+ *  \param value the value to encode into the stream
+ *  \param maxlength the maximum length of the string to write, in bytes;
+ *                   this does not have to be the actual length of the
+ *                   string, which will be determined by this routine
+ */
 void pack_write_string(cmp_ctx_t *cmp, char *value, long unsigned int maxlength) {
   int write_length = (strlen(value) < maxlength) ? strlen(value) : maxlength;
   if (!cmp_write_str(cmp, value, write_length)) CMPERROR(cmp);
@@ -128,6 +211,17 @@ void pack_write_string(cmp_ctx_t *cmp, char *value, long unsigned int maxlength)
 
 // Arrays.
 // Support checker.
+/*!
+ *  \brief Check that the proposed array read will succeed because the length
+ *         recorded in the stream agrees with how many elements we want to read
+ *  \param cmp the CMP stream
+ *  \param expected_length the expected number of elements that will be coming from
+ *         the array that should be the next thing in the stream
+ *  \return if the number of elements recorded as being in the array matches
+ *          \a expected_length, then this routine will return the same number as
+ *          \a expected_length, but from a different source; if there is no match
+ *          an error will be generated and execution will stop
+ */
 unsigned int pack_readarray_checksize(cmp_ctx_t *cmp, unsigned int expected_length) {
   unsigned int size_read;
   char emsg[1024];
@@ -789,6 +883,11 @@ void unpack_vis_data(cmp_ctx_t *cmp, struct vis_data *a) {
   }
 }
 
+/*!
+ *  \brief Free the memory within a vis_data structure, but not the
+ *         structure allocation itself
+ *  \param vis_data the structure to clear
+ */
 void free_vis_data(struct vis_data *vis_data) {
   int i, j, k;
   for (i = 0; i < vis_data->nviscycles; i++) {

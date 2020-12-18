@@ -358,9 +358,26 @@ struct cache_vis_data {
 
 struct cache_vis_data cache_vis_data;
 
+/*! \struct client_vis_data
+ *  \brief Client cache of vis data
+ */
 struct client_vis_data {
+  /*! \var num_clients
+   *  \brief The number of clients we know about
+   */
   int num_clients;
+  /*! \var client_id
+   *  \brief The ID of each client
+   *
+   * This array of strings has length `num_clients`, and is indexed starting
+   * at 0. Each string has length CLIENTIDLENGTH.
+   */
   char **client_id;
+  /*! \var vis_data
+   *  \brief The vis_data associated with each client
+   *
+   * This array has length `num_clients`, and is indexed starting at 0.
+   */
   struct vis_data **vis_data;
 };
 
@@ -401,22 +418,79 @@ struct cache_spd_data {
 
 struct cache_spd_data cache_spd_data;
 
+/*! \struct client_spd_data
+ *  \param Client cache of SPD data
+ */
 struct client_spd_data {
+  /*! \var num_clients
+   *  \brief The number of clients we know about
+   */
   int num_clients;
+  /*! \var client_id
+   *  \brief The ID of each client
+   *
+   * This array has length `num_clients`, and is indexed starting at 0.
+   * Each string has length CLIENTIDLENGTH.
+   */
   char **client_id;
+  /*! \var spectrum_data
+   *  \brief The spectrum_data associated with each client
+   *
+   * This array has length `num_clients`, and is indexed starting at 0.
+   */
   struct spectrum_data **spectrum_data;
 };
 
+/*! \struct rpfits_file_information
+ *  \brief Information about an RPFITS file we are asked to make available
+ */
 struct rpfits_file_information {
+  /*! \var filename
+   *  \brief The full relative path to the RPFITS file
+   */
   char filename[RPSBUFSIZE];
+  /*! \var n_scans
+   *  \brief The number of scans in the file
+   */
   int n_scans;
+  /*! \var scan_headers
+   *  \brief The header information for each scan
+   *
+   * This array has length `n_scans`, and is indexed starting at 0.
+   */
   struct scan_header_data **scan_headers;
+  /*! \var scan_start_mjd
+   *  \brief The MJD of the first cycle of each scan
+   *
+   * This array has length `n_scans`, and is indexed starting at 0.
+   */
   double *scan_start_mjd;
+  /*! \var scan_end_mjd
+   *  \brief The MJD of the last cycle of each scan
+   *
+   * This array has length `n_scans`, and is indexed starting at 0.
+   */
   double *scan_end_mjd;
+  /*! \var n_cycles
+   *  \brief The number of cycles present in each scan
+   *
+   * This array has length `n_scans`, and is indexed starting at 0.
+   */
   int *n_cycles;
+  /*! \var cycle_mjd
+   *  \brief The MJD of each cycle in each scan
+   *
+   * This 2-D array has length `n_scans` for the first index, and
+   * `n_cycles[i]` for the second index, where `i` is the position along
+   * the first index; both indices start at 0.
+   */
   double **cycle_mjd;
 };
 
+/*!
+ *  \brief Initialise and return a new rpfits_file_information structure
+ *  \return the properly initialised structure
+ */
 struct rpfits_file_information *new_rpfits_file(void) {
   struct rpfits_file_information *rv;
 
@@ -734,6 +808,32 @@ bool get_cache_vis_data(int num_options, struct ampphase_options **options,
 
   return false;
 }
+
+// The ways in which we can read data.
+/*! \def READ_SCAN_METADATA
+ *  \brief Magic number to tell data_reader that we would like to read the
+ *         information about scans present in an RPFITS file
+ *
+ * This magic number can be combined in a bitwise-OR with COMPUTE_VIS_PRODUCTS
+ * and GRAB_SPECTRUM.
+ */
+#define READ_SCAN_METADATA   1<<1
+/*! \def COMPUTE_VIS_PRODUCTS
+ *  \brief Magic number to tell data_reader that we would like to compute the
+ *         products that will go to an NVIS client while reading the RPFITS file
+ *
+ * This magic number can be combined in a bitwise-OR with READ_SCAN_METADATA
+ * and GRAB_SPECTRUM.
+ */
+#define COMPUTE_VIS_PRODUCTS 1<<2
+/*! \def GRAB_SPECTRUM
+ *  \brief Magic number to tell data_reader that we would like to compute the
+ *         products that will go to an NSPD client while reading the RPFITS file
+ *
+ * This magic number can be combined in a bitwise-OR with READ_SCAN_METADATA
+ * and COMPUTE_VIS_PRODUCTS.
+ */
+#define GRAB_SPECTRUM        1<<3
 
 void data_reader(int read_type, int n_rpfits_files,
                  double mjd_required, double mjd_low, double mjd_high,
@@ -1181,17 +1281,35 @@ void data_reader(int read_type, int n_rpfits_files,
   
 }
 
+/*! \def RPSENDBUFSIZE
+ *  \brief A reasonable size to accommodate any possible send buffer,
+ *         currently set to 100 MiB.
+ */
 #define RPSENDBUFSIZE 104857600
 
 bool sigint_received;
 
 // Handle signals that we receive.
-static void sighandler(int sig) {
+/*!
+ *  \brief Our signal handler
+ *  \param sig the signal being handled
+ *
+ * This handler handles the signals:
+ * - SIGINT: when received, the global variable `signint_received` is set to
+ *   true
+ */
+static void rpfitsfile_server_sighandler(int sig) {
   if (sig == SIGINT) {
     sigint_received = true;
   }
 }
 
+/*!
+ *  \brief Associate some vis data to an individual client
+ *  \param client_vis_data the cache structure
+ *  \param client_id the client ID
+ *  \param vis_data the vis data to cache, which will be copied
+ */
 void add_client_vis_data(struct client_vis_data *client_vis_data,
                          char *client_id, struct vis_data *vis_data) {
   int i, n;
@@ -1204,16 +1322,16 @@ void add_client_vis_data(struct client_vis_data *client_vis_data,
     if (strncmp(client_vis_data->client_id[i], client_id, CLIENTIDLENGTH) == 0) {
       // We will replace this data.
       n = i;
-      fprintf(stderr, "[add_client_vis_data] client data %s will be replaced at %d\n",
-              client_id, n);
+      /* fprintf(stderr, "[add_client_vis_data] client data %s will be replaced at %d\n", */
+      /*         client_id, n); */
       break;
     }
   }
   
   // Store some vis data as identified by a client id.
   if (n >= client_vis_data->num_clients) {
-    fprintf(stderr, "[add_client_vis_data] making new client cache %s\n",
-            client_id);
+    /* fprintf(stderr, "[add_client_vis_data] making new client cache %s\n", */
+    /*         client_id); */
     REALLOC(client_vis_data->client_id, (n + 1));
     MALLOC(client_vis_data->client_id[n], CLIENTIDLENGTH);
     REALLOC(client_vis_data->vis_data, (n + 1));
@@ -1224,6 +1342,63 @@ void add_client_vis_data(struct client_vis_data *client_vis_data,
   copy_vis_data(client_vis_data->vis_data[n], vis_data);
 }
 
+/*!
+ *  \brief Remove vis data associated with a client
+ *  \param client_vis_data the cache structure
+ *  \param client_id the client ID whose data should be cleared
+ *  \return true if something was removed, false otherwise
+ */
+bool remove_client_vis_data(struct client_vis_data *client_vis_data,
+			    char *client_id) {
+  int i, cidx;
+
+  for (i = 0, cidx = -1; i < client_vis_data->num_clients; i++) {
+    if (strncmp(client_vis_data->client_id[i], client_id, CLIENTIDLENGTH) == 0) {
+      cidx = i;
+      break;
+    }
+  }
+
+  if (cidx == -1) {
+    // Nothing found.
+    return (false);
+  }
+  // Free the vis_data memory for the client.
+  free_vis_data(client_vis_data->vis_data[cidx]);
+  // And the pointer memory too.
+  FREE(client_vis_data->vis_data[cidx]);
+  if (cidx < (client_vis_data->num_clients - 1)) {
+    // We will have to shift data down.
+    for (i = (cidx + 1); i < client_vis_data->num_clients; i++) {
+      strncpy(client_vis_data->client_id[i - 1],
+	      client_vis_data->client_id[i], CLIENTIDLENGTH);
+      // Redirect the pointer.
+      client_vis_data->vis_data[i - 1] = client_vis_data->vis_data[i];
+    }
+  }
+  // Free the memory of the last string.
+  FREE(client_vis_data->client_id[client_vis_data->num_clients - 1]);
+  // Reset our counter.
+  client_vis_data->num_clients -= 1;
+  if (client_vis_data->num_clients > 0) {
+    // Reallocate the arrays.
+    REALLOC(client_vis_data->client_id, client_vis_data->num_clients);
+    REALLOC(client_vis_data->vis_data, client_vis_data->num_clients);
+  } else {
+    // No more clients, free everything.
+    FREE(client_vis_data->client_id);
+    FREE(client_vis_data->vis_data);
+  }
+
+  return (true);
+}
+
+/*!
+ *  \brief Associate some SPD data to an individual client
+ *  \param client_spd_data the cache structure
+ *  \param client_id the client ID
+ *  \param spectrum_data the SPD data to cache, which will be copied
+ */
 void add_client_spd_data(struct client_spd_data *client_spd_data,
 			 char *client_id, struct spectrum_data *spectrum_data) {
   int i, n;
@@ -1254,6 +1429,56 @@ void add_client_spd_data(struct client_spd_data *client_spd_data,
   }
   strncpy(client_spd_data->client_id[n], client_id, CLIENTIDLENGTH);
   copy_spectrum_data(client_spd_data->spectrum_data[n], spectrum_data);
+}
+
+/*!
+ *  \brief Remove SPD data associated with a client
+ *  \param client_spd_data the cache data structure
+ *  \param client_id the client ID whose data should be cleared
+ *  \return true if something was removed, false otherwise
+ */
+bool remove_client_spd_data(struct client_spd_data *client_spd_data,
+			    char *client_id) {
+  int i, cidx;
+
+  for (i = 0, cidx = -1; i < client_spd_data->num_clients; i++) {
+    if (strncmp(client_spd_data->client_id[i], client_id, CLIENTIDLENGTH) == 0) {
+      cidx = i;
+      break;
+    }
+  }
+
+  if (cidx == -1) {
+    // Nothing found.
+    return (false);
+  }
+  // Free the spectrum_data memory for the client.
+  free_spectrum_data(client_spd_data->spectrum_data[cidx]);
+  FREE(client_spd_data->spectrum_data[cidx]);
+  if (cidx < (client_spd_data->num_clients - 1)) {
+    // We will have to shift data down.
+    for (i = (cidx + 1); i < client_spd_data->num_clients; i++) {
+      strncpy(client_spd_data->client_id[i - 1],
+	      client_spd_data->client_id[i], CLIENTIDLENGTH);
+      // Redirect the pointer.
+      client_spd_data->spectrum_data[i - 1] = client_spd_data->spectrum_data[i];
+    }
+  }
+  // Free the memory of the last string.
+  FREE(client_spd_data->client_id[client_spd_data->num_clients - 1]);
+  // Reset our counter.
+  client_spd_data->num_clients -= 1;
+  if (client_spd_data->num_clients > 0) {
+    // Reallocate the arrays.
+    REALLOC(client_spd_data->client_id, client_spd_data->num_clients);
+    REALLOC(client_spd_data->spectrum_data, client_spd_data->num_clients);
+  } else {
+    // No more clients, free everything.
+    FREE(client_spd_data->client_id);
+    FREE(client_spd_data->spectrum_data);
+  }
+
+  return (true);
 }
 
 /*!
@@ -1499,7 +1724,7 @@ int main(int argc, char *argv[]) {
   client_ampphase_options.ampphase_options = NULL;
   
   // Set up our signal handler.
-  signal(SIGINT, sighandler);
+  signal(SIGINT, rpfitsfile_server_sighandler);
   // Ignore the deaths of our children (they won't zombify).
   signal(SIGCHLD, SIG_IGN);
 
@@ -1703,7 +1928,11 @@ int main(int argc, char *argv[]) {
 		     clienttype_string, removed_id, removed_username);
 
 	      // Remove any client-specific cache data.
-	      
+	      if (removed_client_type == CLIENTTYPE_NVIS) {
+		remove_client_vis_data(&client_vis_data, removed_id);
+	      } else if (removed_client_type == CLIENTTYPE_NSPD) {
+		remove_client_spd_data(&client_spd_data, removed_id);
+	      }
               continue;
             }
             printf("Received %d bytes.\n", bytes_received);

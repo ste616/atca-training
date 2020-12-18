@@ -441,6 +441,16 @@ void remove_client(struct client_sockets *clients, SOCKET socket,
       FREE(clients->client_username);
       FREE(clients->client_type);
     }
+  } else {
+    if (client_id != NULL) {
+      client_id[0] = 0;
+    }
+    if (client_username != NULL) {
+      client_username[0] = 0;
+    }
+    if (client_type != NULL) {
+      *client_type = -1;
+    }
   }
 }
 

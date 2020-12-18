@@ -15,11 +15,6 @@
 #include "atnetworking.h"
 #include "compute.h"
 
-// The ways in which we can read data.
-#define READ_SCAN_METADATA   1<<1
-#define COMPUTE_VIS_PRODUCTS 1<<2
-#define GRAB_SPECTRUM        1<<3
-
 // Our routine definitions.
 void error_and_exit(const char *msg);
 bool buffer_read_bytes(void *data, size_t sz, char *buffer);
@@ -80,11 +75,30 @@ void unpack_syscal_data(cmp_ctx_t *cmp, struct syscal_data *a);
 void init_cmp_memory_buffer(cmp_ctx_t *cmp, cmp_mem_access_t *mem, void *buffer,
                             size_t buffer_len);
 
+/*! \def CMPERROR
+ *  \brief Output an error message relevant to a problem encountered while
+ *         working with the CMP stream, and stop execution
+ *  \param c the CMP stream
+ */
 #define CMPERROR(c) error_and_exit(cmp_strerror(c))
 
 // Some shortcut definitions for writing and reading to the
 // packing object.
 // Array size initialiser.
+/*! \def CMPW_ARRAYINIT
+ *  \brief Initialise an array in the stream by marking that an array is
+ *         starting and specifying the number of elements that will be in
+ *         the array
+ *  \param c the CMP stream
+ *  \param l the number of elements that will be written to the array
+ */
 #define CMPW_ARRAYINIT(c, l) if (!cmp_write_array(c, l)) CMPERROR(c)
 // Array size getter.
+/*! \def CMPR_ARRAYSIZE
+ *  \brief Find the array in the stream, and read how many elements to
+ *         expect to be read
+ *  \param c the CMP stream
+ *  \param l the variable which will be used to store the number of elements
+ *           the stream says will be coming from the array
+ */
 #define CMPR_ARRAYSIZE(c, l) if (!cmp_read_array(c, &l)) CMPERROR(c)
