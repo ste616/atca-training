@@ -237,6 +237,14 @@ unsigned int pack_readarray_checksize(cmp_ctx_t *cmp, unsigned int expected_leng
 }
 // Float.
 // Reader.
+/*!
+ *  \brief Read an array of floating-point values from the data stream
+ *  \param cmp the CMP stream
+ *  \param expected_length the number of elements to read from the array
+ *  \param array a pointer to the variable in which the \a expected_length values
+ *               will be stored; the variable must already be allocated to the
+ *               required size
+ */
 void pack_readarray_float(cmp_ctx_t *cmp, unsigned int expected_length,
                           float *array) {
   unsigned int i;
@@ -247,6 +255,13 @@ void pack_readarray_float(cmp_ctx_t *cmp, unsigned int expected_length,
   }
 }
 // Writer.
+/*!
+ *  \brief Write an array of floating-point values into the data stream
+ *  \param cmp the CMP stream
+ *  \param length the number of elements to write
+ *  \param array a pointer to the variable from which the \a expected_length
+ *               values will be read
+ */
 void pack_writearray_float(cmp_ctx_t *cmp, unsigned int length,
                            float *array) {
   unsigned int i;
@@ -258,6 +273,14 @@ void pack_writearray_float(cmp_ctx_t *cmp, unsigned int length,
 
 // Double.
 // Reader.
+/*!
+ *  \brief Read an array of double-precision floating-point values from the data stream
+ *  \param cmp the CMP stream
+ *  \param expected_length the number of elements to read from the array
+ *  \param array a pointer to the variable in which the \a expected_length values
+ *               will be stored; the variable must already be allocated to the
+ *               required size
+ */
 void pack_readarray_double(cmp_ctx_t *cmp, unsigned int expected_length,
                            double *array) {
   unsigned int i;
@@ -267,6 +290,13 @@ void pack_readarray_double(cmp_ctx_t *cmp, unsigned int expected_length,
   }
 }
 // Writer.
+/*!
+ *  \brief Write an array of double-precision floating-point values into the data stream
+ *  \param cmp the CMP stream
+ *  \param length the number of elements to write
+ *  \param array a pointer to the variable from which the \a expected_length
+ *               values will be read
+ */
 void pack_writearray_double(cmp_ctx_t *cmp, unsigned int length,
                             double *array) {
   unsigned int i;
@@ -278,6 +308,14 @@ void pack_writearray_double(cmp_ctx_t *cmp, unsigned int length,
 
 // Float complex.
 // Reader.
+/*!
+ *  \brief Read an array of floating-point complex values from the data stream
+ *  \param cmp the CMP stream
+ *  \param expected_length the number of elements to read from the array
+ *  \param array a pointer to the variable in which the \a expected_length values
+ *               will be stored; the variable must already be allocated to the
+ *               required size
+ */
 void pack_readarray_floatcomplex(cmp_ctx_t *cmp, unsigned int expected_length,
                                  float complex *array) {
   unsigned int i;
@@ -291,6 +329,13 @@ void pack_readarray_floatcomplex(cmp_ctx_t *cmp, unsigned int expected_length,
   }
 }
 // Writer.
+/*!
+ *  \brief Write an array of floating-point complex values into the data stream
+ *  \param cmp the CMP stream
+ *  \param length the number of elements to write
+ *  \param array a pointer to the variable from which the \a expected_length
+ *               values will be read
+ */
 void pack_writearray_floatcomplex(cmp_ctx_t *cmp, unsigned int length,
                                   float complex *array) {
   unsigned int i;
@@ -304,6 +349,14 @@ void pack_writearray_floatcomplex(cmp_ctx_t *cmp, unsigned int length,
 
 // Signed integer.
 // Reader.
+/*!
+ *  \brief Read an array of signed integer values from the data stream
+ *  \param cmp the CMP stream
+ *  \param expected_length the number of elements to read from the array
+ *  \param array a pointer to the variable in which the \a expected_length values
+ *               will be stored; the variable must already be allocated to the
+ *               required size
+ */
 void pack_readarray_sint(cmp_ctx_t *cmp, unsigned int expected_length,
                          int *array) {
   unsigned int i;
@@ -314,6 +367,13 @@ void pack_readarray_sint(cmp_ctx_t *cmp, unsigned int expected_length,
   }
 }
 // Writer.
+/*!
+ *  \brief Write an array of signed integer values into the data stream
+ *  \param cmp the CMP stream
+ *  \param length the number of elements to write
+ *  \param array a pointer to the variable from which the \a expected_length
+ *               values will be read
+ */
 void pack_writearray_sint(cmp_ctx_t *cmp, unsigned int length,
                           int *array) {
   unsigned int i;
@@ -326,6 +386,15 @@ void pack_writearray_sint(cmp_ctx_t *cmp, unsigned int length,
 
 // String.
 // Reader.
+/*!
+ *  \brief Read an array of strings from the data stream
+ *  \param cmp the CMP stream
+ *  \param expected_length the number of elements to read from the array
+ *  \param array a pointer to the variable in which the \a expected_length values
+ *               will be stored; the variable must already be allocated to the
+ *               required size, including all the memory required for each string
+ *  \param maxlength the maximum length of each string in bytes
+ */
 void pack_readarray_string(cmp_ctx_t *cmp, unsigned int expected_length,
                            char **array, long unsigned int maxlength) {
   unsigned int i;
@@ -336,6 +405,14 @@ void pack_readarray_string(cmp_ctx_t *cmp, unsigned int expected_length,
   }
 }
 // Writer.
+/*!
+ *  \brief Write an array of strings into the data stream
+ *  \param cmp the CMP stream
+ *  \param length the number of elements to write
+ *  \param array a pointer to the variable from which the \a expected_length
+ *               values will be read
+ *  \param maxlength the maximum number of characters to write from each string
+ */
 void pack_writearray_string(cmp_ctx_t *cmp, unsigned int length,
                             char **array, long unsigned int maxlength) {
   unsigned int i;
