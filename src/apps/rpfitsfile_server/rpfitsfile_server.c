@@ -1717,6 +1717,7 @@ int main(int argc, char *argv[]) {
   clients.socket = NULL;
   clients.client_id = NULL;
   clients.client_username = NULL;
+  clients.client_type = NULL;
   client_ampphase_options.num_clients = 0;
   client_ampphase_options.client_id = NULL;
   client_ampphase_options.client_username = NULL;
