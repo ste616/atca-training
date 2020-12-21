@@ -1288,6 +1288,7 @@ void data_reader(int read_type, int n_rpfits_files,
 #define RPSENDBUFSIZE 104857600
 
 bool sigint_received;
+bool sigpipe_received;
 
 // Handle signals that we receive.
 /*!
@@ -1295,12 +1296,17 @@ bool sigint_received;
  *  \param sig the signal being handled
  *
  * This handler handles the signals:
- * - SIGINT: when received, the global variable `signint_received` is set to
+ * - SIGINT: when received, the global variable `sigint_received` is set to
+ *   true
+ * - SIGPIPE: when received, the global variable `sigpipe_received` is set to
  *   true
  */
 static void rpfitsfile_server_sighandler(int sig) {
   if (sig == SIGINT) {
     sigint_received = true;
+  }
+  if (sig == SIGPIPE) {
+    sigpipe_received = true;
   }
 }
 
@@ -1727,6 +1733,7 @@ int main(int argc, char *argv[]) {
   
   // Set up our signal handler.
   signal(SIGINT, rpfitsfile_server_sighandler);
+  signal(SIGPIPE, rpfitsfile_server_sighandler);
   // Ignore the deaths of our children (they won't zombify).
   signal(SIGCHLD, SIG_IGN);
 
