@@ -2018,51 +2018,6 @@ int main(int argc, char *argv[]) {
 	      FREE(client_options);
 	      n_client_options = 0;
 
-	      if (client_added) {
-		// Now we check if another client from this user has already connected
-		// and made a request (which might have used different options) that might
-		// require recomputation. We do this here so that the immediately available
-		// data is passed quickly, and the computed data can be requested.
-		printf(" new client added %s, checking for user %s\n",
-		       client_request.client_id, client_request.client_username);
-		find_client(&clients, client_request.client_id,
-			    client_request.client_username, &n_alert_sockets,
-			    &alert_socket, &client_indices);
-		notify_required = false;
-		for (i = 0; i < n_alert_sockets; i++) {
-		  if ((alert_socket[i] != loop_i) &&
-		      (strncmp(clients.client_username[i], client_request.client_username,
-			       CLIENTIDLENGTH) == 0)) {
-		    // Check if we have options cached for this client.
-		    if (get_client_ampphase_options(&client_ampphase_options,
-						    client_request.client_id,
-						    client_request.client_username,
-						    &n_client_options, &client_options)) {
-		      notify_required = true;
-		    }
-		  }
-		}
-		// Free our memory.
-		FREE(alert_socket);
-		FREE(client_indices);
-		n_alert_sockets = 0;
-		for (i = 0; i < n_client_options; i++) {
-		  free_ampphase_options(client_options[i]);
-		  FREE(client_options[i]);
-		}
-		FREE(client_options);
-		n_client_options = 0;
-		if (notify_required) {
-		  client_response.response_type = RESPONSE_USERNAME_EXISTS;
-		  init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)RPSENDBUFSIZE);
-		  pack_responses(&cmp, &client_response);
-		  printf(" %s to client %s.\n",
-			 get_type_string(TYPE_RESPONSE, client_response.response_type),
-			 client_response.client_id);
-		  bytes_sent = socket_send_buffer(loop_i, send_buffer,
-						  cmp_mem_access_get_pos(&mem));
-		}
-	      }
             } else if (client_request.request_type == REQUEST_COMPUTE_VISDATA) {
               // We've been asked to recompute vis data with a different set of options.
               // Get the options.
@@ -2571,6 +2526,63 @@ int main(int argc, char *argv[]) {
 	      bytes_sent = 0;
 	    }
             printf(" Sent %ld bytes\n", bytes_sent);
+
+	    if (client_added) {
+	      // Now we check if another client from this user has already connected
+	      // and made a request (which might have used different options) that might
+	      // require recomputation. We do this here so that the immediately available
+	      // data is passed quickly, and the computed data can be requested.
+	      printf(" new client added %s, checking for user %s\n",
+		     client_request.client_id, client_request.client_username);
+	      find_client(&clients, client_request.client_id,
+			  client_request.client_username, &n_alert_sockets,
+			  &alert_socket, &client_indices);
+	      notify_required = false;
+	      for (i = 0; i < n_alert_sockets; i++) {
+		if ((alert_socket[i] != loop_i) &&
+		    (strncmp(clients.client_username[i], client_request.client_username,
+			     CLIENTIDLENGTH) == 0)) {
+		  // Check if we have options cached for this client.
+		  if (get_client_ampphase_options(&client_ampphase_options,
+						  client_request.client_id,
+						  client_request.client_username,
+						  &n_client_options, &client_options)) {
+		    notify_required = true;
+		  }
+		}
+	      }
+	      // Free our memory.
+	      FREE(alert_socket);
+	      FREE(client_indices);
+	      n_alert_sockets = 0;
+	      for (i = 0; i < n_client_options; i++) {
+		free_ampphase_options(client_options[i]);
+		FREE(client_options[i]);
+	      }
+	      FREE(client_options);
+	      n_client_options = 0;
+	      if (notify_required) {
+		client_response.response_type = RESPONSE_USERNAME_EXISTS;
+		strncpy(client_response.client_id, client_request.client_id,
+			CLIENTIDLENGTH);
+		if (send_buffer != NULL) {
+		  FREE(send_buffer);
+		}
+		MALLOC(send_buffer, JUSTRESPONSESIZE);
+		init_cmp_memory_buffer(&cmp, &mem, send_buffer, JUSTRESPONSESIZE);
+		pack_responses(&cmp, &client_response);
+		printf(" %s to client %s.\n",
+		       get_type_string(TYPE_RESPONSE, client_response.response_type),
+		       client_response.client_id);
+		bytes_sent = socket_send_buffer(loop_i, send_buffer,
+						cmp_mem_access_get_pos(&mem));
+		printf(" Sent %ld bytes\n", bytes_sent);
+		FREE(send_buffer);
+	      } else {
+		printf("   first connection by this user\n");
+	      }
+	    }
+	    
             // Free our memory.
             FREE(send_buffer);
             FREE(recv_buffer);
