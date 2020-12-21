@@ -28,8 +28,9 @@
 #define SERVERTYPE_CORRELATOR 2
 #define SERVERTYPE_TESTING    3
 
-#define CLIENTTYPE_NSPD 1
-#define CLIENTTYPE_NVIS 2
+#define CLIENTTYPE_NSPD  1
+#define CLIENTTYPE_NVIS  2
+#define CLIENTTYPE_CHILD 3
 
 #define TYPE_REQUEST    1
 #define TYPE_RESPONSE   2
@@ -138,6 +139,7 @@ struct requests {
 #define RESPONSE_REQUEST_USERNAME       13
 #define RESPONSE_USERREQUEST_VISDATA    14
 #define RESPONSE_USERREQUEST_SPECTRUM   15
+#define RESPONSE_USERNAME_EXISTS        16
 
 /*! \struct responses
  *  \brief Structure to use when responding to a request
@@ -209,7 +211,7 @@ const char *get_servertype_string(int type);
 void find_client(struct client_sockets *clients,
 		 char *client_id, char *client_username,
 		 int *n_clients, SOCKET **client_sockets, int **indices);
-void add_client(struct client_sockets *clients, char *client_id,
+bool add_client(struct client_sockets *clients, char *client_id,
 		char *client_username, int client_type, SOCKET socket);
 void modify_client(struct client_sockets *clients, char *client_id,
 		   char *client_username, SOCKET socket);

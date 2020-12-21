@@ -970,7 +970,8 @@ int main(int argc, char *argv[]) {
         /* snprintf(mesgout[0], SPDBUFSIZE, " Received information about %d cycles.\n", */
         /*          n_cycles); */
         /* readline_print_messages(nmesg, mesgout); */
-      } else if (server_response.response_type == RESPONSE_USERREQUEST_VISDATA) {
+      } else if ((server_response.response_type == RESPONSE_USERREQUEST_VISDATA) ||
+		 (server_response.response_type == RESPONSE_USERNAME_EXISTS)) {
 	// Another NVIS client the same user is controlling has requested data with
 	// different options, so we re-request the same data we're viewing now but
 	// with those same new options.

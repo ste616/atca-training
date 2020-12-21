@@ -193,7 +193,7 @@ const char *get_type_string(int type, int id) {
   // Get a string representation of the type of request or response,
   // specified by type=TYPE_REQUEST or TYPE_RESPONSE, and
   // id being one of the definitions in the header.
-  int max_request = 13, max_response = 16;
+  int max_request = 13, max_response = 17;
   const char* const request_strings[] = { "",
                                           "REQUEST_CURRENT_SPECTRUM",
                                           "REQUEST_CURRENT_VISDATA",
@@ -223,7 +223,8 @@ const char *get_type_string(int type, int id) {
 					   "RESPONSE_CYCLE_TIMES",
 					   "RESPONSE_REQUEST_USERNAME",
 					   "RESPONSE_USERREQUEST_VISDATA",
-					   "RESPONSE_USERREQUEST_SPECTRUM"
+					   "RESPONSE_USERREQUEST_SPECTRUM",
+					   "RESPONSE_USERNAME_EXISTS"
   };
 
   if ((type == TYPE_REQUEST) && (id >= 0) && (id < max_request)) {
@@ -319,6 +320,8 @@ void find_client(struct client_sockets *clients,
  *  \param client_username the username string supplied by the client
  *  \param client_type the type of client, one of the CLIENTTYPE_* magic numbers
  *  \param socket the socket number that the client has connected on
+ *  \return true if the client wasn't on our list and has been added, false
+ *          otherwise
  *
  * This routine checks if the client has already been connected, but only
  * while using the ID, since multiple clients can connect with the same
@@ -326,7 +329,7 @@ void find_client(struct client_sockets *clients,
  * you need to change details about an already connected client, use
  * `modify_client`.
  */
-void add_client(struct client_sockets *clients, char *client_id,
+bool add_client(struct client_sockets *clients, char *client_id,
 		char *client_username, int client_type, SOCKET socket) {
   int n, n_check;
   SOCKET *check = NULL;
@@ -348,8 +351,10 @@ void add_client(struct client_sockets *clients, char *client_id,
     clients->client_type[n - 1] = client_type;
 
     clients->num_sockets = n;
+    return (true);
   }
   FREE(check);
+  return (false);
 }
 
 /*!
@@ -485,6 +490,9 @@ void client_type_string(int client_type, char *type_string) {
     break;
   case CLIENTTYPE_NVIS:
     snprintf(type_string, 5, "NVIS");
+    break;
+  case CLIENTTYPE_CHILD:
+    snprintf(type_string, 6, "CHILD");
     break;
   default:
     snprintf(type_string, 8, "UNKNOWN");

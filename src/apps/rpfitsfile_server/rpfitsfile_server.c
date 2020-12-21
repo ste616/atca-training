@@ -1364,7 +1364,7 @@ bool remove_client_vis_data(struct client_vis_data *client_vis_data,
     return (false);
   }
   // Free the vis_data memory for the client.
-  free_vis_data(client_vis_data->vis_data[cidx]);
+  //free_vis_data(client_vis_data->vis_data[cidx]);
   // And the pointer memory too.
   FREE(client_vis_data->vis_data[cidx]);
   if (cidx < (client_vis_data->num_clients - 1)) {
@@ -1453,7 +1453,7 @@ bool remove_client_spd_data(struct client_spd_data *client_spd_data,
     return (false);
   }
   // Free the spectrum_data memory for the client.
-  free_spectrum_data(client_spd_data->spectrum_data[cidx]);
+  //free_spectrum_data(client_spd_data->spectrum_data[cidx]);
   FREE(client_spd_data->spectrum_data[cidx]);
   if (cidx < (client_spd_data->num_clients - 1)) {
     // We will have to shift data down.
@@ -1643,6 +1643,7 @@ int main(int argc, char *argv[]) {
   int removed_client_type;
   bool pointer_found = false, vis_cache_updated = false, notify_required = false;
   bool spd_cache_updated = false, outside_mjd_range = false, succ = false;
+  bool client_added = false;
   double mjd_grab, earliest_mjd, latest_mjd, mjd_cycletime;
   double *all_cycle_mjd = NULL;
   struct rpfits_file_information **info_rpfits_files = NULL;
@@ -1946,9 +1947,9 @@ int main(int argc, char *argv[]) {
                    get_type_string(TYPE_REQUEST, client_request.request_type),
                    clienttype_string, client_request.client_id);
             // Add this client to our list.
-            add_client(&clients, client_request.client_id,
-		       client_request.client_username,
-		       client_request.client_type, loop_i);
+            client_added = add_client(&clients, client_request.client_id,
+				      client_request.client_username,
+				      client_request.client_type, loop_i);
             if ((client_request.request_type == REQUEST_CURRENT_SPECTRUM) ||
                 (client_request.request_type == REQUEST_MJD_SPECTRUM) ||
                 (client_request.request_type == REQUEST_CURRENT_VISDATA) ||
@@ -2008,7 +2009,7 @@ int main(int argc, char *argv[]) {
               // Send this data.
               printf(" %s to client %s.\n",
                      get_type_string(TYPE_RESPONSE, client_response.response_type),
-                     client_request.client_id);
+                     client_response.client_id);
               bytes_sent = socket_send_buffer(loop_i, send_buffer, cmp_mem_access_get_pos(&mem));
 	      for (i = 0; i < n_client_options; i++) {
 		free_ampphase_options(client_options[i]);
@@ -2016,6 +2017,52 @@ int main(int argc, char *argv[]) {
 	      }
 	      FREE(client_options);
 	      n_client_options = 0;
+
+	      if (client_added) {
+		// Now we check if another client from this user has already connected
+		// and made a request (which might have used different options) that might
+		// require recomputation. We do this here so that the immediately available
+		// data is passed quickly, and the computed data can be requested.
+		printf(" new client added %s, checking for user %s\n",
+		       client_request.client_id, client_request.client_username);
+		find_client(&clients, client_request.client_id,
+			    client_request.client_username, &n_alert_sockets,
+			    &alert_socket, &client_indices);
+		notify_required = false;
+		for (i = 0; i < n_alert_sockets; i++) {
+		  if ((alert_socket[i] != loop_i) &&
+		      (strncmp(clients.client_username[i], client_request.client_username,
+			       CLIENTIDLENGTH) == 0)) {
+		    // Check if we have options cached for this client.
+		    if (get_client_ampphase_options(&client_ampphase_options,
+						    client_request.client_id,
+						    client_request.client_username,
+						    &n_client_options, &client_options)) {
+		      notify_required = true;
+		    }
+		  }
+		}
+		// Free our memory.
+		FREE(alert_socket);
+		FREE(client_indices);
+		n_alert_sockets = 0;
+		for (i = 0; i < n_client_options; i++) {
+		  free_ampphase_options(client_options[i]);
+		  FREE(client_options[i]);
+		}
+		FREE(client_options);
+		n_client_options = 0;
+		if (notify_required) {
+		  client_response.response_type = RESPONSE_USERNAME_EXISTS;
+		  init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)RPSENDBUFSIZE);
+		  pack_responses(&cmp, &client_response);
+		  printf(" %s to client %s.\n",
+			 get_type_string(TYPE_RESPONSE, client_response.response_type),
+			 client_response.client_id);
+		  bytes_sent = socket_send_buffer(loop_i, send_buffer,
+						  cmp_mem_access_get_pos(&mem));
+		}
+	      }
             } else if (client_request.request_type == REQUEST_COMPUTE_VISDATA) {
               // We've been asked to recompute vis data with a different set of options.
               // Get the options.
@@ -2319,6 +2366,7 @@ int main(int argc, char *argv[]) {
                   strncpy(child_request.client_id, client_request.client_id, CLIENTIDLENGTH);
 		  strncpy(child_request.client_username, client_request.client_username,
 			  CLIENTIDLENGTH);
+		  child_request.client_type = CLIENTTYPE_CHILD;
                   MALLOC(child_send_buffer, RPSENDBUFSIZE);
                   init_cmp_memory_buffer(&child_cmp, &child_mem, child_send_buffer,
                                          (size_t)RPSENDBUFSIZE);
