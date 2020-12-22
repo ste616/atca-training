@@ -1960,6 +1960,14 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
                 }
               }
             }
+	    // Free the memory from the systemp strings.
+	    for (j = 0; j < compiled_tsys_data->num_ants; j++) {
+	      for (k = 0; k < tsys_num_ifs; k++) {
+		FREE(systemp_strings[j][k]);
+	      }
+	      FREE(systemp_strings[j]);
+	    }
+	    FREE(systemp_strings);
             // Reset back to the left and plot some weather parameters.
             information_x_pos = 0.01;
             snprintf(information_text, BUFSIZE, "T=%.1f C P=%.1f hPa H=%.1f %%",

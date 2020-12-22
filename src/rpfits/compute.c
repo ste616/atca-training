@@ -2579,16 +2579,21 @@ void chanaverage_ampphase(struct ampphase *ampphase, struct ampphase *avg_amppha
 	  }
 	} else {
 	  for (l = 0; l < averaging; l++) {
-	    // Easy to use all the channels regardless of the flagging.
-	    median_array_amplitude[n_points] = ampphase->amplitude[i][j][k + l];
-	    median_array_phase[n_points] = ampphase->phase[i][j][k + l];
-	    median_array_raw[n_points] = ampphase->raw[i][j][k + l];
-	    median_array_channel[n_points] = ampphase->channel[k + l];
-	    median_array_frequency[n_points] = ampphase->frequency[k + l];
-	    n_points++;
+	    if ((k + l) < ampphase->nchannels) {
+	      // Easy to use all the channels regardless of the flagging.
+	      median_array_amplitude[n_points] = ampphase->amplitude[i][j][k + l];
+	      median_array_phase[n_points] = ampphase->phase[i][j][k + l];
+	      median_array_raw[n_points] = ampphase->raw[i][j][k + l];
+	      median_array_channel[n_points] = ampphase->channel[k + l];
+	      median_array_frequency[n_points] = ampphase->frequency[k + l];
+	      n_points++;
+	    } else {
+	      break;
+	    }
 	  }
 	  // Find the unflagged channels required.
-	  while ((ampphase->f_channel[i][j][unflagged_index] >= k) &&
+	  while ((unflagged_index < ampphase->f_nchannels[i][j]) &&
+		 (ampphase->f_channel[i][j][unflagged_index] >= k) &&
 		 (ampphase->f_channel[i][j][unflagged_index] < (k + l))) {
 	    median_unflagged_amplitude[n_unflagged_points] =
 	      ampphase->f_amplitude[i][j][unflagged_index];
@@ -2758,5 +2763,16 @@ void chanaverage_ampphase(struct ampphase *ampphase, struct ampphase *avg_amppha
       }
     }
   }
-				 
+
+  // Free the temporary arrays we made for median averaging.
+  FREE(median_array_amplitude);
+  FREE(median_array_phase);
+  FREE(median_array_raw);
+  FREE(median_array_channel);
+  FREE(median_array_frequency);
+  FREE(median_unflagged_amplitude);
+  FREE(median_unflagged_phase);
+  FREE(median_unflagged_raw);
+  FREE(median_unflagged_channel);
+  FREE(median_unflagged_frequency);
 }

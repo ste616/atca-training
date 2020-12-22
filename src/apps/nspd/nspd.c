@@ -580,6 +580,7 @@ int main(int argc, char *argv[]) {
   fd_set watchset, reads;
   int i, r, bytes_received, max_socket = -1, nmesg = 0, n_cycles = 0;
   int nlistlines = 0, mjd_year, mjd_month, mjd_day, min_dmjd_idx = -1;
+  int pending_action = -1;
   float mjd_utseconds;
   size_t recv_buffer_length;
   struct requests server_request;
@@ -723,9 +724,25 @@ int main(int argc, char *argv[]) {
       FREE(tsys_data);
     }
 
+    if ((pending_action >= 0) && (n_cycles > 0)) {
+      // Go back to request the new time.
+      action_required = pending_action;
+      pending_action = -1;
+    }
+    
     if ((action_required & ACTION_CYCLE_FORWARD) ||
         (action_required & ACTION_CYCLE_BACKWARD) ||
         (action_required & ACTION_TIME_REQUEST)) {
+      if (n_cycles <= 0) {
+	if (action_required & ACTION_CYCLE_FORWARD) {
+	  pending_action = ACTION_CYCLE_FORWARD;
+	} else if (action_required & ACTION_CYCLE_BACKWARD) {
+	  pending_action = ACTION_CYCLE_BACKWARD;
+	} else if (action_required & ACTION_TIME_REQUEST) {
+	  pending_action = ACTION_TIME_REQUEST;
+	}
+	action_required -= pending_action;
+      }
       // Ask for different data.
       if ((action_required & ACTION_CYCLE_FORWARD) ||
           (action_required & ACTION_CYCLE_BACKWARD)) {
@@ -910,6 +927,8 @@ int main(int argc, char *argv[]) {
 	/* snprintf(mesgout[nmesg++], SPDBUFSIZE, "OPTIONS RECEIVED:\n"); */
 	/* print_options_set(n_ampphase_options, ampphase_options, mesgout[nmesg++], */
 	/* 		  SPDBUFSIZE); */
+	// Free any old spectrum data.
+	free_spectrum_data(&spectrum_data);
 	// And then get the spectrum data.
         unpack_spectrum_data(&cmp, &spectrum_data);
 	// Find the options relevant to the displayed data.

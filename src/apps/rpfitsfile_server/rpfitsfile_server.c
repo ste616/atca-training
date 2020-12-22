@@ -2291,6 +2291,7 @@ int main(int argc, char *argv[]) {
 						   &n_client_options, &client_options);
 		if (succ == false) {
 		  // No good, so we use the default options.
+		  printf(" Search for user options failed, switching to DEFAULT\n");
 		  get_client_ampphase_options(&client_ampphase_options,
 					      "DEFAULT", "", &n_client_options,
 					      &client_options);

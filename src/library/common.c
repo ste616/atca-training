@@ -296,6 +296,8 @@ bool string_to_seconds(char *s, float *seconds) {
       return false;
     }
   }
+
+  FREE(tels);
   
   return true;
 }

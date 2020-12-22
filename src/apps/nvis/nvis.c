@@ -1117,6 +1117,12 @@ int main(int argc, char *argv[]) {
 	  CALLOC(ampphase_options[i], 1);
 	  unpack_ampphase_options(&cmp, ampphase_options[i]);
 	}
+	// Before we get the new vis data, free the old.
+	for (i = 0; i < vis_data.nviscycles; i++) {
+	  free_scan_header_data(vis_data.header_data[i]);
+	  FREE(vis_data.header_data[i]);
+	}
+	free_vis_data(&vis_data);
         unpack_vis_data(&cmp, &vis_data);
         action_required = ACTION_NEW_DATA_RECEIVED;
 	/* nmesg = 0; */
@@ -1185,4 +1191,9 @@ int main(int argc, char *argv[]) {
   }
   FREE(visband);
   FREE(yaxis_type);
+  for (i = 0; i < n_ampphase_options; i++) {
+    free_ampphase_options(ampphase_options[i]);
+    FREE(ampphase_options[i]);
+  }
+  FREE(ampphase_options);
 }
