@@ -1478,8 +1478,8 @@ int ampphase_average(struct scan_header_data *scan_header_data,
                 (median_array_amplitude[n_points / 2] +
                  median_array_amplitude[n_points / 2 + 1]) / 2;
               (*vis_quantities)->phase[i][k] =
-                (median_array_amplitude[n_points / 2] +
-                 median_array_amplitude[n_points / 2 + 1]) / 2;
+                (median_array_phase[n_points / 2] +
+                 median_array_phase[n_points / 2 + 1]) / 2;
             }
           } else if (band_options->averaging_method[ampphase->window] & AVERAGETYPE_VECTOR) {
             qsort(median_complex, n_points, sizeof(float complex), cmpfunc_complex);
@@ -2643,12 +2643,12 @@ void chanaverage_ampphase(struct ampphase *ampphase, struct ampphase *avg_amppha
 		avg_ampphase->amplitude[i][j][chan_index] =
 		  fmedianf(median_array_amplitude, n_points);
 		avg_ampphase->phase[i][j][chan_index] =
-		  fmedianf(median_array_amplitude, n_points);
+		  fmedianf(median_array_phase, n_points);
 	      } else if (averaging_type & AVERAGETYPE_VECTOR) {
 		avg_ampphase->amplitude[i][j][chan_index] =
 		  cabsf(avg_ampphase->raw[i][j][chan_index]);
 		avg_ampphase->phase[i][j][chan_index] =
-		cargf(avg_ampphase->raw[i][j][chan_index]);
+		  cargf(avg_ampphase->raw[i][j][chan_index]);
 	      }
 	    }
 	  }
