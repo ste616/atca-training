@@ -929,6 +929,8 @@ int main(int argc, char *argv[]) {
 	/* 		  SPDBUFSIZE); */
 	// Free any old spectrum data.
 	free_spectrum_data(&spectrum_data);
+	free_scan_header_data(spectrum_data.header_data);
+	FREE(spectrum_data.header_data);
 	// And then get the spectrum data.
         unpack_spectrum_data(&cmp, &spectrum_data);
 	// Find the options relevant to the displayed data.
@@ -1013,6 +1015,9 @@ int main(int argc, char *argv[]) {
 
   // Release all the memory.
   free_spectrum_data(&spectrum_data);
+  free_scan_header_data(spectrum_data.header_data);
+  FREE(spectrum_data.header_data);
+  FREE(all_cycle_mjd);
   for (i = 0; i < MAX_N_MESSAGES; i++) {
     FREE(mesgout[i]);
   }
