@@ -201,8 +201,9 @@ static void interpret_command(char *line) {
   int nels = -1, i, j, k, pols_specified, if_no, iarg, bidx;
   int if_num_spec[MAXIFS], yaxis_change_type, array_change_spec;
   int flag_change, flag_change_mode, change_nxpanels, change_nypanels;
+  int min_chan, max_chan, drange_swap;
   bool pols_selected = false, if_selected = false, range_valid = false;
-  bool mjdr_timeparsed, decorations_changed = false;
+  bool mjdr_timeparsed, decorations_changed = false, chan_range_valid = false;
   float range_limit_low, range_limit_high, range_swap, mjdr_seconds;
   double mjdr_base;
   
@@ -280,6 +281,57 @@ static void interpret_command(char *line) {
         }
         action_required = ACTION_REFRESH_PLOT;
       }
+    } else if (minmatch("channel", line_els[0], 2)) {
+      // We've been asked to change channel range.
+      if (nels == 1) {
+	// Reset all channel ranges back to their defaults.
+	for (i = 0; i < MAXIFS; i++) {
+	  spd_plotcontrols.channel_range_limit[i] = 0;
+	}
+	action_required = ACTION_REFRESH_PLOT;
+      } else if ((nels == 3) || (nels == 4)) {
+	// Change the channel range of some IFs.
+	cvt = NULL;
+	chan_range_valid = true;
+	min_chan = strtod(line_els[nels - 2], &cvt);
+	if ((cvt == line_els[nels - 2]) || (errno == ERANGE)) {
+	  chan_range_valid = false;
+	}
+	cvt = NULL;
+	max_chan = strtod(line_els[nels - 1], &cvt);
+	if ((cvt == line_els[nels - 1]) || (errno == ERANGE)) {
+	  chan_range_valid = false;
+	}
+	if (chan_range_valid == true) {
+	  if (min_chan > max_chan) {
+	    // Silly user, swap the numbers for them.
+	    drange_swap = min_chan;
+	    min_chan = max_chan;
+	    max_chan = drange_swap;
+	  }
+	  if (nels == 3) {
+	    // Change all channel ranges for the currently displayed IFs.
+	    for (i = 0; i < MAXIFS; i++) {
+	      if (spd_plotcontrols.if_num_spec[i] == 1) {
+		spd_plotcontrols.channel_range_limit[i] = 1;
+		spd_plotcontrols.channel_range_min[i] = min_chan;
+		spd_plotcontrols.channel_range_max[i] = max_chan;
+		action_required = ACTION_REFRESH_PLOT;
+	      }
+	    }
+	  } else if (nels == 4) {
+	    // We've been given an IF to change, so we find it first.
+	    if_no = find_if_name(spectrum_data.header_data, line_els[1]);
+	    if ((if_no >= 0) && (if_no < MAXIFS)) {
+	      spd_plotcontrols.channel_range_limit[if_no - 1] = 1;
+	      spd_plotcontrols.channel_range_min[if_no - 1] = min_chan;
+	      spd_plotcontrols.channel_range_max[if_no - 1] = max_chan;
+	      action_required = ACTION_REFRESH_PLOT;
+	    }
+	  }
+	}
+      }
+    
     } else if ((strcasecmp(line_els[0], "x") == 0) &&
                (nels == 1)) {
       // Change between frequency and channel X axes.
@@ -555,14 +607,25 @@ void reconcile_spd_plotcontrols(struct spectrum_data *spectrum_data,
         data_plotcontrols->if_num_spec[i] = 1;
       }
     }
+    // Also, set which channels to plot.
+    data_plotcontrols->channel_range_limit[i] = 0;
+    if (user_plotcontrols->channel_range_limit[i]) {
+      // The user wants to limit the channels.
+      if (i < spectrum_data->num_ifs) {
+	// This IF is in the data.
+	data_plotcontrols->channel_range_limit[i] = 1;
+	STRUCTCOPY(user_plotcontrols, data_plotcontrols, channel_range_min[i]);
+	STRUCTCOPY(user_plotcontrols, data_plotcontrols, channel_range_max[i]);
+      }
+    }
   }
 
   // Copy over the other parameters.
   STRUCTCOPY(user_plotcontrols, data_plotcontrols, plot_options);
   STRUCTCOPY(user_plotcontrols, data_plotcontrols, plot_flags);
-  STRUCTCOPY(user_plotcontrols, data_plotcontrols, channel_range_limit);
-  STRUCTCOPY(user_plotcontrols, data_plotcontrols, channel_range_min);
-  STRUCTCOPY(user_plotcontrols, data_plotcontrols, channel_range_max);
+  /* STRUCTCOPY(user_plotcontrols, data_plotcontrols, channel_range_limit); */
+  /* STRUCTCOPY(user_plotcontrols, data_plotcontrols, channel_range_min); */
+  /* STRUCTCOPY(user_plotcontrols, data_plotcontrols, channel_range_max); */
   STRUCTCOPY(user_plotcontrols, data_plotcontrols, yaxis_range_limit);
   STRUCTCOPY(user_plotcontrols, data_plotcontrols, yaxis_range_min);
   STRUCTCOPY(user_plotcontrols, data_plotcontrols, yaxis_range_max);

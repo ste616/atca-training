@@ -192,10 +192,10 @@ void init_spd_plotcontrols(struct spd_plotcontrols *plotcontrols,
   // Work out the number of pols.
   count_polarisations(plotcontrols);
   
-  plotcontrols->channel_range_limit = NO;
   plotcontrols->yaxis_range_limit = NO;
   for (i = 0; i < MAXIFS; i++) {
     plotcontrols->if_num_spec[i] = 1;
+    plotcontrols->channel_range_limit[i] = NO;
   }
   plotcontrols->array_spec = 0;
   for (i = 1; i <= MAXANTS; i++) {
@@ -607,7 +607,8 @@ void plotnum_to_xy(struct panelspec *panelspec, int plotnum,
 
 void plotpanel_minmax(struct ampphase **plot_ampphase,
 		      struct spd_plotcontrols *plot_controls,
-		      int plot_baseline_idx, int npols, int *polidx,
+		      int plot_baseline_idx, int plot_if_idx,
+		      int npols, int *polidx,
 		      float *plotmin_x, float *plotmax_x,
 		      float *plotmin_y, float *plotmax_y) {
   // This routine does the computation required to work out what the
@@ -621,32 +622,33 @@ void plotpanel_minmax(struct ampphase **plot_ampphase,
   if (plot_controls->plot_options & PLOT_CHANNEL) {
     *plotmin_x = 0;
     *plotmax_x = plot_ampphase[0]->nchannels;
-    if (plot_controls->channel_range_limit == YES) {
-      if ((plot_controls->channel_range_min >= 0) &&
-          (plot_controls->channel_range_min < plot_ampphase[0]->nchannels)) {
-        *plotmin_x = plot_controls->channel_range_min;
+    if (plot_controls->channel_range_limit[plot_if_idx] == YES) {
+      if ((plot_controls->channel_range_min[plot_if_idx] >= 0) &&
+          (plot_controls->channel_range_min[plot_if_idx] < plot_ampphase[0]->nchannels)) {
+        *plotmin_x = plot_controls->channel_range_min[plot_if_idx];
       }
-      if ((plot_controls->channel_range_max > 0) &&
-          (plot_controls->channel_range_max < plot_ampphase[0]->nchannels) &&
-          (plot_controls->channel_range_max > *plotmin_x)) {
-        *plotmax_x = plot_controls->channel_range_max;
+      if ((plot_controls->channel_range_max[plot_if_idx] > 0) &&
+          (plot_controls->channel_range_max[plot_if_idx] < plot_ampphase[0]->nchannels) &&
+          (plot_controls->channel_range_max[plot_if_idx] > *plotmin_x)) {
+        *plotmax_x = plot_controls->channel_range_max[plot_if_idx];
       }
     }
   } else if (plot_controls->plot_options & PLOT_FREQUENCY) {
     *plotmin_x = plot_ampphase[0]->frequency[0];
     *plotmax_x = plot_ampphase[0]->frequency
       [plot_ampphase[0]->nchannels - 1];
-    if (plot_controls->channel_range_limit == YES) {
-      if ((plot_controls->channel_range_min >= 0) &&
-          (plot_controls->channel_range_min < plot_ampphase[0]->nchannels)) {
+    if (plot_controls->channel_range_limit[plot_if_idx] == YES) {
+      if ((plot_controls->channel_range_min[plot_if_idx] >= 0) &&
+          (plot_controls->channel_range_min[plot_if_idx] < plot_ampphase[0]->nchannels)) {
         *plotmin_x = plot_ampphase[0]->frequency
-          [plot_controls->channel_range_min];
+          [plot_controls->channel_range_min[plot_if_idx]];
       }
-      if ((plot_controls->channel_range_max > 0) &&
-          (plot_controls->channel_range_max < plot_ampphase[0]->nchannels) &&
-          (plot_controls->channel_range_max > plot_controls->channel_range_min)) {
+      if ((plot_controls->channel_range_max[plot_if_idx] > 0) &&
+          (plot_controls->channel_range_max[plot_if_idx] < plot_ampphase[0]->nchannels) &&
+          (plot_controls->channel_range_max[plot_if_idx] >
+	   plot_controls->channel_range_min[plot_if_idx])) {
         *plotmax_x = plot_ampphase[0]->frequency
-          [plot_controls->channel_range_max];
+          [plot_controls->channel_range_max[plot_if_idx]];
       }
     }
     // Check for frequency inversion.
@@ -2008,7 +2010,7 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
           snprintf(ptitle, BIGBUFSIZE, "%s: %s BSL%d%d",
                    ptype, ftype, ant1, ant2);
           
-          plotpanel_minmax(ampphase_if, plot_controls, i, npols, polidx,
+          plotpanel_minmax(ampphase_if, plot_controls, i, idxif, npols, polidx,
                            &xaxis_min, &xaxis_max, &yaxis_min, &yaxis_max);
           /* printf("max/max x = %.6f / %.6f, y = %.6f / %.6f\n", */
           /* 	 xaxis_min, xaxis_max, yaxis_min, yaxis_max); */

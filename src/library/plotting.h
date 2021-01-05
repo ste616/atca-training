@@ -105,27 +105,116 @@ struct panelspec {
 
 // This structure holds all the details about user plot control
 // for an SPD-type plot.
+/*! \struct spd_plotcontrols
+ *  \brief Details about how to plot an SPD-type plot
+ */
 struct spd_plotcontrols {
   // General plot options.
+  /*! \var plot_options
+   *  \brief Flags controlling what to plot on each axis and the polarisations
+   *
+   * This is a bitwise OR combination of the PLOT_* magic numbers
+   * defined in this header.
+   */
   long int plot_options;
+  /*! \var plot_flags
+   *  \brief Flags controlling which polarisations and products are available
+   *         to be plotted
+   *
+   * This is a bitwise OR combination of PLOT_FLAG_* magic numbers defined
+   * in this header.
+   */
   long int plot_flags;
   // Has the user specified a channel range to look at.
-  int channel_range_limit;
-  int channel_range_min;
-  int channel_range_max;
+  /*! \var channel_range_limit
+   *  \brief An array specifying whether a particular IF's x-axis range
+   *         should be limited
+   *
+   * This array has length MAXIFS, which is the maximum number of IFs which
+   * can be supported in the data. Each index in this array corresponds to the
+   * same index in the array of ampphase data, and as such is generally detached
+   * from any definite correspondence betwene index and actual IF number.
+   * If this index is set to 1, the plotting routine will limit the channel range
+   * plotted for that IF, according to the values at the same index in
+   * channel_range_min and channel_range_max.
+   */
+  int channel_range_limit[MAXIFS];
+  /*! \var channel_range_min
+   *  \brief If an index of channel_range_limit is set to YES, the value of
+   *         this array at the same index will be used as the minimum channel
+   *         plotted of each panel's y-axis for that corresponding IF
+   */
+  int channel_range_min[MAXIFS];
+  /*! \var channel_range_max
+   *  \brief If an index of channel_range_limit is set to YES, the value of
+   *         this array at the same index will be used as the maximum channel
+   *         plotted of each panel's y-axis for that corresponding IF
+   */
+  int channel_range_max[MAXIFS];
   // Has the user specified a y-axis range.
+  /*! \var yaxis_range_limit
+   *  \brief An indicator of whether the y-range of each plot should be limited
+   *         by the yaxis_range_min and yaxis_range_max settings
+   *
+   * This variable should be set to either YES or NO, indicating whether the
+   * yaxis_range_* variables should be used.
+   */
   int yaxis_range_limit;
+  /*! \var yaxis_range_min
+   *  \brief If yaxis_range_limit is set to YES, this value will be used as
+   *         the minimum value of each panel's y-axis
+   */
   float yaxis_range_min;
+  /*! \var yaxis_range_max
+   *  \brief If yaxis_range_limit is set to YES, this value will be used as
+   *         the maximum value of each panel's y-axis
+   */
   float yaxis_range_max;
   // The IF numbers to plot.
+  /*! \var if_num_spec
+   *  \brief An array specifying which IFs to consider plotting
+   *
+   * This array has length MAXIFS, which is the maximum number of IFs which
+   * can be supported in the data. Each index in this array corresponds to the
+   * same index in the array of ampphase data, and as such is generally
+   * detached from any definite correspondence between index and actual IF number.
+   * If this index is set to 1, the plotting routine will try to plot it if
+   * there is space.
+   */
   int if_num_spec[MAXIFS];
   // The antennas to plot.
+  /*! \var array_spec
+   *  \brief A bitwise OR combination of antenna numbers to plot
+   *
+   * This is a single number indicating which antennas should be made
+   * available to plot. Each antenna is represented by a 1<<ant number
+   * (where ant starts at 1) in the bitwise OR. No antenna greater than
+   * MAXANTS can be plotted.
+   */
   int array_spec;
   // The number of polarisations to plot.
+  /*! \var npols
+   *  \brief The number of polarisations specified in the plot_options
+   *         variable
+   *
+   * This variable does not need to be set by the user; it will be computed
+   * by the count_polarisations routine during the plotting process.
+   */
   int npols;
   // Whether to wait for user input when changing plots.
+  /*! \var interactive
+   *  \brief Indicator of whether the plot should wait for user input before
+   *         refreshing the plot; YES or NO
+   *
+   * This indicator determines whether the SPD plot should stop after all
+   * the panels have been filled (YES), or if it should automatically go to the
+   * next page (NO).
+   */
   int interactive;
   // The PGPLOT device number used.
+  /*! \var pgplot_device
+   *  \brief The PGPLOT device number used for the plot
+   */
   int pgplot_device;
 };
 
@@ -226,7 +315,8 @@ void changepanel(int x, int y, struct panelspec *panelspec);
 void plotnum_to_xy(struct panelspec *panelspec, int plotnum, int *px, int *py);
 void plotpanel_minmax(struct ampphase **plot_ampphase,
                       struct spd_plotcontrols *plot_controls,
-                      int plot_baseline_idx, int npols, int *polidx,
+                      int plot_baseline_idx, int plot_if_idx,
+		      int npols, int *polidx,
                       float *plotmin_x, float *plotmax_x,
                       float *plotmin_y, float *plotmax_y);
 void add_vis_line(struct vis_line ***vis_lines, int *n_vis_lines,
