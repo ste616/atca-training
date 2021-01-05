@@ -679,6 +679,10 @@ int main(int argc, char *argv[]) {
   action_required = 0;
   while(true) {
     reads = watchset;
+    /* nmesg = 0; */
+    /* snprintf(mesgout[nmesg++], SPDBUFSIZE, " ACTION_REQUIRED = %d  PENDING_ACTION = %d\n", */
+    /* 	     action_required, pending_action); */
+    /* readline_print_messages(nmesg, mesgout); */
     if (action_required & ACTION_NEW_DATA_RECEIVED) {
       // Adjust the number of pols.
       spd_plotcontrols.npols = spectrum_data.num_pols;
@@ -726,7 +730,7 @@ int main(int argc, char *argv[]) {
 
     if ((pending_action >= 0) && (n_cycles > 0)) {
       // Go back to request the new time.
-      action_required = pending_action;
+      action_required |= pending_action;
       pending_action = -1;
     }
     
@@ -740,6 +744,9 @@ int main(int argc, char *argv[]) {
 	  pending_action = ACTION_CYCLE_BACKWARD;
 	} else if (action_required & ACTION_TIME_REQUEST) {
 	  pending_action = ACTION_TIME_REQUEST;
+	}
+	if (action_required & ACTION_OMIT_OPTIONS) {
+	  pending_action |= ACTION_OMIT_OPTIONS;
 	}
 	action_required -= pending_action;
       }

@@ -1995,6 +1995,11 @@ int main(int argc, char *argv[]) {
 		  // Revert to defaults.
 		  get_client_ampphase_options(&client_ampphase_options, "DEFAULT", "",
 					      &n_client_options, &client_options);
+		  printf("DDDD Using DEFAULT options\n");
+		  print_options_set(n_client_options, client_options, NULL, 0);
+		} else {
+		  printf("DDDD Using cached options\n");
+		  print_options_set(n_client_options, client_options, NULL, 0);
 		}
 	      }
 	      pack_write_sint(&cmp, n_client_options);
@@ -2035,6 +2040,8 @@ int main(int argc, char *argv[]) {
 		  CALLOC(client_options[i], 1);
 		  unpack_ampphase_options(&cmp, client_options[i]);
 		}
+		printf("DDDD Client supplied options\n");
+		print_options_set(n_client_options, client_options, NULL, 0);
 		// Store all the options in our cache.
 		add_client_ampphase_options(&client_ampphase_options,
 					    client_request.client_id,
@@ -2053,6 +2060,11 @@ int main(int argc, char *argv[]) {
 		  get_client_ampphase_options(&client_ampphase_options,
 					      "DEFAULT", "", &n_client_options,
 					      &client_options);
+		  printf("DDDD Using DEFAULT options\n");
+		  print_options_set(n_client_options, client_options, NULL, 0);
+		} else {
+		  printf("DDDD Using cached options\n");
+		  print_options_set(n_client_options, client_options, NULL, 0);
 		}
 		// No notification will be necessary.
 		notify_required = false;
@@ -2276,6 +2288,8 @@ int main(int argc, char *argv[]) {
 		  CALLOC(client_options[i], 1);
 		  unpack_ampphase_options(&cmp, client_options[i]);
 		}
+		printf("DDDD Client supplied options\n");
+		print_options_set(n_client_options, client_options, NULL, 0);
 		// Store all the options in our cache.
 		add_client_ampphase_options(&client_ampphase_options,
 					    client_request.client_id,
@@ -2295,6 +2309,11 @@ int main(int argc, char *argv[]) {
 		  get_client_ampphase_options(&client_ampphase_options,
 					      "DEFAULT", "", &n_client_options,
 					      &client_options);
+		  printf("DDDD Using DEFAULT options\n");
+		  print_options_set(n_client_options, client_options, NULL, 0);
+		} else {
+		  printf("DDDD Using cached options\n");
+		  print_options_set(n_client_options, client_options, NULL, 0);
 		}
 		// No notification will be necessary.
 		notify_required = false;
