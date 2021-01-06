@@ -615,14 +615,22 @@ void plotpanel_minmax(struct ampphase **plot_ampphase,
   // axis ranges of a single plot with plotoptions will be. It takes into
   // account whether it's an auto or cross correlation, and the polarisations
   // that are being plotted.
-  int i = 0, j = 0, bltype, ant1, ant2;
+  int i = 0, j = 0, k = 0, bltype, ant1, ant2;
   float swapf;
 
+  base_to_ants(plot_ampphase[0]->baseline[plot_baseline_idx], &ant1, &ant2);
+  if (ant1 == ant2) {
+    // Autocorrelation.
+    bltype = 0;
+  } else {
+    bltype = 1;
+  }
+  
   // Get the x-axis range first.
   if (plot_controls->plot_options & PLOT_CHANNEL) {
     *plotmin_x = 0;
     *plotmax_x = plot_ampphase[0]->nchannels;
-    if (plot_controls->channel_range_limit[plot_if_idx] == YES) {
+    if (plot_controls->channel_range_limit[plot_if_idx] == 1) {
       if ((plot_controls->channel_range_min[plot_if_idx] >= 0) &&
           (plot_controls->channel_range_min[plot_if_idx] < plot_ampphase[0]->nchannels)) {
         *plotmin_x = plot_controls->channel_range_min[plot_if_idx];
@@ -637,7 +645,7 @@ void plotpanel_minmax(struct ampphase **plot_ampphase,
     *plotmin_x = plot_ampphase[0]->frequency[0];
     *plotmax_x = plot_ampphase[0]->frequency
       [plot_ampphase[0]->nchannels - 1];
-    if (plot_controls->channel_range_limit[plot_if_idx] == YES) {
+    if (plot_controls->channel_range_limit[plot_if_idx] == 1) {
       if ((plot_controls->channel_range_min[plot_if_idx] >= 0) &&
           (plot_controls->channel_range_min[plot_if_idx] < plot_ampphase[0]->nchannels)) {
         *plotmin_x = plot_ampphase[0]->frequency
@@ -666,99 +674,158 @@ void plotpanel_minmax(struct ampphase **plot_ampphase,
     *plotmax_y = plot_controls->yaxis_range_max;
     return;
   }
-  
+
   // If we have no pols to plot, we're done.
   if (npols == 0) {
     *plotmin_y = 0;
     *plotmax_y = 1;
     return;
   }
-  
-  // Get the initial value for min and max.
-  if (plot_controls->plot_options & PLOT_AMPLITUDE) {
-    *plotmin_y = plot_ampphase[polidx[0]]->min_amplitude[plot_baseline_idx];
-    *plotmax_y = plot_ampphase[polidx[0]]->max_amplitude[plot_baseline_idx];
-  } else if (plot_controls->plot_options & PLOT_PHASE) {
-    *plotmin_y = plot_ampphase[polidx[0]]->min_phase[plot_baseline_idx];
-    *plotmax_y = plot_ampphase[polidx[0]]->max_phase[plot_baseline_idx];
-  } else if (plot_controls->plot_options & PLOT_REAL) {
-    *plotmin_y = plot_ampphase[polidx[0]]->min_real[plot_baseline_idx];
-    *plotmax_y = plot_ampphase[polidx[0]]->max_real[plot_baseline_idx];
-  } else if (plot_controls->plot_options & PLOT_IMAG) {
-    *plotmin_y = plot_ampphase[polidx[0]]->min_imag[plot_baseline_idx];
-    *plotmax_y = plot_ampphase[polidx[0]]->max_imag[plot_baseline_idx];
-  }
 
-  // Account for all the other polarisations.
-  for (i = 1; i < npols; i++) {
+  // Now if we're not plotting the entire channel range and haven't got
+  // a range set, we work out the values ourselves by looking at the data.
+  if (plot_controls->channel_range_limit[plot_if_idx] == 1) {
+    *plotmin_y = INFINITY;
+    *plotmax_y = -INFINITY;
+    for (i = 0; i < npols; i++) {
+      // Don't include all pols necessarily.
+      for (j = 0; j < plot_ampphase[polidx[i]]->nbins[plot_baseline_idx]; j++) {
+	if ((bltype == 1) && (j > 0) &&
+	    ((plot_ampphase[polidx[i]]->pol == POL_XY) ||
+	     (plot_ampphase[polidx[i]]->pol == POL_YX))) {
+	  // Don't plot second bins for the cross-pols.
+	  continue;
+	}
+	if ((bltype == 0) && (j == 0) &&
+	    (plot_ampphase[polidx[i]]->pol == POL_XY)) {
+	  // XY pol in the autos comes from when the noise diode is on, not off.
+	  continue;
+	}
+	if ((bltype == 0) && (plot_ampphase[polidx[i]]->pol == POL_YX) &&
+	    (!(plot_controls->plot_flags & PLOT_FLAG_POL_YX))) {
+	  // Don't plot the YX bin in the autos without explicit instruction.
+	  // We include only the one here since we do allow XX, YY, XY plotting in
+	  // the autos without instruction.
+	  continue;
+	}
+	if ((bltype == 1) && (((plot_ampphase[polidx[i]]->pol == POL_XY) &&
+			       (!(plot_controls->plot_flags & PLOT_FLAG_POL_XY))) ||
+			      ((plot_ampphase[polidx[i]]->pol == POL_YX) &&
+			       (!(plot_controls->plot_flags & PLOT_FLAG_POL_YX))))) {
+	  // Don't show the cross-pols in the cross-correlations without
+	  // explicit instruction.
+	  continue;
+	}
+	for (k = 0; k < plot_ampphase[polidx[i]]->f_nchannels[plot_baseline_idx][j]; k++) {
+	  if ((plot_ampphase[polidx[i]]->f_channel[plot_baseline_idx][j][k] >=
+	       plot_controls->channel_range_min[plot_if_idx]) &&
+	      (plot_ampphase[polidx[i]]->f_channel[plot_baseline_idx][j][k] <=
+	       plot_controls->channel_range_max[plot_if_idx])) {
+	    if (plot_controls->plot_options & PLOT_AMPLITUDE) {
+	      MINASSIGN(*plotmin_y,
+			plot_ampphase[polidx[i]]->f_amplitude[plot_baseline_idx][j][k]);
+	      MAXASSIGN(*plotmax_y,
+			plot_ampphase[polidx[i]]->f_amplitude[plot_baseline_idx][j][k]);
+	    } else if (plot_controls->plot_options & PLOT_PHASE) {
+	      MINASSIGN(*plotmin_y,
+			plot_ampphase[polidx[i]]->f_phase[plot_baseline_idx][j][k]);
+	      MAXASSIGN(*plotmax_y,
+			plot_ampphase[polidx[i]]->f_phase[plot_baseline_idx][j][k]);
+	    } else if (plot_controls->plot_options & PLOT_REAL) {
+	      MINASSIGN(*plotmin_y,
+			crealf(plot_ampphase[polidx[i]]->f_raw[plot_baseline_idx][j][k]));
+	      MAXASSIGN(*plotmax_y,
+			crealf(plot_ampphase[polidx[i]]->f_raw[plot_baseline_idx][j][k]));
+	    } else if (plot_controls->plot_options & PLOT_IMAG) {
+	      MINASSIGN(*plotmin_y,
+			cimagf(plot_ampphase[polidx[i]]->f_raw[plot_baseline_idx][j][k]));
+	      MAXASSIGN(*plotmax_y,
+			cimagf(plot_ampphase[polidx[i]]->f_raw[plot_baseline_idx][j][k]));
+	    }
+	  }
+	}
+      }
+    }
+  } else {
+    // Get the initial value for min and max.
     if (plot_controls->plot_options & PLOT_AMPLITUDE) {
-      MINASSIGN(*plotmin_y,
-                plot_ampphase[polidx[i]]->min_amplitude[plot_baseline_idx]);
-      MAXASSIGN(*plotmax_y,
-                plot_ampphase[polidx[i]]->max_amplitude[plot_baseline_idx]);
+      *plotmin_y = plot_ampphase[polidx[0]]->min_amplitude[plot_baseline_idx];
+      *plotmax_y = plot_ampphase[polidx[0]]->max_amplitude[plot_baseline_idx];
     } else if (plot_controls->plot_options & PLOT_PHASE) {
-      MINASSIGN(*plotmin_y,
-                plot_ampphase[polidx[i]]->min_phase[plot_baseline_idx]);
-      MAXASSIGN(*plotmax_y,
-                plot_ampphase[polidx[i]]->max_phase[plot_baseline_idx]);
+      *plotmin_y = plot_ampphase[polidx[0]]->min_phase[plot_baseline_idx];
+      *plotmax_y = plot_ampphase[polidx[0]]->max_phase[plot_baseline_idx];
     } else if (plot_controls->plot_options & PLOT_REAL) {
-      MINASSIGN(*plotmin_y,
-                plot_ampphase[polidx[i]]->min_real[plot_baseline_idx]);
-      MAXASSIGN(*plotmax_y,
-                plot_ampphase[polidx[i]]->max_real[plot_baseline_idx]);
+      *plotmin_y = plot_ampphase[polidx[0]]->min_real[plot_baseline_idx];
+      *plotmax_y = plot_ampphase[polidx[0]]->max_real[plot_baseline_idx];
     } else if (plot_controls->plot_options & PLOT_IMAG) {
-      MINASSIGN(*plotmin_y,
-                plot_ampphase[polidx[i]]->min_imag[plot_baseline_idx]);
-      MAXASSIGN(*plotmax_y,
-                plot_ampphase[polidx[i]]->max_imag[plot_baseline_idx]);
+      *plotmin_y = plot_ampphase[polidx[0]]->min_imag[plot_baseline_idx];
+      *plotmax_y = plot_ampphase[polidx[0]]->max_imag[plot_baseline_idx];
     }
-  }
-  
-  // Refine the min/max values.
-  if (plot_controls->plot_options & PLOT_CONSISTENT_YRANGE) {
-    // The user wants us to keep a consistent Y axis range for
-    // all the plots. But we also need a different Y axis range for
-    // auto and cross correlations. So we need to know what type of
-    // correlation the specified baseline is first.
-    base_to_ants(plot_ampphase[0]->baseline[plot_baseline_idx], &ant1, &ant2);
-    if (ant1 == ant2) {
-      // Autocorrelation.
-      bltype = 0;
-    } else {
-      bltype = 1;
+    
+    // Account for all the other polarisations.
+    for (i = 1; i < npols; i++) {
+      if (plot_controls->plot_options & PLOT_AMPLITUDE) {
+	MINASSIGN(*plotmin_y,
+		  plot_ampphase[polidx[i]]->min_amplitude[plot_baseline_idx]);
+	MAXASSIGN(*plotmax_y,
+		  plot_ampphase[polidx[i]]->max_amplitude[plot_baseline_idx]);
+      } else if (plot_controls->plot_options & PLOT_PHASE) {
+	MINASSIGN(*plotmin_y,
+		  plot_ampphase[polidx[i]]->min_phase[plot_baseline_idx]);
+	MAXASSIGN(*plotmax_y,
+		  plot_ampphase[polidx[i]]->max_phase[plot_baseline_idx]);
+      } else if (plot_controls->plot_options & PLOT_REAL) {
+	MINASSIGN(*plotmin_y,
+		  plot_ampphase[polidx[i]]->min_real[plot_baseline_idx]);
+	MAXASSIGN(*plotmax_y,
+		  plot_ampphase[polidx[i]]->max_real[plot_baseline_idx]);
+      } else if (plot_controls->plot_options & PLOT_IMAG) {
+	MINASSIGN(*plotmin_y,
+		  plot_ampphase[polidx[i]]->min_imag[plot_baseline_idx]);
+	MAXASSIGN(*plotmax_y,
+		  plot_ampphase[polidx[i]]->max_imag[plot_baseline_idx]);
+      }
     }
-    for (i = 0; i < plot_ampphase[0]->nbaselines; i++) {
-      base_to_ants(plot_ampphase[0]->baseline[i], &ant1, &ant2);
-      // TODO: check the antennas are in the array spec.
-      if (((ant1 == ant2) && (bltype == 0)) ||
-          ((ant1 != ant2) && (bltype == 1))) {
-        for (j = 0; j < npols; j++) {
-          if (plot_controls->plot_options & PLOT_AMPLITUDE) {
-            MINASSIGN(*plotmin_y,
-                      plot_ampphase[polidx[j]]->min_amplitude[i]);
-            MAXASSIGN(*plotmax_y,
-                      plot_ampphase[polidx[j]]->max_amplitude[i]);
-          } else if (plot_controls->plot_options & PLOT_PHASE) {
-            MINASSIGN(*plotmin_y,
-                      plot_ampphase[polidx[j]]->min_phase[i]);
-            MAXASSIGN(*plotmax_y,
-                      plot_ampphase[polidx[j]]->max_phase[i]);
-          } else if (plot_controls->plot_options & PLOT_REAL) {
-            MINASSIGN(*plotmin_y,
-                      plot_ampphase[polidx[j]]->min_real[i]);
-            MAXASSIGN(*plotmax_y,
-                      plot_ampphase[polidx[j]]->max_real[i]);
-          } else if (plot_controls->plot_options & PLOT_IMAG) {
-            MINASSIGN(*plotmin_y,
-                      plot_ampphase[polidx[j]]->min_imag[i]);
-            MAXASSIGN(*plotmax_y,
-                      plot_ampphase[polidx[j]]->max_imag[i]);
-          }
-        }
+    
+    // Refine the min/max values.
+    if (plot_controls->plot_options & PLOT_CONSISTENT_YRANGE) {
+      // The user wants us to keep a consistent Y axis range for
+      // all the plots. But we also need a different Y axis range for
+      // auto and cross correlations. So we need to know what type of
+      // correlation the specified baseline is first.
+      for (i = 0; i < plot_ampphase[0]->nbaselines; i++) {
+	base_to_ants(plot_ampphase[0]->baseline[i], &ant1, &ant2);
+	// TODO: check the antennas are in the array spec.
+	if (((ant1 == ant2) && (bltype == 0)) ||
+	    ((ant1 != ant2) && (bltype == 1))) {
+	  for (j = 0; j < npols; j++) {
+	    if (plot_controls->plot_options & PLOT_AMPLITUDE) {
+	      MINASSIGN(*plotmin_y,
+			plot_ampphase[polidx[j]]->min_amplitude[i]);
+	      MAXASSIGN(*plotmax_y,
+			plot_ampphase[polidx[j]]->max_amplitude[i]);
+	    } else if (plot_controls->plot_options & PLOT_PHASE) {
+	      MINASSIGN(*plotmin_y,
+			plot_ampphase[polidx[j]]->min_phase[i]);
+	      MAXASSIGN(*plotmax_y,
+			plot_ampphase[polidx[j]]->max_phase[i]);
+	    } else if (plot_controls->plot_options & PLOT_REAL) {
+	      MINASSIGN(*plotmin_y,
+			plot_ampphase[polidx[j]]->min_real[i]);
+	      MAXASSIGN(*plotmax_y,
+			plot_ampphase[polidx[j]]->max_real[i]);
+	    } else if (plot_controls->plot_options & PLOT_IMAG) {
+	      MINASSIGN(*plotmin_y,
+			plot_ampphase[polidx[j]]->min_imag[i]);
+	      MAXASSIGN(*plotmax_y,
+			plot_ampphase[polidx[j]]->max_imag[i]);
+	    }
+	  }
+	}
       }
     }
   }
-
+  
   // Check that the min and max are not the same.
   if (*plotmin_x == *plotmax_x) {
     *plotmin_x -= 1;
@@ -1990,17 +2057,17 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
           } else if (plot_controls->plot_options & PLOT_PHASE) {
             snprintf(ptype, BUFSIZE, "PHASE");
           } else if (plot_controls->plot_options & PLOT_REAL) {
-            if (plot_controls->plot_options & PLOT_AMPLITUDE_LOG) {
-              snprintf(ptype, BUFSIZE, "LOG(dB) REAL");
-            } else {
+            /* if (plot_controls->plot_options & PLOT_AMPLITUDE_LOG) { */
+            /*   snprintf(ptype, BUFSIZE, "LOG(dB) REAL"); */
+            /* } else { */
               snprintf(ptype, BUFSIZE, "REAL");
-            }
+            /* } */
           } else if (plot_controls->plot_options & PLOT_IMAG) {
-            if (plot_controls->plot_options & PLOT_AMPLITUDE_LOG) {
-              snprintf(ptype, BUFSIZE, "LOG(dB) IMAG");
-            } else {
+            /* if (plot_controls->plot_options & PLOT_AMPLITUDE_LOG) { */
+            /*   snprintf(ptype, BUFSIZE, "LOG(dB) IMAG"); */
+            /* } else { */
               snprintf(ptype, BUFSIZE, "IMAG");
-            }
+            /* } */
           }
           if (ampphase_if[0]->window_name[0] == 'f') {
             snprintf(ftype, BUFSIZE, "FQ:%s", ampphase_if[0]->window_name + 1);
