@@ -1716,7 +1716,8 @@ void calculate_system_temperatures_cycle_data(struct cycle_data *cycle_data,
   // overwriting the computed Tsys numbers, we have to first reverse the application
   // otherwise we'll have no way to reverse them later.
   // We make only a simple check for this.
-  if (cycle_data->computed_tsys_applied[0][0][0] == SYSCAL_TSYS_APPLIED) {
+  if ((cycle_data->computed_tsys_applied != NULL) &&
+      (cycle_data->computed_tsys_applied[0][0][0] == SYSCAL_TSYS_APPLIED)) {
     computed_tsys_applied = true;
     system_temperature_modifier(STM_REMOVE, cycle_data, scan_header_data);
   }

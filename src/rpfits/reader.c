@@ -172,7 +172,13 @@ void get_card_value(char *header_name, char *value, int value_maxlength) {
       // Find the first valid character.
       firstptr += strlen(header_name);
       while ((*firstptr == ' ') || (*firstptr == '=')) firstptr++;
-      strncpy(value, firstptr, value_maxlength);
+      // Check we haven't gone past the correct card.
+      if (firstptr >= (names_.card + (i + 1) * 80)) {
+	// The value must be nothing.
+	value[0] = 0;
+      } else {
+	strncpy(value, firstptr, value_maxlength);
+      }
       value[value_maxlength - 1] = 0;
 
       // Remove trailing unnecessary characters.
