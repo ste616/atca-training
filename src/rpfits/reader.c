@@ -796,7 +796,7 @@ int read_cycle_data(struct scan_header_data *scan_header_data,
         /* MALLOC(cycle_data->source[cycle_data->num_points - 1], SOURCE_LENGTH); */
         /* string_copy(SOURCENAME(sourceno), SOURCE_LENGTH, */
         /*             cycle_data->source[cycle_data->num_points - 1]); */
-	ARRAY_APPEND(cycle_data->source_no, cycle_data->num_points, sourceno);
+	ARRAY_APPEND(cycle_data->source_no, cycle_data->num_points, (sourceno - 1));
         // Convert the vis array read into complex numbers.
         MALLOC(cvis, vis_size);
         for (i = 0; i < vis_size; i++) {

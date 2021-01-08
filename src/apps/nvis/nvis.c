@@ -901,7 +901,7 @@ int main(int argc, char *argv[]) {
                vis_data.num_ifs[data_selected_index],
                described_hdr->cycle_time);
       snprintf(mesgout[nmesg++], VISBUFSIZE, "  SOURCE %s OBSTYPE %s\n",
-               described_hdr->source_name[0],
+               described_hdr->source_name[described_ptr[0][0]->source_no],
                described_hdr->obstype);
       for (i = 0; i < vis_data.num_ifs[data_selected_index]; i++) {
         snprintf(mesgout[nmesg++], VISBUFSIZE, " IF %d: CF %.2f MHz NCHAN %d BW %.0f MHz",

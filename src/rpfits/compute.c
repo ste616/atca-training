@@ -135,7 +135,8 @@ struct ampphase* prepare_ampphase(void) {
 
   ampphase->pol = -1;
   ampphase->window = -1;
-
+  ampphase->source_no = -1;
+  
   ampphase->nbins = NULL;
   
   ampphase->flagged_bad = NULL;
@@ -848,7 +849,10 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
   strncpy((*ampphase)->obsdate, scan_header_data->obsdate, OBSDATE_LENGTH);
   (*ampphase)->ut_seconds = cycle_data->ut_seconds;
   strncpy((*ampphase)->scantype, scan_header_data->obstype, OBSTYPE_LENGTH);
-
+  if (cycle_data->source_no != NULL) {
+    (*ampphase)->source_no = cycle_data->source_no[0];
+  }
+  
   // Deal with the syscal_data structure if necessary. We only copy over the
   // information for the selected pol and IF, and we don't copy the Tsys unless
   // we've been given XX or YY as the requested pol.
@@ -1304,6 +1308,7 @@ int ampphase_average(struct scan_header_data *scan_header_data,
   (*vis_quantities)->nbaselines = ampphase->nbaselines;
   (*vis_quantities)->pol = ampphase->pol;
   (*vis_quantities)->window = ampphase->window;
+  (*vis_quantities)->source_no = ampphase->source_no;
   strncpy((*vis_quantities)->obsdate, ampphase->obsdate, OBSDATE_LENGTH);
   (*vis_quantities)->ut_seconds = ampphase->ut_seconds;
   strncpy((*vis_quantities)->scantype, ampphase->scantype, OBSTYPE_LENGTH);

@@ -179,7 +179,8 @@ void seconds_to_hourlabel(float seconds, char *hourlabel) {
   
   dayseconds = (int)seconds % 86400;
   d = (int)((seconds - dayseconds) / 86400);
-
+  seconds -= d * 86400;
+  
   h = (int)floorf(dayseconds / 3600);
   seconds -= h * 3600;
   m = (int)floorf(seconds / 60);

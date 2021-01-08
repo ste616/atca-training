@@ -483,7 +483,8 @@ void pack_ampphase(cmp_ctx_t *cmp, struct ampphase *a) {
   pack_write_string(cmp, a->obsdate, OBSDATE_LENGTH);
   pack_write_float(cmp, a->ut_seconds);
   pack_write_string(cmp, a->scantype, OBSTYPE_LENGTH);
-
+  pack_write_sint(cmp, a->source_no);
+  
   // The bin arrays have one element per baseline.
   pack_writearray_sint(cmp, a->nbaselines, a->nbins);
 
@@ -560,7 +561,8 @@ void unpack_ampphase(cmp_ctx_t *cmp, struct ampphase *a) {
   pack_read_string(cmp, a->obsdate, OBSDATE_LENGTH);
   pack_read_float(cmp, &(a->ut_seconds));
   pack_read_string(cmp, a->scantype, OBSTYPE_LENGTH);
-
+  pack_read_sint(cmp, &(a->source_no));
+  
   // The bin arrays have one element per baseline.
   MALLOC(a->nbins, a->nbaselines);
   pack_readarray_sint(cmp, a->nbaselines, a->nbins);
@@ -732,6 +734,7 @@ void pack_vis_quantities(cmp_ctx_t *cmp, struct vis_quantities *a) {
   // Labels.
   pack_write_sint(cmp, a->pol);
   pack_write_sint(cmp, a->window);
+  pack_write_sint(cmp, a->source_no);
   pack_writearray_sint(cmp, a->nbaselines, a->nbins);
   pack_writearray_sint(cmp, a->nbaselines, a->baseline);
   pack_writearray_sint(cmp, a->nbaselines, a->flagged_bad);
@@ -770,6 +773,7 @@ void unpack_vis_quantities(cmp_ctx_t *cmp, struct vis_quantities *a) {
   // Labels.
   pack_read_sint(cmp, &(a->pol));
   pack_read_sint(cmp, &(a->window));
+  pack_read_sint(cmp, &(a->source_no));
   MALLOC(a->nbins, a->nbaselines);
   pack_readarray_sint(cmp, a->nbaselines, a->nbins);
   MALLOC(a->baseline, a->nbaselines);

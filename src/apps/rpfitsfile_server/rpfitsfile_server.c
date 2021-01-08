@@ -494,7 +494,7 @@ struct rpfits_file_information {
 struct rpfits_file_information *new_rpfits_file(void) {
   struct rpfits_file_information *rv;
 
-  MALLOC(rv, 1);
+  CALLOC(rv, 1);
   rv->scan_headers = NULL;
   rv->n_scans = 0;
   rv->filename[0] = 0;

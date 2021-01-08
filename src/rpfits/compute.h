@@ -564,6 +564,14 @@ struct ampphase {
    *         scan header
    */
   char scantype[OBSTYPE_LENGTH];
+  /*! \var source_no
+   *  \brief The source number of this particular cycle from this scan
+   *
+   * In mosaic scans, the header can have information about several sources, 
+   * and this quantity is the index of the source observed during this cycle
+   * in those header variables. For single-source scans, this should be 0.
+   */
+  int source_no;
   
   // The bin arrays have one element per baseline.
   /*! \var nbins
@@ -861,6 +869,15 @@ struct vis_quantities {
    * interchangeably.
    */
   int window;
+  /*! \var source_no
+   *  \brief The source number of this particular cycle from this scan
+   *
+   * In mosaic scans, the header can have information about several sources, 
+   * and this quantity is the index of the source observed during this cycle
+   * in those header variables. For single-source scans, this should be 0.
+   */
+  int source_no;
+  
   /*! \var nbins
    *  \brief The number of bins present for each baseline
    *

@@ -494,14 +494,6 @@ struct cycle_data {
    * This array has length of `num_points` and is indexed starting at 0.
    */
   int *if_no;
-  /*! \var source
-   *  \brief The source name pertaining to this point
-   *
-   * This array has length of `num_points` * SOURCE_LENGTH, essentially a set
-   * of `num_points` strings, each of length SOURCE_LENGTH, and is indexed
-   * starting at 0. 
-   */
-  /* char **source; */
   /*! \var source_no
    *  \brief The index of the source for this cycle
    *
