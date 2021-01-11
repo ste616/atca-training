@@ -281,17 +281,23 @@ int char_to_product(char pstring) {
 int time_index() {
   float close_time, delta_time;
   int closeidx = 0, i;
+  double basemjd;
   
   if (data_seconds < 0) {
     // The caller hasn't set any time to search for.
     return -1;
   }
-
-  close_time = fabsf(vis_data.vis_quantities[0][0][0]->ut_seconds - data_seconds);
+  basemjd = floor(date2mjd(vis_data.vis_quantities[0][0][0]->obsdate,
+			   vis_data.vis_quantities[0][0][0]->ut_seconds));
+  
+  close_time = fabsf((float)((date2mjd(vis_data.vis_quantities[0][0][0]->obsdate,
+				       vis_data.vis_quantities[0][0][0]->ut_seconds) -
+			      basemjd) * 86400.0) - data_seconds);
   closeidx = 0;
   for (i = 1; i < vis_data.nviscycles; i++) {
-    delta_time = fabsf(vis_data.vis_quantities[i][0][0]->ut_seconds -
-		       data_seconds);
+    delta_time = fabsf((float)((date2mjd(vis_data.vis_quantities[i][0][0]->obsdate,
+					 vis_data.vis_quantities[i][0][0]->ut_seconds) -
+				basemjd) * 86400.0) - data_seconds);
     if (delta_time < close_time) {
       close_time = delta_time;
       closeidx = i;
@@ -889,34 +895,38 @@ int main(int argc, char *argv[]) {
 
     if (action_required & ACTION_DESCRIBE_DATA) {
       // Describe the data.
-      described_ptr = vis_data.vis_quantities[data_selected_index];
-      described_hdr = vis_data.header_data[data_selected_index];
-      found_options = find_ampphase_options(n_ampphase_options, ampphase_options,
-					    described_hdr);
-      seconds_to_hourlabel(described_ptr[0][0]->ut_seconds, htime);
       nmesg = 0;
-      snprintf(mesgout[nmesg++], VISBUFSIZE, "DATA AT %s %s:\n",
-	       described_ptr[0][0]->obsdate, htime);
-      snprintf(mesgout[nmesg++], VISBUFSIZE, "  HAS %d IFS CYCLE TIME %d\n\r",
-               vis_data.num_ifs[data_selected_index],
-               described_hdr->cycle_time);
-      snprintf(mesgout[nmesg++], VISBUFSIZE, "  SOURCE %s OBSTYPE %s\n",
-               described_hdr->source_name[described_ptr[0][0]->source_no],
-               described_hdr->obstype);
-      for (i = 0; i < vis_data.num_ifs[data_selected_index]; i++) {
-        snprintf(mesgout[nmesg++], VISBUFSIZE, " IF %d: CF %.2f MHz NCHAN %d BW %.0f MHz",
-                 (i + 1), described_hdr->if_centre_freq[i], described_hdr->if_num_channels[i],
-                 described_hdr->if_bandwidth[i]);
-        // Check if this is one of the calbands.
-        for (j = 0; j < nvisbands; j++) {
-          if (find_if_name(described_hdr, visband[j]) == (i + 1)) {
-            snprintf(mesgout[nmesg++], VISBUFSIZE, " (%c%c %c%c %c%c)",
-                     ('A' + (2 * j)), ('A' + (2 * j)),
-                     ('B' + (2 * j)), ('B' + (2 * j)),
-                     ('A' + (2 * j)), ('B' + (2 * j)));
-          }
-        }
-        snprintf(mesgout[nmesg++], VISBUFSIZE, "\n");
+      if (data_selected_index < 0) {
+	snprintf(mesgout[nmesg++], VISBUFSIZE, "NO DATA SELECTED\n");
+      } else {
+	described_ptr = vis_data.vis_quantities[data_selected_index];
+	described_hdr = vis_data.header_data[data_selected_index];
+	found_options = find_ampphase_options(n_ampphase_options, ampphase_options,
+					      described_hdr);
+	seconds_to_hourlabel(described_ptr[0][0]->ut_seconds, htime);
+	snprintf(mesgout[nmesg++], VISBUFSIZE, "DATA AT %s %s:\n",
+		 described_ptr[0][0]->obsdate, htime);
+	snprintf(mesgout[nmesg++], VISBUFSIZE, "  HAS %d IFS CYCLE TIME %d\n\r",
+		 vis_data.num_ifs[data_selected_index],
+		 described_hdr->cycle_time);
+	snprintf(mesgout[nmesg++], VISBUFSIZE, "  SOURCE %s OBSTYPE %s\n",
+		 described_hdr->source_name[described_ptr[0][0]->source_no],
+		 described_hdr->obstype);
+	for (i = 0; i < vis_data.num_ifs[data_selected_index]; i++) {
+	  snprintf(mesgout[nmesg++], VISBUFSIZE, " IF %d: CF %.2f MHz NCHAN %d BW %.0f MHz",
+		   (i + 1), described_hdr->if_centre_freq[i], described_hdr->if_num_channels[i],
+		   described_hdr->if_bandwidth[i]);
+	  // Check if this is one of the calbands.
+	  for (j = 0; j < nvisbands; j++) {
+	    if (find_if_name(described_hdr, visband[j]) == (i + 1)) {
+	      snprintf(mesgout[nmesg++], VISBUFSIZE, " (%c%c %c%c %c%c)",
+		       ('A' + (2 * j)), ('A' + (2 * j)),
+		       ('B' + (2 * j)), ('B' + (2 * j)),
+		       ('A' + (2 * j)), ('B' + (2 * j)));
+	    }
+	  }
+	  snprintf(mesgout[nmesg++], VISBUFSIZE, "\n");
+	}
       }
       readline_print_messages(nmesg, mesgout);
       action_required -= ACTION_DESCRIBE_DATA;
