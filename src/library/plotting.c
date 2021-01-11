@@ -1063,6 +1063,7 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
   float cxpos, dxpos, labtotalwidth, labspacing, dy, maxwidth, twidth;
   float padlabel = 0.01, cch, timeline_x[2], timeline_y[2];
   float ***antlines = NULL;
+  double basemjd, chktime, min_time, max_time;
   char xopts[BUFSIZE], yopts[BUFSIZE], panellabel[BUFSIZE], panelunits[BUFSIZE];
   char antstring[BUFSIZE], bandstring[BUFSIZE];
   struct vis_line **vis_lines = NULL, **tsys_vis_lines = NULL, **meta_vis_line = NULL;
@@ -1251,9 +1252,9 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
 
   // Keep track of the min and max values to plot.
   // We can determine the time range for all panels at once.
-  min_x = INFINITY;
-  max_x = -INFINITY;
-
+  min_time = INFINITY;
+  max_time = -INFINITY;
+  
   for (j = 0; j < n_vis_lines; j++) {
     for (k = 0; k < ncycles; k++) {
       for (l = 0; l < cycle_numifs[k]; l++) {
@@ -1268,8 +1269,10 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
                 if (cycle_vis_quantities[k][l][m]->flagged_bad[n] > 0) {
                   continue;
                 }
-                MINASSIGN(min_x, cycle_vis_quantities[k][l][m]->ut_seconds);
-                MAXASSIGN(max_x, cycle_vis_quantities[k][l][m]->ut_seconds);
+		chktime = date2mjd(cycle_vis_quantities[k][l][m]->obsdate,
+				   cycle_vis_quantities[k][l][m]->ut_seconds);
+		MINASSIGN(min_time, chktime);
+		MAXASSIGN(max_time, chktime);
                 break;
               }
             }
@@ -1279,6 +1282,10 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
       }
     }
   }
+  // Remove the base date.
+  basemjd = floor(min_time);
+  min_x = (float)((min_time - basemjd) * 86400.0);
+  max_x = (float)((max_time - basemjd) * 86400.0);
   // Adjust the time constraints based on the history specification.
   MAXASSIGN(min_x, (max_x - plot_controls->history_start * 60));
   MINASSIGN(max_x, (min_x + plot_controls->history_length * 60));
@@ -1321,8 +1328,10 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
           for (l = 0; l < cycle_numifs[k]; l++) {
             for (m = 0; m < npols; m++) {
               // Exclude data outside our history range.
-              if ((cycle_vis_quantities[k][l][m]->ut_seconds < min_x) ||
-                  (cycle_vis_quantities[k][l][m]->ut_seconds > max_x)) {
+	      chktime = (date2mjd(cycle_vis_quantities[k][l][m]->obsdate,
+				  cycle_vis_quantities[k][l][m]->ut_seconds) -
+			 basemjd) * 86400.0;
+              if (((float)chktime < min_x) || ((float)chktime > max_x)) {
                 break;
               }
               /* printf("comparing pols %d to %d, window %d\n", */
@@ -1347,8 +1356,8 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
                     REALLOC(plot_lines[i][j][0], n_plot_lines[i][j]);
                     REALLOC(plot_lines[i][j][1], n_plot_lines[i][j]);
                     REALLOC(plot_lines[i][j][2], n_plot_lines[i][j]);
-                    plot_lines[i][j][0][n_plot_lines[i][j] - 1] =
-                      cycle_vis_quantities[k][l][m]->ut_seconds;
+                    plot_lines[i][j][0][n_plot_lines[i][j] - 1] = (float)chktime;
+		    //cycle_vis_quantities[k][l][m]->ut_seconds;
                     if (header_data != NULL) {
                       // Get the cycle time from this cycle.
                       plot_lines[i][j][2][n_plot_lines[i][j] - 1] =
@@ -1399,8 +1408,10 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
         for (k = 0; k < ncycles; k++) {
           for (l = 0; l < cycle_numifs[k]; l++) {
             for (m = 0; m < npols; m++) {
-              if ((cycle_vis_quantities[k][l][m]->ut_seconds < min_x) ||
-                  (cycle_vis_quantities[k][l][m]->ut_seconds > max_x)) {
+	      chktime = (date2mjd(cycle_vis_quantities[k][l][m]->obsdate,
+					 cycle_vis_quantities[k][l][m]->ut_seconds) -
+			 basemjd) * 86400.0;
+              if (((float)chktime < min_x) || ((float)chktime > max_x)) {
                 break;
               }
               // We need to find the correct Tsys to show.
@@ -1437,8 +1448,8 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
                 REALLOC(plot_lines[i][j][0], n_plot_lines[i][j]);
                 REALLOC(plot_lines[i][j][1], n_plot_lines[i][j]);
                 REALLOC(plot_lines[i][j][2], n_plot_lines[i][j]);
-                plot_lines[i][j][0][n_plot_lines[i][j] - 1] =
-                  cycle_vis_quantities[k][l][m]->ut_seconds;
+                plot_lines[i][j][0][n_plot_lines[i][j] - 1] = (float)chktime;
+		//cycle_vis_quantities[k][l][m]->ut_seconds;
                 if (header_data != NULL) {
                   plot_lines[i][j][2][n_plot_lines[i][j] - 1] =
                     header_data[k]->cycle_time;
@@ -1492,16 +1503,18 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
         dbrk = 0;
         for (l = 0; l < cycle_numifs[k]; l++) {
           for (m = 0; m < npols; m++) {
-            if ((cycle_vis_quantities[k][l][m]->ut_seconds < min_x) ||
-                (cycle_vis_quantities[k][l][m]->ut_seconds > max_x)) {
+	    chktime = (date2mjd(cycle_vis_quantities[k][l][m]->obsdate,
+				cycle_vis_quantities[k][l][m]->ut_seconds) -
+		       basemjd) * 86400.0;
+            if (((float)chktime < min_x) || ((float)chktime > max_x)) {
               break;
             }
             n_plot_lines[i][j] += 1;
             REALLOC(plot_lines[i][j][0], n_plot_lines[i][j]);
             REALLOC(plot_lines[i][j][1], n_plot_lines[i][j]);
             REALLOC(plot_lines[i][j][2], n_plot_lines[i][j]);
-            plot_lines[i][j][0][n_plot_lines[i][j] - 1] =
-              cycle_vis_quantities[k][0][0]->ut_seconds;
+            plot_lines[i][j][0][n_plot_lines[i][j] - 1] = (float)chktime;
+	    //cycle_vis_quantities[k][0][0]->ut_seconds;
             if (header_data != NULL) {
               plot_lines[i][j][2][n_plot_lines[i][j] - 1] =
                 header_data[k]->cycle_time;
