@@ -1646,7 +1646,7 @@ int main(int argc, char *argv[]) {
   struct rpfitsfile_server_arguments arguments;
   int i, j, k, l, ri, rj, bytes_received, r, n_cycle_mjd = 0, n_client_options = 0;
   int n_alert_sockets = 0, n_ampphase_options = 0, *client_indices = NULL;
-  int removed_client_type;
+  int removed_client_type, total_n_scans = 0;
   bool pointer_found = false, vis_cache_updated = false, notify_required = false;
   bool spd_cache_updated = false, outside_mjd_range = false, succ = false;
   bool client_added = false;
@@ -1769,6 +1769,7 @@ int main(int argc, char *argv[]) {
               info_rpfits_files, &spectrum_data, &vis_data);
   // We can now work out which time range we cover and the cycle time.
   for (i = 0; i < arguments.n_rpfits_files; i++) {
+    total_n_scans += info_rpfits_files[i]->n_scans;
     for (j = 0; j < info_rpfits_files[i]->n_scans; j++) {
       if ((i == 0) && (j == 0)) {
         mjd_cycletime = (double)info_rpfits_files[i]->scan_headers[j]->cycle_time / 86400.0;
@@ -1779,6 +1780,11 @@ int main(int argc, char *argv[]) {
         MAXASSIGN(latest_mjd, info_rpfits_files[i]->scan_end_mjd[j] + (mjd_cycletime / 2.0));
       }
     }
+  }
+
+  if (total_n_scans <= 0) {
+    fprintf(stderr, " FATAL: NO USABLE SCANS FOUND IN RPFITS FILES!\n");
+    exit(1);
   }
   
   // Print out the summary.
