@@ -118,6 +118,58 @@ float complex fcmeanfc(float complex *a, int n) {
 }
 
 /*!
+ *  \brief Return the smallest value from a variadic list of arguments
+ *  \param n the number of values to follow
+ *  \param ... the variadic list of arguments
+ *  \returns the smallest of the arguments
+ */
+double smallest(int n, ...) {
+  va_list ap;
+  double s = INFINITY, t;
+  int i;
+
+  va_start(ap, n);
+  for (i = 0; i < n; i++) {
+    t = va_arg(ap, double);
+    s = (t < s) ? t : s;
+  }
+  va_end(ap);
+  
+  return s;
+}
+
+/*!
+ *  \brief Return the smallest value from a variadic list of arguments,
+ *         whose value is smallest when considered as a positive number
+ *  \param n the number of values to follow
+ *  \param ... the variadic list of arguments
+ *  \returns the smallest of the arguments
+ *
+ * For example, if we called this function like so:
+ * ```
+ * a = smallest_abs(3, 1, -2, 4); // a will return as 1
+ * ```
+ * This is because abs(1) < abs(-2).
+ */
+double smallest_abs(int n, ...) {
+  va_list ap;
+  float s, t, c = INFINITY;
+  int i;
+
+  va_start(ap, n);
+  for (i = 0; i < n; i++) {
+    t = va_arg(ap, double);
+    if (fabsf(t) < c) {
+      c = fabsf(t);
+      s = t;
+    }
+  }
+  va_end(ap);
+
+  return s;
+}
+
+/*!
  *  \brief Initialise and return an ampphase structure
  *  \return a pointer to a properly initialised ampphase structure
  */
@@ -1287,9 +1339,9 @@ int ampphase_average(struct scan_header_data *scan_header_data,
                      struct ampphase_options ***options) {
   int n_points = 0, i, j, k, n_expected = 0, n_delavg_expected = 0;
   int *delavg_n = NULL, delavg_idx = 0, n_delay_points = 0;
-  int min_tvchannel, max_tvchannel;
+  int min_tvchannel, max_tvchannel, a1, a2;
   float total_amplitude = 0, total_phase = 0, total_delay = 0;
-  float delta_phase, delta_frequency;
+  float delta_phase, delta_frequency, dp, p1, p2, p3;
   float *median_array_amplitude = NULL, *median_array_phase = NULL;
   float *median_array_delay = NULL;
   float *array_frequency = NULL, *delavg_frequency = NULL;
@@ -1298,6 +1350,8 @@ int ampphase_average(struct scan_header_data *scan_header_data,
   float complex *delavg_raw = NULL;
   bool needs_new_options = false;
   struct ampphase_options *band_options = NULL;
+  FILE *debug = NULL;
+  char debug_fname[1024];
   
   // Prepare the structure if required.
   if (*vis_quantities == NULL) {
@@ -1313,6 +1367,10 @@ int ampphase_average(struct scan_header_data *scan_header_data,
   (*vis_quantities)->ut_seconds = ampphase->ut_seconds;
   strncpy((*vis_quantities)->scantype, ampphase->scantype, OBSTYPE_LENGTH);
 
+  sprintf(debug_fname, "debugging/delay_debug_window-%d_pol-%d_%s_%d.txt",
+	  ampphase->window, ampphase->pol, ampphase->obsdate,
+	  (int)floorf(ampphase->ut_seconds));
+  
   // Check for options.
   if (options == NULL) {
     // Use the options from the ampphase.
@@ -1393,7 +1451,10 @@ int ampphase_average(struct scan_header_data *scan_header_data,
   CALLOC(median_array_delay, (n_delavg_expected - 1));
   // Do the averaging loop.
   /* fprintf(stderr, "[ampphase_averaging] starting averaging loop\n"); */
+  debug = fopen(debug_fname, "w");
   for (i = 0; i < (*vis_quantities)->nbaselines; i++) {
+    base_to_ants((*vis_quantities)->baseline[i], &a1, &a2);
+    fprintf(debug, " baseline %d-%d\n", a1, a2);
     for (k = 0; k < (*vis_quantities)->nbins[i]; k++) {
       // Check if this quantity is flagged.
       if ((band_options->include_flagged_data == 0) &&
@@ -1406,6 +1467,13 @@ int ampphase_average(struct scan_header_data *scan_header_data,
       total_delay = 0;
       total_complex = 0 + 0 * I;
       n_points = 0;
+      // Reset the delay averaging quantities.
+      for (j = 0; j < n_delavg_expected; j++) {
+	delavg_frequency[j] = 0;
+	delavg_phase[j] = 0;
+	delavg_raw[j] = 0;
+	delavg_n[j] = 0;
+      }
       for (j = 0; j < ampphase->f_nchannels[i][k]; j++) {
         // Check for in range.
         if ((ampphase->f_channel[i][k][j] >= min_tvchannel) &&
@@ -1442,16 +1510,26 @@ int ampphase_average(struct scan_header_data *scan_header_data,
         for (j = 1, n_delay_points = 0; j < n_delavg_expected; j++) {
           if ((delavg_n[j - 1] > 0) &&
               (delavg_n[j] > 0)) {
-            delta_phase = delavg_phase[j] - delavg_phase[j - 1];
-            if (band_options->phase_in_degrees) {
+	    dp = (band_options->phase_in_degrees) ? 360.0 : (2 * M_PI);
+	    p1 = delavg_phase[j] - delavg_phase[j - 1];
+	    p2 = (delavg_phase[j] + dp) - delavg_phase[j - 1];
+	    p3 = (delavg_phase[j] - dp) - delavg_phase[j - 1];
+	    
+            delta_phase = (float)smallest_abs(3, p1, p2, p3);
+
+	    if (band_options->phase_in_degrees) {
               // Change to radians.
               delta_phase *= (M_PI / 180);
             }
             delta_frequency = delavg_frequency[j] - delavg_frequency[j - 1];
             // This frequency is in MHz, change to Hz.
-            delta_frequency *= 1E6;
-            total_delay += delta_phase / delta_frequency;
-            median_array_delay[n_delay_points] = delta_phase / delta_frequency;
+            //delta_frequency *= 1E6;
+            total_delay += delta_phase / (2 * M_PI * delta_frequency);
+	    fprintf(debug, " chans %d %d, phase = %.1f %.1f, diffs = %.1f %.1f %.1f, "
+		    "chosen = %.6f, delta_f = %.6f, delay = %.6f\n",
+		    (j - 1), j, delavg_phase[j - 1], delavg_phase[j],
+		    p1, p2, p3, delta_phase, delta_frequency, (delta_phase / delta_frequency));
+            median_array_delay[n_delay_points] = (delta_phase / (2 * M_PI * delta_frequency));
             n_delay_points++;
           }
         }
@@ -1467,7 +1545,7 @@ int ampphase_average(struct scan_header_data *scan_header_data,
           }
           // Calculate the final average delay, return in ns.
           (*vis_quantities)->delay[i][k] = (n_delay_points > 0) ?
-            (1E9 * total_delay / (float)n_delay_points) : 0;
+            (1E3 * total_delay / (float)n_delay_points) : 0;
         } else if (band_options->averaging_method[ampphase->window] & AVERAGETYPE_MEDIAN) {
           if (band_options->averaging_method[ampphase->window] & AVERAGETYPE_SCALAR) {
             qsort(median_array_amplitude, n_points, sizeof(float), cmpfunc_real);
@@ -1503,20 +1581,23 @@ int ampphase_average(struct scan_header_data *scan_header_data,
           } else {
             qsort(median_array_delay, n_delay_points, sizeof(float),
                   cmpfunc_real);
-            if (n_delay_points % 2) {
-              (*vis_quantities)->delay[i][k] = 1E9 *
-                median_array_delay[(n_delay_points + 1) / 2];
-            } else {
-              (*vis_quantities)->delay[i][k] = 1E9 *
-                (median_array_delay[n_delay_points / 2] +
-                 median_array_delay[n_delay_points / 2 + 1]) / 2;
-            }
+	    (*vis_quantities)->delay[i][k] = 1E3 * fmedianf(median_array_delay,
+							    n_delay_points);
+            /* if (n_delay_points % 2) { */
+            /*   (*vis_quantities)->delay[i][k] = 1E3 * */
+            /*     median_array_delay[(n_delay_points + 1) / 2]; */
+            /* } else { */
+            /*   (*vis_quantities)->delay[i][k] = 1E3 * */
+            /*     (median_array_delay[n_delay_points / 2] + */
+            /*      median_array_delay[n_delay_points / 2 + 1]) / 2; */
+            /* } */
           }
         }
       }
     }
   }
-
+  fclose(debug);
+  
   FREE(median_array_amplitude);
   FREE(median_array_phase);
   FREE(median_complex);

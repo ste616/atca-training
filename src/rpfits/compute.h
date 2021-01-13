@@ -1097,6 +1097,8 @@ float fsumf(float *a, int n);
 float complex fcsumfc(float complex *a, int n);
 float fmeanf(float *a, int n);
 float complex fcmeanfc(float complex *a, int n);
+double smallest(int n, ...);
+double smallest_abs(int n, ...);
 struct ampphase* prepare_ampphase(void);
 struct vis_quantities* prepare_vis_quantities(void);
 void free_ampphase(struct ampphase **ampphase);
