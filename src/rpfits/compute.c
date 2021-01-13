@@ -1350,8 +1350,8 @@ int ampphase_average(struct scan_header_data *scan_header_data,
   float complex *delavg_raw = NULL;
   bool needs_new_options = false;
   struct ampphase_options *band_options = NULL;
-  FILE *debug = NULL;
-  char debug_fname[1024];
+  /* FILE *debug = NULL; */
+  /* char debug_fname[1024]; */
   
   // Prepare the structure if required.
   if (*vis_quantities == NULL) {
@@ -1367,9 +1367,9 @@ int ampphase_average(struct scan_header_data *scan_header_data,
   (*vis_quantities)->ut_seconds = ampphase->ut_seconds;
   strncpy((*vis_quantities)->scantype, ampphase->scantype, OBSTYPE_LENGTH);
 
-  sprintf(debug_fname, "debugging/delay_debug_window-%d_pol-%d_%s_%d.txt",
-	  ampphase->window, ampphase->pol, ampphase->obsdate,
-	  (int)floorf(ampphase->ut_seconds));
+  /* sprintf(debug_fname, "debugging/delay_debug_window-%d_pol-%d_%s_%d.txt", */
+  /* 	  ampphase->window, ampphase->pol, ampphase->obsdate, */
+  /* 	  (int)floorf(ampphase->ut_seconds)); */
   
   // Check for options.
   if (options == NULL) {
@@ -1451,10 +1451,10 @@ int ampphase_average(struct scan_header_data *scan_header_data,
   CALLOC(median_array_delay, (n_delavg_expected - 1));
   // Do the averaging loop.
   /* fprintf(stderr, "[ampphase_averaging] starting averaging loop\n"); */
-  debug = fopen(debug_fname, "w");
+  /* debug = fopen(debug_fname, "w"); */
   for (i = 0; i < (*vis_quantities)->nbaselines; i++) {
     base_to_ants((*vis_quantities)->baseline[i], &a1, &a2);
-    fprintf(debug, " baseline %d-%d\n", a1, a2);
+    /* fprintf(debug, " baseline %d-%d\n", a1, a2); */
     for (k = 0; k < (*vis_quantities)->nbins[i]; k++) {
       // Check if this quantity is flagged.
       if ((band_options->include_flagged_data == 0) &&
@@ -1525,10 +1525,10 @@ int ampphase_average(struct scan_header_data *scan_header_data,
             // This frequency is in MHz, change to Hz.
             //delta_frequency *= 1E6;
             total_delay += delta_phase / (2 * M_PI * delta_frequency);
-	    fprintf(debug, " chans %d %d, phase = %.1f %.1f, diffs = %.1f %.1f %.1f, "
-		    "chosen = %.6f, delta_f = %.6f, delay = %.6f\n",
-		    (j - 1), j, delavg_phase[j - 1], delavg_phase[j],
-		    p1, p2, p3, delta_phase, delta_frequency, (delta_phase / delta_frequency));
+	    /* fprintf(debug, " chans %d %d, phase = %.1f %.1f, diffs = %.1f %.1f %.1f, " */
+	    /* 	    "chosen = %.6f, delta_f = %.6f, delay = %.6f\n", */
+	    /* 	    (j - 1), j, delavg_phase[j - 1], delavg_phase[j], */
+	    /* 	    p1, p2, p3, delta_phase, delta_frequency, (delta_phase / delta_frequency)); */
             median_array_delay[n_delay_points] = (delta_phase / (2 * M_PI * delta_frequency));
             n_delay_points++;
           }
@@ -1596,7 +1596,7 @@ int ampphase_average(struct scan_header_data *scan_header_data,
       }
     }
   }
-  fclose(debug);
+  /* fclose(debug); */
   
   FREE(median_array_amplitude);
   FREE(median_array_phase);
