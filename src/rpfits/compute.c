@@ -1550,28 +1550,31 @@ int ampphase_average(struct scan_header_data *scan_header_data,
           if (band_options->averaging_method[ampphase->window] & AVERAGETYPE_SCALAR) {
             qsort(median_array_amplitude, n_points, sizeof(float), cmpfunc_real);
             qsort(median_array_phase, n_points, sizeof(float), cmpfunc_real);
-            if (n_points % 2) {
-              // Odd number of points.
-              (*vis_quantities)->amplitude[i][k] =
-                median_array_amplitude[(n_points + 1) / 2];
-              (*vis_quantities)->phase[i][k] =
-                median_array_phase[(n_points + 1) / 2];
-            } else {
-              (*vis_quantities)->amplitude[i][k] =
-                (median_array_amplitude[n_points / 2] +
-                 median_array_amplitude[n_points / 2 + 1]) / 2;
-              (*vis_quantities)->phase[i][k] =
-                (median_array_phase[n_points / 2] +
-                 median_array_phase[n_points / 2 + 1]) / 2;
-            }
+	    (*vis_quantities)->amplitude[i][k] = fmedianf(median_array_amplitude, n_points);
+	    (*vis_quantities)->phase[i][k] = fmedianf(median_array_phase, n_points);
+            /* if (n_points % 2) { */
+            /*   // Odd number of points. */
+            /*   (*vis_quantities)->amplitude[i][k] = */
+            /*     median_array_amplitude[(n_points + 1) / 2]; */
+            /*   (*vis_quantities)->phase[i][k] = */
+            /*     median_array_phase[(n_points + 1) / 2]; */
+            /* } else { */
+            /*   (*vis_quantities)->amplitude[i][k] = */
+            /*     (median_array_amplitude[n_points / 2] + */
+            /*      median_array_amplitude[n_points / 2 + 1]) / 2; */
+            /*   (*vis_quantities)->phase[i][k] = */
+            /*     (median_array_phase[n_points / 2] + */
+            /*      median_array_phase[n_points / 2 + 1]) / 2; */
+            /* } */
           } else if (band_options->averaging_method[ampphase->window] & AVERAGETYPE_VECTOR) {
             qsort(median_complex, n_points, sizeof(float complex), cmpfunc_complex);
-            if (n_points % 2) {
-              average_complex = median_complex[(n_points + 1) / 2];
-            } else {
-              average_complex =
-                (median_complex[n_points / 2] + median_complex[n_points / 2 + 1]) / 2;
-            }
+	    average_complex = fcmedianfc(median_complex, n_points);
+            /* if (n_points % 2) { */
+            /*   average_complex = median_complex[(n_points + 1) / 2]; */
+            /* } else { */
+            /*   average_complex = */
+            /*     (median_complex[n_points / 2] + median_complex[n_points / 2 + 1]) / 2; */
+            /* } */
             (*vis_quantities)->amplitude[i][k] = cabsf(average_complex);
             (*vis_quantities)->phase[i][k] = cargf(average_complex);
           }
