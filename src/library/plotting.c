@@ -2179,8 +2179,13 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
                    ri++, rj--) {
                 if (inverted == YES) {
                   // Swap the frequencies.
-		  plot_xvalues[ri] =
-		    ampphase_if[polidx[rp]]->f_frequency[i][bi][rj];
+		  if (plot_controls->plot_options & PLOT_FREQUENCY) {
+		    plot_xvalues[ri] =
+		      ampphase_if[polidx[rp]]->f_frequency[i][bi][rj];
+		  } else if (plot_controls->plot_options & PLOT_CHANNEL) {
+		    plot_xvalues[ri] =
+		      ampphase_if[polidx[rp]]->f_channel[i][bi][rj];
+		  }
                   if (plot_controls->plot_options & PLOT_AMPLITUDE) {
                     if (plot_controls->plot_options & PLOT_AMPLITUDE_LOG) {
                       LOGAMP(ampphase_if[polidx[rp]]->f_amplitude[i][bi][rj], ylog_max,
@@ -2232,7 +2237,7 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
 		    if (plot_controls->plot_options & PLOT_FREQUENCY) {
 		      plot_xvalues[ri] = avg_ampphase->f_frequency[i][bi][rj];
 		    } else if (plot_controls->plot_options & PLOT_CHANNEL) {
-		      plot_xvalues[ri] = avg_ampphase->f_channel[i][bi][ri];
+		      plot_xvalues[ri] = avg_ampphase->f_channel[i][bi][rj];
 		    }
 		    if (plot_controls->plot_options & PLOT_AMPLITUDE) {
 		      if (plot_controls->plot_options & PLOT_AMPLITUDE_LOG) {
