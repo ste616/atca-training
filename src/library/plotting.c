@@ -134,6 +134,9 @@ void change_spd_plotcontrols(struct spd_plotcontrols *plotcontrols,
     if (plotcontrols->plot_options & PLOT_TVCHANNELS) {
       plotcontrols->plot_options -= PLOT_TVCHANNELS;
     }
+    if (plotcontrols->plot_options & PLOT_AVERAGED_DATA) {
+      plotcontrols->plot_options -= PLOT_AVERAGED_DATA;
+    }
     plotcontrols->plot_options |= *decorations;
   }
   
@@ -2176,10 +2179,8 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
                    ri++, rj--) {
                 if (inverted == YES) {
                   // Swap the frequencies.
-                  if (rp == 0) {
-                    plot_xvalues[ri] =
-                      ampphase_if[polidx[rp]]->f_frequency[i][bi][rj];
-                  }
+		  plot_xvalues[ri] =
+		    ampphase_if[polidx[rp]]->f_frequency[i][bi][rj];
                   if (plot_controls->plot_options & PLOT_AMPLITUDE) {
                     if (plot_controls->plot_options & PLOT_AMPLITUDE_LOG) {
                       LOGAMP(ampphase_if[polidx[rp]]->f_amplitude[i][bi][rj], ylog_max,
@@ -2228,8 +2229,10 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
 		     ri < avg_ampphase->f_nchannels[i][bi]; ri++, rj--) {
 		  if (inverted == YES) {
 		    // Swap the frequencies.
-		    if (rp == 0) {
+		    if (plot_controls->plot_options & PLOT_FREQUENCY) {
 		      plot_xvalues[ri] = avg_ampphase->f_frequency[i][bi][rj];
+		    } else if (plot_controls->plot_options & PLOT_CHANNEL) {
+		      plot_xvalues[ri] = avg_ampphase->f_channel[i][bi][ri];
 		    }
 		    if (plot_controls->plot_options & PLOT_AMPLITUDE) {
 		      if (plot_controls->plot_options & PLOT_AMPLITUDE_LOG) {

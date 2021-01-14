@@ -1526,6 +1526,10 @@ int ampphase_average(struct scan_header_data *scan_header_data,
 	    }
 	  } else if (band_options->averaging_method[ampphase->window] & AVERAGETYPE_MEDIAN) {
 	    if (n_delavg_median[j] > 0) {
+	      qsort(median_delavg_raw[j], n_delavg_median[j], sizeof(float complex),
+		    cmpfunc_complex);
+	      qsort(median_delavg_phase[j], n_delavg_median[j], sizeof(float), cmpfunc_real);
+	      qsort(median_delavg_frequency[j], n_delavg_median[j], sizeof(float), cmpfunc_real);
 	      delavg_raw[j] = fcmedianfc(median_delavg_raw[j], n_delavg_median[j]);
 	      delavg_phase[j] = fmedianf(median_delavg_phase[j], n_delavg_median[j]);
 	      delavg_frequency[j] = fmedianf(median_delavg_frequency[j], n_delavg_median[j]);
@@ -2691,7 +2695,7 @@ void chanaverage_ampphase(struct ampphase *ampphase, struct ampphase *avg_amppha
 	  // Find the unflagged channels required.
 	  while ((unflagged_index < ampphase->f_nchannels[i][j]) &&
 		 (ampphase->f_channel[i][j][unflagged_index] >= k) &&
-		 (ampphase->f_channel[i][j][unflagged_index] < (k + l))) {
+		 (ampphase->f_channel[i][j][unflagged_index] < (k + averaging))) {
 	    median_unflagged_amplitude[n_unflagged_points] =
 	      ampphase->f_amplitude[i][j][unflagged_index];
 	    median_unflagged_phase[n_unflagged_points] =
