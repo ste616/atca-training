@@ -27,7 +27,12 @@
  *  \brief The size of backtrace buffers used in the error handlers
  */
 #define BT_BUFSIZE 100
-
+/*! \def BACKTRACE
+ *  \brief Macro to output the stack location
+ *
+ * This macro is used by each of the following memory macros so that any
+ * memory errors can be debugged using add2line.
+ */
 #define BACKTRACE					\
   do							\
     {							\

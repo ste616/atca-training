@@ -891,10 +891,23 @@ void data_reader(int read_type, int n_rpfits_files,
     }
   }
 
+  half_cycle = -1;
+  for (i = 0; i < n_rpfits_files; i++) {
+    for (j = 0; j < info_rpfits_files[i]->n_scans; j++) {
+      if (info_rpfits_files[i]->n_cycles[j] > 0) {
+	half_cycle = (double)info_rpfits_files[i]->scan_headers[j]->cycle_time / (2.0 * 86400.0);
+	break;
+      }
+    }
+    if (half_cycle > 0) {
+      break;
+    }
+  }
+  
   cache_hit_spectrum_data = false;
   if (read_type & GRAB_SPECTRUM) {
     // Check whether we have a cached product for this.
-    half_cycle = (double)info_rpfits_files[0]->scan_headers[0]->cycle_time / (2.0 * 86400.0);
+    //half_cycle = (double)info_rpfits_files[0]->scan_headers[0]->cycle_time / (2.0 * 86400.0);
     cache_hit_spectrum_data = get_cache_spd_data(*num_options, *ampphase_options, mjd_required,
 						 half_cycle, spectrum_data);
     if (cache_hit_spectrum_data == true) {
@@ -916,7 +929,7 @@ void data_reader(int read_type, int n_rpfits_files,
     // this section.
     if (read_type & GRAB_SPECTRUM) {
       // Does this file encompass the time we want?
-      half_cycle = (double)info_rpfits_files[i]->scan_headers[0]->cycle_time / (2.0 * 86400.0);
+      //half_cycle = (double)info_rpfits_files[i]->scan_headers[0]->cycle_time / (2.0 * 86400.0);
       if ((mjd_required >= (info_rpfits_files[i]->scan_start_mjd[0] - half_cycle)) &&
           (mjd_required <= (info_rpfits_files[i]->scan_end_mjd[info_rpfits_files[i]->n_scans - 1]
                             + half_cycle))) {
@@ -1040,7 +1053,7 @@ void data_reader(int read_type, int n_rpfits_files,
 	    if (cycle_data->num_points == 0) {
 	      // This isn't really usable data.
 	      keep_cycling = false;
-	      free_cycle_data(cycle_data);
+	      /* free_cycle_data(cycle_data); */
 	      FREE(cycle_data);
 	      continue;
 	    }
@@ -1658,10 +1671,10 @@ int main(int argc, char *argv[]) {
   struct rpfitsfile_server_arguments arguments;
   int i, j, k, l, ri, rj, bytes_received, r, n_cycle_mjd = 0, n_client_options = 0;
   int n_alert_sockets = 0, n_ampphase_options = 0, *client_indices = NULL;
-  int removed_client_type, total_n_scans = 0;
+  int removed_client_type, total_n_scans = 0, loop_limit;
   bool pointer_found = false, vis_cache_updated = false, notify_required = false;
   bool spd_cache_updated = false, outside_mjd_range = false, succ = false;
-  bool client_added = false;
+  bool client_added = false, determine_params = false;
   double mjd_grab, earliest_mjd, latest_mjd, mjd_cycletime;
   double *all_cycle_mjd = NULL;
   struct rpfits_file_information **info_rpfits_files = NULL;
@@ -1780,13 +1793,16 @@ int main(int argc, char *argv[]) {
 	      &n_ampphase_options, &ampphase_options,
               info_rpfits_files, &spectrum_data, &vis_data);
   // We can now work out which time range we cover and the cycle time.
-  for (i = 0; i < arguments.n_rpfits_files; i++) {
+  for (i = 0, determine_params = true; i < arguments.n_rpfits_files; i++) {
     total_n_scans += info_rpfits_files[i]->n_scans;
     for (j = 0; j < info_rpfits_files[i]->n_scans; j++) {
-      if ((i == 0) && (j == 0)) {
-        mjd_cycletime = (double)info_rpfits_files[i]->scan_headers[j]->cycle_time / 86400.0;
-        earliest_mjd = info_rpfits_files[i]->scan_start_mjd[j] - (mjd_cycletime / 2.0);
-        latest_mjd = info_rpfits_files[i]->scan_end_mjd[j] + (mjd_cycletime / 2.0);
+      if (determine_params) {
+	if (info_rpfits_files[i]->n_cycles[j] > 0) {
+	  mjd_cycletime = (double)info_rpfits_files[i]->scan_headers[j]->cycle_time / 86400.0;
+	  earliest_mjd = info_rpfits_files[i]->scan_start_mjd[j] - (mjd_cycletime / 2.0);
+	  latest_mjd = info_rpfits_files[i]->scan_end_mjd[j] + (mjd_cycletime / 2.0);
+	  determine_params = false;
+	}
       } else {
         MINASSIGN(earliest_mjd, info_rpfits_files[i]->scan_start_mjd[j] - (mjd_cycletime / 2.0));
         MAXASSIGN(latest_mjd, info_rpfits_files[i]->scan_end_mjd[j] + (mjd_cycletime / 2.0));
@@ -1806,16 +1822,18 @@ int main(int argc, char *argv[]) {
     printf("RPFITS FILE: %s (%d scans):\n",
            info_rpfits_files[i]->filename, info_rpfits_files[i]->n_scans);
     for (j = 0; j < info_rpfits_files[i]->n_scans; j++) {
-      printf("  scan %d (%s, %s) MJD range %.6f -> %.6f (%d c)\n", (j + 1),
-             info_rpfits_files[i]->scan_headers[j]->source_name[0],
-             info_rpfits_files[i]->scan_headers[j]->obstype,
-             info_rpfits_files[i]->scan_start_mjd[j],
-             info_rpfits_files[i]->scan_end_mjd[j],
-             info_rpfits_files[i]->n_cycles[j]);
-      for (k = 0; k < info_rpfits_files[i]->n_cycles[j]; k++) {
-        n_cycle_mjd++;
-        REALLOC(all_cycle_mjd, n_cycle_mjd);
-        all_cycle_mjd[n_cycle_mjd - 1] = info_rpfits_files[i]->cycle_mjd[j][k];
+      if (info_rpfits_files[i]->n_cycles[j] > 0) {
+	printf("  scan %d (%s, %s) MJD range %.6f -> %.6f (%d c)\n", (j + 1),
+	       info_rpfits_files[i]->scan_headers[j]->source_name[0],
+	       info_rpfits_files[i]->scan_headers[j]->obstype,
+	       info_rpfits_files[i]->scan_start_mjd[j],
+	       info_rpfits_files[i]->scan_end_mjd[j],
+	       info_rpfits_files[i]->n_cycles[j]);
+	for (k = 0; k < info_rpfits_files[i]->n_cycles[j]; k++) {
+	  n_cycle_mjd++;
+	  REALLOC(all_cycle_mjd, n_cycle_mjd);
+	  all_cycle_mjd[n_cycle_mjd - 1] = info_rpfits_files[i]->cycle_mjd[j][k];
+	}
       	/* printf("    cycle %d: MJD %.8f\n", (k + 1), info_rpfits_files[i]->cycle_mjd[j][k]); */
       }
     }
@@ -1826,9 +1844,20 @@ int main(int argc, char *argv[]) {
   // something if required to.
   printf("Preparing for operation...\n");
   srand(time(NULL));
-  ri = rand() % arguments.n_rpfits_files;
-  rj = rand() % info_rpfits_files[ri]->n_scans;
-  mjd_grab = info_rpfits_files[ri]->scan_start_mjd[rj] + 10.0 / 86400.0;
+  mjd_grab = -1;
+  loop_limit = 0;
+  while ((mjd_grab < 0) && (loop_limit < 10)) {
+    ri = rand() % arguments.n_rpfits_files;
+    rj = rand() % info_rpfits_files[ri]->n_scans;
+    if (info_rpfits_files[ri]->n_cycles[rj] > 0) {
+      mjd_grab = info_rpfits_files[ri]->scan_start_mjd[rj] + 10.0 / 86400.0;
+    }
+    loop_limit++;
+  }
+  if (mjd_grab < 0) {
+    printf(" Unable to find a usable random grab of data to begin!\n");
+    exit(1);
+  }
   printf(" grabbing from random scan %d from file %d, MJD %.6f\n", rj, ri, mjd_grab);
   data_reader(GRAB_SPECTRUM | COMPUTE_VIS_PRODUCTS, arguments.n_rpfits_files, mjd_grab, -1, -1,
               &n_ampphase_options, &ampphase_options, info_rpfits_files, &spectrum_data, &vis_data);
@@ -2727,9 +2756,11 @@ int main(int argc, char *argv[]) {
   // We're finished, free all our memory.
   for (i = 0; i < arguments.n_rpfits_files; i++) {
     for (j = 0; j < info_rpfits_files[i]->n_scans; j++) {
-      free_scan_header_data(info_rpfits_files[i]->scan_headers[j]);
-      FREE(info_rpfits_files[i]->scan_headers[j]);
-      FREE(info_rpfits_files[i]->cycle_mjd[j]);
+      if (info_rpfits_files[i]->n_cycles[j] > 0) {
+	free_scan_header_data(info_rpfits_files[i]->scan_headers[j]);
+	FREE(info_rpfits_files[i]->scan_headers[j]);
+	FREE(info_rpfits_files[i]->cycle_mjd[j]);
+      }
     }
     FREE(info_rpfits_files[i]->scan_headers);
     FREE(info_rpfits_files[i]->scan_start_mjd);

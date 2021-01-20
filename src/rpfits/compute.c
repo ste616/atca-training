@@ -1621,6 +1621,7 @@ int ampphase_average(struct scan_header_data *scan_header_data,
   FREE(median_delavg_phase);
   FREE(median_delavg_raw);
   FREE(median_delavg_frequency);
+  FREE(n_delavg_median);
   
   return 0;
 }
