@@ -9,6 +9,8 @@
  */
 #include <stdlib.h>
 #include <stdio.h>
+#include <execinfo.h>
+#include <unistd.h>
 
 #pragma once
 
@@ -21,6 +23,29 @@
  *  \brief This is the error message that will be emitted if REALLOC fails.
  */
 #define ERROR_REALLOC_MESSAGE "Reallocation failed"
+/*! \def BT_BUFSIZE
+ *  \brief The size of backtrace buffers used in the error handlers
+ */
+#define BT_BUFSIZE 100
+
+#define BACKTRACE					\
+  do							\
+    {							\
+      int j, nptrs;					\
+      void *buffer[BT_BUFSIZE];				\
+      char **strings;					\
+      nptrs = backtrace(buffer, BT_BUFSIZE);		\
+      strings = backtrace_symbols(buffer, nptrs);	\
+      if (strings == NULL) {				\
+	perror("backtrace_symbols failed");		\
+      }	else {						\
+	for (j = 0; j < nptrs; j++) {			\
+	  printf("%s\n", strings[j]);			\
+	}						\
+	free(strings);					\
+      }							\
+    }							\
+  while(0)
 
 /*! \def MALLOC
  *  \brief A convenience wrapper around malloc with error checking and a
@@ -43,6 +68,7 @@
       if ( !( (p) = malloc(sizeof(*(p)) * (n)) ) )  \
         {                                           \
           perror(ERROR_MALLOC_MESSAGE);             \
+	  BACKTRACE;				    \
           exit(EXIT_FAILURE);                       \
         }                                           \
     }                                               \
@@ -69,6 +95,7 @@
       if ( !( (p) = calloc((n), sizeof(*(p))) ) ) \
         {                                         \
           perror(ERROR_MALLOC_MESSAGE);           \
+	  BACKTRACE;				  \
           exit(EXIT_FAILURE);                     \
         }                                         \
     }                                             \
@@ -92,6 +119,7 @@
       if ( !( (p) = realloc((p), sizeof(*(p)) * (n)) ) )  \
         {                                                 \
           perror(ERROR_REALLOC_MESSAGE);                  \
+	  BACKTRACE;					  \
           exit(EXIT_FAILURE);				  \
         }                                                 \
     }                                                     \

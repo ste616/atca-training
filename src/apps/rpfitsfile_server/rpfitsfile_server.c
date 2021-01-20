@@ -1037,6 +1037,14 @@ void data_reader(int read_type, int n_rpfits_files,
 		continue;
 	      }
             }
+	    if (cycle_data->num_points == 0) {
+	      // This isn't really usable data.
+	      keep_cycling = false;
+	      free_cycle_data(cycle_data);
+	      FREE(cycle_data);
+	      continue;
+	    }
+	    
             // HERE WILL GO THE LOGIC TO WORK OUT IF WE WANT TO DO
             // SOMETHING WITH THIS CYCLE
             cycle_mjd = date2mjd(sh->obsdate, cycle_data->ut_seconds);
@@ -1153,11 +1161,11 @@ void data_reader(int read_type, int n_rpfits_files,
                     }
                     if ((read_type & COMPUTE_VIS_PRODUCTS) && (nocompute == false)) {
                       /* MALLOC(local_ampphase_options, 1); */
-		      for (j = 0; j < local_num_options; j++) {
-			free_ampphase_options(local_ampphase_options[j]);
-			set_default_ampphase_options(local_ampphase_options[j]);
-			copy_ampphase_options(local_ampphase_options[j], (*ampphase_options)[j]);
-		      }
+		      /* for (j = 0; j < local_num_options; j++) { */
+		      /* 	free_ampphase_options(local_ampphase_options[j]); */
+		      /* 	set_default_ampphase_options(local_ampphase_options[j]); */
+		      /* 	copy_ampphase_options(local_ampphase_options[j], (*ampphase_options)[j]); */
+		      /* } */
                       /* fprintf(stderr, "[data_reader] calculating vis products\n"); */
                       ampphase_average(sh, temp_spectrum->spectrum[idx_if][idx_pol],
                                        &((*vis_data)->vis_quantities[(*vis_data)->nviscycles][idx_if][idx_pol]),
@@ -1253,12 +1261,16 @@ void data_reader(int read_type, int n_rpfits_files,
 	// We also need to deallocate the scan header.
 	header_free = true;
 	// Change the size of the arrays.
-	REALLOC(info_rpfits_files[i]->scan_headers, n);
-	REALLOC(info_rpfits_files[i]->scan_start_mjd, n);
-	REALLOC(info_rpfits_files[i]->scan_end_mjd, n);
-	REALLOC(info_rpfits_files[i]->n_cycles, n);
-	REALLOC(info_rpfits_files[i]->cycle_mjd, n);
-	info_rpfits_files[i]->n_scans = n;
+	if (n > 0) {
+	  // Don't change the size of the arrays if this cycle is the
+	  // first one!
+	  REALLOC(info_rpfits_files[i]->scan_headers, n);
+	  REALLOC(info_rpfits_files[i]->scan_start_mjd, n);
+	  REALLOC(info_rpfits_files[i]->scan_end_mjd, n);
+	  REALLOC(info_rpfits_files[i]->n_cycles, n);
+	  REALLOC(info_rpfits_files[i]->cycle_mjd, n);
+	  info_rpfits_files[i]->n_scans = n;
+	}
       }
 
       if (header_free) {

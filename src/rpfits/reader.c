@@ -666,7 +666,7 @@ int read_cycle_data(struct scan_header_data *scan_header_data,
       } else if (this_jstat == JSTAT_HEADERNOTDATA) {
         /* printf("READER: while reading data, hit a header with %d entries\n", */
         /*        fg_.n_fg); */
-        
+        rv = READER_HEADER_AVAILABLE;
       }
     } else if (rpfits_result == 0) {
       fprintf(stderr, "While reading data, rpfitsin encountered an error\n");
@@ -812,6 +812,12 @@ int read_cycle_data(struct scan_header_data *scan_header_data,
   }
 
   cycle_data->n_baselines = bidx - 1;
+
+  if (cycle_data->num_points == 0) {
+    // We didn't actually get any data from this header, we reset some
+    // possibly erroneous quantities.
+    cycle_data->ut_seconds = 0;
+  }
   
   return(rv);
   
