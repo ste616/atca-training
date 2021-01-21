@@ -15,17 +15,48 @@
 #include <string.h>
 #include <compute.h>
 
+/*! \def ISVALIDSOCKET
+ *  \brief Check that some variable is a valid network socket
+ *  \param s the variable to check, of type SOCKET
+ *  \returns 0 if the variable is not a valid socket, or 1 if it is valid
+ */
 #define ISVALIDSOCKET(s) ((s) >= 0)
+/*! \def CLOSESOCKET
+ *  \brief Close the socket
+ *  \param s the SOCKET variable
+ */
 #define CLOSESOCKET(s) close(s)
+/*! \def GETSOCKETERRNO
+ *  \brief Return the current error number
+ *  \returns the current error number
+ */
 #define GETSOCKETERRNO() (errno)
+/*! \def SOCKET
+ *  \brief A convenience definition for the SOCKET type, to allow for
+ *         easy cross-platform compatibility
+ *
+ * For Linux systems, SOCKET is int type.
+ */
 #define SOCKET int
 
 #define DEBUG_NBYTES 16
 #define SOCKBUFSIZE 1024
 #define CLIENTIDLENGTH 20
 
+/*! \def SERVERTYPE_SIMULATOR
+ *  \brief The server makes pre-made data available and allows for
+ *         recomputation of average variables
+ */
 #define SERVERTYPE_SIMULATOR  1
+/*! \def SERVERTYPE_CORRELATOR
+ *  \brief The server is a real-time correlator
+ */
 #define SERVERTYPE_CORRELATOR 2
+/*! \def SERVERTYPE_TESTING
+ *  \brief The server makes pre-made data available and will present
+ *         questions to test the user about their understanding of the
+ *         system
+ */
 #define SERVERTYPE_TESTING    3
 
 #define CLIENTTYPE_NSPD  1

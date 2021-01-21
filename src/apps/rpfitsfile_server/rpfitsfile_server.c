@@ -2138,6 +2138,7 @@ int main(int argc, char *argv[]) {
                   strncpy(child_request.client_id, client_request.client_id, CLIENTIDLENGTH);
 		  strncpy(child_request.client_username, client_request.client_username,
 			  CLIENTIDLENGTH);
+		  child_request.client_type = CLIENTTYPE_CHILD;
                   MALLOC(child_send_buffer, RPSENDBUFSIZE);
                   init_cmp_memory_buffer(&child_cmp, &child_mem, child_send_buffer,
                                          (size_t)RPSENDBUFSIZE);

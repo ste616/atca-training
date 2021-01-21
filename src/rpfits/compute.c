@@ -1445,6 +1445,8 @@ int ampphase_average(struct scan_header_data *scan_header_data,
   if (n_delavg_expected < 1) n_delavg_expected = 1;
   /* fprintf(stderr, "[ampphase_average] allocating memory for %d delay-averaged samples\n", */
   /*         n_delavg_expected); */
+  // Safety.
+  n_delavg_expected += 1;
   CALLOC(delavg_frequency, n_delavg_expected);
   CALLOC(delavg_phase, n_delavg_expected);
   CALLOC(delavg_raw, n_delavg_expected);
