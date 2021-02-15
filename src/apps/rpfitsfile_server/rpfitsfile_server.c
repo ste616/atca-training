@@ -1684,7 +1684,7 @@ int main(int argc, char *argv[]) {
   FILE *fh = NULL;
   cmp_ctx_t cmp, child_cmp;
   cmp_mem_access_t mem, child_mem;
-  struct addrinfo hints, *bind_address;
+  struct addrinfo hints, *bind_address, *addrinfo = NULL;
   char port_string[RPSBUFSIZE], address_buffer[RPSBUFSIZE], clienttype_string[RPSBUFSIZE];
   char *recv_buffer = NULL, *send_buffer = NULL, *child_send_buffer = NULL;
   char removed_id[CLIENTIDLENGTH], removed_username[CLIENTIDLENGTH];
@@ -1912,10 +1912,15 @@ int main(int argc, char *argv[]) {
       return(1);
     }
 
-    printf("Binding socket to local address...\n");
-    if (bind(socket_listen, bind_address->ai_addr, bind_address->ai_addrlen)) {
-      fprintf(stderr, "bind() failed. (%d)\n", GETSOCKETERRNO());
-      return(1);
+    printf("Binding sockets...\n");
+    addrinfo = bind_address;
+    while (addrinfo != NULL) {
+      printf("   to %s\n", addrinfo->ai_canonname);
+      if (bind(socket_listen, addrinfo->ai_addr, addrinfo->ai_addrlen)) {
+	fprintf(stderr, "bind() failed. (%d)\n", GETSOCKETERRNO());
+	return(1);
+      }
+      addrinfo = addrinfo->ai_next;
     }
     freeaddrinfo(bind_address);
 
@@ -2131,7 +2136,7 @@ int main(int argc, char *argv[]) {
 			    &n_client_options, &client_options, info_rpfits_files,
 			    &spectrum_data, &child_vis_data);
                 // We send the data back to our parent over the network.
-                if (prepare_client_connection("localhost", arguments.port_number,
+                if (prepare_client_connection("127.0.0.1", arguments.port_number,
                                               &child_socket, false)) {
                   // We have a connection.
                   child_request.request_type = CHILDREQUEST_VISDATA_COMPUTED;
@@ -2389,7 +2394,7 @@ int main(int argc, char *argv[]) {
 			    &n_client_options, &client_options, info_rpfits_files,
 			    &child_spectrum_data, NULL);
                 // We send the data back to our parent over the network.
-                if (prepare_client_connection("localhost", arguments.port_number,
+                if (prepare_client_connection("127.0.0.1", arguments.port_number,
                                               &child_socket, false)) {
                   // We have a connection.
                   child_request.request_type = CHILDREQUEST_SPECTRUM_MJD;
