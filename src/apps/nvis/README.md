@@ -70,4 +70,55 @@ working out which clients have requested what in the logs from
 
 The `NVIS>` prompt will appear whenever `nvis` is ready to accept commands.
 
+### Display
 
+`nvis` shares many of the same display qualities as `vis`, so as to ensure
+that if you're familiar with examining `nvis` you'll be at ease
+with `vis` when you're actually in control of the telescope.
+
+Some things are different however, in order to make it clearer what is
+being displayed. For example, instead of having the source name and central
+frequencies of the two "calibration" IFs being jammed up at the top-right
+of the display like `vis`, `nvis` shows the IFs being displayed, and their
+frequencies underneath that. You may also display more than three panels if
+you'd like, which is something that `vis` cannot do. At the moment, `nvis`
+does not however have the symbol legend that `vis` does at the top of the display,
+but this may come in future updates.
+
+You cannot currently use any x-axis other than time with `nvis` either, but
+this will also be rectified as development continues; it is intended that
+`nvis` will be used in the BIGCAT era.
+
+To change which panels `nvis` displays, you can give a panel specifier in much
+the same way as `vis`. For example, the following two commands are identical,
+and will cause both `vis` and `nvis` to show the "Amplitude", "Phase" and
+"Delay" plots (in that order, from top to bottom), with "UT" along the x-axis.
+
+```
+apd-t
+```
+
+```
+tapd
+```
+
+In the first example, the x-axis is given as the last character, after the
+`-`, while in the first example the x-axis is given as the first character.
+Each other character instructs `nvis` about which panels to display, in order
+from top to bottom; in this case "a" (Amplitude), "p" (Phase) and "d" (Delay).
+
+The complete list of all panels available to display in `nvis` is given in the
+table below, along with a brief description if necessary. This list is given in
+alphabetical order, and each character specification is case-sensitive.
+
+Character | Panel Displayed
+--------- | ---------------
+a         | Amplitude: the average amplitude on each baseline per cycle
+C         | Computed System Temperature: the system temperature of each antenna, as computed using the options currently supplied by this client
+d         | Delay: the delay error as determined by examining the phases as a function of frequency
+D         | Wind Direction: the direction the wind is coming from
+
+### Interactive commands
+
+Like `vis`, what `nvis` displays is controlled by commands given at the
+`NVIS>` prompt. This section describes the commands that `nvis` understands.
