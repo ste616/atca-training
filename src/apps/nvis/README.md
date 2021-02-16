@@ -54,7 +54,7 @@ whenever changes are made in any other client. The username can be anything,
 but only the first 20 characters are used.
 
 Upon start, you will see something like the following appear in your terminal
-(assuming you've connected to an `rpfitsfile_server`.
+(assuming you've connected to an `rpfitsfile_server`):
 
 ```
  $ ./nvis -d /xs -s localhost -u abc123
