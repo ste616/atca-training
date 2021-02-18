@@ -164,3 +164,20 @@ as `sel` or `select`, or even `sele`, but not `se`.
 
 Format: **sel**ect [*products*]
 
+This command selects which products are available to show in each panel. You may
+specify any number of products in a single
+command, but only the first 16 matching products will be shown in each panel.
+
+Each product can be specified as the baseline pair and a polarisation spec. For
+example, to show the A-polarisation cross-correlation on the baseline formed
+by antennas 1 and 4, you can give the command `select 14aa`. Each panel showing
+baseline products would then display only a single line, while panels showing
+single antenna products would display only antennas 1 and 4.
+
+You can specify any number of those products. For example `select 14aa 25bb 36cc`.
+
+Any missing information in this specification acts as a wildcard. For example,
+`sel 1aa` displays all the baselines available in the array specification which
+contain antenna 1. Again, you can specify any number of those products, and
+`nvis` will ensure that any products common to multiple specifications are
+shown only once.

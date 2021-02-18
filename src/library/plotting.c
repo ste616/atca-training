@@ -873,14 +873,13 @@ void add_vis_line(struct vis_line ***vis_lines, int *n_vis_lines,
                   int pol, int colour, int line_style,
                   struct scan_header_data *header_data) {
   struct vis_line *new_line = NULL;
+  int i;
   double dx, dy, dz;
   char polname[8];
   // Add a potential vis line.
-  *n_vis_lines += 1;
-  REALLOC(*vis_lines, *n_vis_lines);
   MALLOC(new_line, 1);
-  new_line->ant1 = ant1;
-  new_line->ant2 = ant2;
+  new_line->ant1 = (ant1 < ant2) ? ant1 : ant2;
+  new_line->ant2 = (ant1 < ant2) ? ant2 : ant1;
   strncpy(new_line->if_label, if_label, BUFSIZE);
   new_line->pol = pol;
   pol_to_vis_name(new_line->pol, ifnum, polname);
@@ -900,6 +899,21 @@ void add_vis_line(struct vis_line ***vis_lines, int *n_vis_lines,
   } else {
     new_line->line_style = line_style;
   }
+
+  // Check if this line is already on the list.
+  for (i = 0; i < *n_vis_lines; i++) {
+    if (((*vis_lines)[i]->ant1 == new_line->ant1) &&
+	((*vis_lines)[i]->ant2 == new_line->ant2) &&
+	((*vis_lines)[i]->pol == new_line->pol) &&
+	(strncmp((*vis_lines)[i]->if_label, new_line->if_label, BUFSIZE) == 0)) {
+      // We don't need to add this.
+      FREE(new_line);
+      return;
+    }
+  }
+  
+  *n_vis_lines += 1;
+  REALLOC(*vis_lines, *n_vis_lines);
   
   (*vis_lines)[*n_vis_lines - 1] = new_line;
 }
@@ -1127,6 +1141,7 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
   for (p = 0, n_vis_lines = 0, n_tsys_vis_lines = 0;
        p < plot_controls->nproducts; p++) {
     // Check if only a single antenna is requested.
+    singleant = -1;
     for (i = 1; i <= MAXANTS; i++) {
       if ((plot_controls->vis_products[p]->antenna_spec == (1<<i)) &&
           (plot_controls->array_spec & (1<<i))) {
@@ -1137,8 +1152,8 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
     for (i = 1; i <= MAXANTS; i++) {
       if (((1 << i) & plot_controls->array_spec) &&
           (((1 << i) & plot_controls->vis_products[p]->antenna_spec) ||
-           (singleant > i))) {
-        for (j = i; j <= MAXANTS; j++) {
+           ((singleant > 0) && (singleant != i)))) {
+        for (j = (singleant > 0) ? 1 : i; j <= MAXANTS; j++) {
           if (((1 << j) & plot_controls->array_spec) &&
               ((1 << j) & plot_controls->vis_products[p]->antenna_spec)) {
             if (i != j) {
