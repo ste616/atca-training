@@ -117,6 +117,39 @@ a         | Amplitude: the average amplitude on each baseline per cycle
 C         | Computed System Temperature: the system temperature of each antenna, as computed using the options currently supplied by this client
 d         | Delay: the delay error as determined by examining the phases as a function of frequency
 D         | Wind Direction: the direction the wind is coming from
+G         | GTP: the gated total power measured online
+H         | Humidity: as reported by the site weather station
+n         | The amplitude of the noise diode in Jy: this is measured per antenna
+N         | SDO: the synchronously-demodulated output measured online
+p         | Phase: the average phase on each baseline per cycle
+P         | Pressure: as reported by the site weather station
+R         | Rain Gauge: as reported by the site weather station
+S         | System Temperature: the system temperature of each antenna, as computed online by the correlator using the options that were set during the observation
+t         | Time: the UTC, can be used as an x-axis
+T         | Temperature: as reported by the site weather station
+V         | Wind Speed: as reported by the site weather station
+X         | Seeing Monitor Phase: the phase measured on the seeing monitor interferometer
+Y         | Seeing Monitor RMS Phase: the phase RMS noise measured on the seeing monitor interferometer
+
+For each panel, a label indicating what it is can be found on the left of the
+display, and the units being plotted on the right. The axis scaling is usually
+alternated between the left and right to ensure that the numbers don't collide
+between adjacent panels.
+
+At the bottom of the display is the colour key between baselines, polarisations
+and colours. Up to 16 different lines can be plotted, and for all panels which
+display baselines (even auto-correlated baselines), the colour key will apply.
+
+For measurements that do not depend on baselines (like the weather station
+parameters), only a single line will be shown, and it will usually be white-ish.
+
+For parameters that depend on antenna only (like system temperatures), the line
+colours are specified by the antenna colours shown next to the "Ants:" label at
+the top of the display. In addition, as shown in the image below, a key between
+line style and polarisation will be displayed to the right of the antenna colour
+key.
+
+![nvis display with antenna-based parameters](nvis_antenna_display.png)
 
 ### Interactive commands
 
