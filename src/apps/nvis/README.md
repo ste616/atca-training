@@ -155,3 +155,12 @@ key.
 
 Like `vis`, what `nvis` displays is controlled by commands given at the
 `NVIS>` prompt. This section describes the commands that `nvis` understands.
+
+Each command can be given with minimum match; the minimum string is given
+for each command below in **bold**. For example, you may give the **sel**ect command
+as `sel` or `select`, or even `sele`, but not `se`.
+
+#### select
+
+Format: **sel**ect [*products*]
+
