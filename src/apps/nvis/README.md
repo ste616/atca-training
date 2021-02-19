@@ -160,9 +160,38 @@ Each command can be given with minimum match; the minimum string is given
 for each command below in **bold**. For example, you may give the **sel**ect command
 as `sel` or `select`, or even `sele`, but not `se`.
 
+#### array
+
+Format: **arr**ay *antennas*
+
+This command selects which antennas are available to show in each panel.
+This interacts with the select command to decide which products to show.
+
+You can specify which antennas to include either as a list or a string.
+For example:
+`arr 1 2 3 4 5` would allow any products that only include antennas 1 through 5
+inclusive. This is equivalent to the more traditional `vis` format of
+`array 12345`.
+
+#### history
+
+Format: **hist**ory *time range* [*start time offset*]
+
+This command tells `nvis` how much historical data to display. If only one
+argument is given to this command, then both *time range* and
+*start time offset* become this argument. For example, `hist 10m` is equivalent
+to saying "display 10m of data starting 10m ago".
+
+Another example: `hist 20m 1h` displays 20m of data, starting from 1h ago. That
+is, if 0 is the present moment, `nvis` would display data from between -60m and
+-40m.
+
+Examples of valid time strings accepted by this command: `30s`, `20m`, `2h`,
+`2h20m`, `1d14h`.
+
 #### select
 
-Format: **sel**ect [*products*]
+Format: **sel**ect *products*
 
 This command selects which products are available to show in each panel. You may
 specify any number of products in a single
