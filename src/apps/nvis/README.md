@@ -177,6 +177,37 @@ inclusive. This is equivalent to the more traditional `vis` format of
 
 #### data
 
+Format: **dat**a [*time*]
+
+This command tells `nvis` to output the details of the observation configuration.
+If *time* is not specified, `nvis` will output details for the most recent
+integration, otherwise it will output the details for the integration closest
+to the *time* specified.
+
+The output will look similar to the following:
+
+```
+NVIS> data
+DATA AT 2021-01-16  23:04:54:
+  HAS 2 IFS CYCLE TIME 10
+  SOURCE 1934-638        OBSTYPE 
+ IF 1: CF 2100.00 MHz NCHAN 2049 BW 2048 MHz (AA BB AB)
+ IF 2: CF 2100.00 MHz NCHAN 2049 BW 2048 MHz (CC DD CD)
+```
+
+The time at the midpoint of the cycle selected is shown, along with information
+including:
+* how many IFs were configured
+* the cycle time
+* the name of the source being observed
+* the observation type of the scan
+* the configuration of each IF, including:
+  * the centre frequency
+  * the number of channels
+  * the total bandwidth
+  * and when the IF is selected as one of the calbands, the polarisation
+    letters that can be used in `nvis` are shown in parentheses
+
 #### delavg
 
 #### history
