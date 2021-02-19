@@ -498,37 +498,53 @@ static void interpret_command(char *line) {
       } else if (nels > 1) {
         // Get the panel type from the second argument.
         change_panel = VIS_PLOTPANEL_ALL;
-        if (minmatch("amplitude", line_els[1], 1)) {
+        if (minmatch("amplitude", line_els[1], 1) ||
+	    (strcmp(line_els[1], "a") == 0)) {
           change_panel = VIS_PLOTPANEL_AMPLITUDE;
-        } else if (minmatch("phase", line_els[1], 1)) {
+        } else if (minmatch("phase", line_els[1], 1) ||
+		   (strcmp(line_els[1], "p") == 0)) {
           change_panel = VIS_PLOTPANEL_PHASE;
-        } else if (minmatch("delay", line_els[1], 1)) {
+        } else if (minmatch("delay", line_els[1], 1) ||
+		   (strcmp(line_els[1], "d") == 0)) {
           change_panel = VIS_PLOTPANEL_DELAY;
-        } else if (minmatch("temperature", line_els[1], 4)) {
+        } else if (minmatch("temperature", line_els[1], 4) ||
+		   (strcmp(line_els[1], "T") == 0)) {
           change_panel = VIS_PLOTPANEL_TEMPERATURE;
-        } else if (minmatch("pressure", line_els[1], 4)) {
+        } else if (minmatch("pressure", line_els[1], 4) ||
+		   (strcmp(line_els[1], "P") == 0)) {
           change_panel = VIS_PLOTPANEL_PRESSURE;
-        } else if (minmatch("humidity", line_els[1], 4)) {
+        } else if (minmatch("humidity", line_els[1], 4) ||
+		   (strcmp(line_els[1], "H") == 0)) {
           change_panel = VIS_PLOTPANEL_HUMIDITY;
-        } else if (minmatch("systemp", line_els[1], 4)) {
+        } else if (minmatch("systemp", line_els[1], 4) ||
+		   (strcmp(line_els[1], "S") == 0)) {
           change_panel = VIS_PLOTPANEL_SYSTEMP;
-        } else if (minmatch("windspeed", line_els[1], 5)) {
+        } else if (minmatch("windspeed", line_els[1], 5) ||
+		   (strcmp(line_els[1], "V") == 0)) {
           change_panel = VIS_PLOTPANEL_WINDSPEED;
-        } else if (minmatch("winddirection", line_els[1], 5)) {
+        } else if (minmatch("winddirection", line_els[1], 5) ||
+		   (strcmp(line_els[1], "D") == 0)) {
           change_panel = VIS_PLOTPANEL_WINDDIR;
-        } else if (minmatch("rain", line_els[1], 3)) {
+        } else if (minmatch("rain", line_els[1], 3) ||
+		   (strcmp(line_els[1], "R") == 0)) {
           change_panel = VIS_PLOTPANEL_RAINGAUGE;
-        } else if (minmatch("seemonphase", line_els[1], 7)) {
+        } else if (minmatch("seemonphase", line_els[1], 7) ||
+		   (strcmp(line_els[1], "X") == 0)) {
           change_panel = VIS_PLOTPANEL_SEEMONPHASE;
-        } else if (minmatch("seemonrms", line_els[1], 7)) {
+        } else if (minmatch("seemonrms", line_els[1], 7) ||
+		   (strcmp(line_els[1], "Y") == 0)) {
           change_panel = VIS_PLOTPANEL_SEEMONRMS;
-        } else if (minmatch("computed_systemp", line_els[1], 4)) {
+        } else if (minmatch("computed_systemp", line_els[1], 4) ||
+		   (strcmp(line_els[1], "C") == 0)) {
           change_panel = VIS_PLOTPANEL_SYSTEMP_COMPUTED;
-        } else if (minmatch("gtp", line_els[1], 3)) {
+        } else if (minmatch("gtp", line_els[1], 3) ||
+		   (strcmp(line_els[1], "G") == 0)) {
           change_panel = VIS_PLOTPANEL_GTP;
-        } else if (minmatch("sdo", line_els[1], 3)) {
+        } else if (minmatch("sdo", line_els[1], 3) ||
+		   (strcmp(line_els[1], "N") == 0)) {
           change_panel = VIS_PLOTPANEL_SDO;
-        } else if (minmatch("caljy", line_els[1], 3)) {
+        } else if (minmatch("caljy", line_els[1], 3) ||
+		   (strcmp(line_els[1], "n") == 0)) {
           change_panel = VIS_PLOTPANEL_CALJY;
         }
         if (change_panel != VIS_PLOTPANEL_ALL) {
@@ -645,8 +661,8 @@ static void interpret_command(char *line) {
         action_required = ACTION_AMPPHASE_OPTIONS_PRINT;
       }
     } else if (minmatch("onsource", line_els[0], 3)) {
-      CHECKSIMULATOR;
       // Change whether we display data while off-source.
+      CHECKSIMULATOR;
       for (i = 0; i < n_ampphase_options; i++) {
 	if (i == 0) {
 	  if (ampphase_options[i]->include_flagged_data == YES) {
@@ -663,6 +679,7 @@ static void interpret_command(char *line) {
     } else if (minmatch("tsys", line_els[0], 4)) {
       // Tell the simulator to recompute visibilities based on some
       // version of the system temperature.
+      CHECKSIMULATOR;
       tsys_apply = -1;
       if (nels == 2) {
 	CHECKSIMULATOR;

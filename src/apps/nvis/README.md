@@ -173,6 +173,12 @@ For example:
 inclusive. This is equivalent to the more traditional `vis` format of
 `array 12345`.
 
+#### calband
+
+#### data
+
+#### delavg
+
 #### history
 
 Format: **hist**ory *time range* [*start time offset*]
@@ -188,6 +194,37 @@ is, if 0 is the present moment, `nvis` would display data from between -60m and
 
 Examples of valid time strings accepted by this command: `30s`, `20m`, `2h`,
 `2h20m`, `1d14h`.
+
+#### onsource
+
+Format: **ons**ource
+
+This command toggles whether the panels should show data from when the
+array was not on-source. The array is considered on-source if all the antennas
+in the array specification are tracking the same source position.
+
+#### print
+
+#### scale
+
+Format: **sca**le [*panel name* [*min value* *max value*]]
+
+This command sets the y-axis scaling for a panel. If no arguments are given,
+then all panel y-axis ranges are reset to contain all the data (the default).
+
+The *panel name* is one of the following (the minimum match is shown in bold
+for each name, and the short letter name of the panel, as used for select is
+given in parentheses; either is usable): **a**mplitude (a), **p**hase (p),
+**d**elay (d), **temp**erature (T), **pres**sure (P), **humi**dity (H),
+**winds**peed (V), **windd**irection (D), **rai**n (R), **seemonp**hase (X),
+**seemonr**ms (Y), **comp**uted_systemp (C), **gtp** (G), **sdo** (N),
+**cal**jy (n).
+
+If only the *panel name* is supplied, that panel's y-axis range is reset to
+the default, but no other panel is affected.
+
+Otherwise, you may set manually the minimum and maximum values to use for
+that particular panel. You must supply both the minimum and maximum values.
 
 #### select
 
@@ -210,3 +247,24 @@ Any missing information in this specification acts as a wildcard. For example,
 contain antenna 1. Again, you can specify any number of those products, and
 `nvis` will ensure that any products common to multiple specifications are
 shown only once.
+
+#### sort
+
+Format: **sor**t [*on/off*]
+
+This command specifies the way to sort the baselines in terms of the
+colour key.
+
+If used without an argument, it acts as a toggle. If the command
+`sort on` is used, then the baselines are ordered in ascending length order,
+otherwise they are ordered numerically; this is 12, 13, 14, ..., 45, 46, 56.
+
+This command always prints the sorting order method to the
+controlling terminal.
+
+#### tsys
+
+#### tvchannel
+
+#### tvmedian
+
