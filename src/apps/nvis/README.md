@@ -180,9 +180,11 @@ inclusive. This is equivalent to the more traditional `vis` format of
 Format: **dat**a [*time*]
 
 This command tells `nvis` to output the details of the observation configuration.
-If *time* is not specified, `nvis` will output details for the most recent
-integration, otherwise it will output the details for the integration closest
-to the *time* specified.
+If *time* is not specified, `nvis` will output details for the most recently
+specified time, and if no time was previously specified, for the most recent
+integration. Otherwise it will output the details for the integration closest
+to the *time* specified. The *time* can be specified like `13:28:10` or
+`19:21`.
 
 The output will look similar to the following:
 
@@ -207,6 +209,9 @@ including:
   * the total bandwidth
   * and when the IF is selected as one of the calbands, the polarisation
     letters that can be used in `nvis` are shown in parentheses
+
+If a *time* has been specified, a dashed vertical line will be displayed at
+that exact time - not at the midpoint of the nearest cycle.
 
 #### delavg
 
