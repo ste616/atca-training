@@ -35,9 +35,12 @@ ATCA observer or duty astronomer.
 
 [`nvis`](src/apps/nvis/)
 
-Soon, we will put links here to the usage guides for `rpfitsfile_server`, `nvis` and `nspd`.
+Soon, we will put links here to the usage guides for `rpfitsfile_server`, `nvis`
+and `nspd`.
 
 Soon, we will put links here to individual tutorials.
 
 ## About this package
-This software was written and tested by Jamie Stevens (ste616@gmail.com, or Jamie.Stevens@csiro.au) in 2020/2021. It is licenced under the GPLv3 open source licence.
+This software was written and tested by Jamie Stevens (ste616@gmail.com, or
+Jamie.Stevens@csiro.au) in 2020/2021. It is licenced under the GPLv3 open
+source licence.
