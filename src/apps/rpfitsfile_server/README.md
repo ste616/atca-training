@@ -62,3 +62,49 @@ presented to any new `nvis` clients.
 
 When these initial reads are finished, the server will begin listening for
 connections.
+
+### Data manipulation
+
+While reading the data from the RPFITS files, a set of default options
+is created for each different configuration found, with each configuration
+being a different set of continuum central frequencies.
+
+Each set of options consists of the following parameters:
+* the units of the phase: default is to make phase in units of degrees,
+  but can be set to radians
+* whether to include flagged data: the default is not to include any
+  flagged data in the computations
+* how to correct the data for system temperature: by default, the
+  data is left as it was written, which normally means that the correlator
+  has made some online corrections, but it can also be uncorrected, or
+  it can be corrected by the system temperatures that are computed by
+  `rpfitsfile_server`
+* the tvchannel range: the range of channels to use when averaging the
+  data before presenting it to an `nvis` client; this range can be set
+  independently for each frequency window, and the default is dependent
+  on which frequency band it is
+* the delay averaging: the number of channels within the tvchannel range
+  to average together before computing the phase which will be used to
+  calculate the delay error; this parameter can be set independently for
+  each frequency window, and the default is 1
+* the averaging method: how to average data across the tvchannel range;
+  this parameter can be set indepedently for each frequency window, and by
+  default it is set to scalar mean averaging
+
+The clients can send their desired options sets to this server, and the
+data will be re-read from the files and new computations performed before
+sending the data back. The server also keeps a cache so that if a request
+is made with options it has seen before, it can immediately return the
+pre-computed data rather than having to re-read it from file.
+
+A cache is also kept for each user, so that if the same user connects
+with multiple clients, each of the clients is kept synchronised with
+changes to the options made by any one of the clients. For example, if
+the tvchannel range is changed by a user via their `nvis` client, their
+`nspd` client will also be given new data reflecting the change.
+
+### Shutdown
+
+To stop the server, simply press Ctrl-c in the controlling terminal.
+The program will catch the SIGINT and shutdown gracefully.
+
