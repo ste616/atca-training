@@ -2882,3 +2882,10 @@ void chanaverage_ampphase(struct ampphase *ampphase, struct ampphase *avg_amppha
   FREE(median_unflagged_channel);
   FREE(median_unflagged_frequency);
 }
+
+void compute_closure_phase(struct scan_header_data *scan_header_data,
+			   struct vis_quantities *vis_quantities,
+			   int reference_antenna) {
+  
+}
+			   
