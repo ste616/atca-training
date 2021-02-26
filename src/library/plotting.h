@@ -62,6 +62,7 @@
 #define VIS_PLOTPANEL_GTP              14
 #define VIS_PLOTPANEL_SDO              15
 #define VIS_PLOTPANEL_CALJY            16
+#define VIS_PLOTPANEL_CLOSUREPHASE     17
 
 #define PANEL_ORIGINAL    -1
 #define PANEL_INFORMATION -2
@@ -230,35 +231,101 @@ struct vis_product {
 
 // This structure holds all the details about use plot control
 // for a VIS-type plot.
+/*! \struct vis_plotcontrols
+ *  \brief Parameter collection for controlling how a vis plot is made
+ */
 struct vis_plotcontrols {
-  // General plot options.
+  /*! \var plot_options
+   *  \brief A bitwise-OR collection of options controlling which panels
+   *         to plot, and which polarisations can be plotted, etc; 
+   *         the PLOT_* binary numbers at the top of this header file
+   */
   long int plot_options;
-  // The products to show.
-  struct vis_product **vis_products;
+  /*! \var nproducts
+   *  \brief The number of products selected for plotting by the user
+   */
   int nproducts;
-  // The array specification.
+  /*! \var vis_products
+   *  \brief A list of all the products selected for plotting by the user
+   *
+   * This is a 1-D array of pointers, with length `nproducts`, and is indexed
+   * starting at 0.
+   */
+  struct vis_product **vis_products;
+  /*! \var array_spec
+   *  \brief An indicator of which antennas can be plotted, as a bitwise-OR
+   *         combination of their antenna numbers as binary shifts
+   */
   int array_spec;
-  // The number of panels needed.
+  /*! \var num_panels
+   *  \brief The number of panels needed on the vis plot
+   */
   int num_panels;
-  // And their type.
+  /*! \var panel_type
+   *  \brief The type of panels to plot
+   *
+   * This 1-D array has length `num_panels` and is indexed starting at 0.
+   * Each element is one of the VIS_PLOTPANEL_* magic numbers defined in this
+   * header.
+   */
   int *panel_type;
-  // And any axis limits.
+  /*! \var use_panel_limits
+   *  \brief Indicator of whether each panel has user-defined limits
+   *
+   * This 1-D array has length `num_panels` and is indexed starting at 0.
+   * Each element indicates whether to use `panel_limits_min` and `panel_limits_max`
+   * when setting the axis range for this panel (true), or not (false).
+   */
   bool *use_panel_limits;
+  /*! \var panel_limits_min
+   *  \brief The minimum value set by the user for each panel
+   *
+   * This 1-D array has length `num_panels` and is indexed starting at 0.
+   */
   float *panel_limits_min;
+  /*! \var panel_limits_max
+   *  \brief The maximum value set by the user for each panel
+   *
+   * This 1-D array has length `num_panels` and is indexed starting at 0.
+   */
   float *panel_limits_max;
-  // The x-axis type.
+  /*! \var x_axis_type
+   *  \brief The variable to use on the x-axis, as one of the eligible
+   *         PLOT_* magic numbers defined in this header
+   */
   int x_axis_type;
-  // The maximum history to plot (minutes).
+  /*! \var history_length
+   *  \brief The maximum amount of history to plot, in minutes
+   */
   float history_length;
-  // The history start point (minutes).
+  /*! \var history_start
+   *  \brief How long ago to start plotting `history_length`, in minutes
+   */
   float history_start;
-  // The PGPLOT device number used.
+  /*! \var pgplot_device
+   *  \brief The PGPLOT device number to use for the plotting
+   */
   int pgplot_device;
-  // The bands to assign as IFs.
+  /*! \var nvisbands
+   *  \brief The number of bands to plot
+   */
   int nvisbands;
+  /*! \var visbands
+   *  \brief The name of the bands to plot
+   *
+   * This 1-D array of strings has length `nvisbands` and is indexed starting
+   * at 0. Each string has length VISBANDLEN.
+   */
   char **visbands;
-  // The cycle time.
+  /*! \var cycletime
+   *  \brief The cycle time, in seconds
+   */
   int cycletime;
+  /*! \var reference_antenna
+   *  \brief The reference antenna to use while plotting closure phase, as the
+   *         antenna number
+   */
+  int reference_antenna;
 };
 
 // This structure holds details about the lines we are asked to

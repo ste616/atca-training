@@ -73,6 +73,7 @@ int action_required, server_type, n_ampphase_options;
 int vis_device_number, data_selected_index, tsys_apply;
 int xaxis_type, *yaxis_type, nxpanels, nypanels, nvisbands;
 int *visband_idx, tvchan_change_min, tvchan_change_max;
+int reference_antenna_index;
 char **visband, tvchan_visband[10];
 // Whether to order the baselines in length order (true/false).
 bool sort_baselines;
@@ -177,6 +178,7 @@ static void sighandler(int sig) {
 #define ACTION_TSYSCORR_CHANGED          1<<11
 #define ACTION_OMIT_OPTIONS              1<<12
 #define ACTION_UNKNOWN_COMMAND           1<<13
+#define ACTION_COMPUTE_CLOSUREPHASE      1<<14
 
 // Make a shortcut to stop action for those actions which can only be
 // done by a simulator.
@@ -230,6 +232,8 @@ int char_to_product(char pstring) {
   switch (pstring) {
   case 'a':
     return VIS_PLOTPANEL_AMPLITUDE;
+  case 'c':
+    return VIS_PLOTPANEL_CLOSUREPHASE;
   case 'C':
     return VIS_PLOTPANEL_SYSTEMP_COMPUTED;
   case 'd':
@@ -546,7 +550,10 @@ static void interpret_command(char *line) {
         } else if (minmatch("caljy", line_els[1], 3) ||
 		   (strcmp(line_els[1], "n") == 0)) {
           change_panel = VIS_PLOTPANEL_CALJY;
-        }
+        } else if (minmatch("closurephase", line_els[1], 4) ||
+		   (strcmp(line_els[1], "c") == 0)) {
+	  change_panel = VIS_PLOTPANEL_CLOSUREPHASE;
+	}
         if (change_panel != VIS_PLOTPANEL_ALL) {
           if (nels == 2) {
             // Reset just the named panel.
@@ -759,7 +766,7 @@ static void interpret_command(char *line) {
 
 int main(int argc, char *argv[]) {
   struct nvis_arguments arguments;
-  int i, j, r, bytes_received, nmesg = 0, bidx = -1, num_timelines = 0;
+  int i, j, k, r, bytes_received, nmesg = 0, bidx = -1, num_timelines = 0;
   cmp_ctx_t cmp;
   cmp_mem_access_t mem;
   struct requests server_request;
@@ -794,6 +801,7 @@ int main(int argc, char *argv[]) {
   n_ampphase_options = 0;
   ampphase_options = NULL;
   found_options = NULL;
+  reference_antenna_index = 0;
 
   // Set the default for the arguments.
   arguments.use_file = false;
@@ -883,6 +891,7 @@ int main(int argc, char *argv[]) {
     if (action_required & ACTION_NEW_DATA_RECEIVED) {
       action_required -= ACTION_NEW_DATA_RECEIVED;
       action_required |= ACTION_VISBANDS_CHANGED;
+      action_required |= ACTION_COMPUTE_CLOSUREPHASE;
       // Reset the selected index from the data.
       nmesg = 0;
       /* snprintf(mesgout[nmesg++], VISBUFSIZE, " new data arrives\n"); */
@@ -910,6 +919,21 @@ int main(int argc, char *argv[]) {
       
     }
 
+    if (action_required & ACTION_COMPUTE_CLOSUREPHASE) {
+      action_required -= ACTION_COMPUTE_CLOSUREPHASE;
+      vis_plotcontrols.reference_antenna =
+	vis_data.header_data[i]->ant_label[reference_antenna_index];
+      for (i = 0; i < vis_data.nviscycles; i++) {
+	for (j = 0; j < vis_data.num_ifs[i]; j++) {
+	  for (k = 0; k < vis_data.num_pols[i][j]; k++) {
+	    compute_closure_phase(vis_data.header_data[i],
+				  vis_data.vis_quantities[i][j][k],
+				  reference_antenna_index);
+	  }
+	}
+      }
+    }
+    
     if (action_required & ACTION_DESCRIBE_DATA) {
       // Describe the data.
       nmesg = 0;

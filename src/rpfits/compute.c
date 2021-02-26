@@ -243,18 +243,24 @@ struct vis_quantities* prepare_vis_quantities(void) {
   vis_quantities->baseline = NULL;
   vis_quantities->flagged_bad = NULL;
   vis_quantities->scantype[0] = 0;
+  vis_quantities->ntriangles = 0;
+  vis_quantities->nbins_cross = 0;
+  vis_quantities->triangles = NULL;
   
   vis_quantities->amplitude = NULL;
   vis_quantities->phase = NULL;
   vis_quantities->delay = NULL;
-
+  vis_quantities->closure_phase = NULL;
+  
   vis_quantities->min_amplitude = INFINITY;
   vis_quantities->max_amplitude = -INFINITY;
   vis_quantities->min_phase = INFINITY;
   vis_quantities->max_phase = -INFINITY;
   vis_quantities->min_delay = INFINITY;
   vis_quantities->max_delay = -INFINITY;
-
+  vis_quantities->min_closure_phase = INFINITY;
+  vis_quantities->max_closure_phase = -INFINITY;
+  
   return(vis_quantities);
 }
 
@@ -341,7 +347,12 @@ void free_vis_quantities(struct vis_quantities **vis_quantities) {
   int i;
   free_ampphase_options((*vis_quantities)->options);
   FREE((*vis_quantities)->options);
-  
+  for (i = 0; i < (*vis_quantities)->ntriangles; i++) {
+    FREE((*vis_quantities)->triangles[i]);
+    FREE((*vis_quantities)->closure_phase[i]);
+  }
+  FREE((*vis_quantities)->triangles);
+  FREE((*vis_quantities)->closure_phase);
   for (i = 0; i < (*vis_quantities)->nbaselines; i++) {
     FREE((*vis_quantities)->amplitude[i]);
     FREE((*vis_quantities)->phase[i]);
@@ -413,6 +424,7 @@ struct ampphase_options ampphase_options_default(void) {
   options.averaging_method = NULL;
   options.systemp_reverse_online = false;
   options.systemp_apply_computed = false;
+  options.reference_antenna = 0;
   
   return options;
 }
@@ -438,6 +450,7 @@ void set_default_ampphase_options(struct ampphase_options *options) {
   options->averaging_method = NULL;
   options->systemp_reverse_online = false;
   options->systemp_apply_computed = false;
+  options->reference_antenna = 0;
 }
 
 /*!
@@ -469,6 +482,7 @@ void copy_ampphase_options(struct ampphase_options *dest,
   }
   STRUCTCOPY(src, dest, systemp_reverse_online);
   STRUCTCOPY(src, dest, systemp_apply_computed);
+  STRUCTCOPY(src, dest, reference_antenna);
 }
 
 /*!
@@ -1647,7 +1661,8 @@ bool ampphase_options_match(struct ampphase_options *a,
       (a->include_flagged_data == b->include_flagged_data) &&
       (a->num_ifs == b->num_ifs) &&
       (a->systemp_reverse_online == b->systemp_reverse_online) &&
-      (a->systemp_apply_computed == b->systemp_apply_computed)) {
+      (a->systemp_apply_computed == b->systemp_apply_computed) &&
+      (a->reference_antenna == b->reference_antenna)) {
     // Looks good so far, now check the tvchannels.
     match = true;
     for (i = 0; i < a->num_ifs; i++) {
@@ -2883,9 +2898,111 @@ void chanaverage_ampphase(struct ampphase *ampphase, struct ampphase *avg_amppha
   FREE(median_unflagged_frequency);
 }
 
+/*!
+ *  \brief Return the phase on a specified baseline
+ *  \param vis_quantities pre-computed averaged data
+ *  \param ant1 the first antenna in the baseline pair, should be a real number not an index
+ *  \param ant2 the second antenna in the baseline pair, should be a real number not an index
+ *  \param bin the bin number for the phase; if this is larger than the number of bins
+ *             available, the phase from the last bin is returned
+ *  \return the phase on the baseline formed between \a ant1 and \a ant2,
+ *          properly signed considering the relationship between \a ant1 and \a ant2
+ *          and the pre-computed phase in \a vis_quantities
+ *
+ * This is primarily a helper function to make it easier to compute closure phase when
+ * at least one of the phase terms will need to have its sign swapped.
+ */
+float baseline_phase(struct vis_quantities *vis_quantities,
+		     int ant1, int ant2, int bin) {
+  int basenum, i, rbin;
+
+  // The following routine automatically swaps the antennas to the correct order
+  // to give us the baseline number.
+  basenum = ants_to_base(ant1, ant2);
+
+  // Find this baseline number in the data.
+  for (i = 0; i < vis_quantities->nbaselines; i++) {
+    if (vis_quantities->baseline[i] == basenum) {
+      rbin = (bin < vis_quantities->nbins[i]) ? bin : (vis_quantities->nbins[i] - 1);
+      if (ant1 < ant2) {
+	return (vis_quantities->phase[i][rbin]);
+      } else {
+	return (-1 * vis_quantities->phase[i][rbin]);
+      }
+    }
+  }
+
+  // If we get here we've failed.
+  return (0.0);
+}
+
+/*!
+ *  \brief Compute the closure phase from the precomputed averaged data
+ *  \param scan_header_data the header data relating to the scan
+ *  \param vis_quantities the precomputed data from that scan
+ *  \param reference_antenna the antenna which is included in all the closure
+ *                           phase computations, to ensure independence; this should
+ *                           be an index, not a real number
+ */
 void compute_closure_phase(struct scan_header_data *scan_header_data,
 			   struct vis_quantities *vis_quantities,
 			   int reference_antenna) {
+  int i, j, k, n_triangles_set = 0, a1, a2;
+
+  for (i = 0; i < vis_quantities->nbaselines; i++) {
+    // Store the number of bins for later if this is a cross-correlation.
+    base_to_ants(vis_quantities->baseline[i], &a1, &a2);
+    if (a1 != a2) {
+      vis_quantities->nbins_cross = vis_quantities->nbins[i];
+    }
+  }
   
+  // Compute the closure phase triangles.
+  vis_quantities->ntriangles = ((scan_header_data->num_ants - 1) *
+				(scan_header_data->num_ants - 2)) / 2;
+  MALLOC(vis_quantities->triangles, vis_quantities->ntriangles);
+  MALLOC(vis_quantities->closure_phase, vis_quantities->ntriangles);
+  for (i = 0; i < vis_quantities->ntriangles; i++) {
+    CALLOC(vis_quantities->triangles[i], 3);
+    CALLOC(vis_quantities->closure_phase[i], vis_quantities->nbins_cross);
+  }
+  n_triangles_set = 0;
+  for (i = 0; i < scan_header_data->num_ants - 2; i++) {
+    for (j = (i + 1); j < scan_header_data->num_ants - 1; j++) {
+      for (k = (j + 1); k < scan_header_data->num_ants; k++) {
+	if ((n_triangles_set < vis_quantities->ntriangles) &&
+	    ((i == reference_antenna) ||
+	     (j == reference_antenna) ||
+	     (k == reference_antenna))) {
+	  vis_quantities->triangles[n_triangles_set][0] =
+	    scan_header_data->ant_label[i];
+	  vis_quantities->triangles[n_triangles_set][1] =
+	    scan_header_data->ant_label[j];
+	  vis_quantities->triangles[n_triangles_set][2] =
+	    scan_header_data->ant_label[k];
+	  n_triangles_set++;
+	}
+      }
+    }
+  }
+
+  // Compute the closure phases now.
+  for (i = 0; i < n_triangles_set; i++) {
+    for (j = 0; j < vis_quantities->nbins_cross; j++) {
+      vis_quantities->closure_phase[i][j] =
+	baseline_phase(vis_quantities, vis_quantities->triangles[i][0],
+		       vis_quantities->triangles[i][1], j) +
+	baseline_phase(vis_quantities, vis_quantities->triangles[i][1],
+		       vis_quantities->triangles[i][2], j) +
+	baseline_phase(vis_quantities, vis_quantities->triangles[i][2],
+		       vis_quantities->triangles[i][0], j);
+      if (vis_quantities->closure_phase[i][j] < vis_quantities->min_closure_phase) {
+	vis_quantities->min_closure_phase = vis_quantities->closure_phase[i][j];
+      }
+      if (vis_quantities->closure_phase[i][j] > vis_quantities->max_closure_phase) {
+	vis_quantities->max_closure_phase = vis_quantities->closure_phase[i][j];
+      }
+    }
+  }
 }
 			   

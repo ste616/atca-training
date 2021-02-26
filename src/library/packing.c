@@ -746,7 +746,7 @@ void pack_vis_quantities(cmp_ctx_t *cmp, struct vis_quantities *a) {
     pack_writearray_float(cmp, a->nbins[i], a->phase[i]);
     pack_writearray_float(cmp, a->nbins[i], a->delay[i]);
   }
-
+  
   // Metadata.
   pack_write_float(cmp, a->min_amplitude);
   pack_write_float(cmp, a->max_amplitude);
@@ -781,7 +781,7 @@ void unpack_vis_quantities(cmp_ctx_t *cmp, struct vis_quantities *a) {
   MALLOC(a->flagged_bad, a->nbaselines);
   pack_readarray_sint(cmp, a->nbaselines, a->flagged_bad);
   pack_read_string(cmp, a->scantype, OBSTYPE_LENGTH);
-
+  
   // The arrays.
   MALLOC(a->amplitude, a->nbaselines);
   MALLOC(a->phase, a->nbaselines);

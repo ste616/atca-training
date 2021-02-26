@@ -264,7 +264,7 @@ void change_vis_plotcontrols_limits(struct vis_plotcontrols *plotcontrols,
   }
 }
 
-#define NAVAILABLE_PANELS 16
+#define NAVAILABLE_PANELS 17
 const int available_panels[NAVAILABLE_PANELS] = { VIS_PLOTPANEL_AMPLITUDE,
                                                   VIS_PLOTPANEL_PHASE,
                                                   VIS_PLOTPANEL_DELAY,
@@ -280,7 +280,8 @@ const int available_panels[NAVAILABLE_PANELS] = { VIS_PLOTPANEL_AMPLITUDE,
                                                   VIS_PLOTPANEL_SYSTEMP_COMPUTED,
                                                   VIS_PLOTPANEL_GTP,
                                                   VIS_PLOTPANEL_SDO,
-                                                  VIS_PLOTPANEL_CALJY };
+                                                  VIS_PLOTPANEL_CALJY,
+						  VIS_PLOTPANEL_CLOSUREPHASE };
 
 bool product_can_be_x(int product) {
   switch (product) {
@@ -1076,6 +1077,7 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
   int sysantidx = -1, sysifidx = -1, syspolidx = -1, ap;
   int **n_plot_lines = NULL, ipos = -1, *panel_n_vis_lines = NULL, n_active_ants = 0;
   int n_tsys_vis_lines = 0, n_meta_vis_lines = 0, dbrk, *antprod = NULL, nls = 1;
+  int n_closure_vis_lines = 0;
   float ****plot_lines = NULL, min_x, max_x, min_y, max_y;
   float cxpos, dxpos, labtotalwidth, labspacing, dy, maxwidth, twidth;
   float padlabel = 0.01, cch, timeline_x[2], timeline_y[2];
@@ -1084,7 +1086,7 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
   char xopts[BUFSIZE], yopts[BUFSIZE], panellabel[BUFSIZE], panelunits[BUFSIZE];
   char antstring[BUFSIZE], bandstring[BUFSIZE];
   struct vis_line **vis_lines = NULL, **tsys_vis_lines = NULL, **meta_vis_line = NULL;
-  struct vis_line ***plot_vis_lines = NULL;
+  struct vis_line ***plot_vis_lines = NULL, **closure_vis_lines = NULL;
   struct scan_header_data *vlh = NULL;
 
   // Work out how many antennas we will show.
@@ -1138,7 +1140,7 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
   }
   // The second dimension will be the line number.
   // We need to work out how to allocate up to 16 lines.
-  for (p = 0, n_vis_lines = 0, n_tsys_vis_lines = 0;
+  for (p = 0, n_vis_lines = 0, n_tsys_vis_lines = 0, n_closure_vis_lines = 0;
        p < plot_controls->nproducts; p++) {
     // Check if only a single antenna is requested.
     singleant = -1;
@@ -1163,11 +1165,34 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
                   add_vis_line(&vis_lines, &n_vis_lines,
                                i, j, 1, plot_controls->visbands[0], 
                                POL_XX, DEFAULT, DEFAULT, vlh);
+		  if (((1 << plot_controls->reference_antenna) &
+		       plot_controls->array_spec) &&
+		      ((1 << plot_controls->reference_antenna) &
+		       plot_controls->vis_products[p]->antenna_spec) &&
+		      (i != plot_controls->reference_antenna) &&
+		      (j != plot_controls->reference_antenna)) {
+		    // Add a closure phase line for this baseline, which
+		    // should inevitably exist as part of a triangle
+		    // with the reference antenna.
+		    add_vis_line(&closure_vis_lines, &n_closure_vis_lines, i, j,
+				 1, plot_controls->visbands[0],
+				 POL_XX, DEFAULT, DEFAULT, vlh);
+		  }
                 }
                 if (plot_controls->vis_products[p]->if_spec & VIS_PLOT_IF2) {
                   add_vis_line(&vis_lines, &n_vis_lines,
                                i, j, 2, plot_controls->visbands[1], POL_XX,
                                DEFAULT, DEFAULT, vlh);
+		  if (((1 << plot_controls->reference_antenna) &
+		       plot_controls->array_spec) &&
+		      ((1 << plot_controls->reference_antenna) &
+		       plot_controls->vis_products[p]->antenna_spec) &&
+		      (i != plot_controls->reference_antenna) &&
+		      (j != plot_controls->reference_antenna)) {
+		    add_vis_line(&closure_vis_lines, &n_closure_vis_lines, i, j,
+				 2, plot_controls->visbands[1], POL_XX,
+				 DEFAULT, DEFAULT, vlh);
+		  }
                 }
               }
               if (plot_controls->vis_products[p]->pol_spec & PLOT_POL_YY) {
@@ -1175,11 +1200,31 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
                   add_vis_line(&vis_lines, &n_vis_lines,
                                i, j, 1, plot_controls->visbands[0], POL_YY,
                                DEFAULT, DEFAULT, vlh);
+		  if (((1 << plot_controls->reference_antenna) &
+		       plot_controls->array_spec) &&
+		      ((1 << plot_controls->reference_antenna) &
+		       plot_controls->vis_products[p]->antenna_spec) &&
+		      (i != plot_controls->reference_antenna) &&
+		      (j != plot_controls->reference_antenna)) {
+		    add_vis_line(&closure_vis_lines, &n_closure_vis_lines, i, j,
+				 1, plot_controls->visbands[1], POL_YY,
+				 DEFAULT, DEFAULT, vlh);
+		  }
                 }
                 if (plot_controls->vis_products[p]->if_spec & VIS_PLOT_IF2) {
                   add_vis_line(&vis_lines, &n_vis_lines,
                                i, j, 2, plot_controls->visbands[1], POL_YY,
                                DEFAULT, DEFAULT, vlh);
+		  if (((1 << plot_controls->reference_antenna) &
+		       plot_controls->array_spec) &&
+		      ((1 << plot_controls->reference_antenna) &
+		       plot_controls->vis_products[p]->antenna_spec) &&
+		      (i != plot_controls->reference_antenna) &&
+		      (j != plot_controls->reference_antenna)) {
+		    add_vis_line(&closure_vis_lines, &n_closure_vis_lines, i, j,
+				 2, plot_controls->visbands[1], POL_YY,
+				 DEFAULT, DEFAULT, vlh);
+		  }
                 }
               }
             } else {
@@ -1266,6 +1311,14 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
   }
   for (i = 0; i < n_vis_lines; i++) {
     vis_lines[i]->pgplot_colour = (i + 1);
+    // Match this colour to the appropriate closure line.
+    for (j = 0; j < n_closure_vis_lines; j++) {
+      if ((vis_lines[i]->ant1 == closure_vis_lines[j]->ant1) &&
+	  (vis_lines[i]->ant2 == closure_vis_lines[j]->ant2)) {
+	closure_vis_lines[j]->pgplot_colour = vis_lines[i]->pgplot_colour;
+	break;
+      }
+    }
   }
 
   // Keep track of the min and max values to plot.
@@ -1575,6 +1628,84 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
           }
         }
       }
+    } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_CLOSUREPHASE) {
+      // Make the lines based on the closure triangles.
+      panel_n_vis_lines[i] = n_closure_vis_lines;
+      MALLOC(plot_lines[i], n_closure_vis_lines);
+      MALLOC(n_plot_lines[i], n_closure_vis_lines);
+      CALLOC(plot_vis_lines[i], n_closure_vis_lines);
+
+      for (j = 0; j < n_closure_vis_lines; j++) {
+	n_plot_lines[i][j] = 0;
+	MALLOC(plot_lines[i][j], 3);
+	plot_lines[i][j][0] = NULL;
+	plot_lines[i][j][1] = NULL;
+	plot_lines[i][j][2] = NULL;
+	plot_vis_lines[i][j] = closure_vis_lines[j];
+	for (k = 0; k < ncycles; k++) {
+	  for (l = 0; l < cycle_numifs[k]; l++) {
+	    for (m = 0; m < npols; m++) {
+	      // Exclude data outside our history range.
+	      chktime = (date2mjd(cycle_vis_quantities[k][l][m]->obsdate,
+				  cycle_vis_quantities[k][l][m]->ut_seconds) -
+			 basemjd) * 86400.0;
+	      if (((float)chktime < min_x) || ((float)chktime > max_x)) {
+		break;
+	      }
+	      if ((cycle_vis_quantities[k][l][m]->pol ==
+		   vis_lines[j]->pol) &&
+		  (cycle_vis_quantities[k][l][m]->window ==
+		   find_if_name(header_data[k], vis_lines[j]->if_label))) {
+		for (n = 0; n < cycle_vis_quantities[k][l][m]->ntriangles; n++) {
+		  if (((cycle_vis_quantities[k][l][m]->triangles[n][0] ==
+			plot_controls->reference_antenna) ||
+		       (cycle_vis_quantities[k][l][m]->triangles[n][1] ==
+			plot_controls->reference_antenna) ||
+		       (cycle_vis_quantities[k][l][m]->triangles[n][2] ==
+			plot_controls->reference_antenna)) &&
+		      ((cycle_vis_quantities[k][l][m]->triangles[n][0] ==
+			closure_vis_lines[j]->ant1) ||
+		       (cycle_vis_quantities[k][l][m]->triangles[n][1] ==
+			closure_vis_lines[j]->ant1) ||
+		       (cycle_vis_quantities[k][l][m]->triangles[n][2] ==
+			closure_vis_lines[j]->ant1)) &&
+		      ((cycle_vis_quantities[k][l][m]->triangles[n][0] ==
+			closure_vis_lines[j]->ant2) ||
+		       (cycle_vis_quantities[k][l][m]->triangles[n][1] ==
+			closure_vis_lines[j]->ant2) ||
+		       (cycle_vis_quantities[k][l][m]->triangles[n][2] ==
+			closure_vis_lines[j]->ant2))) {
+		    if (cycle_vis_quantities[k][l][m]->flagged_bad[n] > 0) {
+		      continue;
+		    }
+		    // Found it.
+		    n_plot_lines[i][j] += 1;
+		    REALLOC(plot_lines[i][j][0], n_plot_lines[i][j]);
+		    REALLOC(plot_lines[i][j][1], n_plot_lines[i][j]);
+		    REALLOC(plot_lines[i][j][2], n_plot_lines[i][j]);
+		    plot_lines[i][j][0][n_plot_lines[i][j] - 1] = (float)chktime;
+		    if (header_data != NULL) {
+		      // Get the cycle time from this cycle.
+		      plot_lines[i][j][2][n_plot_lines[i][j] - 1] =
+			header_data[k]->cycle_time;
+		    } else {
+		      // Get the cycle time from the plot options.
+		      plot_lines[i][j][2][n_plot_lines[i][j] - 1] =
+			plot_controls->cycletime;
+		    }
+		    // Need to fix for bin.
+		    plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
+		      cycle_vis_quantities[k][l][m]->closure_phase[n][0];
+		    MINASSIGN(min_y, plot_lines[i][j][1][n_plot_lines[i][j] - 1]);
+		    MAXASSIGN(max_y, plot_lines[i][j][1][n_plot_lines[i][j] - 1]);
+		    break;
+		  }
+		}
+	      }
+	    }
+	  }
+	}
+      }
     }
 
     // Make the panel.
@@ -1669,6 +1800,9 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
     } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_CALJY) {
       (void)strcpy(panellabel, "Noise Cal.");
       (void)strcpy(panelunits, "(Jy)");
+    } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_CLOSUREPHASE) {
+      (void)strcpy(panellabel, "Closure Phase");
+      (void)strcpy(panelunits, "(degrees)");
     }
     cpgmtxt("L", 2.2, 0.5, 0.5, panellabel);
     cpgmtxt("R", 2.2, 0.5, 0.5, panelunits);

@@ -220,6 +220,12 @@ struct ampphase_options {
    *         the system temperatures computed by this library (if set to true)
    */
   bool systemp_apply_computed;
+
+  /*! \var reference_antenna
+   *  \brief The antenna number to use for computing the independent
+   *         closure phase quantities
+   */
+  int reference_antenna;
 };
 
 /*! \struct metinfo
@@ -970,6 +976,45 @@ struct vis_quantities {
    *  \brief The maximum delay across all the baselines
    */
   float max_delay;
+
+  /* Variables from here are client-side only and do not get
+   * transferred across the network. */
+  /*! \var ntriangles
+   *  \brief The number of independent closure phase triangles
+   */
+  int ntriangles;
+  /*! \var nbins_cross
+   *  \brief The number of bins for each cross-correlation
+   *
+   * Since closure phase triangles only include cross-correlations, and since
+   * the number of bins in a single window is always the same for all the
+   * cross-correlations, we can keep this as a single integer.
+   */
+  int nbins_cross;
+  /*! \var triangles
+   *  \brief The independent closure phase triangles
+   *
+   * This array has length `ntriangles` along the first axis, and 3 (it's a triangle)
+   * along the second axis and is indexed starting at 0. The second axis is each
+   * antenna number in the triangle.
+   */
+  int **triangles;
+  
+  /*! \var closure_phase
+   *  \brief The closure phase for each triangle and bin, in phase units
+   *
+   * This 2-D array has length `ntriangles` for the first index, and `nbins_cross`
+   * for the seocnd index. Both indices start at 0.
+   */
+  float **closure_phase;
+  /*! \var min_closure_phase
+   *  \brief The minimum closure phase across all the baselines
+   */
+  float min_closure_phase;
+  /*! \var max_closure_phase
+   *  \brief The maximum closure phase across all the baselines
+   */
+  float max_closure_phase;
 };
 
 /*! \struct spectrum_data
@@ -1156,3 +1201,8 @@ void print_information_scan_header(struct scan_header_data *header_data,
 				   char *output, int output_length);
 void chanaverage_ampphase(struct ampphase *ampphase, struct ampphase *avg_ampphase,
 			  int averaging, int averaging_type);
+float baseline_phase(struct vis_quantities *vis_quantities,
+		     int ant1, int ant2, int bin);
+void compute_closure_phase(struct scan_header_data *scan_header_data,
+			   struct vis_quantities *vis_quantities,
+			   int reference_antenna);
