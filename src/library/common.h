@@ -207,6 +207,7 @@ bool minmatch(char *ref, char *chk, int minlength);
 int split_string(char *s, char *delim, char ***elements);
 void minutes_representation(float minutes, char *representation);
 bool string_to_float(char *s, float *v);
+bool string_to_integer(char *s, int *v);
 bool string_to_seconds(char *s, float *seconds);
 float string_to_minutes(char *s);
 void generate_client_id(char *client_id, size_t maxlen);

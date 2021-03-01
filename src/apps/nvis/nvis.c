@@ -326,6 +326,7 @@ static void interpret_command(char *line) {
   int nels, i, j, k, array_change_spec, nproducts, pr;
   int change_panel = PLOT_ALL_PANELS, iarg, plen = 0, temp_xaxis_type;
   int *temp_yaxis_type = NULL, temp_nypanels, idx_low, idx_high, ty;
+  int temp_refant;
   float histlength;
   float limit_min, limit_max;
   struct vis_product **vis_products = NULL, *tproduct = NULL;
@@ -689,7 +690,6 @@ static void interpret_command(char *line) {
       CHECKSIMULATOR;
       tsys_apply = -1;
       if (nels == 2) {
-	CHECKSIMULATOR;
 	// The user should supply a flag as to which Tsys to use.
 	if (minmatch("off", line_els[1], 3)) {
 	  // Don't correct visibilites, and reverse any corrections already made.
@@ -709,6 +709,35 @@ static void interpret_command(char *line) {
       } else {
 	action_required = ACTION_AMPPHASE_OPTIONS_PRINT;
       }
+    } else if (minmatch("refant", line_els[0], 3)) {
+      // Change or report the reference antenna used for closure phase
+      // calculations.
+      if (nels == 1) {
+	// Report the reference antenna.
+	printf(" Reference antenna is %d\n",
+	       vis_plotcontrols.reference_antenna);
+      } else {
+	// Set the reference antenna. The user should specify the actual
+	// antenna number.
+	succ = string_to_integer(line_els[1], &temp_refant);
+	if (succ) {
+	  succ = false;
+	  for (i = 0; i < vis_data.header_data[data_selected_index]->num_ants; i++) {
+	    if (vis_data.header_data[data_selected_index]->ant_label[i] == temp_refant) {
+	      // Found the antenna.
+	      succ = true;
+	      reference_antenna_index = i;
+	      break;
+	    }
+	  }
+	}
+	if (succ) {
+	  action_required = ACTION_COMPUTE_CLOSUREPHASE;
+	} else {
+	  printf(" Unable to find reference antenna %s\n", line_els[1]);
+	}
+      }
+      
     } else {
       if (nels == 1) {
         // We try to interpret the string as the panels to show.
@@ -921,8 +950,9 @@ int main(int argc, char *argv[]) {
 
     if (action_required & ACTION_COMPUTE_CLOSUREPHASE) {
       action_required -= ACTION_COMPUTE_CLOSUREPHASE;
+      action_required |= ACTION_REFRESH_PLOT;
       vis_plotcontrols.reference_antenna =
-	vis_data.header_data[i]->ant_label[reference_antenna_index];
+	vis_data.header_data[data_selected_index]->ant_label[reference_antenna_index];
       for (i = 0; i < vis_data.nviscycles; i++) {
 	for (j = 0; j < vis_data.num_ifs[i]; j++) {
 	  for (k = 0; k < vis_data.num_pols[i][j]; k++) {

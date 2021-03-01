@@ -1828,6 +1828,7 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
         cxpos += dxpos + labspacing;
       }
     }
+    cpgqch(&cch);
     if (i == 0) {
       // Print the array antennas at the top left.
       dxpos = fracwidth(panelspec, min_x, max_x, 0, i, "Ants:");
@@ -1844,12 +1845,14 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
         cpgsci(j + 3);
         dxpos = fracwidth(panelspec, min_x, max_x, 0, i, antstring);
         cpgmtxt("T", 0.5, cxpos, 0, antstring);
+	if (j == plot_controls->reference_antenna) {
+	  cpgmtxt("T", 0.5 + cch, cxpos, 0, "R");
+	}
         cxpos += dxpos;
       }
       // Print a legend of antenna based lines in the middle if
       // necessary.
       cxpos += dxpos;
-      cpgqch(&cch);
       if (show_tsys_legend) {
         for (j = 0; j < (2 * 2); j++) {
           if (antprod[j] > 0) {

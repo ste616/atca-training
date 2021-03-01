@@ -14,6 +14,7 @@
 #include <time.h>
 #include <sys/types.h>
 #include <regex.h>
+#include <errno.h>
 #include "common.h"
 #include "memory.h"
 
@@ -271,6 +272,33 @@ bool string_to_float(char *s, float *v) {
     // Success.
     succ = true;
     *v = tv;
+  }
+  return succ;
+}
+
+/*!
+ *  \brief A wrapper around strtol that indicates if the parsing has
+ *         been successful
+ *  \param s the string which should represent an integer
+ *  \param v a pointer to a variable that will be set with the parsed value
+ *  \return an indication of whether the string could be converted into an
+ *          integer (true) or not (false)
+ */
+bool string_to_integer(char *s, int *v) {
+  bool succ;
+  long int tv;
+  char *eptr = NULL;
+
+  tv = strtol(s, &eptr, 10);
+  if (eptr == s) {
+    // Failure.
+    succ = false;
+  } else if (errno == ERANGE) {
+    succ = false;
+  } else {
+    // Success.
+    succ = true;
+    *v = (int)tv;
   }
   return succ;
 }
