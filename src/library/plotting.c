@@ -1071,7 +1071,7 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
                    struct scan_header_data **header_data,
                    struct metinfo **metinfo, struct syscal_data **syscal_data,
 		   int num_times, float *times) {
-  bool show_tsys_legend = false;
+  bool show_tsys_legend = false, show_panel_error = false;
   int nants = 0, i = 0, n_vis_lines = 0, j = 0, k = 0, p = 0;
   int singleant = 0, l = 0, m = 0, n = 0, ii, connidx = 0;
   int sysantidx = -1, sysifidx = -1, syspolidx = -1, ap;
@@ -1084,7 +1084,7 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
   float ***antlines = NULL;
   double basemjd, chktime, min_time, max_time;
   char xopts[BUFSIZE], yopts[BUFSIZE], panellabel[BUFSIZE], panelunits[BUFSIZE];
-  char antstring[BUFSIZE], bandstring[BUFSIZE];
+  char antstring[BUFSIZE], bandstring[BUFSIZE], panelerror[BUFSIZE];
   struct vis_line **vis_lines = NULL, **tsys_vis_lines = NULL, **meta_vis_line = NULL;
   struct vis_line ***plot_vis_lines = NULL, **closure_vis_lines = NULL;
   struct scan_header_data *vlh = NULL;
@@ -1736,6 +1736,14 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
 
     /* printf("plotting panel %d with %.2f <= x <= %.2f, %.2f <= y <= %.2f\n", */
     /* 	   i, min_x, max_x, min_y, max_y); */
+    show_panel_error = false;
+    if ((min_y == INFINITY) && (max_y == -INFINITY)) {
+      // This panel doesn't work with this product.
+      (void)strcpy(panelerror, "PANEL NOT COMPATIBLE WITH PRODUCT");
+      show_panel_error = true;
+      min_y = -0.1;
+      max_y = 0.1;
+    }
     
     cpgswin(min_x, max_x, min_y, max_y);
     cpgsci(3);
@@ -1806,6 +1814,9 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
     }
     cpgmtxt("L", 2.2, 0.5, 0.5, panellabel);
     cpgmtxt("R", 2.2, 0.5, 0.5, panelunits);
+    if (show_panel_error) {
+      cpgmtxt("T", -2.0, 0.5, 0.5, panelerror);
+    }
     if (i == (plot_controls->num_panels - 1)) {
       cpgmtxt("B", 3, 0.5, 0.5, "UT");
       // Print the baselines on the bottom.
