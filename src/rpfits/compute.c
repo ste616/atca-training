@@ -1445,6 +1445,12 @@ int ampphase_average(struct scan_header_data *scan_header_data,
   }
   CALLOC((*vis_quantities)->options, 1);
   copy_ampphase_options((*vis_quantities)->options, band_options);
+
+  // Always set the non-transported stuff to 0.
+  (*vis_quantities)->ntriangles = 0;
+  (*vis_quantities)->triangles = NULL;
+  (*vis_quantities)->closure_phase = NULL;
+  
   //n_expected = (options->max_tvchannel - options->min_tvchannel) + 1;
   n_expected = (max_tvchannel - min_tvchannel) + 1;
   /* fprintf(stderr, "[ampphase_average] allocating memory for %d samples\n", */

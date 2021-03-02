@@ -802,6 +802,12 @@ void unpack_vis_quantities(cmp_ctx_t *cmp, struct vis_quantities *a) {
   pack_read_float(cmp, &(a->max_phase));
   pack_read_float(cmp, &(a->min_delay));
   pack_read_float(cmp, &(a->max_delay));
+
+  // Initialise the variables that weren't transported.
+  a->ntriangles = 0;
+  a->triangles = NULL;
+  a->closure_phase = NULL;
+
 }
 
 void copy_spectrum_data(struct spectrum_data *dest,
@@ -962,6 +968,7 @@ void unpack_vis_data(cmp_ctx_t *cmp, struct vis_data *a) {
     MALLOC(a->options[i], 1);
     unpack_ampphase_options(cmp, a->options[i]);
   }
+
 }
 
 /*!
