@@ -181,6 +181,44 @@ inclusive. This is equivalent to the more traditional `vis` format of
 
 #### calband
 
+Format: **calb**and [*IF1* [*IF2*]]
+
+This command selects which IFs are plotted as AA/BB/AB (*IF1*) and
+CC/DD/CD (*IF2*).
+
+If used without an argument, the current calbands are printed to the
+terminal. The same information can be gleaned from the top right of
+the plot.
+
+If a single argument is supplied, that band will become the only one
+plotted (so only AA/BB/AB products will be available). If two arguments
+are supplied, those two bands will become available.
+
+Each argument can be specified in several ways:
+- f: if this is specified as argument 1, then the first continuum band is
+  selected, and if specified as argument 2, the second continuum band is
+  selected
+- f*n*: where f1 is the first continuum band, and f3 is usually the
+  first zoom band, and *n* can continue up until however many zooms
+  are in the data + 2
+- z: if this is specified as argument 1, then the first zoom band associated
+  with the first continuum band is selected, and if specified as argument 2,
+  the first zoom band associated with the second continuum band is selected
+- z*n*: where z1 is the first zoom band, and *n* can continue up until
+  however many zooms are in the data
+- z*m*-*n*: where z1-2 is the second zoom band associated with the first
+  continuum band, and z2-5 is the fifth zoom band associated with the second
+  continuum band
+
+Because the server computes all the vis data for all the bands at the same
+time, any change to the calband setting is instantly enacted in the plots.
+
+If you want to change a parameter like **tvmedian** for a specific band,
+it must first be selected as one of the calbands, since **tvmedian** only
+accepts positional arguments. This is unlike **tvchannel** which accepts
+and *IF* argument, meaning you can change the setting for a band which is
+not currently set as a calband.
+
 #### data
 
 Format: **dat**a [*time*]
@@ -221,6 +259,19 @@ that exact time - not at the midpoint of the nearest cycle.
 
 #### delavg
 
+Format **delav**g *number of channels* [*number of channels*]
+
+This command instructs the server to recompute data while performing
+averaging over phase while calculating the delay errors.
+
+If only one argument is supplied, the number of channels specified will
+be used as the averaging level for both current calband IFs. If two arguments
+are supplied, the first will be used for IF 1, and the second will be used
+for IF 2.
+
+While the server recomputes the data, `nvis` will continue to show the
+current data.
+
 #### history
 
 Format: **hist**ory *time range* [*start time offset*]
@@ -246,6 +297,51 @@ array was not on-source. The array is considered on-source if all the antennas
 in the array specification are tracking the same source position.
 
 #### print
+
+Format: **pr**int *quantity*
+
+This command prints some *quantity* about the data. These commands are:
+
+##### computation
+
+Format: **pr**int **comp**utation
+
+Print the full list of options used by the server while calculating the
+quantities shown in `nvis` or `nspd`.
+
+The output will look something like this:
+
+```
+VIS DATA COMPUTED WITH OPTIONS:
+Options set has 1 elements:
+  SET 0:
+     PHASE IN DEGREES: YES
+     INCLUDE FLAGGED: NO
+     TSYS CORRECTION: CORRELATOR
+     # WINDOWS: 2
+     --WINDOW 1:
+        CENTRE FREQ: 2100.0 MHz
+        BANDWIDTH: 2048.0 MHz
+        # CHANNELS: 2049
+        TVCHAN RANGE: 1140 - 1220
+        DELAY AVERAGING: 1
+        AVERAGING METHOD: SCALAR MEDIAN
+     --WINDOW 2:
+        CENTRE FREQ: 2100.0 MHz
+        BANDWIDTH: 2048.0 MHz
+        # CHANNELS: 2049
+        TVCHAN RANGE: 256 - 1792
+        DELAY AVERAGING: 1
+        AVERAGING METHOD: SCALAR MEAN
+```
+
+Each set of options corresponds to a different observing configuration
+(different centre frequencies, different zoom configurations, etc.).
+For each option set, the options used for all windows are shown first,
+and then the window-specific options (and some vital parameters to allow
+for their identification) are shown for each window. The number
+of windows will correspond to how many continuum bands there are, plus
+all the zooms.
 
 #### refant
 

@@ -2487,8 +2487,9 @@ void print_options_set(int num_options,
       info_print(output, output_length, " %s\n",
 		 ((options[i]->systemp_reverse_online == false) ? "CORRELATOR" : "COMPUTED"));
     }
-    info_print(output, output_length, "     # WINDOWS: %d\n", options[i]->num_ifs);
+    info_print(output, output_length,   "     # WINDOWS: %d\n", (options[i]->num_ifs - 1));
     for (j = 1; j < options[i]->num_ifs; j++) {
+      info_print(output, output_length, "     --WINDOW %d:\n", j);
       info_print(output, output_length, "        CENTRE FREQ: %.1f MHz\n",
 		 options[i]->if_centre_freq[j]);
       info_print(output, output_length, "        BANDWIDTH: %.1f MHz\n",
