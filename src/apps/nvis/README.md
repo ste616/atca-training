@@ -208,7 +208,8 @@ Each argument can be specified in several ways:
   however many zooms are in the data
 - z*m*-*n*: where z1-2 is the second zoom band associated with the first
   continuum band, and z2-5 is the fifth zoom band associated with the second
-  continuum band
+  continuum band; here *m* can be either 1 or 2, and *n* is between 1 and 16
+  inclusive
 
 Because the server computes all the vis data for all the bands at the same
 time, any change to the calband setting is instantly enacted in the plots.
@@ -216,7 +217,7 @@ time, any change to the calband setting is instantly enacted in the plots.
 If you want to change a parameter like **tvmedian** for a specific band,
 it must first be selected as one of the calbands, since **tvmedian** only
 accepts positional arguments. This is unlike **tvchannel** which accepts
-and *IF* argument, meaning you can change the setting for a band which is
+an *IF* argument, meaning you can change the setting for a band which is
 not currently set as a calband.
 
 #### data
