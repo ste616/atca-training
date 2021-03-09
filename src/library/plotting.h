@@ -330,22 +330,48 @@ struct vis_plotcontrols {
 
 // This structure holds details about the lines we are asked to
 // plot in the VIS-type plots.
+/*! \struct vis_line
+ *  \brief A descriptive set of parameters for each product displayed on
+ *         a vis display
+ */
 struct vis_line {
-  // The antennas.
+  /*! \var ant1
+   *  \brief The first antenna of the baseline pair
+   */
   int ant1;
+  /*! \var ant2
+   *  \brief The second antenna of the pair, or the same antenna if it's
+   *         an autocorrelation product or a single antenna parameter
+   */
   int ant2;
-  // The IF.
+  /*! \var if_label
+   *  \brief The label of the IF that this product comes from
+   */
   char if_label[BUFSIZE];
-  // Polarisation.
+  /*! \var pol
+   *  \brief The polarisation code for this product
+   */
   int pol;
-  // Label.
+  /*! \var label
+   *  \brief The label that describes this product on the plot
+   */
   char label[BUFSIZE];
-  // The colour.
+  /*! \var pgplot_colour
+   *  \brief The PGPLOT colour index to use when plotting this line
+   */
   int pgplot_colour;
-  // The linestyle.
+  /*! \var line_style
+   *  \brief The PGPLOT line style setting to use when plotting this line
+   */
   int line_style;
-  // To come: baseline length for sorting.
+  /*! \var baseline_length
+   *  \brief The length of this baseline, to use when sorting the products
+   */
   float baseline_length;
+  /*! \var bin_index
+   *  \brief The bin index from which to get the data to plot
+   */
+  int bin_index;
 };
 
 void count_polarisations(struct spd_plotcontrols *plotcontrols);
@@ -388,7 +414,7 @@ void plotpanel_minmax(struct ampphase **plot_ampphase,
                       float *plotmin_y, float *plotmax_y);
 void add_vis_line(struct vis_line ***vis_lines, int *n_vis_lines,
                   int ant1, int ant2, int ifnum, char *if_label, int pol,
-                  int colour, int line_style,
+                  int colour, int line_style, int bin_index,
                   struct scan_header_data *scan_header_data);
 void vis_interpret_pol(char *pol, struct vis_product *vis_product);
 int vis_interpret_product(char *product, struct vis_product **vis_product);

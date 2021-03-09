@@ -114,6 +114,7 @@ alphabetical order, and each character specification is case-sensitive.
 Character | Panel Displayed
 --------- | ---------------
 a         | Amplitude: the average amplitude on each baseline per cycle
+c         | Closure phase: the closure phase quantity calculated for some baselines with the reference antenna per cycle
 C         | Computed System Temperature: the system temperature of each antenna, as computed using the options currently supplied by this client
 d         | Delay: the delay error as determined by examining the phases as a function of frequency
 D         | Wind Direction: the direction the wind is coming from
@@ -139,6 +140,11 @@ between adjacent panels.
 At the bottom of the display is the colour key between baselines, polarisations
 and colours. Up to 16 different lines can be plotted, and for all panels which
 display baselines (even auto-correlated baselines), the colour key will apply.
+
+For the closure phase, only baselines that do not include the reference antenna
+are plotted in the panel, and they have the same colour coding as the other
+panels. The associated closure phase triangle consists of the two antennas in that
+baseline, plus the reference antenna.
 
 For measurements that do not depend on baselines (like the weather station
 parameters), only a single line will be shown, and it will usually be white-ish.
@@ -241,6 +247,20 @@ in the array specification are tracking the same source position.
 
 #### print
 
+#### refant
+
+Format: **ref**ant [*antenna number*]
+
+This command sets the reference antenna, which is used when computing the
+closure phase quantity. If no argument is given, the currently selected
+reference antenna is returned. This can also be determined by looking at
+the antenna numbers at the top-left of the plot; the reference antenna
+will have an "R" above the antenna number, in the same colour.
+
+If you want to change the reference antenna, supply the antenna number
+(one of the antenna numbers listed at the top-left of the plot) as the
+argument.
+
 #### scale
 
 Format: **sca**le [*panel name* [*min value* *max value*]]
@@ -302,5 +322,35 @@ controlling terminal.
 
 #### tvchannel
 
+Format: **tvch**annel [*IF* *min chan* *max chan*]
+
+This command instructs the server to recompute data with a different range
+of tvchannels.
+
+If used without an argument, the current full set of computation options
+is printed to the controlling terminal.
+
+To set the channels, an *IF* argument needs to be supplied, followed
+by the *min chan* and *max chan* to use for that IF. The *IF* can be
+something like `f1` or `f2` or `z1`, and is basically whatever you would
+use to select that IF in SPD.
+
+While the server recomputes the data, `nvis` will continue to show the
+current data.
+
 #### tvmedian
 
+Format: **tvmed**ian [*on/off* [*on/off*]]
+
+This command instructs the server to recompute data with median averaging
+either enabled or disabled.
+
+If used without an argument, the current setting in each IF will be
+printed in the controlling terminal. If a single argument is given,
+the setting will affect both IFs; the setting can be *on* (indicating
+that median averaging should be used), or *off* (indicating that
+mean averaging should be used). If two arguments are given, you can
+control the setting for each IF individual.
+
+While the server recomputes the data, `nvis` will continue to show
+the current data.

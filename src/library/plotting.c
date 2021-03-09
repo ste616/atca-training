@@ -871,7 +871,7 @@ void pol_to_vis_name(int pol, int if_num, char *vis_name) {
 
 void add_vis_line(struct vis_line ***vis_lines, int *n_vis_lines,
                   int ant1, int ant2, int ifnum, char *if_label,
-                  int pol, int colour, int line_style,
+                  int pol, int colour, int line_style, int bin_index,
                   struct scan_header_data *header_data) {
   struct vis_line *new_line = NULL;
   int i;
@@ -901,11 +901,21 @@ void add_vis_line(struct vis_line ***vis_lines, int *n_vis_lines,
     new_line->line_style = line_style;
   }
 
+  if (bin_index == DEFAULT) {
+    // Maybe this should depend on whether we have an auto-correlation
+    // cross-pol or not.
+    new_line->bin_index = 0;
+  } else {
+    // Maybe we should check if the requested index will work.
+    new_line->bin_index = bin_index;
+  }
+  
   // Check if this line is already on the list.
   for (i = 0; i < *n_vis_lines; i++) {
     if (((*vis_lines)[i]->ant1 == new_line->ant1) &&
 	((*vis_lines)[i]->ant2 == new_line->ant2) &&
 	((*vis_lines)[i]->pol == new_line->pol) &&
+	((*vis_lines)[i]->bin_index == new_line->bin_index) &&
 	(strncmp((*vis_lines)[i]->if_label, new_line->if_label, BUFSIZE) == 0)) {
       // We don't need to add this.
       FREE(new_line);
@@ -1081,7 +1091,7 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
   float ****plot_lines = NULL, min_x, max_x, min_y, max_y;
   float cxpos, dxpos, labtotalwidth, labspacing, dy, maxwidth, twidth;
   float padlabel = 0.01, cch, timeline_x[2], timeline_y[2];
-  float ***antlines = NULL;
+  float ***antlines = NULL, maxch = 1.1;
   double basemjd, chktime, min_time, max_time;
   char xopts[BUFSIZE], yopts[BUFSIZE], panellabel[BUFSIZE], panelunits[BUFSIZE];
   char antstring[BUFSIZE], bandstring[BUFSIZE], panelerror[BUFSIZE];
@@ -1164,7 +1174,7 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
                 if (plot_controls->vis_products[p]->if_spec & VIS_PLOT_IF1) {
                   add_vis_line(&vis_lines, &n_vis_lines,
                                i, j, 1, plot_controls->visbands[0], 
-                               POL_XX, DEFAULT, DEFAULT, vlh);
+                               POL_XX, DEFAULT, DEFAULT, DEFAULT, vlh);
 		  if (((1 << plot_controls->reference_antenna) &
 		       plot_controls->array_spec) &&
 		      ((1 << plot_controls->reference_antenna) &
@@ -1176,13 +1186,13 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
 		    // with the reference antenna.
 		    add_vis_line(&closure_vis_lines, &n_closure_vis_lines, i, j,
 				 1, plot_controls->visbands[0],
-				 POL_XX, DEFAULT, DEFAULT, vlh);
+				 POL_XX, DEFAULT, DEFAULT, DEFAULT, vlh);
 		  }
                 }
                 if (plot_controls->vis_products[p]->if_spec & VIS_PLOT_IF2) {
                   add_vis_line(&vis_lines, &n_vis_lines,
                                i, j, 2, plot_controls->visbands[1], POL_XX,
-                               DEFAULT, DEFAULT, vlh);
+                               DEFAULT, DEFAULT, DEFAULT, vlh);
 		  if (((1 << plot_controls->reference_antenna) &
 		       plot_controls->array_spec) &&
 		      ((1 << plot_controls->reference_antenna) &
@@ -1191,7 +1201,7 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
 		      (j != plot_controls->reference_antenna)) {
 		    add_vis_line(&closure_vis_lines, &n_closure_vis_lines, i, j,
 				 2, plot_controls->visbands[1], POL_XX,
-				 DEFAULT, DEFAULT, vlh);
+				 DEFAULT, DEFAULT, DEFAULT, vlh);
 		  }
                 }
               }
@@ -1199,7 +1209,7 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
                 if (plot_controls->vis_products[p]->if_spec & VIS_PLOT_IF1) {
                   add_vis_line(&vis_lines, &n_vis_lines,
                                i, j, 1, plot_controls->visbands[0], POL_YY,
-                               DEFAULT, DEFAULT, vlh);
+                               DEFAULT, DEFAULT, DEFAULT, vlh);
 		  if (((1 << plot_controls->reference_antenna) &
 		       plot_controls->array_spec) &&
 		      ((1 << plot_controls->reference_antenna) &
@@ -1208,13 +1218,13 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
 		      (j != plot_controls->reference_antenna)) {
 		    add_vis_line(&closure_vis_lines, &n_closure_vis_lines, i, j,
 				 1, plot_controls->visbands[1], POL_YY,
-				 DEFAULT, DEFAULT, vlh);
+				 DEFAULT, DEFAULT, DEFAULT, vlh);
 		  }
                 }
                 if (plot_controls->vis_products[p]->if_spec & VIS_PLOT_IF2) {
                   add_vis_line(&vis_lines, &n_vis_lines,
                                i, j, 2, plot_controls->visbands[1], POL_YY,
-                               DEFAULT, DEFAULT, vlh);
+                               DEFAULT, DEFAULT, DEFAULT, vlh);
 		  if (((1 << plot_controls->reference_antenna) &
 		       plot_controls->array_spec) &&
 		      ((1 << plot_controls->reference_antenna) &
@@ -1223,7 +1233,7 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
 		      (j != plot_controls->reference_antenna)) {
 		    add_vis_line(&closure_vis_lines, &n_closure_vis_lines, i, j,
 				 2, plot_controls->visbands[1], POL_YY,
-				 DEFAULT, DEFAULT, vlh);
+				 DEFAULT, DEFAULT, DEFAULT, vlh);
 		  }
                 }
               }
@@ -1233,12 +1243,12 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
                 if (plot_controls->vis_products[p]->if_spec & VIS_PLOT_IF1) {
                   add_vis_line(&vis_lines, &n_vis_lines,
                                i, j, 1, plot_controls->visbands[0], POL_XY,
-                               DEFAULT, DEFAULT, vlh);
+                               DEFAULT, DEFAULT, 1, vlh);
                 }
                 if (plot_controls->vis_products[p]->if_spec & VIS_PLOT_IF2) {
                   add_vis_line(&vis_lines, &n_vis_lines,
                                i, j, 2, plot_controls->visbands[1], POL_XY,
-                               DEFAULT, DEFAULT, vlh);
+                               DEFAULT, DEFAULT, 1, vlh);
                 }
               }
               // Prepare if we're plotting Tsys.
@@ -1253,7 +1263,7 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
                   }
                   add_vis_line(&tsys_vis_lines, &n_tsys_vis_lines,
                                i, j, 1, plot_controls->visbands[0], POL_XX,
-                               (i + 3), antprod[ap], vlh);
+                               (i + 3), antprod[ap], DEFAULT, vlh);
                 }
                 if (plot_controls->vis_products[p]->if_spec & VIS_PLOT_IF2) {
                   ap += 1 * 2;
@@ -1262,7 +1272,7 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
                   }
                   add_vis_line(&tsys_vis_lines, &n_tsys_vis_lines,
                                i, j, 1, plot_controls->visbands[1], POL_XX,
-                               (i + 3), antprod[ap], vlh);
+                               (i + 3), antprod[ap], DEFAULT, vlh);
                 }
               }
               if (plot_controls->vis_products[p]->pol_spec & PLOT_POL_YY) {
@@ -1274,7 +1284,7 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
                   }
                   add_vis_line(&tsys_vis_lines, &n_tsys_vis_lines,
                                i, j, 1, plot_controls->visbands[0], POL_YY,
-                               (i + 3), antprod[ap], vlh);
+                               (i + 3), antprod[ap], DEFAULT, vlh);
                 }
                 if (plot_controls->vis_products[p]->if_spec & VIS_PLOT_IF2) {
                   ap += 1 * 2;
@@ -1283,7 +1293,7 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
                   }
                   add_vis_line(&tsys_vis_lines, &n_tsys_vis_lines,
                                i, j, 1, plot_controls->visbands[1], POL_YY,
-                               (i + 3), antprod[ap], vlh);
+                               (i + 3), antprod[ap], DEFAULT, vlh);
                 }
               }
             }
@@ -1294,7 +1304,7 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
   }
   // Prepare if we're plotting site metadata.
   add_vis_line(&meta_vis_line, &n_meta_vis_lines,
-               1, 1, 1, plot_controls->visbands[0], POL_XX, 1, 1, vlh);
+               1, 1, 1, plot_controls->visbands[0], POL_XX, 1, 1, DEFAULT, vlh);
   //printf("generating %d vis lines\n", n_vis_lines);
   if ((n_vis_lines == 0) && (n_tsys_vis_lines == 0) && (n_meta_vis_lines == 0)) {
     // Nothing to plot!
@@ -1444,13 +1454,13 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
                     // Need to fix for bin.
                     if (plot_controls->panel_type[i] == VIS_PLOTPANEL_AMPLITUDE) {
                       plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
-                        cycle_vis_quantities[k][l][m]->amplitude[n][0];
+                        cycle_vis_quantities[k][l][m]->amplitude[n][vis_lines[j]->bin_index];
                     } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_PHASE) {
                       plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
-                        cycle_vis_quantities[k][l][m]->phase[n][0];
+                        cycle_vis_quantities[k][l][m]->phase[n][vis_lines[j]->bin_index];
                     } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_DELAY) {
                       plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
-                        cycle_vis_quantities[k][l][m]->delay[n][0];
+                        cycle_vis_quantities[k][l][m]->delay[n][vis_lines[j]->bin_index];
                     }
                     MINASSIGN(min_y, plot_lines[i][j][1][n_plot_lines[i][j] - 1]);
                     MAXASSIGN(max_y, plot_lines[i][j][1][n_plot_lines[i][j] - 1]);
@@ -1747,7 +1757,7 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
     
     cpgswin(min_x, max_x, min_y, max_y);
     cpgsci(3);
-    cpgsch(1.1);
+    cpgsch(maxch * (3.0 / (float)plot_controls->num_panels));
     if (i % 2 == 0) {
       (void)strcpy(yopts, "BCNTS");
     } else {
@@ -1814,6 +1824,7 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
     }
     cpgmtxt("L", 2.2, 0.5, 0.5, panellabel);
     cpgmtxt("R", 2.2, 0.5, 0.5, panelunits);
+    cpgsch(maxch);
     if (show_panel_error) {
       cpgmtxt("T", -2.0, 0.5, 0.5, panelerror);
     }
