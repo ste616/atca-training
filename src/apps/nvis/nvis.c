@@ -44,6 +44,7 @@ static char nvis_args_doc[] = "[options]";
 // Our options.
 static struct argp_option nvis_options[] = {
   { "device", 'd', "PGPLOT_DEVICE", 0, "The PGPLOT device to use" },
+  { "default-dump", 'D', "DUMP_TYPE", 0, "The plot type to use as default for output files (default: PNG)" },
   { "file", 'f', "FILE", 0, "Use an output file as the input" },
   { "port", 'p', "PORTNUM", 0,
     "The port number on the server to connect to" },
@@ -55,6 +56,7 @@ static struct argp_option nvis_options[] = {
 };
 
 #define VISBUFSIZE 1024
+#define VISBUFSHORT 512
 #define MAXVISBANDS 2
 
 // The arguments structure.
@@ -66,15 +68,16 @@ struct nvis_arguments {
   char server_name[VISBUFSIZE];
   bool network_operation;
   char username[CLIENTIDLENGTH];
+  int default_dump;
 };
 
 // And some fun, totally necessary, global state variables.
 int action_required, server_type, n_ampphase_options;
-int vis_device_number, data_selected_index, tsys_apply;
+int data_selected_index, tsys_apply;
 int xaxis_type, *yaxis_type, nxpanels, nypanels, nvisbands;
 int *visband_idx, tvchan_change_min, tvchan_change_max;
 int reference_antenna_index;
-char **visband, tvchan_visband[10];
+char **visband, tvchan_visband[10], hardcopy_filename[VISBUFSHORT];
 // Whether to order the baselines in length order (true/false).
 bool sort_baselines;
 float data_seconds;
@@ -89,6 +92,13 @@ static error_t nvis_parse_opt(int key, char *arg, struct argp_state *state) {
   switch(key) {
   case 'd':
     strncpy(arguments->vis_device, arg, VISBUFSIZE);
+    break;
+  case 'D':
+    if (strcasecmp(arg, "ps") == 0) {
+      arguments->default_dump = FILETYPE_POSTSCRIPT;
+    } else if (strcasecmp(arg, "png") == 0) {
+      arguments->default_dump = FILETYPE_PNG;
+    }
     break;
   case 'f':
     arguments->use_file = true;
@@ -125,28 +135,30 @@ void read_data_from_file(char *filename, struct vis_data *vis_data) {
   fclose(fh);
 }
 
-void prepare_vis_device(char *device_name, bool *device_opened) {
+void prepare_vis_device(char *device_name, int *vis_device_number,
+			bool *device_opened, struct panelspec *vis_panelspec) {
   if (!(*device_opened)) {
     // Open the device.
-    vis_device_number = cpgopen(device_name);
+    *vis_device_number = cpgopen(device_name);
     *device_opened = true;
   }
 
   // Set up the device with the current settings.
   cpgask(0);
-  vis_panelspec.measured = NO;
+  vis_panelspec->measured = NO;
 }
 
-void release_vis_device(bool *device_opened) {
+void release_vis_device(int *vis_device_number, bool *device_opened,
+			struct panelspec *vis_panelspec) {
   if (*device_opened) {
     // Close the device.
-    cpgslct(vis_device_number);
+    cpgslct(*vis_device_number);
     cpgclos();
     *device_opened = false;
-    vis_device_number = -1;
+    *vis_device_number = -1;
   }
 
-  free_panelspec(&vis_panelspec);
+  free_panelspec(vis_panelspec);
 }
 
 bool sigwinch_received, sigint_received;
@@ -179,6 +191,7 @@ static void sighandler(int sig) {
 #define ACTION_OMIT_OPTIONS              1<<12
 #define ACTION_UNKNOWN_COMMAND           1<<13
 #define ACTION_COMPUTE_CLOSUREPHASE      1<<14
+#define ACTION_HARDCOPY_PLOT             1<<15
 
 // Make a shortcut to stop action for those actions which can only be
 // done by a simulator.
@@ -318,11 +331,12 @@ int time_index() {
   return -1;
 }
 
+#define TIMEFILE_LENGTH 18
 // Callback function called for each line when accept-line
 // executed, EOF seen, or EOF character read.
 static void interpret_command(char *line) {
   char **line_els = NULL, *cycomma = NULL, delim[] = " ";
-  char duration[VISBUFSIZE], historystart[VISBUFSIZE];
+  char duration[VISBUFSIZE], historystart[VISBUFSIZE], ttime[TIMEFILE_LENGTH];
   int nels, i, j, k, array_change_spec, nproducts, pr;
   int change_panel = PLOT_ALL_PANELS, iarg, plen = 0, temp_xaxis_type;
   int *temp_yaxis_type = NULL, temp_nypanels, idx_low, idx_high, ty;
@@ -737,7 +751,17 @@ static void interpret_command(char *line) {
 	  printf(" Unable to find reference antenna %s\n", line_els[1]);
 	}
       }
-      
+    } else if (minmatch("dump", line_els[0], 4)) {
+      // Make a hardcopy version of the plot.
+      if (nels == 1) {
+	// We automatically generate a file name, based on the current time.
+	current_time_string(ttime, TIMEFILE_LENGTH);
+	snprintf(hardcopy_filename, VISBUFSHORT, "nvis_plot_%s", ttime);
+      } else if (nels == 2) {
+	// We've been given a file name to use.
+	strncpy(hardcopy_filename, line_els[1], VISBUFSHORT);
+      }
+      action_required = ACTION_HARDCOPY_PLOT;
     } else {
       if (nels == 1) {
         // We try to interpret the string as the panels to show.
@@ -796,6 +820,7 @@ static void interpret_command(char *line) {
 int main(int argc, char *argv[]) {
   struct nvis_arguments arguments;
   int i, j, k, r, bytes_received, nmesg = 0, bidx = -1, num_timelines = 0;
+  int dump_type = FILETYPE_UNKNOWN, dump_device_number = -1, vis_device_number = -1;
   cmp_ctx_t cmp;
   cmp_mem_access_t mem;
   struct requests server_request;
@@ -803,13 +828,14 @@ int main(int argc, char *argv[]) {
   SOCKET socket_peer, max_socket = -1;
   char *recv_buffer = NULL, send_buffer[VISBUFSIZE], htime[20];
   char **mesgout = NULL, client_id[CLIENTIDLENGTH];
-  char header_string[VISBUFSIZE];
+  char header_string[VISBUFSIZE], dump_device[VISBUFSIZE * 2];
   fd_set watchset, reads;
-  bool vis_device_opened = false;
+  bool vis_device_opened = false, dump_device_opened = false;
   size_t recv_buffer_length;
   float *timelines = NULL;
   struct vis_quantities ***described_ptr = NULL;
   struct scan_header_data *described_hdr = NULL;
+  struct panelspec dump_panelspec;
 
   // Allocate and initialise some memory.
   MALLOC(mesgout, MAX_N_MESSAGES);
@@ -840,6 +866,7 @@ int main(int argc, char *argv[]) {
   arguments.port_number = 8880;
   arguments.network_operation = false;
   arguments.username[0] = 0;
+  arguments.default_dump = FILETYPE_PNG;
 
   // And defaults for some of the parameters.
   nxpanels = 1;
@@ -885,7 +912,8 @@ int main(int argc, char *argv[]) {
   }
 
   // Open the plotting device.
-  prepare_vis_device(arguments.vis_device, &vis_device_opened);
+  prepare_vis_device(arguments.vis_device, &vis_device_number, &vis_device_opened,
+		     &vis_panelspec);
 
   // Install the line handler.
   rl_callback_handler_install(prompt, interpret_command);
@@ -1014,25 +1042,63 @@ int main(int argc, char *argv[]) {
       action_required |= ACTION_REFRESH_PLOT;
     }
 
-    if (action_required & ACTION_REFRESH_PLOT) {
+    if ((action_required & ACTION_HARDCOPY_PLOT) ||
+	(action_required & ACTION_REFRESH_PLOT)) {
       if (data_seconds > 0) {
 	num_timelines = 1;
 	MALLOC(timelines, num_timelines);
 	timelines[0] = data_seconds;
-	/* nmesg = 0; */
-	/* snprintf(mesgout[nmesg++], VISBUFSIZE, "Time line at %.2f\n", timelines[0]); */
-	/* readline_print_messages(nmesg, mesgout); */
       }
-      // Let's make a plot.
-      make_vis_plot(vis_data.vis_quantities, vis_data.nviscycles,
-                    vis_data.num_ifs, 4, sort_baselines,
-                    &vis_panelspec, &vis_plotcontrols, vis_data.header_data,
-                    vis_data.metinfo, vis_data.syscal_data, num_timelines, timelines);
+
+      if (action_required & ACTION_HARDCOPY_PLOT) {
+	nmesg = 0;
+	// Open a new PGPLOT device.
+	dump_type = filename_to_pgplot_device(hardcopy_filename, dump_device,
+					      VISBUFSIZE, arguments.default_dump);
+	if (dump_type != FILETYPE_UNKNOWN) {
+	  // Open the device.
+	  prepare_vis_device(dump_device, &dump_device_number, &dump_device_opened,
+			     &dump_panelspec);
+	  if (dump_device_opened) {
+	    // Tell the plotter to use the device.
+	    vis_plotcontrols.pgplot_device = dump_device_number;
+	    // Make the plot.
+	    make_vis_plot(vis_data.vis_quantities, vis_data.nviscycles,
+			  vis_data.num_ifs, 4, sort_baselines,
+			  &dump_panelspec, &vis_plotcontrols, vis_data.header_data,
+			  vis_data.metinfo, vis_data.syscal_data, num_timelines, timelines);
+	    // Reset the plot controls.
+	    vis_plotcontrols.pgplot_device = vis_device_number;
+	    // Close the device.
+	    release_vis_device(&dump_device_number, &dump_device_opened, &dump_panelspec);
+	    snprintf(mesgout[nmesg++], VISBUFSIZE, " NVIS output to file %s\n",
+		     hardcopy_filename);
+	  } else {
+	    // Print an error.
+	    snprintf(mesgout[nmesg++], VISBUFSIZE, " NVIS NOT ABLE TO OUPUT TO %s\n",
+		     hardcopy_filename);
+	  }
+	} else {
+	  // Print an error.
+	  snprintf(mesgout[nmesg++], VISBUFSIZE, " UNKNOWN OUTPUT %s\n", hardcopy_filename);
+	}
+	action_required -= ACTION_HARDCOPY_PLOT;
+	readline_print_messages(nmesg, mesgout);
+      }
+      
+      if (action_required & ACTION_REFRESH_PLOT) {
+	// Let's make a plot.
+	make_vis_plot(vis_data.vis_quantities, vis_data.nviscycles,
+		      vis_data.num_ifs, 4, sort_baselines,
+		      &vis_panelspec, &vis_plotcontrols, vis_data.header_data,
+		      vis_data.metinfo, vis_data.syscal_data, num_timelines, timelines);
+	action_required -= ACTION_REFRESH_PLOT;
+      }
+
       FREE(timelines);
       num_timelines = 0;
-      action_required -= ACTION_REFRESH_PLOT;
     }
-
+    
 
     if (action_required & ACTION_AMPPHASE_OPTIONS_PRINT) {
       // Output the ampphase_options that were used for the
@@ -1253,7 +1319,7 @@ int main(int argc, char *argv[]) {
   printf("\n\n NVIS EXITS\n");
 
   // Release the plotting device.
-  release_vis_device(&vis_device_opened);
+  release_vis_device(&vis_device_number, &vis_device_opened, &vis_panelspec);
 
   // Release all the memory.
   // We have to handle freeing header data.

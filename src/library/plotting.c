@@ -2577,3 +2577,96 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
   FREE(panel_plotted);
   
 }
+
+/*!
+ *  \brief Determine a file type from a filename
+ *  \param f the name of the file which might give us a clue about the required
+ *           file type
+ *  \return a FILETYPE_* magic number depending on the determined filetype
+ *          - FILETYPE_PNG: the filename indicates a PNG
+ *          - FILETYPE_POSTSCRIPT: the filename indicates a PS
+ *          - FILETYPE_UNKNOWN: the filename is no help
+ */
+int determine_filetype(char *f) {
+  size_t slen;
+
+  if (f == NULL) {
+    return(FILETYPE_UNKNOWN);
+  }
+  
+  slen = strlen(f);
+  if (slen < 4) {
+    // Need at least a.ps
+    return(FILETYPE_UNKNOWN);
+  }
+
+  // Check if the file is a postscript.
+  if (strcasecmp(f + (slen - 3), ".ps") == 0) {
+    return(FILETYPE_POSTSCRIPT);
+  }
+
+  if (slen < 5) {
+    // Need at least a.png
+    return(FILETYPE_UNKNOWN);
+  }
+
+  // Check if the file is a PNG.
+  if (strcasecmp(f + (slen - 4), ".png") == 0) {
+    return(FILETYPE_PNG);
+  }
+
+  return(FILETYPE_UNKNOWN);
+}
+
+/*!
+ *  \brief Convert a filename into a PGPLOT device string
+ *  \param f the name of the file to output
+ *  \param d a string that upon exit will contain the PGPLOT device string
+ *  \param l the maximum length that will fit in \a d
+ *  \param type the default file type to use if the file type cannot be determined
+ *              from \a f
+ *  \return the file type that will be made from \a d
+ */
+int filename_to_pgplot_device(char *f, char *d, size_t l, int type) {
+  int ftype;
+  bool add_extension = false;
+  char *tmp = NULL;
+
+  // Try to interpret the file name to get the file type.
+  ftype = determine_filetype(f);
+
+  if (ftype == FILETYPE_UNKNOWN) {
+    ftype = type;
+    add_extension = true;
+  }
+
+  if (l < 10) {
+    // Not big enough for a.png/png
+    d[0] = 0;
+    return(FILETYPE_UNKNOWN);
+  }
+  
+  // Check we were given a useful type.
+  if ((ftype == FILETYPE_PNG) || (ftype == FILETYPE_POSTSCRIPT)) {
+    // Copy the filename across.
+    MALLOC(tmp, l);
+    strncpy(tmp, f, l);
+    if (add_extension) {
+      if (ftype == FILETYPE_PNG) {
+	snprintf(tmp, l, "%s.png", f);
+      } else if (ftype == FILETYPE_POSTSCRIPT) {
+	snprintf(tmp, l, "%s.ps", f);
+      }
+    }
+    // Add the necessary thing for the PGPLOT device descriptor.
+    if (ftype == FILETYPE_PNG) {
+      snprintf(d, l, "%s/png", tmp);
+    } else if (ftype == FILETYPE_POSTSCRIPT) {
+      snprintf(d, l, "%s/cps", tmp);
+    }
+    return(ftype);
+  } else {
+    d[0] = 0;
+    return(FILETYPE_UNKNOWN);
+  }
+}

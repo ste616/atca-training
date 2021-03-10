@@ -225,3 +225,4 @@ int scan_header_to_array(struct scan_header_data *scan_header_data,
 			 struct array_information **array_information);
 void free_array_information(struct array_information **array_information);
 void strip_end_spaces(char *s, char *r, size_t rlen);
+void current_time_string(char *s, size_t l);

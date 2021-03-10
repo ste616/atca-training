@@ -260,7 +260,7 @@ that exact time - not at the midpoint of the nearest cycle.
 
 #### delavg
 
-Format **delav**g *number of channels* [*number of channels*]
+Format: **delav**g *number of channels* [*number of channels*]
 
 This command instructs the server to recompute data while performing
 averaging over phase while calculating the delay errors.
@@ -272,6 +272,12 @@ for IF 2.
 
 While the server recomputes the data, `nvis` will continue to show the
 current data.
+
+#### exit
+
+Format: **exit**
+
+Exit `nvis`.
 
 #### history
 
@@ -343,6 +349,12 @@ and then the window-specific options (and some vital parameters to allow
 for their identification) are shown for each window. The number
 of windows will correspond to how many continuum bands there are, plus
 all the zooms.
+
+#### quit
+
+Format **quit**
+
+Exit `nvis`.
 
 #### refant
 
@@ -416,6 +428,31 @@ This command always prints the sorting order method to the
 controlling terminal.
 
 #### tsys
+
+Format: **tsys** [* **off**/**cor**relator/**comp**uted *]
+
+This command instructs the server to recompute data while compensating for
+measured system temperatures in a specified way.
+
+If used without an argument, this command works as equivalent to
+`print computation`, and outputs the options sets to the terminal.
+
+This command accepts only a single argument, that being one of the
+following:
+- **off**: the server will reverse whatever system temperature compensation
+  was previously applied, and the output amplitudes will be the correlation
+  coefficient
+- **cor**relator: the output amplitudes will be scaled by the system
+  temperatures that were measured by the correlator during the observation,
+  using whatever tvchannel and tvmedian settings that were in effect at the
+  time
+- **comp**uted: the output amplitudes will be scaled by the system
+  temperatures that were computed by the server using the current
+  tvchannel and tvmedian settings
+
+When this command is used, the system temperature correction option will
+be changed only for the options set relating to the configuration at the
+selected time. That time selection can be changed using the **data** command.
 
 #### tvchannel
 

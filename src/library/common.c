@@ -848,3 +848,23 @@ void strip_end_spaces(char *s, char *r, size_t rlen) {
     r[last_char] = 0;
   }
 }
+
+/*!
+ *  \brief Create a string representing the time when this function is
+ *         called
+ *  \param s the string which upon exit will contain the time string
+ *  \param l the maximum length of the string that will fit in s
+ *
+ * The time strings created by this function will not contain whitespace,
+ * making them quite suitable for filenames.
+ */
+void current_time_string(char *s, size_t l) {
+  // Get the current time.
+  time_t now;
+  struct tm *timeinfo;
+
+  time(&now);
+  timeinfo = localtime(&now);
+  
+  strftime(s, l, "%Y-%m-%d_%H%M%S", timeinfo);
+}

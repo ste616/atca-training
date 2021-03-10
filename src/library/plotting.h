@@ -67,6 +67,10 @@
 #define PANEL_ORIGINAL    -1
 #define PANEL_INFORMATION -2
 
+#define FILETYPE_PNG        -3
+#define FILETYPE_POSTSCRIPT -4
+#define FILETYPE_UNKNOWN     0
+
 // This structure holds pre-calculated panel positions for a PGPLOT
 // device with nx x ny panels.
 struct panelspec {
@@ -434,3 +438,5 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
                    struct scan_header_data *scan_header_data,
                    struct syscal_data *compiled_tsys_data,
                    int max_tsys_ifs, bool all_data_present);
+int determine_filetype(char *f);
+int filename_to_pgplot_device(char *f, char *d, size_t l, int type);
