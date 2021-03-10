@@ -347,8 +347,8 @@ static void interpret_command(char *line) {
   bool products_selected, data_time_parsed = false, product_usable, succ = false;
   bool product_backwards = false;
 
-  if ((line == NULL) || (strcasecmp(line, "exit") == 0) ||
-      (strcasecmp(line, "quit") == 0)) {
+  if ((line == NULL) || (strncasecmp(line, "exit", 4) == 0) ||
+      (strncasecmp(line, "quit", 4) == 0)) {
     action_required = ACTION_QUIT;
     if (line == 0) {
       return;
@@ -368,7 +368,10 @@ static void interpret_command(char *line) {
     }
     nels = split_string(line, delim, &line_els);
 
-    if (minmatch("select", line_els[0], 3)) {
+    if (minmatch("exit", line_els[0], 4) ||
+	minmatch("quit", line_els[0], 4)) {
+      action_required = ACTION_QUIT;
+    } else if (minmatch("select", line_els[0], 3)) {
       // We've been given a selection command.
       products_selected = false;
       nproducts = 0;
@@ -1062,6 +1065,9 @@ int main(int argc, char *argv[]) {
 	  if (dump_device_opened) {
 	    // Tell the plotter to use the device.
 	    vis_plotcontrols.pgplot_device = dump_device_number;
+	    // Do some prep work.
+	    splitpanels(1, vis_plotcontrols.num_panels, dump_device_number, 1, 1, 0,
+			&dump_panelspec);
 	    // Make the plot.
 	    make_vis_plot(vis_data.vis_quantities, vis_data.nviscycles,
 			  vis_data.num_ifs, 4, sort_baselines,
