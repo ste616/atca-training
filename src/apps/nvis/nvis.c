@@ -58,6 +58,7 @@ static struct argp_option nvis_options[] = {
 #define VISBUFSIZE 1024
 #define VISBUFSHORT 512
 #define VISBUFMEDIUM 768
+#define VISBUFLONG 1280
 #define MAXVISBANDS 2
 
 // The arguments structure.
@@ -831,7 +832,7 @@ int main(int argc, char *argv[]) {
   SOCKET socket_peer, max_socket = -1;
   char *recv_buffer = NULL, send_buffer[VISBUFSIZE], htime[20];
   char **mesgout = NULL, client_id[CLIENTIDLENGTH];
-  char header_string[VISBUFSIZE], dump_device[VISBUFMEDIUM];
+  char header_string[VISBUFSIZE], dump_device[VISBUFMEDIUM], dump_file[VISBUFSIZE];
   fd_set watchset, reads;
   bool vis_device_opened = false, dump_device_opened = false;
   size_t recv_buffer_length;
@@ -843,7 +844,7 @@ int main(int argc, char *argv[]) {
   // Allocate and initialise some memory.
   MALLOC(mesgout, MAX_N_MESSAGES);
   for (i = 0; i < MAX_N_MESSAGES; i++) {
-    CALLOC(mesgout[i], VISBUFSIZE);
+    CALLOC(mesgout[i], VISBUFLONG);
   }
   nvisbands = (2 > MAXVISBANDS) ? MAXVISBANDS : 2;
   MALLOC(visband, MAXVISBANDS);
@@ -999,35 +1000,35 @@ int main(int argc, char *argv[]) {
       // Describe the data.
       nmesg = 0;
       if (data_selected_index < 0) {
-	snprintf(mesgout[nmesg++], VISBUFSIZE, "NO DATA SELECTED\n");
+	snprintf(mesgout[nmesg++], VISBUFLONG, "NO DATA SELECTED\n");
       } else {
 	described_ptr = vis_data.vis_quantities[data_selected_index];
 	described_hdr = vis_data.header_data[data_selected_index];
 	found_options = find_ampphase_options(n_ampphase_options, ampphase_options,
 					      described_hdr);
 	seconds_to_hourlabel(described_ptr[0][0]->ut_seconds, htime);
-	snprintf(mesgout[nmesg++], VISBUFSIZE, "DATA AT %s %s:\n",
+	snprintf(mesgout[nmesg++], VISBUFLONG, "DATA AT %s %s:\n",
 		 described_ptr[0][0]->obsdate, htime);
-	snprintf(mesgout[nmesg++], VISBUFSIZE, "  HAS %d IFS CYCLE TIME %d\n\r",
+	snprintf(mesgout[nmesg++], VISBUFLONG, "  HAS %d IFS CYCLE TIME %d\n\r",
 		 vis_data.num_ifs[data_selected_index],
 		 described_hdr->cycle_time);
-	snprintf(mesgout[nmesg++], VISBUFSIZE, "  SOURCE %s OBSTYPE %s\n",
+	snprintf(mesgout[nmesg++], VISBUFLONG, "  SOURCE %s OBSTYPE %s\n",
 		 described_hdr->source_name[described_ptr[0][0]->source_no],
 		 described_hdr->obstype);
 	for (i = 0; i < vis_data.num_ifs[data_selected_index]; i++) {
-	  snprintf(mesgout[nmesg++], VISBUFSIZE, " IF %d: CF %.2f MHz NCHAN %d BW %.0f MHz",
+	  snprintf(mesgout[nmesg++], VISBUFLONG, " IF %d: CF %.2f MHz NCHAN %d BW %.0f MHz",
 		   (i + 1), described_hdr->if_centre_freq[i], described_hdr->if_num_channels[i],
 		   described_hdr->if_bandwidth[i]);
 	  // Check if this is one of the calbands.
 	  for (j = 0; j < nvisbands; j++) {
 	    if (find_if_name(described_hdr, visband[j]) == (i + 1)) {
-	      snprintf(mesgout[nmesg++], VISBUFSIZE, " (%c%c %c%c %c%c)",
+	      snprintf(mesgout[nmesg++], VISBUFLONG, " (%c%c %c%c %c%c)",
 		       ('A' + (2 * j)), ('A' + (2 * j)),
 		       ('B' + (2 * j)), ('B' + (2 * j)),
 		       ('A' + (2 * j)), ('B' + (2 * j)));
 	    }
 	  }
-	  snprintf(mesgout[nmesg++], VISBUFSIZE, "\n");
+	  snprintf(mesgout[nmesg++], VISBUFLONG, "\n");
 	}
       }
       readline_print_messages(nmesg, mesgout);
@@ -1057,10 +1058,11 @@ int main(int argc, char *argv[]) {
 	nmesg = 0;
 	// Open a new PGPLOT device.
 	dump_type = filename_to_pgplot_device(hardcopy_filename, dump_device,
-					      VISBUFSIZE, arguments.default_dump);
+					      VISBUFSIZE, arguments.default_dump,
+					      dump_file, VISBUFSIZE);
 	if (dump_type != FILETYPE_UNKNOWN) {
 	  // Open the device.
-	  snprintf(mesgout[nmesg++], VISBUFSIZE, " PGPLOT device %s\n", dump_device);
+	  //snprintf(mesgout[nmesg++], VISBUFLONG, " PGPLOT device %s\n", dump_device);
 	  prepare_vis_device(dump_device, &dump_device_number, &dump_device_opened,
 			     &dump_panelspec);
 	  if (dump_device_opened) {
@@ -1078,16 +1080,16 @@ int main(int argc, char *argv[]) {
 	    release_vis_device(&dump_device_number, &dump_device_opened, &dump_panelspec);
 	    // Reset the plot controls.
 	    vis_plotcontrols.pgplot_device = vis_device_number;
-	    snprintf(mesgout[nmesg++], VISBUFSIZE, " NVIS output to file %s\n",
-		     hardcopy_filename);
+	    snprintf(mesgout[nmesg++], VISBUFLONG, " NVIS output to file %s\n",
+		     dump_file);
 	  } else {
 	    // Print an error.
-	    snprintf(mesgout[nmesg++], VISBUFSIZE, " NVIS NOT ABLE TO OUPUT TO %s\n",
+	    snprintf(mesgout[nmesg++], VISBUFLONG, " NVIS NOT ABLE TO OUPUT TO %s\n",
 		     hardcopy_filename);
 	  }
 	} else {
 	  // Print an error.
-	  snprintf(mesgout[nmesg++], VISBUFSIZE, " UNKNOWN OUTPUT %s\n", hardcopy_filename);
+	  snprintf(mesgout[nmesg++], VISBUFLONG, " UNKNOWN OUTPUT %s\n", hardcopy_filename);
 	}
 	action_required -= ACTION_HARDCOPY_PLOT;
 	readline_print_messages(nmesg, mesgout);
@@ -1111,8 +1113,8 @@ int main(int argc, char *argv[]) {
       // Output the ampphase_options that were used for the
       // computation of the data at the selected index.
       nmesg = 0;
-      snprintf(mesgout[nmesg++], VISBUFSIZE, "VIS DATA COMPUTED WITH OPTIONS:\n");
-      print_options_set(1, &found_options, mesgout[nmesg++], VISBUFSIZE);
+      snprintf(mesgout[nmesg++], VISBUFLONG, "VIS DATA COMPUTED WITH OPTIONS:\n");
+      print_options_set(1, &found_options, mesgout[nmesg++], VISBUFLONG);
       readline_print_messages(nmesg, mesgout);
       action_required -= ACTION_AMPPHASE_OPTIONS_PRINT;
     }
@@ -1124,7 +1126,7 @@ int main(int argc, char *argv[]) {
       nmesg = 0;
       if (bidx < 0) {
         // Didn't find the specified band.
-        snprintf(mesgout[nmesg++], VISBUFSIZE, "Band %s not found in data.\n",
+        snprintf(mesgout[nmesg++], VISBUFLONG, "Band %s not found in data.\n",
                  tvchan_visband);
       } else {
         found_options->min_tvchannel[bidx] = tvchan_change_min;
@@ -1192,7 +1194,7 @@ int main(int argc, char *argv[]) {
       strncpy(arguments.username, username, CLIENTIDLENGTH);
       // Print a message.
       nmesg = 1;
-      snprintf(mesgout[0], VISBUFSIZE, " Thankyou and hello %s\n", arguments.username);
+      snprintf(mesgout[0], VISBUFLONG, " Thankyou and hello %s\n", arguments.username);
       readline_print_messages(nmesg, mesgout);
     }
 
@@ -1209,7 +1211,7 @@ int main(int argc, char *argv[]) {
 
     if (action_required & ACTION_UNKNOWN_COMMAND) {
       nmesg = 0;
-      snprintf(mesgout[nmesg++], VISBUFSIZE, "  UNKNOWN COMMAND!\n");
+      snprintf(mesgout[nmesg++], VISBUFLONG, "  UNKNOWN COMMAND!\n");
       readline_print_messages(nmesg, mesgout);
       action_required -= ACTION_UNKNOWN_COMMAND;
     }
@@ -1246,7 +1248,7 @@ int main(int argc, char *argv[]) {
         continue;
       }
       /* nmesg = 1; */
-      /* snprintf(mesgout[0], VISBUFSIZE, "Received %d bytes\n", bytes_received); */
+      /* snprintf(mesgout[0], VISBUFLONG, "Received %d bytes\n", bytes_received); */
       /* readline_print_messages(nmesg, mesgout); */
       init_cmp_memory_buffer(&cmp, &mem, recv_buffer, recv_buffer_length);
       unpack_responses(&cmp, &server_response);
@@ -1280,9 +1282,9 @@ int main(int argc, char *argv[]) {
         unpack_vis_data(&cmp, &vis_data);
         action_required = ACTION_NEW_DATA_RECEIVED;
 	/* nmesg = 0; */
-	/* snprintf(mesgout[nmesg++], VISBUFSIZE, " Data received\n"); */
-	/* print_options_set(n_ampphase_options, ampphase_options, header_string, VISBUFSIZE); */
-	/* snprintf(mesgout[nmesg++], VISBUFSIZE, "%s", header_string); */
+	/* snprintf(mesgout[nmesg++], VISBUFLONG, " Data received\n"); */
+	/* print_options_set(n_ampphase_options, ampphase_options, header_string, VISBUFLONG); */
+	/* snprintf(mesgout[nmesg++], VISBUFLONG, "%s", header_string); */
 	/* readline_print_messages(nmesg, mesgout); */
       } else if (server_response.response_type == RESPONSE_VISDATA_COMPUTED) {
         // We're being told new data is available after we asked for a new
@@ -1295,7 +1297,7 @@ int main(int argc, char *argv[]) {
         // We're being told what type of server we've connected to.
         pack_read_sint(&cmp, &server_type);
         nmesg = 1;
-        snprintf(mesgout[0], VISBUFSIZE, "Connected to %s server.\n",
+        snprintf(mesgout[0], VISBUFLONG, "Connected to %s server.\n",
                  get_servertype_string(server_type));
         readline_print_messages(nmesg, mesgout);
       } else if (server_response.response_type == RESPONSE_REQUEST_USERNAME) {
@@ -1306,7 +1308,7 @@ int main(int argc, char *argv[]) {
         username_tries = 0;
         // Print a message.
         nmesg = 1;
-        snprintf(mesgout[0], VISBUFSIZE, "PLEASE INPUT ATNF USER NAME\n");
+        snprintf(mesgout[0], VISBUFLONG, "PLEASE INPUT ATNF USER NAME\n");
         // Change the prompt.
         readline_print_messages(nmesg, mesgout);
       } else if ((server_response.response_type == RESPONSE_USERREQUEST_SPECTRUM) ||

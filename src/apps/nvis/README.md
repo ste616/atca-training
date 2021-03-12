@@ -22,6 +22,8 @@ Usage: nvis [OPTION...] [options]
 new/network VIS
 
   -d, --device=PGPLOT_DEVICE The PGPLOT device to use
+  -D, --default-dump=DUMP_TYPE   The plot type to use as default for output
+                             files (default: PNG)
   -f, --file=FILE            Use an output file as the input
   -p, --port=PORTNUM         The port number on the server to connect to
   -s, --server=SERVER        The server name or address to connect to
@@ -272,6 +274,12 @@ for IF 2.
 
 While the server recomputes the data, `nvis` will continue to show the
 current data.
+
+#### dump
+
+Format: **dump** [*filename*]
+
+
 
 #### exit
 

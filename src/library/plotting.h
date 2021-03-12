@@ -439,4 +439,4 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
                    struct syscal_data *compiled_tsys_data,
                    int max_tsys_ifs, bool all_data_present);
 int determine_filetype(char *f);
-int filename_to_pgplot_device(char *f, char *d, size_t l, int type);
+int filename_to_pgplot_device(char *f, char *d, size_t l, int type, char *a, size_t al);

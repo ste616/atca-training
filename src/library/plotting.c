@@ -2630,9 +2630,13 @@ int determine_filetype(char *f) {
  *  \param l the maximum length that will fit in \a d
  *  \param type the default file type to use if the file type cannot be determined
  *              from \a f
+ *  \param a actual filename, which upon exit will contain the actual file that
+ *           will be created; this differs from f only if f doesn't contain the
+ *           appropriate extension
+ *  \param al the maximum length that will fit in \a l
  *  \return the file type that will be made from \a d
  */
-int filename_to_pgplot_device(char *f, char *d, size_t l, int type) {
+int filename_to_pgplot_device(char *f, char *d, size_t l, int type, char *a, size_t al) {
   int ftype;
   bool add_extension = false;
   char *tmp = NULL;
@@ -2662,6 +2666,9 @@ int filename_to_pgplot_device(char *f, char *d, size_t l, int type) {
       } else if (ftype == FILETYPE_POSTSCRIPT) {
 	snprintf(tmp, l, "%s.ps", f);
       }
+    }
+    if (a != NULL) {
+      strncpy(a, tmp, al);
     }
     // Add the necessary thing for the PGPLOT device descriptor.
     if (ftype == FILETYPE_PNG) {
