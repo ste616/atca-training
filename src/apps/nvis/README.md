@@ -352,7 +352,7 @@ all the zooms.
 
 #### quit
 
-Format **quit**
+Format: **quit**
 
 Exit `nvis`.
 

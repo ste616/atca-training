@@ -57,6 +57,7 @@ static struct argp_option nvis_options[] = {
 
 #define VISBUFSIZE 1024
 #define VISBUFSHORT 512
+#define VISBUFMEDIUM 768
 #define MAXVISBANDS 2
 
 // The arguments structure.
@@ -136,7 +137,7 @@ void read_data_from_file(char *filename, struct vis_data *vis_data) {
 }
 
 void prepare_vis_device(char *device_name, int *vis_device_number,
-			bool *device_opened, struct panelspec *vis_panelspec) {
+			bool *device_opened, struct panelspec *panelspec) {
   if (!(*device_opened)) {
     // Open the device.
     *vis_device_number = cpgopen(device_name);
@@ -145,11 +146,11 @@ void prepare_vis_device(char *device_name, int *vis_device_number,
 
   // Set up the device with the current settings.
   cpgask(0);
-  vis_panelspec->measured = NO;
+  panelspec->measured = NO;
 }
 
 void release_vis_device(int *vis_device_number, bool *device_opened,
-			struct panelspec *vis_panelspec) {
+			struct panelspec *panelspec) {
   if (*device_opened) {
     // Close the device.
     cpgslct(*vis_device_number);
@@ -158,7 +159,7 @@ void release_vis_device(int *vis_device_number, bool *device_opened,
     *vis_device_number = -1;
   }
 
-  free_panelspec(vis_panelspec);
+  free_panelspec(panelspec);
 }
 
 bool sigwinch_received, sigint_received;
@@ -347,8 +348,7 @@ static void interpret_command(char *line) {
   bool products_selected, data_time_parsed = false, product_usable, succ = false;
   bool product_backwards = false;
 
-  if ((line == NULL) || (strncasecmp(line, "exit", 4) == 0) ||
-      (strncasecmp(line, "quit", 4) == 0)) {
+  if (line == NULL) {
     action_required = ACTION_QUIT;
     if (line == 0) {
       return;
@@ -831,7 +831,7 @@ int main(int argc, char *argv[]) {
   SOCKET socket_peer, max_socket = -1;
   char *recv_buffer = NULL, send_buffer[VISBUFSIZE], htime[20];
   char **mesgout = NULL, client_id[CLIENTIDLENGTH];
-  char header_string[VISBUFSIZE], dump_device[VISBUFSIZE * 2];
+  char header_string[VISBUFSIZE], dump_device[VISBUFMEDIUM];
   fd_set watchset, reads;
   bool vis_device_opened = false, dump_device_opened = false;
   size_t recv_buffer_length;
@@ -1060,6 +1060,7 @@ int main(int argc, char *argv[]) {
 					      VISBUFSIZE, arguments.default_dump);
 	if (dump_type != FILETYPE_UNKNOWN) {
 	  // Open the device.
+	  snprintf(mesgout[nmesg++], VISBUFSIZE, " PGPLOT device %s\n", dump_device);
 	  prepare_vis_device(dump_device, &dump_device_number, &dump_device_opened,
 			     &dump_panelspec);
 	  if (dump_device_opened) {
@@ -1073,10 +1074,10 @@ int main(int argc, char *argv[]) {
 			  vis_data.num_ifs, 4, sort_baselines,
 			  &dump_panelspec, &vis_plotcontrols, vis_data.header_data,
 			  vis_data.metinfo, vis_data.syscal_data, num_timelines, timelines);
-	    // Reset the plot controls.
-	    vis_plotcontrols.pgplot_device = vis_device_number;
 	    // Close the device.
 	    release_vis_device(&dump_device_number, &dump_device_opened, &dump_panelspec);
+	    // Reset the plot controls.
+	    vis_plotcontrols.pgplot_device = vis_device_number;
 	    snprintf(mesgout[nmesg++], VISBUFSIZE, " NVIS output to file %s\n",
 		     hardcopy_filename);
 	  } else {
@@ -1343,6 +1344,7 @@ int main(int argc, char *argv[]) {
     FREE(visband[i]);
   }
   FREE(visband);
+  FREE(visband_idx);
   FREE(yaxis_type);
   for (i = 0; i < n_ampphase_options; i++) {
     free_ampphase_options(ampphase_options[i]);

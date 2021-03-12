@@ -2994,6 +2994,8 @@ void compute_closure_phase(struct scan_header_data *scan_header_data,
   }
 
   // Compute the closure phases now.
+  vis_quantities->min_closure_phase = INFINITY;
+  vis_quantities->max_closure_phase = -INFINITY;
   for (i = 0; i < n_triangles_set; i++) {
     for (j = 0; j < vis_quantities->nbins_cross; j++) {
       vis_quantities->closure_phase[i][j] =

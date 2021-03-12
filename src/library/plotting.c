@@ -1973,6 +1973,11 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
     FREE(tsys_vis_lines[i]);
   }
   FREE(tsys_vis_lines);
+  for (i = 0; i < n_closure_vis_lines; i++) {
+    FREE(closure_vis_lines[i]);
+  }
+  FREE(closure_vis_lines);
+
   FREE(meta_vis_line[0]);
   FREE(meta_vis_line);
   for (i = 0; i < plot_controls->num_panels; i++) {
@@ -2664,6 +2669,7 @@ int filename_to_pgplot_device(char *f, char *d, size_t l, int type) {
     } else if (ftype == FILETYPE_POSTSCRIPT) {
       snprintf(d, l, "%s/cps", tmp);
     }
+    FREE(tmp);
     return(ftype);
   } else {
     d[0] = 0;
