@@ -1,6 +1,8 @@
 # NSPD
 A "clone" of ATCA's SPD, with extra features.
 
+![nspd example display](nspd_example.png)
+
 ## Introduction
 
 The `nspd` application, like the `spd` application it clones and is used
@@ -76,6 +78,11 @@ The `NSPD>` prompt will appear whenever `nspd` is ready to accept commands.
 `nspd` shares many of the display qualities as `spd`, so as to ensure that
 if you're familiar with examining `nspd` you'll be at ease with `spd`
 when you're actually in control of the telescope.
+
+There are some differences however, in order to make it clearer what is
+being displayed. For example, there is an area at the top of the display
+which shows the time label for the data being shown, some environmental
+data, and the system temperatures.
 
 ### Interactive commands
 
