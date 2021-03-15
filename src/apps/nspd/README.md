@@ -112,6 +112,43 @@ Format: **ch**annel [[*band*] *min channel* *max channel*]
 
 Format: **delav**g [*band*] *number of channels*
 
+#### dump
+
+Format: **dump** [*filename*]
+
+Output the current plot to a file. If no argument is specified, then the
+filename is generated automatically to be
+`nspd_plot_yyyy-mm-dd_HHMMSS`, where `yyyy` is the year (like 2021),
+`mm` is the month (like 06), `dd` is the date (like 02), `HH` is the
+hour (like 23), `MM` is the minute and `SS` is the second. The time is
+in the local timezone according to the machine that `nspd` is running on.
+
+`nspd` can output two types of files: PNG and PS. If the filename is
+generated automatically, the type of file created will depend on the
+value of the argument supplied to the `-D` option when `nspd` was started.
+If no `-D` option was specified, the default PNG will be output. To output
+PS without specifying an argument, run `nspd -D ps`.
+
+If a *filename* argument is supplied to the **dump** command, the type of
+output will be determined by the extension of that *filename*. If no extension
+is supplied (or an extension which isn't `.png` or `.ps`) then the default
+file type will be used, exactly as above. If an extension is supplied, the
+appropriate file type will be used.
+
+When this command is executed, some output will be given in the terminal
+telling you what file is created. For example:
+
+```
+NSPD> dump newtest
+ NSPD output to file newtest.png
+ ```
+
+#### exit
+
+Format: **exit**
+
+Exit `nspd`.
+
 #### forward
 
 Format: **forw**ard
@@ -147,6 +184,12 @@ Format: **on** *product* [*product* ...]
 #### phase
 
 Format: **p**hase [*min phase* *max phase*]
+
+#### quit
+
+Format: **quit**
+
+Exit `nspd`.
 
 #### real
 

@@ -224,8 +224,7 @@ static void interpret_command(char *line) {
   float range_limit_low, range_limit_high, range_swap, mjdr_seconds;
   double mjdr_base;
   
-  if ((line == NULL) || (strcasecmp(line, "exit") == 0) ||
-      (strcasecmp(line, "quit") == 0)) {
+  if (line == NULL) {
     action_required = ACTION_QUIT;
     if (line == 0) {
       return;
@@ -252,7 +251,10 @@ static void interpret_command(char *line) {
     /* for (i = 0; i < nels; i++) { */
     /*   fprintf(stderr, "%d: %s\n", i, line_els[i]); */
     /* } */
-    if (minmatch("select", line_els[0], 3)) {
+    if (minmatch("exit", line_els[0], 4) ||
+	minmatch("quit", line_els[0], 4)) {
+      action_required = ACTION_QUIT;
+    } else if (minmatch("select", line_els[0], 3)) {
       // We've been given a selection command.
       pols_specified = 0;
       for (i = 1; i < nels; i++) {
