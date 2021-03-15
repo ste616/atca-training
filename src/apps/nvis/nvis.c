@@ -44,7 +44,8 @@ static char nvis_args_doc[] = "[options]";
 // Our options.
 static struct argp_option nvis_options[] = {
   { "device", 'd', "PGPLOT_DEVICE", 0, "The PGPLOT device to use" },
-  { "default-dump", 'D', "DUMP_TYPE", 0, "The plot type to use as default for output files (default: PNG)" },
+  { "default-dump", 'D', "DUMP_TYPE", 0,
+    "The plot type to use as default for output files (default: PNG)" },
   { "file", 'f', "FILE", 0, "Use an output file as the input" },
   { "port", 'p', "PORTNUM", 0,
     "The port number on the server to connect to" },

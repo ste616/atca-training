@@ -43,11 +43,13 @@ static char nspd_args_doc[] = "[options]";
 // Our options.
 static struct argp_option nspd_options[] = {
   { "device", 'd', "PGPLOT_DEVICE", 0, "The PGPLOT device to use" },
-  { "debug", 'D', 0, 0, "Output debugging information" },
+  { "default-dump", 'D', "DUMP_TYPE", 0,
+    "The plot type to use as default for output files (default: PNG)" },
   { "file", 'f', "FILE", 0, "Use an output file as the input" },
   { "port", 'p', "PORTNUM", 0, "The port number on the server to connect to" },
   { "server", 's', "SERVER", 0, "The server name or address to connect to" },
   { "username", 'u', "USERNAME", 0, "The username to communicate to the server" },
+  { "verbose", 'v', 0, 0, "Output debugging information" },
   { 0 }
 };
 
@@ -63,6 +65,7 @@ struct nspd_arguments {
   char server_name[SPDBUFSIZE];
   bool network_operation;
   char username[CLIENTIDLENGTH];
+  int default_dump;
 };
 
 // And some fun, totally necessary, global state variables.
@@ -89,7 +92,11 @@ static error_t nspd_parse_opt(int key, char *arg, struct argp_state *state) {
     strncpy(arguments->spd_device, arg, SPDBUFSIZE);
     break;
   case 'D':
-    arguments->debugging_output = true;
+    if (strcasecmp(arg, "ps") == 0) {
+      arguments->default_dump = FILETYPE_POSTSCRIPT;
+    } else if (strcasecmp(arg, "png") == 0) {
+      arguments->default_dump = FILETYPE_PNG;
+    }
     break;
   case 'f':
     arguments->use_file = true;
@@ -104,6 +111,9 @@ static error_t nspd_parse_opt(int key, char *arg, struct argp_state *state) {
     break;
   case 'u':
     strncpy(arguments->username, arg, CLIENTIDLENGTH);
+    break;
+  case 'v':
+    arguments->debugging_output = true;
     break;
   default:
     return ARGP_ERR_UNKNOWN;
@@ -672,7 +682,8 @@ int main(int argc, char *argv[]) {
   arguments.port_number = 8880;
   arguments.network_operation = false;
   arguments.username[0] = 0;
-
+  arguments.default_dump = FILETYPE_PNG;
+  
   // And defaults for some of the parameters.
   nxpanels = 5;
   nypanels = 5;
