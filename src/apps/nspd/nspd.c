@@ -54,6 +54,9 @@ static struct argp_option nspd_options[] = {
 };
 
 #define SPDBUFSIZE 1024
+#define SPDBUFSHORT 512
+#define SPDBUFMEDIUM 768
+#define SPDBUFLONG 1280
 
 // The arguments structure.
 struct nspd_arguments {
@@ -69,10 +72,10 @@ struct nspd_arguments {
 };
 
 // And some fun, totally necessary, global state variables.
-int action_required, server_type;
-int spd_device_number, n_ampphase_options;
+int action_required, server_type, n_ampphase_options;
 int xaxis_type, yaxis_type, plot_pols, yaxis_scaling, nxpanels, nypanels, plot_decorations;
 double mjd_request, mjd_base;
+char hardcopy_filename[SPDBUFSHORT];
 struct spd_plotcontrols spd_plotcontrols;
 struct panelspec spd_panelspec;
 struct spectrum_data spectrum_data;
@@ -137,33 +140,35 @@ void read_data_from_file(char *filename, struct spectrum_data *spectrum_data) {
   fclose(fh);
 }
 
-void prepare_spd_device(char *device_name, bool *device_opened) {
+void prepare_spd_device(char *device_name, int *spd_device_number,
+			bool *device_opened, struct panelspec *panelspec) {
 
   if (!(*device_opened)) {
     // Open the device.
-    spd_device_number = cpgopen(device_name);
+    *spd_device_number = cpgopen(device_name);
     *device_opened = true;
   }
 
   // Set up the device with the current settings.
   cpgask(0);
-  spd_panelspec.measured = NO;
-  splitpanels(nxpanels, nypanels, spd_device_number, 0, 5,
-	      (NUM_INFO_LINES + 1), &spd_panelspec);
+  panelspec->measured = NO;
+  splitpanels(nxpanels, nypanels, *spd_device_number, 0, 5,
+	      (NUM_INFO_LINES + 1), panelspec);
   
 }
 
-void release_spd_device(bool *device_opened) {
+void release_spd_device(int *spd_device_number, bool *device_opened,
+			struct panelspec *panelspec) {
 
   if (*device_opened) {
     // Close the device.
-    cpgslct(spd_device_number);
+    cpgslct(*spd_device_number);
     cpgclos();
     *device_opened = false;
-    spd_device_number = -1;
+    *spd_device_number = -1;
   }
 
-  free_panelspec(&spd_panelspec);
+  free_panelspec(panelspec);
   
 }
 
@@ -188,6 +193,7 @@ static void sighandler(int sig) {
 #define ACTION_TIME_REQUEST              1<<7
 #define ACTION_OMIT_OPTIONS              1<<8
 #define ACTION_UNKNOWN_COMMAND           1<<9
+#define ACTION_HARDCOPY_PLOT             1<<10
 
 // Make a shortcut to stop action for those actions which can only be
 // done by a simulator.
@@ -203,11 +209,12 @@ static void sighandler(int sig) {
     }						\
   while(0)
 
+#define TIMEFILE_LENGTH 18
 // Callback function called for each line when accept-line
 // executed, EOF seen, or EOF character read.
 static void interpret_command(char *line) {
   char **line_els = NULL, *cvt = NULL, *cycomma = NULL;
-  char delim[] = " ";
+  char delim[] = " ", ttime[TIMEFILE_LENGTH];
   int nels = -1, i, j, k, pols_specified, if_no, iarg, bidx;
   int if_num_spec[MAXIFS], yaxis_change_type, array_change_spec;
   int flag_change, flag_change_mode, change_nxpanels, change_nypanels;
@@ -589,6 +596,17 @@ static void interpret_command(char *line) {
 	  fprintf(stderr, "Couldn't find %s\n", line_els[1]);
 	}
       }
+    } else if (minmatch("dump", line_els[0], 4)) {
+      // Make a hardcopy version of the plot.
+      if (nels == 1) {
+	// We automatically generate a file name, based on the current time.
+	current_time_string(ttime, TIMEFILE_LENGTH);
+	snprintf(hardcopy_filename, SPDBUFSHORT, "nspd_plot_%s", ttime);
+      } else if (nels == 2) {
+	// We've been given a file name to use.
+	strncpy(hardcopy_filename, line_els[1], SPDBUFSHORT);
+      }
+      action_required = ACTION_HARDCOPY_PLOT;
     } else {
       action_required = ACTION_UNKNOWN_COMMAND;
     }
@@ -648,29 +666,32 @@ void reconcile_spd_plotcontrols(struct spectrum_data *spectrum_data,
 
 int main(int argc, char *argv[]) {
   struct nspd_arguments arguments;
-  bool spd_device_opened = false, action_proceed = false;
+  bool spd_device_opened = false, action_proceed = false, dump_device_opened = false;
   struct spd_plotcontrols spd_alteredcontrols;
   fd_set watchset, reads;
   int i, r, bytes_received, max_socket = -1, nmesg = 0, n_cycles = 0;
   int nlistlines = 0, mjd_year, mjd_month, mjd_day, min_dmjd_idx = -1;
-  int pending_action = -1;
+  int pending_action = -1, dump_type = FILETYPE_UNKNOWN, dump_device_number = -1;
+  int spd_device_number = -1;
   float mjd_utseconds;
   size_t recv_buffer_length;
   struct requests server_request;
   struct responses server_response;
   char send_buffer[SPDBUFSIZE], client_id[CLIENTIDLENGTH];
   char *recv_buffer = NULL, **mesgout = NULL, tstring[20];
+  char dump_device[SPDBUFMEDIUM], dump_file[SPDBUFSIZE];
   SOCKET socket_peer;
   cmp_ctx_t cmp;
   cmp_mem_access_t mem;
   double earliest_mjd, latest_mjd, mjd_cycletime, cmjd, min_dmjd, dmjd;
   double *all_cycle_mjd = NULL;
   struct syscal_data *tsys_data;
-
+  struct panelspec dump_panelspec;
+  
   // Allocate some memory.
   MALLOC(mesgout, MAX_N_MESSAGES);
   for (i = 0; i < MAX_N_MESSAGES; i++) {
-    CALLOC(mesgout[i], SPDBUFSIZE);
+    CALLOC(mesgout[i], SPDBUFLONG);
   }
   
   // Set the default for the arguments.
@@ -725,7 +746,8 @@ int main(int argc, char *argv[]) {
   }
 
   // Open the plotting device.
-  prepare_spd_device(arguments.spd_device, &spd_device_opened);
+  prepare_spd_device(arguments.spd_device, &spd_device_number, &spd_device_opened,
+		     &spd_panelspec);
 
   // Install the line handler.
   rl_callback_handler_install(prompt, interpret_command);
@@ -785,19 +807,59 @@ int main(int argc, char *argv[]) {
       action_required -= ACTION_CHANGE_PLOTSURFACE;
       action_required |= ACTION_REFRESH_PLOT;
     }
-    
-    if (action_required & ACTION_REFRESH_PLOT) {
+
+    if ((action_required & ACTION_HARDCOPY_PLOT) ||
+	(action_required & ACTION_REFRESH_PLOT)) {
       // Let's make a plot.
       if (arguments.debugging_output) {
-        fprintf(stderr, "Refreshing plot.\n");
+	fprintf(stderr, "Refreshing plot.\n");
       }
       // First, ensure the plotter doesn't try to do something it can't.
       reconcile_spd_plotcontrols(&spectrum_data, &spd_plotcontrols, &spd_alteredcontrols);
       // Get the Tsys.
       spectrum_data_compile_system_temperatures(&spectrum_data, &tsys_data);
-      make_spd_plot(spectrum_data.spectrum, &spd_panelspec, &spd_alteredcontrols,
-                    spectrum_data.header_data, tsys_data, 2, true);
-      action_required -= ACTION_REFRESH_PLOT;
+
+      if (action_required & ACTION_HARDCOPY_PLOT) {
+	nmesg = 0;
+	// Open a new PGPLOT device.
+	dump_type = filename_to_pgplot_device(hardcopy_filename, dump_device,
+					      SPDBUFSIZE, arguments.default_dump,
+					      dump_file, SPDBUFSIZE);
+	if (dump_type != FILETYPE_UNKNOWN) {
+	  // Open the device.
+	  prepare_spd_device(dump_device, &dump_device_number, &dump_device_opened,
+			     &dump_panelspec);
+	  if (dump_device_opened) {
+	    // The the plotter to use the device.
+	    spd_alteredcontrols.pgplot_device = dump_device_number;
+	    // Make the plot.
+	    make_spd_plot(spectrum_data.spectrum, &dump_panelspec, &spd_alteredcontrols,
+			  spectrum_data.header_data, tsys_data, 2, true);
+	    // Close the device.
+	    release_spd_device(&dump_device_number, &dump_device_opened, &dump_panelspec);
+	    // Reset the plot controls.
+	    spd_alteredcontrols.pgplot_device = spd_device_number;
+	    snprintf(mesgout[nmesg++], SPDBUFLONG, " NSPD output to file %s\n",
+		     dump_file);
+	  } else {
+	    // Print an error.
+	    snprintf(mesgout[nmesg++], SPDBUFLONG, " NSPD NOT ABLE TO OUTPUT TO %s\n",
+		     hardcopy_filename);
+	  }
+	} else {
+	  // Print an error.
+	  snprintf(mesgout[nmesg++], SPDBUFLONG, " UNKNOWN OUTPUT %s\n", hardcopy_filename);
+	}
+	action_required -= ACTION_HARDCOPY_PLOT;
+	readline_print_messages(nmesg, mesgout);
+      }
+      
+      if (action_required & ACTION_REFRESH_PLOT) {
+	make_spd_plot(spectrum_data.spectrum, &spd_panelspec, &spd_alteredcontrols,
+		      spectrum_data.header_data, tsys_data, 2, true);
+	action_required -= ACTION_REFRESH_PLOT;
+      }
+
       free_syscal_data(tsys_data);
       FREE(tsys_data);
     }
@@ -1092,7 +1154,7 @@ int main(int argc, char *argv[]) {
   printf("\n\n  NSPD EXITS\n");
   
   // Release the plotting device.
-  release_spd_device(&spd_device_opened);
+  release_spd_device(&spd_device_number, &spd_device_opened, &spd_panelspec);
 
   // Release all the memory.
   free_spectrum_data(&spectrum_data);

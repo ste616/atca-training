@@ -122,7 +122,7 @@ Format: **get** _**tim**e_ *arguments*
 
 #### hide
 
-Format: **hid**e _**tvch**annels/**av**eraged**_
+Format: **hid**e _**tvch**annels/**av**eraged_
 
 #### imaginary
 
@@ -162,7 +162,7 @@ Format: **sel**ect *product* [*product* ...]
 
 #### show
 
-Format: **sho**w _**tvch**annels/**av**eraged**_
+Format: **sho**w _**tvch**annels/**av**eraged_
 
 #### x
 
