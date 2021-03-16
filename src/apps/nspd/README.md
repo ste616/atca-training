@@ -97,6 +97,18 @@ command as `sel` or `select`, or even `sele`, but not `se`.
 
 Format: **a**mplitude [*min amplitude* *max amplitude*]
 
+This command makes `nspd` display amplitude as the y-axis of each of the
+panels. If you would like to limit the range of each panel, you can specify
+both the *min amplitude* and *max amplitude* arguments. This will limit all
+the panels of all the IFs in the same way.
+
+If you want to reset the amplitude scaling to the default (which will be to
+contain all the data on each panel, which likely means that each panel has
+its own range), give this command without arguments.
+
+The range should be given on the linear axis values, even if plotting the amplitude
+on a logarithmic scale.
+
 #### array
 
 Format: **arr**ay *antennas*
@@ -111,13 +123,62 @@ equivalent to the more traditional `spd` format of `array 12345`.
 
 Format: **back**ward
 
+This command instructs the server to supply the data from the cycle
+immediately prior to the currently displayed data.
+
+While the server retrieves the data from file, `nspd` will continue to
+show the current data.
+
 #### channel
 
-Format: **ch**annel [[*band*] *min channel* *max channel*]
+Format: **ch**annel [[*IF name*] *min channel* *max channel*]
+
+Change the channel range shown on each panel. If no arguments are given
+along with this command, then all the channels for all IFs are shown.
+
+If given with two arguments, then all panels for all IFs are shown with
+the same range, which is specified by the *minimum* and *maximum* channel
+arguments. Both these arguments are inclusive, such that if the command
+`chan 1 100` is given, all channels from 1 to 100 (and including channels
+1 and 100) are shown on the panels.
+
+If given with three arguments, the first argument specifies the IF to
+restrict. The IF can be specified in several ways:
+- f*n*: where f1 is the first continuum band, and f3 is usually the
+  first zoom band, and *n* can continue up until however many zooms
+  are in the data + 2
+- z*n*: where z1 is the first zoom band, and *n* can continue up until
+  however many zooms are in the data
+- z*m*-*n*: where z1-2 is the second zoom band associated with the first
+  continuum band, and z2-5 is the fifth zoom band associated with the second
+  continuum band; here *m* can be either 1 or 2, and *n* is between 1 and 16
+  inclusive, depending on how many zooms are configured
+
+Note that you cannot unrestrict a single IF with this command, ie.
+`chan f1` will not do anything. If you need to reset the channel range
+to default for one IF, you must do it for all IFs.
 
 #### delavg
 
 Format: **delav**g [*band*] *number of channels*
+
+This command instructs the server to recompute data while performing
+averaging over phase while calculating the delay errors.
+
+If only one argument is supplied, the *number of channels* specified
+will be used as the averaging level for all the IFs available in the
+data. If two arguments are supplied, the first argument specifies
+the IF to change the averaging level for. The IF can be specified as for
+the **chan**nel command.
+
+While the server recomputes the data, `nspd` will continue to show the
+current data.
+
+Note that the phase, amplitude, real and imaginary spectra shown by
+`nspd` will not be affected by changing this setting. The only thing
+that will differ will be the averaged phase quantity available through
+the **sho**w **av**eraged command. Changing this parameter will affect
+any `nvis` clients connected with the same username however.
 
 #### dump
 
@@ -160,9 +221,32 @@ Exit `nspd`.
 
 Format: **forw**ard
 
+This command instructs the server to supply the data from the cycle
+immediately subsequent to the currently displayed data.
+
+While the server retrieves the data from file, `nspd` will continue to
+show the current data.
+
 #### get
 
-Format: **get** _**tim**e_ *arguments*
+Format: **get** *quantity* *arguments*
+
+Get some *quantity* from the server. The options for *quantity* are:
+
+##### time
+
+Format: **get** **tim**e [*yyyy-mm-dd*] *HH:MM*[*:SS*]
+
+Get a new cycle of data from the server, specified by a time and optional
+date. The date will need to be specified only if the data coming from the
+server spans more than one day.
+
+While specifying the time, only the hours and minutes are necessary; if the
+seconds are omitted, "00" seconds is assumed.
+
+The server will return data for the cycle whose mid-cycle time is nearest
+to the specified time. While the server retrieves the data, `nspd` will
+continue to show the current data.
 
 #### hide
 
@@ -209,6 +293,15 @@ Format: **sca**le _**log**arithmic/**lin**ear_
 #### select
 
 Format: **sel**ect *product* [*product* ...]
+
+This command selects which products to show in each panel. You may specify
+any number of products in a single command. These products are the polarisations
+codes **aa**, **bb**, **ab**, **ba**, or one of the band names, like **f1**,
+**f2**, **z1** etc.
+
+Only products that have been enabled with the **on** command will be displayed.
+For example, normally **ab** and **ba** are not enabled for cross-correlations
+and thus will not be displayed even if selected with this command.
 
 #### show
 
