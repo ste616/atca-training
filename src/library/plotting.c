@@ -728,10 +728,8 @@ void plotpanel_minmax(struct ampphase **plot_ampphase,
 	}
 	for (k = 0; k < plot_ampphase[polidx[i]]->f_nchannels[plot_baseline_idx][j]; k++) {
 	  if ((plot_ampphase[polidx[i]]->f_channel[plot_baseline_idx][j][k] >=
-	       /* plot_controls->channel_range_min[plot_if_idx]) && */
 	       channelmin) &&
 	      (plot_ampphase[polidx[i]]->f_channel[plot_baseline_idx][j][k] <=
-	       /* plot_controls->channel_range_max[plot_if_idx])) { */
 	       channelmax)) {
 	    if (plot_controls->plot_options & PLOT_AMPLITUDE) {
 	      MINASSIGN(*plotmin_y,
