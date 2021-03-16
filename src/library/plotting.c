@@ -620,7 +620,7 @@ void plotpanel_minmax(struct ampphase **plot_ampphase,
   // account whether it's an auto or cross correlation, and the polarisations
   // that are being plotted.
   int i = 0, j = 0, k = 0, bltype, ant1, ant2;
-  float swapf;
+  float swapf, channelmin, channelmax;
 
   base_to_ants(plot_ampphase[0]->baseline[plot_baseline_idx], &ant1, &ant2);
   if (ant1 == ant2) {
@@ -645,15 +645,20 @@ void plotpanel_minmax(struct ampphase **plot_ampphase,
         *plotmax_x = plot_controls->channel_range_max[plot_if_idx];
       }
     }
+    channelmin = *plotmin_x;
+    channelmax = *plotmax_x;
   } else if (plot_controls->plot_options & PLOT_FREQUENCY) {
     *plotmin_x = plot_ampphase[0]->frequency[0];
     *plotmax_x = plot_ampphase[0]->frequency
       [plot_ampphase[0]->nchannels - 1];
+    channelmin = 0;
+    channelmax = plot_ampphase[0]->nchannels;
     if (plot_controls->channel_range_limit[plot_if_idx] == 1) {
       if ((plot_controls->channel_range_min[plot_if_idx] >= 0) &&
           (plot_controls->channel_range_min[plot_if_idx] < plot_ampphase[0]->nchannels)) {
         *plotmin_x = plot_ampphase[0]->frequency
           [plot_controls->channel_range_min[plot_if_idx]];
+	channelmin = plot_controls->channel_range_min[plot_if_idx];
       }
       if ((plot_controls->channel_range_max[plot_if_idx] > 0) &&
           (plot_controls->channel_range_max[plot_if_idx] < plot_ampphase[0]->nchannels) &&
@@ -661,6 +666,7 @@ void plotpanel_minmax(struct ampphase **plot_ampphase,
 	   plot_controls->channel_range_min[plot_if_idx])) {
         *plotmax_x = plot_ampphase[0]->frequency
           [plot_controls->channel_range_max[plot_if_idx]];
+	channelmax = plot_controls->channel_range_max[plot_if_idx];
       }
     }
     // Check for frequency inversion.
@@ -722,9 +728,11 @@ void plotpanel_minmax(struct ampphase **plot_ampphase,
 	}
 	for (k = 0; k < plot_ampphase[polidx[i]]->f_nchannels[plot_baseline_idx][j]; k++) {
 	  if ((plot_ampphase[polidx[i]]->f_channel[plot_baseline_idx][j][k] >=
-	       plot_controls->channel_range_min[plot_if_idx]) &&
+	       /* plot_controls->channel_range_min[plot_if_idx]) && */
+	       channelmin) &&
 	      (plot_ampphase[polidx[i]]->f_channel[plot_baseline_idx][j][k] <=
-	       plot_controls->channel_range_max[plot_if_idx])) {
+	       /* plot_controls->channel_range_max[plot_if_idx])) { */
+	       channelmax)) {
 	    if (plot_controls->plot_options & PLOT_AMPLITUDE) {
 	      MINASSIGN(*plotmin_y,
 			plot_ampphase[polidx[i]]->f_amplitude[plot_baseline_idx][j][k]);
