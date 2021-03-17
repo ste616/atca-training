@@ -33,10 +33,9 @@ ATCA observer or duty astronomer.
 
 ### Usage guides for the tools
 
+[`rpfitsfile_server`](src/apps/rpfitsfile_server)
 [`nvis`](src/apps/nvis/)
-
-Soon, we will put links here to the usage guides for `rpfitsfile_server`, `nvis`
-and `nspd`.
+[`nspd`](src/apps/rpfitsfile_server)
 
 Soon, we will put links here to individual tutorials.
 
