@@ -1595,6 +1595,11 @@ int ampphase_average(struct scan_header_data *scan_header_data,
             average_complex = total_complex / (float)n_points;
             (*vis_quantities)->amplitude[i][k] = cabsf(average_complex);
             (*vis_quantities)->phase[i][k] = cargf(average_complex);
+	    // We have to change to degrees here because that was only done for phase
+	    // in the computer.
+	    if (band_options->phase_in_degrees) {
+	      (*vis_quantities)->phase[i][k] *= (180 / M_PI);
+	    }
           }
           // Calculate the final average delay, return in ns.
           (*vis_quantities)->delay[i][k] = (n_delay_points > 0) ?
@@ -1610,6 +1615,11 @@ int ampphase_average(struct scan_header_data *scan_header_data,
 	    average_complex = fcmedianfc(median_complex, n_points);
             (*vis_quantities)->amplitude[i][k] = cabsf(average_complex);
             (*vis_quantities)->phase[i][k] = cargf(average_complex);
+	    // We have to change to degrees here because that was only done for phase
+	    // in the computer.
+	    if (band_options->phase_in_degrees) {
+	      (*vis_quantities)->phase[i][k] *= (180 / M_PI);
+	    }
           }
           // Calculate the final median delay, return in ns.
           if (n_delay_points == 0) {

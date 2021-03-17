@@ -2786,6 +2786,16 @@ int main(int argc, char *argv[]) {
   FREE(vis_data);
 
   FREE(all_cycle_mjd);
+
+  // Disconnect any clients that are still connected.
+  for (i = 0; i < clients.num_sockets; i++) {
+    client_type_string(clients.client_type[i], clienttype_string);
+    printf("Disconnecting %s client %s (%s)\n",
+	   clienttype_string, clients.client_id[i], clients.client_username[i]);
+    FD_CLR(clients.socket[i], &master);
+    CLOSESOCKET(clients.socket[i]);
+  }
+  free_client_sockets(&clients);
   
   // Free the clients.
   for (i = 0; i < client_vis_data.num_clients; i++) {
@@ -2800,7 +2810,6 @@ int main(int argc, char *argv[]) {
   }
   FREE(client_spd_data.client_id);
   FREE(client_spd_data.spectrum_data);
-  free_client_sockets(&clients);
   for (i = 0; i < client_ampphase_options.num_clients; i++) {
     FREE(client_ampphase_options.client_id[i]);
     FREE(client_ampphase_options.client_username[i]);
