@@ -250,15 +250,61 @@ continue to show the current data.
 
 #### hide
 
-Format: **hid**e _**tvch**annels/**av**eraged_
+Format: **hid**e *parameter*
+
+Stop showing some *parameter* on the displayed panels. The options for
+*parameter* are:
+
+##### tvchannels
+
+Format: **hid**e **tvch**annels
+
+Stop showing the tvchannel range indicators on the displayed panels. These
+indicators are vertical yellow dashed lines at the minimum and maximum
+tvchannels.
+
+##### averaged
+
+Format: **hid**e **av**eraged
+
+Stop showing the data which has been binned by the **delavg** value.
 
 #### imaginary
 
 Format: **i**maginary [*min imaginary* *max imaginary*]
 
+This command makes `nspd` display the imaginary part of the complex
+visibility as the y-axis of each of the panels. If you would like to limit
+the range of each panel, you can specify both the *min imaginary* and
+*max imaginary* arguments. This will limit all the panels of all the
+IFs in the same way.
+
+If you want to reset the imaginary scaling to the default (which will be to
+contain all the data on each panel, which likely means that each panel has
+its own range), give this command without arguments.
+
 #### list
 
 Format: **lis**t
+
+Produce a list of the cycles that are available from the server. Something
+like the following will be output in the controlling terminal after this
+command is given:
+
+```
+NSPD> list
+ CYCLE 1: 2021-01-16 22:47:04
+ CYCLE 2: 2021-01-16 22:47:14
+ ....
+ CYCLE 107: 2021-01-16 23:04:44
+ CYCLE 108: 2021-01-16 23:04:54
+```
+
+For each cycle, the date and time at the midpoint of the cycle is shown.
+Whenever the time between cycles differs by more than the cycle time, the
+two cycles before the gap and the two cycles after are shown; this usually
+happens at scan boundaries. Whenever there is a set of cycles which are each
+simply separated by the cycle time, the ouput will be truncated by `....`.
 
 #### nxy
 
@@ -276,6 +322,15 @@ Format: **on** *product* [*product* ...]
 
 Format: **p**hase [*min phase* *max phase*]
 
+This command makes `nspd` display the phase as the y-axis of each of
+the panels. If you would like to limit the range of each panel, you can
+specify both the *min phase* and *max phase* arguments. This will limit
+all the panels of all the IFs in the same way.
+
+If you want to reset the phase scaling to the default (which will be
+to contain all the data on each panel, which likely means that each panel
+has its own range), given this command without arguments.
+
 #### quit
 
 Format: **quit**
@@ -285,6 +340,15 @@ Exit `nspd`.
 #### real
 
 Format: **r**eal [*min real* *max real*]
+
+This command makes `nspd` display the real part of the complex visibility
+as the y-axis of each of the panels. If you would like to limit the
+range of each panel, you can specify both the *min real* and *max real*
+arguments. This will limit all the panels of all the IFs in the same way.
+
+If you want to reset the real scaling to the default (which will be to contain
+all the data on each panel, which likely means that each panel has its own
+range), give this command without arguments.
 
 #### scale
 

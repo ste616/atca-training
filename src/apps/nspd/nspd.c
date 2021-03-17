@@ -82,8 +82,8 @@ struct spectrum_data spectrum_data;
 struct ampphase_options **ampphase_options, *found_options;
 
 // The maximum number of divisions supported on the plot.
-#define MAX_XPANELS 6
-#define MAX_YPANELS 6
+#define MAX_XPANELS 7
+#define MAX_YPANELS 7
 // The number of information lines to use on the plot.
 #define NUM_INFO_LINES 4
 
