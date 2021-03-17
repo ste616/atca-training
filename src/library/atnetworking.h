@@ -171,6 +171,7 @@ struct requests {
 #define RESPONSE_USERREQUEST_VISDATA    14
 #define RESPONSE_USERREQUEST_SPECTRUM   15
 #define RESPONSE_USERNAME_EXISTS        16
+#define RESPONSE_SHUTDOWN               17
 
 /*! \struct responses
  *  \brief Structure to use when responding to a request

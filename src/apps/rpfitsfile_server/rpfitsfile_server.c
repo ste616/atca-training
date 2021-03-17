@@ -1675,6 +1675,7 @@ int main(int argc, char *argv[]) {
   bool pointer_found = false, vis_cache_updated = false, notify_required = false;
   bool spd_cache_updated = false, outside_mjd_range = false, succ = false;
   bool client_added = false, determine_params = false;
+  bool quit_when_closed = false;
   double mjd_grab, earliest_mjd, latest_mjd, mjd_cycletime;
   double *all_cycle_mjd = NULL;
   struct rpfits_file_information **info_rpfits_files = NULL;
@@ -1939,6 +1940,12 @@ int main(int argc, char *argv[]) {
     while (true) {
       // We wait for someone to ask for something.
       reads = master;
+
+      if (quit_when_closed && (clients.num_sockets == 0)) {
+	// All the clients have closed, and we want to shutdown, so we quit now.
+	break;
+      }
+
       r = select(max_socket + 1, &reads, 0, 0, 0);
       if ((r < 0) && (errno != EINTR)) {
         fprintf(stderr, "select() failed. (%d)\n", GETSOCKETERRNO());
@@ -1946,9 +1953,29 @@ int main(int argc, char *argv[]) {
       }
       // Check we got a valid selection.
       if (sigint_received == true) {
+	// We're quitting, user has ctrl-c-ed us.
+	// Disconnect any clients that are still connected.
+	for (i = 0; i < clients.num_sockets; i++) {
+	  client_type_string(clients.client_type[i], clienttype_string);
+	  client_response.response_type = RESPONSE_SHUTDOWN;
+	  strncpy(client_response.client_id, clients.client_id[i], CLIENTIDLENGTH);
+	  printf(" %s to %s client %s (%s)\n",
+		 get_type_string(TYPE_RESPONSE, client_response.response_type),
+		 clienttype_string, clients.client_id[i], clients.client_username[i]);
+	  MALLOC(send_buffer, JUSTRESPONSESIZE);
+	  init_cmp_memory_buffer(&cmp, &mem, send_buffer, JUSTRESPONSESIZE);
+	  pack_responses(&cmp, &client_response);
+	  bytes_sent = socket_send_buffer(clients.socket[i], send_buffer,
+					  cmp_mem_access_get_pos(&mem));
+	  FREE(send_buffer);
+	  /* FD_CLR(clients.socket[i], &master); */
+	  /* CLOSESOCKET(clients.socket[i]); */
+	}
         sigint_received = false;
-        break;
+	quit_when_closed = true;
       }
+
+      
       if (r < 0) {
         // Nothing got selected.
         continue;
@@ -2788,13 +2815,6 @@ int main(int argc, char *argv[]) {
   FREE(all_cycle_mjd);
 
   // Disconnect any clients that are still connected.
-  for (i = 0; i < clients.num_sockets; i++) {
-    client_type_string(clients.client_type[i], clienttype_string);
-    printf("Disconnecting %s client %s (%s)\n",
-	   clienttype_string, clients.client_id[i], clients.client_username[i]);
-    FD_CLR(clients.socket[i], &master);
-    CLOSESOCKET(clients.socket[i]);
-  }
   free_client_sockets(&clients);
   
   // Free the clients.

@@ -1318,6 +1318,10 @@ int main(int argc, char *argv[]) {
 	// different options, so we re-request the same data we're viewing now but
 	// with those same new options.
 	action_required = ACTION_AMPPHASE_OPTIONS_CHANGED | ACTION_OMIT_OPTIONS;
+      } else if (server_response.response_type == RESPONSE_SHUTDOWN) {
+	// The server is shutting down and wants us to die first so it can close
+	// its listening port cleanly.
+	action_required = ACTION_QUIT;
       }
       FREE(recv_buffer);
     }
