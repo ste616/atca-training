@@ -788,7 +788,7 @@ void add_tvchannels_to_options(struct ampphase_options *ampphase_options, int wi
       if (i == 0) {
         // First go!
         ampphase_options->delay_averaging[i] = 1;
-        ampphase_options->averaging_method[i] = AVERAGETYPE_MEAN | AVERAGETYPE_SCALAR;
+        ampphase_options->averaging_method[i] = AVERAGETYPE_MEAN | AVERAGETYPE_VECTOR;
       } else {
         ampphase_options->delay_averaging[i] =
           ampphase_options->delay_averaging[i - 1];
