@@ -1168,5 +1168,12 @@ int main(int argc, char *argv[]) {
     FREE(mesgout[i]);
   }
   FREE(mesgout);
+  if (n_ampphase_options > 0) {
+    for (i = 0; i < n_ampphase_options; i++) {
+      free_ampphase_options(ampphase_options[i]);
+      FREE(ampphase_options[i]);
+    }
+    FREE(ampphase_options);
+  }
   
 }
