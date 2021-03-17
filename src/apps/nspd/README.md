@@ -84,6 +84,8 @@ being displayed. For example, there is an area at the top of the display
 which shows the time label for the data being shown, some environmental
 data, and the system temperatures.
 
+---
+
 ### Interactive commands
 
 Like `spd`, what `nspd` displays is controlled by commands given at the
@@ -92,6 +94,8 @@ Like `spd`, what `nspd` displays is controlled by commands given at the
 Each command can be given with minimum match; the minimum string is given
 for each command below in **bold**. For example, you may give the **sel**ect
 command as `sel` or `select`, or even `sele`, but not `se`.
+
+---
 
 #### amplitude
 
@@ -109,6 +113,8 @@ its own range), give this command without arguments.
 The range should be given on the linear axis values, even if plotting the amplitude
 on a logarithmic scale.
 
+---
+
 #### array
 
 Format: **arr**ay *antennas*
@@ -119,6 +125,8 @@ For example: `arr 1 2 3 4 5` would make `nspd` show any antenna product
 or baseline which only included antennas 1 through 5 inclusive. This is
 equivalent to the more traditional `spd` format of `array 12345`.
 
+---
+
 #### backward
 
 Format: **back**ward
@@ -128,6 +136,8 @@ immediately prior to the currently displayed data.
 
 While the server retrieves the data from file, `nspd` will continue to
 show the current data.
+
+---
 
 #### channel
 
@@ -158,6 +168,8 @@ Note that you cannot unrestrict a single IF with this command, ie.
 `chan f1` will not do anything. If you need to reset the channel range
 to default for one IF, you must do it for all IFs.
 
+---
+
 #### delavg
 
 Format: **delav**g [*band*] *number of channels*
@@ -179,6 +191,8 @@ Note that the phase, amplitude, real and imaginary spectra shown by
 that will differ will be the averaged phase quantity available through
 the **sho**w **av**eraged command. Changing this parameter will affect
 any `nvis` clients connected with the same username however.
+
+---
 
 #### dump
 
@@ -211,11 +225,15 @@ NSPD> dump newtest
  NSPD output to file newtest.png
  ```
 
+---
+
 #### exit
 
 Format: **exit**
 
 Exit `nspd`.
+
+---
 
 #### forward
 
@@ -226,6 +244,8 @@ immediately subsequent to the currently displayed data.
 
 While the server retrieves the data from file, `nspd` will continue to
 show the current data.
+
+---
 
 #### get
 
@@ -248,6 +268,8 @@ The server will return data for the cycle whose mid-cycle time is nearest
 to the specified time. While the server retrieves the data, `nspd` will
 continue to show the current data.
 
+---
+
 #### hide
 
 Format: **hid**e *parameter*
@@ -269,6 +291,8 @@ Format: **hid**e **av**eraged
 
 Stop showing the data which has been binned by the **delavg** value.
 
+---
+
 #### imaginary
 
 Format: **i**maginary [*min imaginary* *max imaginary*]
@@ -282,6 +306,8 @@ IFs in the same way.
 If you want to reset the imaginary scaling to the default (which will be to
 contain all the data on each panel, which likely means that each panel has
 its own range), give this command without arguments.
+
+---
 
 #### list
 
@@ -306,6 +332,8 @@ two cycles before the gap and the two cycles after are shown; this usually
 happens at scan boundaries. Whenever there is a set of cycles which are each
 simply separated by the cycle time, the ouput will be truncated by `....`.
 
+---
+
 #### nxy
 
 Format: **nxy** *nx* *ny*
@@ -317,6 +345,8 @@ By default, `nspd` starts with *nx* and *ny* both set to 5. Each of *nx*
 and *ny* can be set to any number between 1 and 7 inclusive. For ATCA,
 with its 15 baselines and 6 antennas, an *nx* of 3 and *ny* of 7 can
 display all these 21 products on the same page quite comfortably.
+
+---
 
 #### off
 
@@ -343,6 +373,8 @@ Format: **off** aa/bb/ab/ba
 
 Disables plotting of certain polarisation correlations.
 
+---
+
 #### on
 
 Format: **on** *product* [*product* ...]
@@ -368,6 +400,8 @@ Format: **on** aa/bb/ab/ba
 
 Enables plotting of certain polarisation correlations.
 
+---
+
 #### phase
 
 Format: **p**hase [*min phase* *max phase*]
@@ -381,11 +415,15 @@ If you want to reset the phase scaling to the default (which will be
 to contain all the data on each panel, which likely means that each panel
 has its own range), given this command without arguments.
 
+---
+
 #### quit
 
 Format: **quit**
 
 Exit `nspd`.
+
+---
 
 #### real
 
@@ -399,6 +437,8 @@ arguments. This will limit all the panels of all the IFs in the same way.
 If you want to reset the real scaling to the default (which will be to contain
 all the data on each panel, which likely means that each panel has its own
 range), give this command without arguments.
+
+---
 
 #### scale
 
@@ -414,6 +454,8 @@ be -120 dB or greater.
 
 ![nspd displaying logarithmic amplitudes](nspd_log_example.png)
 
+---
+
 #### select
 
 Format: **sel**ect *product* [*product* ...]
@@ -427,9 +469,13 @@ Only products that have been enabled with the **on** command will be displayed.
 For example, normally **ab** and **ba** are not enabled for cross-correlations
 and thus will not be displayed even if selected with this command.
 
+---
+
 #### show
 
 Format: **sho**w _**tvch**annels/**av**eraged_
+
+---
 
 #### x
 
