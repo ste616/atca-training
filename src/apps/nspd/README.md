@@ -310,13 +310,63 @@ simply separated by the cycle time, the ouput will be truncated by `....`.
 
 Format: **nxy** *nx* *ny*
 
+Set the number of panels to display in the horizontal direction (*nx*) and
+vertical direction (*ny*).
+
+By default, `nspd` starts with *nx* and *ny* both set to 5. Each of *nx*
+and *ny* can be set to any number between 1 and 7 inclusive. For ATCA,
+with its 15 baselines and 6 antennas, an *nx* of 3 and *ny* of 7 can
+display all these 21 products on the same page quite comfortably.
+
 #### off
 
 Format: **off** *product* [*product* ...]
 
+Disable the plotting of one or more *product*. These products are:
+
+##### acs
+
+Format: **off** acs
+
+Disables plotting of autocorrelations, or more precisely, products related
+to a single antenna only.
+
+##### ccs
+
+Format: **off** ccs
+
+Disables plotting of cross-correlations involving more than one antenna.
+
+##### aa/bb/ab/ba
+
+Format: **off** aa/bb/ab/ba
+
+Disables plotting of certain polarisation correlations.
+
 #### on
 
 Format: **on** *product* [*product* ...]
+
+Enable the plotting of one or more *product*. These products are:
+
+##### acs
+
+Format: **on** acs
+
+Enables plotting of autocorrelations, or more precisely, products related
+to a single antenna only.
+
+##### ccs
+
+Format: **on** ccs
+
+Enables plotting of cross-correlations involving more than one antenna.
+
+##### aa/bb/ab/ba
+
+Format: **on** aa/bb/ab/ba
+
+Enables plotting of certain polarisation correlations.
 
 #### phase
 
@@ -353,6 +403,16 @@ range), give this command without arguments.
 #### scale
 
 Format: **sca**le _**log**arithmic/**lin**ear_
+
+Change how the amplitude quantity is displayed. If set to **lin**ear, then
+the data will be shown as is. If set to **log**arithmic, the maximum value
+either of the data on each panel, or the value set as the *max amplitude*,
+will be set as 0 dB, and displayed at the top of each panel. The amplitudes
+will be scaled as 10 log(v/m), where the log is base 10, v is the linear value
+and m is the value assigned as 0 dB. The minimum value displayed will always
+be -120 dB or greater.
+
+![nspd displaying logarithmic amplitudes](nspd_log_example.png)
 
 #### select
 

@@ -408,20 +408,21 @@ static void interpret_command(char *line) {
       }
       change_spd_plotcontrols(&spd_plotcontrols, NULL, &yaxis_change_type, NULL, NULL);
       action_required = ACTION_REFRESH_PLOT;
-    } else if ((minmatch("scale", line_els[0], 3)) &&
-               (nels == 2)) {
-      // We've been asked to change how to scale the y axis.
-      yaxis_change_type = -1;
-      if (minmatch("logarithmic", line_els[1], 3)) {
-        yaxis_scaling = PLOT_AMPLITUDE_LOG;
-        yaxis_change_type = yaxis_type | yaxis_scaling;
-      } else if (minmatch("linear", line_els[1], 3)) {
-        yaxis_scaling = PLOT_AMPLITUDE_LINEAR;
-        yaxis_change_type = yaxis_type | yaxis_scaling;
-      }
-      if (yaxis_change_type >= 0) {
-        change_spd_plotcontrols(&spd_plotcontrols, NULL, &yaxis_change_type, NULL, NULL);
-        action_required = ACTION_REFRESH_PLOT;
+    } else if (minmatch("scale", line_els[0], 3)) {
+      if (nels == 2) {
+	// We've been asked to change how to scale the y axis.
+	yaxis_change_type = -1;
+	if (minmatch("logarithmic", line_els[1], 3)) {
+	  yaxis_scaling = PLOT_AMPLITUDE_LOG;
+	  yaxis_change_type = yaxis_type | yaxis_scaling;
+	} else if (minmatch("linear", line_els[1], 3)) {
+	  yaxis_scaling = PLOT_AMPLITUDE_LINEAR;
+	  yaxis_change_type = yaxis_type | yaxis_scaling;
+	}
+	if (yaxis_change_type >= 0) {
+	  change_spd_plotcontrols(&spd_plotcontrols, NULL, &yaxis_change_type, NULL, NULL);
+	  action_required = ACTION_REFRESH_PLOT;
+	}
       }
     } else if (minmatch("array", line_els[0], 3)) {
       // Change which antennas are being shown. We look at all the
