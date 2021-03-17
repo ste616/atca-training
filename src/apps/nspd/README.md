@@ -473,7 +473,35 @@ and thus will not be displayed even if selected with this command.
 
 #### show
 
-Format: **sho**w _**tvch**annels/**av**eraged_
+Format: **sho**w *parameter*
+
+Show some *parameter* on the displayed panels. The options for
+*parameter* are:
+
+##### tvchannels
+
+Format: **sho**w **tvch**annels
+
+Show the tvchannel range indicators on the displayed panels. These indicators
+are vertical yellow dashed lines at the minimum and maximum tvchannels.
+
+##### averaged
+
+Format: **sho**w **av**eraged
+
+Show the data which has binned by the **delavg** value.
+
+While the server only uses the **delavg** value to smooth phase before
+computing the delay error, `nspd` will compute and display all the
+parameters (amplitude, phase, real and imaginary) smoothed by **delavg**.
+When shown, a new line will be displayed on each panel for each polarisation
+product, and this line will be labelled with a "v" on the end of the
+corresponding product. For example, if "AA" is displayed on a panel,
+the smoothed line will be labelled as "AAv", and shown in a different colour.
+
+When **delavg** is 1, the two lines will be plot exactly over each other,
+and since the "v" line is drawn later than the normal product, the line visible
+on the panel will be in the "v" colour.
 
 ---
 
@@ -481,3 +509,9 @@ Format: **sho**w _**tvch**annels/**av**eraged_
 
 Format: **x**
 
+Change the x-axis. This command acts as a toggle to switch between plotting
+frequency on the x-axis, and channel number. By default, when `nspd` is
+first started, the x-axis is set to show frequency in MHz.
+
+The x-axis is always shown with low values on the left and high values on
+the right.

@@ -159,6 +159,8 @@ key.
 
 ![nvis display with antenna-based parameters](nvis_antenna_display.png)
 
+---
+
 ### Interactive commands
 
 Like `vis`, what `nvis` displays is controlled by commands given at the
@@ -167,6 +169,8 @@ Like `vis`, what `nvis` displays is controlled by commands given at the
 Each command can be given with minimum match; the minimum string is given
 for each command below in **bold**. For example, you may give the **sel**ect command
 as `sel` or `select`, or even `sele`, but not `se`.
+
+---
 
 #### array
 
@@ -180,6 +184,8 @@ For example:
 `arr 1 2 3 4 5` would allow any products that only include antennas 1 through 5
 inclusive. This is equivalent to the more traditional `vis` format of
 `array 12345`.
+
+---
 
 #### calband
 
@@ -222,6 +228,8 @@ accepts positional arguments. This is unlike **tvchannel** which accepts
 an *IF* argument, meaning you can change the setting for a band which is
 not currently set as a calband.
 
+---
+
 #### data
 
 Format: **dat**a [*time*]
@@ -260,6 +268,8 @@ including:
 If a *time* has been specified, a dashed vertical line will be displayed at
 that exact time - not at the midpoint of the nearest cycle.
 
+---
+
 #### delavg
 
 Format: **delav**g *number of channels* [*number of channels*]
@@ -274,6 +284,8 @@ for IF 2.
 
 While the server recomputes the data, `nvis` will continue to show the
 current data.
+
+---
 
 #### dump
 
@@ -306,11 +318,15 @@ NVIS> dump newtest
  NVIS output to file newtest.png
 ```
 
+---
+
 #### exit
 
 Format: **exit**
 
 Exit `nvis`.
+
+---
 
 #### history
 
@@ -328,6 +344,8 @@ is, if 0 is the present moment, `nvis` would display data from between -60m and
 Examples of valid time strings accepted by this command: `30s`, `20m`, `2h`,
 `2h20m`, `1d14h`.
 
+---
+
 #### onsource
 
 Format: **ons**ource
@@ -335,6 +353,8 @@ Format: **ons**ource
 This command toggles whether the panels should show data from when the
 array was not on-source. The array is considered on-source if all the antennas
 in the array specification are tracking the same source position.
+
+---
 
 #### print
 
@@ -383,11 +403,15 @@ for their identification) are shown for each window. The number
 of windows will correspond to how many continuum bands there are, plus
 all the zooms.
 
+---
+
 #### quit
 
 Format: **quit**
 
 Exit `nvis`.
+
+---
 
 #### refant
 
@@ -402,6 +426,8 @@ will have an "R" above the antenna number, in the same colour.
 If you want to change the reference antenna, supply the antenna number
 (one of the antenna numbers listed at the top-left of the plot) as the
 argument.
+
+---
 
 #### scale
 
@@ -423,6 +449,8 @@ the default, but no other panel is affected.
 
 Otherwise, you may set manually the minimum and maximum values to use for
 that particular panel. You must supply both the minimum and maximum values.
+
+---
 
 #### select
 
@@ -446,6 +474,8 @@ contain antenna 1. Again, you can specify any number of those products, and
 `nvis` will ensure that any products common to multiple specifications are
 shown only once.
 
+---
+
 #### sort
 
 Format: **sor**t [*on/off*]
@@ -459,6 +489,8 @@ otherwise they are ordered numerically; this is 12, 13, 14, ..., 45, 46, 56.
 
 This command always prints the sorting order method to the
 controlling terminal.
+
+---
 
 #### tsys
 
@@ -487,6 +519,8 @@ When this command is used, the system temperature correction option will
 be changed only for the options set relating to the configuration at the
 selected time. That time selection can be changed using the **data** command.
 
+---
+
 #### tvchannel
 
 Format: **tvch**annel [*IF* *min chan* *max chan*]
@@ -504,6 +538,8 @@ use to select that IF in SPD.
 
 While the server recomputes the data, `nvis` will continue to show the
 current data.
+
+---
 
 #### tvmedian
 
