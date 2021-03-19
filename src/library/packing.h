@@ -48,6 +48,8 @@ void pack_readarray_string(cmp_ctx_t *cmp, unsigned int expected_length, char **
                            long unsigned int maxlength);
 void pack_writearray_string(cmp_ctx_t *cmp, unsigned int length, char **array,
                             long unsigned int maxlength);
+void pack_ampphase_modifiers(cmp_ctx_t *cmp, struct ampphase_modifiers *a);
+void unpack_ampphase_modifiers(cmp_ctx_t *cmp, struct ampphase_modifiers *a);
 void pack_ampphase_options(cmp_ctx_t *cmp, struct ampphase_options *a);
 void unpack_ampphase_options(cmp_ctx_t *cmp, struct ampphase_options *a);
 void pack_ampphase(cmp_ctx_t *cmp, struct ampphase *a);

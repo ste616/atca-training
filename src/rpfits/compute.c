@@ -485,6 +485,14 @@ void copy_ampphase_options(struct ampphase_options *dest,
   STRUCTCOPY(src, dest, reference_antenna);
 }
 
+void free_ampphase_modifiers(struct ampphase_modifiers *modifiers) {
+  int i;
+  for (i = 0; i < modifiers->num_antennas; i++) {
+    FREE(modifiers->delay[i]);
+  }
+  FREE(modifiers->delay);
+}
+
 /*!
  *  \brief Free an ampphase_options structure
  *  \param options a pointer to the ampphase_options structure
@@ -493,6 +501,8 @@ void copy_ampphase_options(struct ampphase_options *dest,
  * the structure, but will not free the structure memory.
  */
 void free_ampphase_options(struct ampphase_options *options) {
+  int i, j;
+  
   FREE(options->if_centre_freq);
   FREE(options->if_bandwidth);
   FREE(options->if_nchannels);
@@ -500,6 +510,14 @@ void free_ampphase_options(struct ampphase_options *options) {
   FREE(options->max_tvchannel);
   FREE(options->delay_averaging);
   FREE(options->averaging_method);
+  for (i = 0; i < options->num_ifs; i++) {
+    for (j = 0; j < options->num_modifiers[i]; j++) {
+      free_ampphase_modifiers(options->modifiers[i][j]);
+      FREE(options->modifiers[i][j]);
+    }
+    FREE(options->modifiers[i]);
+  }
+  FREE(options->modifiers);
 }
 
 /*!

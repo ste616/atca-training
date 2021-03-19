@@ -423,7 +423,43 @@ void pack_writearray_string(cmp_ctx_t *cmp, unsigned int length,
   }
 }
 
+void pack_ampphase_modifiers(cmp_ctx_t *cmp, struct ampphase_modifiers *a) {
+  int i;
+  
+  pack_write_bool(cmp, a->add_delay);
+  pack_write_sint(cmp, a->num_antennas);
+  pack_write_sint(cmp, a->num_pols);
+  for (i = 0; i < a->num_antennas; i++) {
+    pack_writearray_float(cmp, a->num_pols, a->delay[i]);
+  }
+}
+
+void unpack_ampphase_modifiers(cmp_ctx_t *cmp, struct ampphase_modifiers *a) {
+  int i;
+  
+  pack_read_bool(cmp, &(a->add_delay));
+  pack_read_sint(cmp, &(a->num_antennas));
+  pack_read_sint(cmp, &(a->num_pols));
+  if (a->num_antennas > 0) {
+    CALLOC(a->delay, a->num_antennas);
+    if (a->num_pols > 0) {
+      for (i = 0; i < a->num_antennas; i++) {
+	pack_readarray_float(cmp, a->num_pols, a->delay[i]);
+      }
+    }
+  } else {
+    a->delay = NULL;
+  }
+}
+
+/*!
+ *  \brief Write an ampphase_options structure into the data stream
+ *  \param cmp the CMP stream
+ *  \param ampphase_options the structure to pack
+ */
 void pack_ampphase_options(cmp_ctx_t *cmp, struct ampphase_options *a) {
+  int i, j;
+  
   // This routine takes an ampphase_options structure and packs it for
   // transport.
   pack_write_bool(cmp, a->phase_in_degrees);
@@ -438,9 +474,18 @@ void pack_ampphase_options(cmp_ctx_t *cmp, struct ampphase_options *a) {
   pack_writearray_sint(cmp, a->num_ifs, a->averaging_method);
   pack_write_bool(cmp, a->systemp_reverse_online);
   pack_write_bool(cmp, a->systemp_apply_computed);
+  pack_write_sint(cmp, a->reference_antenna);
+  pack_writearray_sint(cmp, a->num_ifs, a->num_modifiers);
+  for (i = 0; i < a->num_ifs; i++) {
+    for (j = 0; j < a->num_modifiers[i]; j++) {
+      pack_ampphase_modifiers(cmp, a->modifiers[i][j]);
+    }
+  }
 }
 
 void unpack_ampphase_options(cmp_ctx_t *cmp, struct ampphase_options *a) {
+  int i, j;
+
   // This routine unpacks an ampphase_options structure from the
   // serializer, and stores it in the passed structure.
   pack_read_bool(cmp, &(a->phase_in_degrees));
@@ -462,6 +507,19 @@ void unpack_ampphase_options(cmp_ctx_t *cmp, struct ampphase_options *a) {
   pack_readarray_sint(cmp, a->num_ifs, a->averaging_method);
   pack_read_bool(cmp, &(a->systemp_reverse_online));
   pack_read_bool(cmp, &(a->systemp_apply_computed));
+  pack_read_sint(cmp, &(a->reference_antenna));
+  MALLOC(a->num_modifiers, a->num_ifs);
+  CALLOC(a->modifiers, a->num_ifs);
+  pack_readarray_sint(cmp, a->num_ifs, a->num_modifiers);
+  for (i = 0; i < a->num_ifs; i++) {
+    if (a->num_modifiers[i] > 0) {
+      CALLOC(a->modifiers[i], a->num_modifiers[j]);
+      for (j = 0; j < a->num_modifiers[i]; j++) {
+	CALLOC(a->modifiers[i][j], 1);
+	unpack_ampphase_modifiers(cmp, a->modifiers[i][j]);
+      }
+    }
+  }
 }
 
 void pack_ampphase(cmp_ctx_t *cmp, struct ampphase *a) {

@@ -122,6 +122,40 @@
  */
 #define TMPSTRINGLEN 100
 
+/*! \struct ampphase_modifiers
+ *  \brief Structure to hold details about modifications to be made to the
+ *         data
+ */
+struct ampphase_modifiers {
+  /*! \var add_delay
+   *  \brief Flag to indicate whether the delay parameters in this structure hold
+   *         values that should be added to the data (if set to true) or ignored
+   *         (if set to false)
+   */
+  bool add_delay;
+
+  /*! \var num_antennas
+   *  \brief The number of antennas with delay values (should always be 7)
+   */
+  int num_antennas;
+
+  /*! \var num_pols
+   *  \brief The number of polarisations for each antenna with delay values
+   *         (should always be 3)
+   */
+  int num_pols;
+
+  /*! \var delay
+   *  \brief The amount of delay (in ns) to add to each antenna and polarisation
+   *
+   * This is a 2-D array of floats. The first index has size `num_antennas` and is
+   * indexed starting at 1, while the second index has size `num_pols` and is indexed
+   * starting at `POL_X` and ending at `POL_Y`.
+   */
+  float **delay;
+  
+};
+
 /*! \struct ampphase_options
  *  \brief Structure to hold options controlling how to take raw data and produce
  *         more useful quantities like amplitude and phase.
@@ -222,10 +256,26 @@ struct ampphase_options {
   bool systemp_apply_computed;
 
   /*! \var reference_antenna
-   *  \brief The antenna number to use for computing the independent
-   *         closure phase quantities
+   *  \brief The antenna number to use as reference when performing calibration
+   *         alterations to the data
    */
   int reference_antenna;
+
+  /*! \var num_modifiers
+   *  \brief The number of modifiers for each IF
+   *
+   * This array has size `num_ifs`, and is indexed starting at 1.
+   */
+  int *num_modifiers;
+  
+  /*! \var modifiers
+   *  \brief All the modifiers for each IF
+   *
+   * This is a 2-D array of structure pointers. The first index has size `num_ifs` and
+   * is indexed starting at 1, while the second index has size `num_modifiers[i]` where
+   * `i` is the position along the first index, and is indexed starting at 0.
+   */
+  struct ampphase_modifiers ***modifiers;
 };
 
 /*! \struct metinfo
@@ -1153,6 +1203,7 @@ struct ampphase_options ampphase_options_default(void);
 void set_default_ampphase_options(struct ampphase_options *options);
 void copy_ampphase_options(struct ampphase_options *dest,
                            struct ampphase_options *src);
+void free_ampphase_modifiers(struct ampphase_modifiers *modifiers);
 void free_ampphase_options(struct ampphase_options *options);
 struct ampphase_options* find_ampphase_options(int num_options,
 					       struct ampphase_options **options,
