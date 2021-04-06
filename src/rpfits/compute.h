@@ -134,17 +134,28 @@ struct ampphase_modifiers {
    */
   bool add_delay;
 
-  /*! \var num_antennas
+  /*! \var delay_num_antennas
    *  \brief The number of antennas with delay values (should always be 7)
    */
-  int num_antennas;
+  int delay_num_antennas;
 
-  /*! \var num_pols
+  /*! \var delay_num_pols
    *  \brief The number of polarisations for each antenna with delay values
    *         (should always be 3)
    */
-  int num_pols;
+  int delay_num_pols;
 
+  /*! \var delay_start_mjd
+   *  \brief The earliest MJD for which to correct the delay in the data
+   */
+  float delay_start_mjd;
+
+  /*! \var delay_end_mjd
+   *  \brief The latest MJD for which to correct the delay in the data (or 0
+   *         to correct all data after \a delay_start_mjd)
+   */
+  float delay_end_mjd;
+  
   /*! \var delay
    *  \brief The amount of delay (in ns) to add to each antenna and polarisation
    *
@@ -1201,6 +1212,8 @@ void free_vis_quantities(struct vis_quantities **vis_quantities);
 int polarisation_number(char *polstring);
 struct ampphase_options ampphase_options_default(void);
 void set_default_ampphase_options(struct ampphase_options *options);
+void copy_ampphase_modifiers(struct ampphase_modifiers *dest,
+			     struct ampphase_modifiers *src);
 void copy_ampphase_options(struct ampphase_options *dest,
                            struct ampphase_options *src);
 void free_ampphase_modifiers(struct ampphase_modifiers *modifiers);
@@ -1231,6 +1244,8 @@ int ampphase_average(struct scan_header_data *scan_header_data,
                      struct vis_quantities **vis_quantities,
 		     int *num_options,
                      struct ampphase_options ***options);
+bool ampphase_modifiers_match(struct ampphase_modifiers *a,
+			      struct ampphase_modifiers *b);
 bool ampphase_options_match(struct ampphase_options *a,
                             struct ampphase_options *b);
 void calculate_system_temperatures_cycle_data(struct cycle_data *cycle_data,

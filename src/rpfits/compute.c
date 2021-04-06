@@ -425,6 +425,8 @@ struct ampphase_options ampphase_options_default(void) {
   options.systemp_reverse_online = false;
   options.systemp_apply_computed = false;
   options.reference_antenna = 0;
+  options.num_modifiers = NULL;
+  options.modifiers = NULL;
   
   return options;
 }
@@ -451,6 +453,36 @@ void set_default_ampphase_options(struct ampphase_options *options) {
   options->systemp_reverse_online = false;
   options->systemp_apply_computed = false;
   options->reference_antenna = 0;
+  options->num_modifiers = NULL;
+  options->modifiers = NULL;
+}
+
+/*!
+ *  \brief Copy one ampphase_modifiers structure into another
+ *  \param dest the destinations structure which will be over-written
+ *  \param src the source structure from which all values will be copied
+ */
+void copy_ampphase_modifiers(struct ampphase_modifiers *dest,
+			     struct ampphase_modifiers *src) {
+  int i, j;
+  STRUCTCOPY(src, dest, add_delay);
+  STRUCTCOPY(src, dest, delay_num_antennas);
+  STRUCTCOPY(src, dest, delay_num_pols);
+  STRUCTCOPY(src, dest, delay_start_mjd);
+  STRUCTCOPY(src, dest, delay_end_mjd);
+  if (dest->delay_num_antennas > 0) {
+    CALLOC(dest->delay, dest->delay_num_antennas);
+    for (i = 0; i < dest->delay_num_antennas; i++) {
+      if (dest->delay_num_pols > 0) {
+	CALLOC(dest->delay[i], dest->delay_num_pols);
+	for (j = 0; j < dest->delay_num_pols; j++) {
+	  STRUCTCOPY(src, dest, delay[i][j]);
+	}
+      }
+    }
+  } else {
+    dest->delay = NULL;
+  }
 }
 
 /*!
@@ -460,7 +492,7 @@ void set_default_ampphase_options(struct ampphase_options *options) {
  */
 void copy_ampphase_options(struct ampphase_options *dest,
                            struct ampphase_options *src) {
-  int i;
+  int i, j;
   STRUCTCOPY(src, dest, phase_in_degrees);
   STRUCTCOPY(src, dest, include_flagged_data);
   STRUCTCOPY(src, dest, num_ifs);
@@ -471,6 +503,8 @@ void copy_ampphase_options(struct ampphase_options *dest,
   REALLOC(dest->max_tvchannel, dest->num_ifs);
   REALLOC(dest->delay_averaging, dest->num_ifs);
   REALLOC(dest->averaging_method, dest->num_ifs);
+  REALLOC(dest->num_modifiers, dest->num_ifs);
+  REALLOC(dest->modifiers, dest->num_ifs);
   for (i = 0; i < dest->num_ifs; i++) {
     STRUCTCOPY(src, dest, if_centre_freq[i]);
     STRUCTCOPY(src, dest, if_bandwidth[i]);
@@ -479,15 +513,29 @@ void copy_ampphase_options(struct ampphase_options *dest,
     STRUCTCOPY(src, dest, max_tvchannel[i]);
     STRUCTCOPY(src, dest, delay_averaging[i]);
     STRUCTCOPY(src, dest, averaging_method[i]);
+    STRUCTCOPY(src, dest, num_modifiers[i]);
+    CALLOC(dest->modifiers, dest->num_modifiers[i]);
+    for (j = 0; j < dest->num_modifiers[i]; j++) {
+      CALLOC(dest->modifiers[i][j], 1);
+      copy_ampphase_modifiers(dest->modifiers[i][j], src->modifiers[i][j]);
+    }
   }
   STRUCTCOPY(src, dest, systemp_reverse_online);
   STRUCTCOPY(src, dest, systemp_apply_computed);
   STRUCTCOPY(src, dest, reference_antenna);
+
 }
 
+/*!
+ *  \brief Free an ampphase_modifiers structure
+ *  \param modifiers a pointer to the ampphase_modifiers structure
+ *
+ * This routine will free all the memory that would have been allocated within
+ * the structure, but will not free the structure memory.
+ */
 void free_ampphase_modifiers(struct ampphase_modifiers *modifiers) {
   int i;
-  for (i = 0; i < modifiers->num_antennas; i++) {
+  for (i = 0; i < modifiers->delay_num_antennas; i++) {
     FREE(modifiers->delay[i]);
   }
   FREE(modifiers->delay);
@@ -518,6 +566,7 @@ void free_ampphase_options(struct ampphase_options *options) {
     FREE(options->modifiers[i]);
   }
   FREE(options->modifiers);
+  FREE(options->num_modifiers);
 }
 
 /*!
@@ -802,16 +851,23 @@ void add_tvchannels_to_options(struct ampphase_options *ampphase_options, int wi
     // Copy the other IF-specific options.
     REALLOC(ampphase_options->delay_averaging, nwindow);
     REALLOC(ampphase_options->averaging_method, nwindow);
+    REALLOC(ampphase_options->num_modifiers, nwindow);
+    REALLOC(ampphase_options->modifiers, nwindow);
     for (i = ampphase_options->num_ifs; i < nwindow; i++) {
       if (i == 0) {
         // First go!
         ampphase_options->delay_averaging[i] = 1;
         ampphase_options->averaging_method[i] = AVERAGETYPE_MEAN | AVERAGETYPE_VECTOR;
+	ampphase_options->num_modifiers[i] = 0;
+	ampphase_options->modifiers[i] = NULL;
       } else {
         ampphase_options->delay_averaging[i] =
           ampphase_options->delay_averaging[i - 1];
         ampphase_options->averaging_method[i] =
           ampphase_options->averaging_method[i - 1];
+	// We don't make modifiers out of thin air.
+	ampphase_options->num_modifiers[i] = 0;
+	ampphase_options->modifiers[i] = NULL;
       }
     }
     ampphase_options->num_ifs = nwindow;
@@ -1679,7 +1735,45 @@ int ampphase_average(struct scan_header_data *scan_header_data,
 }
 
 /*!
- *  \brief Compare two ampphase_options structure to determine if they match
+ *  \brief Compare to ampphase_modifiers structres to determine if they match
+ *  \param a a pointer to an ampphase_modifiers structure
+ *  \param b a pointer to another ampphase_modifiers structure
+ *  \return true if \a a and \a b have exactly the same values for all their
+ *          parameters, or false otherwise
+ */
+bool ampphase_modifiers_match(struct ampphase_modifiers *a,
+			      struct ampphase_modifiers *b) {
+  bool match = false;
+  int i, j;
+  if ((a == NULL) && (b == NULL)) {
+    return true;
+  } else if ((a == NULL) || (b == NULL)) {
+    return false;
+  }
+  if ((a->add_delay == b->add_delay) &&
+      (a->delay_num_antennas == b->delay_num_antennas) &&
+      (a->delay_num_pols == b->delay_num_pols) &&
+      (a->delay_start_mjd == b->delay_start_mjd) &&
+      (a->delay_end_mjd == b->delay_end_mjd)) {
+    // Looks good so far, now check the delay settings.
+    match = true;
+    for (i = 0; i < a->delay_num_antennas; i++) {
+      for (j = 0; j < b->delay_num_pols; j++) {
+	if (a->delay[i][j] != b->delay[i][j]) {
+	  match = false;
+	  break;
+	}
+      }
+      if (!match) {
+	break;
+      }
+    }
+  }
+  return match;
+}
+
+/*!
+ *  \brief Compare two ampphase_options structures to determine if they match
  *  \param a a pointer to an ampphase_options structure
  *  \param b a pointer to another ampphase_options structure
  *  \return true if \a a and \a b have exactly the same values for all their
@@ -1689,7 +1783,7 @@ bool ampphase_options_match(struct ampphase_options *a,
                             struct ampphase_options *b) {
   // Check if two ampphase_options structures match.
   bool match = false;
-  int i;
+  int i, j;
 
   if ((a->phase_in_degrees == b->phase_in_degrees) &&
       (a->include_flagged_data == b->include_flagged_data) &&
@@ -1697,15 +1791,26 @@ bool ampphase_options_match(struct ampphase_options *a,
       (a->systemp_reverse_online == b->systemp_reverse_online) &&
       (a->systemp_apply_computed == b->systemp_apply_computed) &&
       (a->reference_antenna == b->reference_antenna)) {
-    // Looks good so far, now check the tvchannels.
+    // Looks good so far, now check the tvchannels and the modifiers.
     match = true;
     for (i = 0; i < a->num_ifs; i++) {
       if ((a->min_tvchannel[i] != b->min_tvchannel[i]) ||
           (a->max_tvchannel[i] != b->max_tvchannel[i]) ||
           (a->delay_averaging[i] != b->delay_averaging[i]) ||
-          (a->averaging_method[i] != b->averaging_method[i])) {
+          (a->averaging_method[i] != b->averaging_method[i]) ||
+	  (a->num_modifiers[i] != b->num_modifiers[i])) {
         match = false;
         break;
+      }
+      for (j = 0; j < a->num_modifiers[i]; j++) {
+	if (!ampphase_modifiers_match(a->modifiers[i][j],
+				      b->modifiers[i][j])) {
+	  match = false;
+	  break;
+	}
+      }
+      if (!match) {
+	break;
       }
     }
   }

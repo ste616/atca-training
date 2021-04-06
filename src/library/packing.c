@@ -423,28 +423,44 @@ void pack_writearray_string(cmp_ctx_t *cmp, unsigned int length,
   }
 }
 
+/*!
+ *  \brief Write an ampphase_modifiers structure into the data stream
+ *  \param cmp the CMP stream
+ *  \param a a pointer to the ampphase_modifiers structure
+ */
 void pack_ampphase_modifiers(cmp_ctx_t *cmp, struct ampphase_modifiers *a) {
   int i;
   
   pack_write_bool(cmp, a->add_delay);
-  pack_write_sint(cmp, a->num_antennas);
-  pack_write_sint(cmp, a->num_pols);
-  for (i = 0; i < a->num_antennas; i++) {
-    pack_writearray_float(cmp, a->num_pols, a->delay[i]);
+  pack_write_sint(cmp, a->delay_num_antennas);
+  pack_write_sint(cmp, a->delay_num_pols);
+  pack_write_float(cmp, a->delay_start_mjd);
+  pack_write_float(cmp, a->delay_end_mjd);
+  for (i = 0; i < a->delay_num_antennas; i++) {
+    pack_writearray_float(cmp, a->delay_num_pols, a->delay[i]);
   }
 }
 
+/*!
+ *  \brief Read an ampphase_modifiers structure from the data stream
+ *  \param cmp the CMP stream
+ *  \param a a pointer to the ampphase_modifiers structure (which must already
+ *           be allocated, although the internal arrays are allocated by this
+ *           routine)
+ */
 void unpack_ampphase_modifiers(cmp_ctx_t *cmp, struct ampphase_modifiers *a) {
   int i;
   
   pack_read_bool(cmp, &(a->add_delay));
-  pack_read_sint(cmp, &(a->num_antennas));
-  pack_read_sint(cmp, &(a->num_pols));
-  if (a->num_antennas > 0) {
-    CALLOC(a->delay, a->num_antennas);
-    if (a->num_pols > 0) {
-      for (i = 0; i < a->num_antennas; i++) {
-	pack_readarray_float(cmp, a->num_pols, a->delay[i]);
+  pack_read_sint(cmp, &(a->delay_num_antennas));
+  pack_read_sint(cmp, &(a->delay_num_pols));
+  pack_read_float(cmp, &(a->delay_start_mjd));
+  pack_read_float(cmp, &(a->delay_end_mjd));
+  if (a->delay_num_antennas > 0) {
+    CALLOC(a->delay, a->delay_num_antennas);
+    if (a->delay_num_pols > 0) {
+      for (i = 0; i < a->delay_num_antennas; i++) {
+	pack_readarray_float(cmp, a->delay_num_pols, a->delay[i]);
       }
     }
   } else {
