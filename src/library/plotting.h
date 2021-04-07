@@ -71,6 +71,9 @@
 #define FILETYPE_POSTSCRIPT -4
 #define FILETYPE_UNKNOWN     0
 
+#define TIMEDISPLAY_DASHED 1
+#define TIMEDISPLAY_CYCLE  2
+
 // This structure holds pre-calculated panel positions for a PGPLOT
 // device with nx x ny panels.
 struct panelspec {
@@ -432,7 +435,7 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
                    struct vis_plotcontrols *plot_controls,
                    struct scan_header_data **header_data,
                    struct metinfo **metinfo, struct syscal_data **syscal_data,
-		   int num_times, float *times);
+		   int num_times, float *times, int *time_display, float *time_deltas);
 void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspec,
                    struct spd_plotcontrols *plot_controls,
                    struct scan_header_data *scan_header_data,

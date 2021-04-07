@@ -1076,8 +1076,13 @@ float fracwidth(struct panelspec *panelspec,
  *                     system calibration metadata for each cycle; this should have length
  *                     \a ncycles
  *  \param num_times the number of time indicator lines to plot
- *  \param times an array of times to indicate on the plot by vertical dashed lines;
+ *  \param times an array of times to indicate on the plot;
  *               this should have length \a num_times
+ *  \param time_display the way to draw each element in the times array; one of the
+ *                      TIMEDISPLAY_* magic numbers defined in our header; this should have
+ *                      length \a num_times
+ *  \param time_deltas the amount of time to shade starting from each displayed time, for
+ *                     those displays which require shading; this should have length \a num_times
  */
 void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
                    int ncycles, int *cycle_numifs, int npols,
@@ -1086,7 +1091,7 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
                    struct vis_plotcontrols *plot_controls,
                    struct scan_header_data **header_data,
                    struct metinfo **metinfo, struct syscal_data **syscal_data,
-		   int num_times, float *times) {
+		   int num_times, float *times, int *time_display, float *time_deltas) {
   bool show_tsys_legend = false, show_panel_error = false;
   int nants = 0, i = 0, n_vis_lines = 0, j = 0, k = 0, p = 0;
   int singleant = 0, l = 0, m = 0, n = 0, ii, connidx = 0;
@@ -1928,6 +1933,30 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
       
     }
     cpgsci(1);
+
+    // Plot any time indicators that need to go behind the data.
+    for (j = 0; j < num_times; j++) {
+      if (time_display[j] == TIMEDISPLAY_CYCLE) {
+	if ((times[j] >= min_x) && (times[j] <= max_x)) {
+	  if (time_deltas[j] < 0) {
+	    timeline_x[0] = times[j] + time_deltas[j];
+	    timeline_x[1] = times[j];
+	  } else if (time_deltas[j] > 0) {
+	    timeline_x[0] = times[j];
+	    timeline_x[1] = times[j] + time_deltas[j];
+	  } else {
+	    continue;
+	  }
+	  timeline_y[0] = min_y;
+	  timeline_y[1] = max_y;
+	  cpgsci(12);
+	  cpgsfs(3);
+	  cpgrect(timeline_x[0], timeline_x[1], timeline_y[0], timeline_y[1]);
+	}
+      }
+    }
+
+    cpgsci(1);
     for (j = 0; j < panel_n_vis_lines[i]; j++) {
       cpgsci(plot_vis_lines[i][j]->pgplot_colour);
       cpgsls(plot_vis_lines[i][j]->line_style);
@@ -1946,14 +1975,15 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
     }
     // Plot any time indicators.
     for (j = 0; j < num_times; j++) {
-      cpgsci(4);
-      cpgsls(2);
-
-      if ((times[j] >= min_x) && (times[j] <= max_x)) {
-	timeline_x[0] = timeline_x[1] = times[j];
-	timeline_y[0] = min_y;
-	timeline_y[1] = max_y;
-	cpgline(2, timeline_x, timeline_y);
+      if (time_display[j] == TIMEDISPLAY_DASHED) {
+	cpgsci(4);
+	cpgsls(2);
+	if ((times[j] >= min_x) && (times[j] <= max_x)) {
+	  timeline_x[0] = timeline_x[1] = times[j];
+	  timeline_y[0] = min_y;
+	  timeline_y[1] = max_y;
+	  cpgline(2, timeline_x, timeline_y);
+	}
       }
     }
     if ((i == 0) && (show_tsys_legend)) {

@@ -79,11 +79,12 @@ int action_required, server_type, n_ampphase_options;
 int data_selected_index, tsys_apply;
 int xaxis_type, *yaxis_type, nxpanels, nypanels, nvisbands;
 int *visband_idx, tvchan_change_min, tvchan_change_max;
-int reference_antenna_index;
+int reference_antenna_index, nncal;
+int *nncal_indices, nncal_cycletime;
 char **visband, tvchan_visband[10], hardcopy_filename[VISBUFSHORT];
 // Whether to order the baselines in length order (true/false).
 bool sort_baselines;
-float data_seconds;
+float data_seconds, *nncal_seconds;
 struct vis_plotcontrols vis_plotcontrols;
 struct panelspec vis_panelspec;
 struct vis_data vis_data;
@@ -299,9 +300,9 @@ int char_to_product(char pstring) {
  * this routine returns -1, and `data_seconds` is also set back to -1.
  */
 int time_index() {
-  float close_time, delta_time;
+  float close_time, delta_time, actual_time;
   int closeidx = 0, i;
-  double basemjd;
+  double basemjd, cycletime;
   
   if (data_seconds < 0) {
     // The caller hasn't set any time to search for.
@@ -309,7 +310,9 @@ int time_index() {
   }
   basemjd = floor(date2mjd(vis_data.vis_quantities[0][0][0]->obsdate,
 			   vis_data.vis_quantities[0][0][0]->ut_seconds));
-  
+  actual_time = fabs((float)(date2mjd(vis_data.vis_quantities[0][0][0]->obsdate,
+				      vis_data.vis_quantities[0][0][0]->ut_seconds) -
+			     basemjd) * 86400.0);
   close_time = fabsf((float)((date2mjd(vis_data.vis_quantities[0][0][0]->obsdate,
 				       vis_data.vis_quantities[0][0][0]->ut_seconds) -
 			      basemjd) * 86400.0) - data_seconds);
@@ -320,6 +323,9 @@ int time_index() {
 				basemjd) * 86400.0) - data_seconds);
     if (delta_time < close_time) {
       close_time = delta_time;
+      actual_time = fabs((float)(date2mjd(vis_data.vis_quantities[i][0][0]->obsdate,
+					  vis_data.vis_quantities[i][0][0]->ut_seconds) -
+				 basemjd) * 86400.0);
       closeidx = i;
     }
   }
@@ -327,6 +333,30 @@ int time_index() {
   // Don't consider it a match if more than 10 minutes away.
   if ((close_time < 600) && (closeidx >= 0) &&
       (closeidx < vis_data.nviscycles)) {
+    // This is close enough.
+    cycletime = (double)vis_data.header_data[closeidx]->cycle_time / 86400.0;
+    nncal_cycletime = vis_data.header_data[closeidx]->cycle_time;
+    // We also try to fill in the indices for the nncal cycles prior to this data.
+    nncal_indices[0] = closeidx;
+    nncal_seconds[0] = actual_time;
+    for (i = 1; i < nncal; i++) {
+      if ((closeidx - i) >= 0) {
+	delta_time = date2mjd(vis_data.vis_quantities[nncal_indices[i - 1]][0][0]->obsdate,
+			      vis_data.vis_quantities[nncal_indices[i - 1]][0][0]->ut_seconds) -
+	  date2mjd(vis_data.vis_quantities[closeidx - i][0][0]->obsdate,
+		   vis_data.vis_quantities[closeidx - i][0][0]->ut_seconds);
+	if (delta_time <= cycletime) {
+	  // These are consecutive cycles.
+	  nncal_indices[i] = closeidx - i;
+	  nncal_seconds[i] = nncal_seconds[i - 1] - (float)nncal_cycletime;
+	} else {
+	  // Non-consecutive.
+	  nncal_indices[i] = -1;
+	  nncal_seconds[i] = -1;
+	  break;
+	}
+      }
+    }
     return closeidx;
   }
   // Reset the time.
@@ -343,7 +373,7 @@ static void interpret_command(char *line) {
   int nels, i, j, k, array_change_spec, nproducts, pr;
   int change_panel = PLOT_ALL_PANELS, iarg, plen = 0, temp_xaxis_type;
   int *temp_yaxis_type = NULL, temp_nypanels, idx_low, idx_high, ty;
-  int temp_refant;
+  int temp_refant, temp_nncal;
   float histlength;
   float limit_min, limit_max;
   struct vis_product **vis_products = NULL, *tproduct = NULL;
@@ -767,6 +797,21 @@ static void interpret_command(char *line) {
 	strncpy(hardcopy_filename, line_els[1], VISBUFSHORT);
       }
       action_required = ACTION_HARDCOPY_PLOT;
+    } else if (minmatch("nncal", line_els[0], 3)) {
+      // Set the number of cycles to use while computing calibration parameters.
+      if (nels == 1) {
+	// Report the number of cycles.
+	printf(" NNCAL = %d\n", nncal);
+      } else {
+	succ = string_to_integer(line_els[1], &temp_nncal);
+	if (succ && (temp_nncal > 0)) {
+	  nncal = temp_nncal;
+	  REALLOC(nncal_indices, nncal);
+	  REALLOC(nncal_seconds, nncal);
+	  // Re-compute the indices if we can.
+	  time_index();
+	}
+      }
     } else {
       if (nels == 1) {
         // We try to interpret the string as the panels to show.
@@ -826,6 +871,7 @@ int main(int argc, char *argv[]) {
   struct nvis_arguments arguments;
   int i, j, k, r, bytes_received, nmesg = 0, bidx = -1, num_timelines = 0;
   int dump_type = FILETYPE_UNKNOWN, dump_device_number = -1, vis_device_number = -1;
+  int *timeline_types = NULL;
   cmp_ctx_t cmp;
   cmp_mem_access_t mem;
   struct requests server_request;
@@ -837,7 +883,7 @@ int main(int argc, char *argv[]) {
   fd_set watchset, reads;
   bool vis_device_opened = false, dump_device_opened = false;
   size_t recv_buffer_length;
-  float *timelines = NULL;
+  float *timelines = NULL, *timeline_deltas = NULL;
   struct vis_quantities ***described_ptr = NULL;
   struct scan_header_data *described_hdr = NULL;
   struct panelspec dump_panelspec;
@@ -878,6 +924,13 @@ int main(int argc, char *argv[]) {
   nypanels = 3;
   CALLOC(yaxis_type, nypanels);
   data_seconds = -1;
+  nncal = 3;
+  MALLOC(nncal_indices, nncal);
+  MALLOC(nncal_seconds, nncal);
+  for (i = 0; i < nncal; i++) {
+    nncal_indices[i] = -1;
+    nncal_seconds[i] = -1;
+  }
   
   // Parse the arguments.
   argp_parse(&argp, argc, argv, 0, 0, &arguments);
@@ -1052,7 +1105,22 @@ int main(int argc, char *argv[]) {
       if (data_seconds > 0) {
 	num_timelines = 1;
 	MALLOC(timelines, num_timelines);
+	MALLOC(timeline_types, num_timelines);
+	MALLOC(timeline_deltas, num_timelines);
 	timelines[0] = data_seconds;
+	timeline_types[0] = TIMEDISPLAY_DASHED;
+	timeline_deltas[0] = 0;
+      }
+      for (i = 0; i < nncal; i++) {
+	if (nncal_indices[i] >= 0) {
+	  num_timelines++;
+	  REALLOC(timelines, num_timelines);
+	  REALLOC(timeline_types, num_timelines);
+	  REALLOC(timeline_deltas, num_timelines);
+	  timelines[i + 1] = nncal_seconds[i];
+	  timeline_types[i + 1] = TIMEDISPLAY_CYCLE;
+	  timeline_deltas[i + 1] = -1 * nncal_cycletime;
+	}
       }
 
       if (action_required & ACTION_HARDCOPY_PLOT) {
@@ -1076,7 +1144,8 @@ int main(int argc, char *argv[]) {
 	    make_vis_plot(vis_data.vis_quantities, vis_data.nviscycles,
 			  vis_data.num_ifs, 4, sort_baselines,
 			  &dump_panelspec, &vis_plotcontrols, vis_data.header_data,
-			  vis_data.metinfo, vis_data.syscal_data, num_timelines, timelines);
+			  vis_data.metinfo, vis_data.syscal_data, num_timelines, timelines,
+			  timeline_types, timeline_deltas);
 	    // Close the device.
 	    release_vis_device(&dump_device_number, &dump_device_opened, &dump_panelspec);
 	    // Reset the plot controls.
@@ -1101,11 +1170,14 @@ int main(int argc, char *argv[]) {
 	make_vis_plot(vis_data.vis_quantities, vis_data.nviscycles,
 		      vis_data.num_ifs, 4, sort_baselines,
 		      &vis_panelspec, &vis_plotcontrols, vis_data.header_data,
-		      vis_data.metinfo, vis_data.syscal_data, num_timelines, timelines);
+		      vis_data.metinfo, vis_data.syscal_data, num_timelines, timelines,
+		      timeline_types, timeline_deltas);
 	action_required -= ACTION_REFRESH_PLOT;
       }
 
       FREE(timelines);
+      FREE(timeline_deltas);
+      FREE(timeline_types);
       num_timelines = 0;
     }
     
@@ -1358,4 +1430,5 @@ int main(int argc, char *argv[]) {
     FREE(ampphase_options[i]);
   }
   FREE(ampphase_options);
+  FREE(nncal_indices);
 }

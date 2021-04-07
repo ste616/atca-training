@@ -346,6 +346,19 @@ Examples of valid time strings accepted by this command: `30s`, `20m`, `2h`,
 
 ---
 
+#### nncal
+
+Format: **nnc**al [*number of cycles*]
+
+This command sets the number of cycles to look at when computing calibration
+correction values; it does not do anything by itself when the command is given.
+
+If this command is given without arguments, the current setting is displayed
+in the controlling terminal. If a single argument is supplied, and can be
+intepreted as a non-zero positive integer number, the setting is updated.
+
+---
+
 #### onsource
 
 Format: **ons**ource
