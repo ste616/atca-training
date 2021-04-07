@@ -345,10 +345,22 @@ int time_index() {
 			      vis_data.vis_quantities[nncal_indices[i - 1]][0][0]->ut_seconds) -
 	  date2mjd(vis_data.vis_quantities[closeidx - i][0][0]->obsdate,
 		   vis_data.vis_quantities[closeidx - i][0][0]->ut_seconds);
-	if (delta_time <= cycletime) {
+	/* printf("point %d: reference  time %s %.2f (%.7f)\n", i, */
+	/*        vis_data.vis_quantities[nncal_indices[i - 1]][0][0]->obsdate, */
+	/*        vis_data.vis_quantities[nncal_indices[i - 1]][0][0]->ut_seconds, */
+	/*        date2mjd(vis_data.vis_quantities[nncal_indices[i - 1]][0][0]->obsdate, */
+	/* 		vis_data.vis_quantities[nncal_indices[i - 1]][0][0]->ut_seconds)); */
+	/* printf("          comparison time %s %.2f (%.7f)\n", */
+	/*        vis_data.vis_quantities[closeidx - i][0][0]->obsdate, */
+	/*        vis_data.vis_quantities[closeidx - i][0][0]->ut_seconds, */
+	/*        date2mjd(vis_data.vis_quantities[closeidx - i][0][0]->obsdate, */
+	/* 		vis_data.vis_quantities[closeidx - i][0][0]->ut_seconds)); */
+	/* printf("          difference = %.10f, cycle = %.10f\n", delta_time, cycletime); */
+	if (fabs(delta_time - cycletime) < 1e-9) {
 	  // These are consecutive cycles.
 	  nncal_indices[i] = closeidx - i;
 	  nncal_seconds[i] = nncal_seconds[i - 1] - (float)nncal_cycletime;
+	  /* printf(" CYCLE ACCEPTED\n"); */
 	} else {
 	  // Non-consecutive.
 	  nncal_indices[i] = -1;
@@ -810,6 +822,7 @@ static void interpret_command(char *line) {
 	  REALLOC(nncal_seconds, nncal);
 	  // Re-compute the indices if we can.
 	  time_index();
+	  action_required = ACTION_REFRESH_PLOT;
 	}
       }
     } else {
