@@ -8,7 +8,8 @@ target_compile_options(applib PRIVATE -Werror -Wall -Wextra)
 
 add_library(atrpfits STATIC src/rpfits/reader.c src/rpfits/compute.c
   src/rpfits/atrpfits.c)
-target_include_directories(atrpfits PUBLIC src/rpfits src/include)
+target_link_libraries(atrpfits PUBLIC applib)
+target_include_directories(atrpfits PUBLIC src/rpfits src/include src/library)
 target_compile_options(atrpfits PRIVATE -Werror -Wall -Wextra)
 
 add_executable(summariser src/apps/summariser/summariser.c)

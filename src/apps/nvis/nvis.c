@@ -196,6 +196,7 @@ static void sighandler(int sig) {
 #define ACTION_UNKNOWN_COMMAND           1<<13
 #define ACTION_COMPUTE_CLOSUREPHASE      1<<14
 #define ACTION_HARDCOPY_PLOT             1<<15
+#define ACTION_COMPUTE_DELAYS            1<<16
 
 // Make a shortcut to stop action for those actions which can only be
 // done by a simulator.
@@ -345,22 +346,10 @@ int time_index() {
 			      vis_data.vis_quantities[nncal_indices[i - 1]][0][0]->ut_seconds) -
 	  date2mjd(vis_data.vis_quantities[closeidx - i][0][0]->obsdate,
 		   vis_data.vis_quantities[closeidx - i][0][0]->ut_seconds);
-	/* printf("point %d: reference  time %s %.2f (%.7f)\n", i, */
-	/*        vis_data.vis_quantities[nncal_indices[i - 1]][0][0]->obsdate, */
-	/*        vis_data.vis_quantities[nncal_indices[i - 1]][0][0]->ut_seconds, */
-	/*        date2mjd(vis_data.vis_quantities[nncal_indices[i - 1]][0][0]->obsdate, */
-	/* 		vis_data.vis_quantities[nncal_indices[i - 1]][0][0]->ut_seconds)); */
-	/* printf("          comparison time %s %.2f (%.7f)\n", */
-	/*        vis_data.vis_quantities[closeidx - i][0][0]->obsdate, */
-	/*        vis_data.vis_quantities[closeidx - i][0][0]->ut_seconds, */
-	/*        date2mjd(vis_data.vis_quantities[closeidx - i][0][0]->obsdate, */
-	/* 		vis_data.vis_quantities[closeidx - i][0][0]->ut_seconds)); */
-	/* printf("          difference = %.10f, cycle = %.10f\n", delta_time, cycletime); */
 	if (fabs(delta_time - cycletime) < 1e-9) {
 	  // These are consecutive cycles.
 	  nncal_indices[i] = closeidx - i;
 	  nncal_seconds[i] = nncal_seconds[i - 1] - (float)nncal_cycletime;
-	  /* printf(" CYCLE ACCEPTED\n"); */
 	} else {
 	  // Non-consecutive.
 	  nncal_indices[i] = -1;
@@ -825,6 +814,28 @@ static void interpret_command(char *line) {
 	  action_required = ACTION_REFRESH_PLOT;
 	}
       }
+    } else if (minmatch("dcal", line_els[0], 4)) {
+      CHECKSIMULATOR;
+      // Compute the delays required to correct the data and then tell the server
+      // to incorporate them.
+      // Check if a time range has been specified.
+      if (data_seconds < 0) {
+	printf(" Unable to dcal: please select a time range with data and nncal\n");
+      } else {
+	// Check that we have enough cycles of data.
+	temp_nncal = 0;
+	for (i = 0; i < nncal; i++) {
+	  if (nncal_indices[i] >= 0) {
+	    temp_nncal += 1;
+	  }
+	}
+	if (temp_nncal != nncal) {
+	  printf(" Unable to dcal: need %d consecutive cycles of data, please change data and/or nncal\n",
+		 nncal);
+	} else {
+	  action_required = ACTION_COMPUTE_DELAYS;
+	}
+      }
     } else {
       if (nels == 1) {
         // We try to interpret the string as the panels to show.
@@ -882,9 +893,9 @@ static void interpret_command(char *line) {
 
 int main(int argc, char *argv[]) {
   struct nvis_arguments arguments;
-  int i, j, k, r, bytes_received, nmesg = 0, bidx = -1, num_timelines = 0;
+  int i, j, k, l, m, r, bytes_received, nmesg = 0, bidx = -1, num_timelines = 0;
   int dump_type = FILETYPE_UNKNOWN, dump_device_number = -1, vis_device_number = -1;
-  int *timeline_types = NULL;
+  int *timeline_types = NULL, cycidx, visidx, a1, a2;
   cmp_ctx_t cmp;
   cmp_mem_access_t mem;
   struct requests server_request;
@@ -896,10 +907,11 @@ int main(int argc, char *argv[]) {
   fd_set watchset, reads;
   bool vis_device_opened = false, dump_device_opened = false;
   size_t recv_buffer_length;
-  float *timelines = NULL, *timeline_deltas = NULL;
+  float *timelines = NULL, *timeline_deltas = NULL, tmjd;
   struct vis_quantities ***described_ptr = NULL;
   struct scan_header_data *described_hdr = NULL;
   struct panelspec dump_panelspec;
+  struct ampphase_modifiers *modptr = NULL;
 
   // Allocate and initialise some memory.
   MALLOC(mesgout, MAX_N_MESSAGES);
@@ -1061,6 +1073,96 @@ int main(int argc, char *argv[]) {
 	  }
 	}
       }
+    }
+
+    if (action_required & ACTION_COMPUTE_DELAYS) {
+      action_required -= ACTION_COMPUTE_DELAYS;
+      action_required |= ACTION_AMPPHASE_OPTIONS_CHANGED;
+      nmesg = 0;
+      for (j = 0; j < nvisbands; j++) {
+	visidx = visband_idx[j] - 1;
+	// Create a new modifier in the options.
+	found_options->num_modifiers[visband_idx[j]] += 1;
+	REALLOC(found_options->modifiers[visband_idx[j]],
+		found_options->num_modifiers[visband_idx[j]]);
+	CALLOC(found_options->modifiers[visband_idx[j]]
+	       [found_options->num_modifiers[visband_idx[j]] - 1], 1);
+	modptr = found_options->modifiers[visband_idx[j]]
+	  [found_options->num_modifiers[visband_idx[j]] - 1];
+	modptr->add_delay = true;
+	modptr->delay_num_antennas = 7;
+	modptr->delay_num_pols = 3;
+	CALLOC(modptr->delay, modptr->delay_num_antennas);
+	for (i = 0; i < modptr->delay_num_antennas; i++) {
+	  CALLOC(modptr->delay[i], modptr->delay_num_pols);
+	}
+	modptr->delay_start_mjd =
+	  (float)date2mjd(vis_data.vis_quantities[nncal_indices[0]][0][0]->obsdate,
+			  vis_data.vis_quantities[nncal_indices[0]][0][0]->ut_seconds);
+	modptr->delay_end_mjd =
+	  (float)date2mjd(vis_data.vis_quantities[nncal_indices[nncal - 1]][0][0]->obsdate,
+			  vis_data.vis_quantities[nncal_indices[nncal - 1]][0][0]->ut_seconds);
+	if (modptr->delay_end_mjd < modptr->delay_start_mjd) {
+	  tmjd = modptr->delay_start_mjd;
+	  modptr->delay_start_mjd = modptr->delay_end_mjd;
+	  modptr->delay_end_mjd = tmjd;
+	}
+	for (i = 0; i < nncal; i++) {
+	  cycidx = nncal_indices[i];
+	  for (k = 0; k < vis_data.num_pols[cycidx][visidx]; k++) {
+	    if ((vis_data.vis_quantities[cycidx][visidx][k]->pol == POL_XX) ||
+		(vis_data.vis_quantities[cycidx][visidx][k]->pol == POL_YY)) {
+	      // Gather the delay data for the interferometer.
+	      for (l = 0; l < vis_data.header_data[cycidx]->num_ants; l++) {
+		if (l == reference_antenna_index) {
+		  continue;
+		}
+		for (m = 0; m < vis_data.vis_quantities[cycidx][visidx][k]->nbaselines; m++) {
+		  base_to_ants(vis_data.vis_quantities[cycidx][visidx][k]->baseline[m],
+			       &a1, &a2);
+		  if (((a1 == vis_data.header_data[cycidx]->ant_label[reference_antenna_index]) ||
+		       (a2 == vis_data.header_data[cycidx]->ant_label[reference_antenna_index])) &&
+		      ((a1 == vis_data.header_data[cycidx]->ant_label[l]) ||
+		       (a2 == vis_data.header_data[cycidx]->ant_label[l]))) {
+		    // We can read off the delay here.
+		    /* snprintf(mesgout[nmesg++], VISBUFLONG, */
+		    /* 	     " CYC %d BAND %d POL %d DELAY %d-%d = %.5f ns\n", */
+		    /* 	     cycidx, visidx, */
+		    /* 	     vis_data.vis_quantities[cycidx][visidx][k]->pol, a1, a2, */
+		    /* 	     vis_data.vis_quantities[cycidx][visidx][k]->delay[m][0]); */
+		    modptr->delay[vis_data.header_data[cycidx]->ant_label[l]]
+		      [vis_data.vis_quantities[cycidx][visidx][k]->pol - 2] +=
+		      vis_data.vis_quantities[cycidx][visidx][k]->delay[m][0] / (float)nncal;
+		  }
+		}
+	      }
+	    } else if (vis_data.vis_quantities[cycidx][visidx][k]->pol == POL_XY) {
+	      // Get the cross-pol delay per antenna.
+	      for (l = 0; l < vis_data.header_data[cycidx]->num_ants; l++) {
+		for (m = 0; m < vis_data.vis_quantities[cycidx][visidx][k]->nbaselines; m++) {
+		  base_to_ants(vis_data.vis_quantities[cycidx][visidx][k]->baseline[m],
+			       &a1, &a2);
+		  if ((a1 == vis_data.header_data[cycidx]->ant_label[l]) &&
+		      (a2 == vis_data.header_data[cycidx]->ant_label[l])) {
+		    // We get the delay and add it to the Y pol.
+		    modptr->delay[vis_data.header_data[cycidx]->ant_label[l]][POL_Y] +=
+		      vis_data.vis_quantities[cycidx][visidx][k]->delay[m][1] / (float)nncal;
+		  }
+		}
+	      }
+	    }
+	  }
+	}
+	// Print out the delay corrections found.
+	snprintf(mesgout[nmesg++], VISBUFLONG, " BAND %d:\n", visband_idx[j]);
+	for (l = 0; l < vis_data.header_data[nncal_indices[0]]->num_ants; l++) {
+	  snprintf(mesgout[nmesg++], VISBUFLONG, "   ANT %d: X = %.3f Y = %.3f ns\n",
+		   vis_data.header_data[nncal_indices[0]]->ant_label[l],
+		   modptr->delay[vis_data.header_data[nncal_indices[0]]->ant_label[l]][POL_X],
+		   modptr->delay[vis_data.header_data[nncal_indices[0]]->ant_label[l]][POL_Y]);
+	}
+      }
+      readline_print_messages(nmesg, mesgout);
     }
     
     if (action_required & ACTION_DESCRIBE_DATA) {
@@ -1444,4 +1546,5 @@ int main(int argc, char *argv[]) {
   }
   FREE(ampphase_options);
   FREE(nncal_indices);
+  FREE(nncal_seconds);
 }

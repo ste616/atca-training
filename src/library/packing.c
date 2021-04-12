@@ -460,6 +460,7 @@ void unpack_ampphase_modifiers(cmp_ctx_t *cmp, struct ampphase_modifiers *a) {
     CALLOC(a->delay, a->delay_num_antennas);
     if (a->delay_num_pols > 0) {
       for (i = 0; i < a->delay_num_antennas; i++) {
+	CALLOC(a->delay[i], a->delay_num_pols);
 	pack_readarray_float(cmp, a->delay_num_pols, a->delay[i]);
       }
     }
@@ -529,7 +530,7 @@ void unpack_ampphase_options(cmp_ctx_t *cmp, struct ampphase_options *a) {
   pack_readarray_sint(cmp, a->num_ifs, a->num_modifiers);
   for (i = 0; i < a->num_ifs; i++) {
     if (a->num_modifiers[i] > 0) {
-      CALLOC(a->modifiers[i], a->num_modifiers[j]);
+      CALLOC(a->modifiers[i], a->num_modifiers[i]);
       for (j = 0; j < a->num_modifiers[i]; j++) {
 	CALLOC(a->modifiers[i][j], 1);
 	unpack_ampphase_modifiers(cmp, a->modifiers[i][j]);

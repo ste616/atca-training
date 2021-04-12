@@ -18,6 +18,7 @@
 #include "atrpfits.h"
 #include "memory.h"
 #include "compute.h"
+#include "common.h"
 
 /*!
  *  \brief Get the median value of a float array
@@ -514,7 +515,7 @@ void copy_ampphase_options(struct ampphase_options *dest,
     STRUCTCOPY(src, dest, delay_averaging[i]);
     STRUCTCOPY(src, dest, averaging_method[i]);
     STRUCTCOPY(src, dest, num_modifiers[i]);
-    CALLOC(dest->modifiers, dest->num_modifiers[i]);
+    CALLOC(dest->modifiers[i], dest->num_modifiers[i]);
     for (j = 0; j < dest->num_modifiers[i]; j++) {
       CALLOC(dest->modifiers[i][j], 1);
       copy_ampphase_modifiers(dest->modifiers[i][j], src->modifiers[i][j]);
@@ -920,12 +921,14 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
                  int pol, int ifnum, int *num_options,
                  struct ampphase_options ***options) {
   int ap_created = 0, reqpol = -1, i = 0, polnum = -1, bl = -1, bidx = -1;
-  int j = 0, jflag = 0, vidx = -1, cidx = -1, ifno, syscal_if_idx = -1;
-  int syscal_pol_idx = -1;
-  float rcheck = 0, chanwidth, firstfreq, nhalfchan;
-  bool needs_new_options = false;
+  int j = 0, k = 0, jflag = 0, vidx = -1, cidx = -1, ifno, syscal_if_idx = -1;
+  int syscal_pol_idx = -1, pidx1, pidx2;
+  float rcheck = 0, chanwidth, firstfreq, nhalfchan, total_delay = 0, cmjd;
+  float delay_angle;
+  bool needs_new_options = false, correct_delay = false;
+  float complex delay;
   struct ampphase_options *band_options = NULL;
-
+  
   // Check we know about the window number we were given.
   if ((ifnum < 1) || (ifnum > scan_header_data->num_ifs)) {
     return -1;
@@ -959,7 +962,7 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
     CALLOC((*options)[*num_options - 1], 1);
     (*options)[*num_options - 1] = band_options;
   }
-  
+
   // Determine which of the polarisations is the one requested.
   for (i = 0; i < scan_header_data->if_num_stokes[ifno]; i++) {
     polnum = polarisation_number(scan_header_data->if_stokes_names[ifno][i]);
@@ -973,6 +976,25 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
     return -1;
   }
 
+  // Later, if we need to do delay correction, we will need to know which
+  // polarisations to deal with on each antenna, so we determine that here.
+  switch (pol) {
+  case POL_XX:
+    pidx1 = pidx2 = POL_X;
+    break;
+  case POL_YY:
+    pidx1 = pidx2 = POL_Y;
+    break;
+  case POL_XY:
+    pidx1 = POL_X;
+    pidx2 = POL_Y;
+    break;
+  case POL_YX:
+    pidx1 = POL_Y;
+    pidx2 = POL_X;
+    break;
+  }
+  
   // Prepare the structure if required.
   if (*ampphase == NULL) {
     ap_created = 1;
@@ -988,6 +1010,7 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
   (*ampphase)->pol = pol;
   strncpy((*ampphase)->obsdate, scan_header_data->obsdate, OBSDATE_LENGTH);
   (*ampphase)->ut_seconds = cycle_data->ut_seconds;
+  cmjd = (float)date2mjd((*ampphase)->obsdate, (*ampphase)->ut_seconds);
   strncpy((*ampphase)->scantype, scan_header_data->obstype, OBSTYPE_LENGTH);
   if (cycle_data->source_no != NULL) {
     (*ampphase)->source_no = cycle_data->source_no[0];
@@ -1263,12 +1286,30 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
 	   bl, bidx, (*ampphase)->baseline[bidx]);
 	   printf("this baseline has %d channels\n", (*ampphase)->nchannels);*/
     cidx = cycle_data->bin[i] - 1;
+    // Check for a modifier which might need us to add some delay.
+    total_delay = 0;
+    correct_delay = false;
+    for (k = 0; k < band_options->num_modifiers[ifnum]; k++) {
+      if ((band_options->modifiers[ifnum][k]->add_delay) &&
+	  (cmjd >= band_options->modifiers[ifnum][k]->delay_start_mjd) &&
+	  (cmjd <= band_options->modifiers[ifnum][k]->delay_end_mjd)) {
+	total_delay += band_options->modifiers[ifnum][k]->delay[cycle_data->ant2[i]][pidx2] -
+	  band_options->modifiers[ifnum][k]->delay[cycle_data->ant1[i]][pidx1];
+	correct_delay = true;
+      }
+    }
     for (j = 0, jflag = 0; j < (*ampphase)->nchannels; j++) {
       vidx = reqpol + j * scan_header_data->if_num_stokes[ifno];
       (*ampphase)->weight[bidx][cidx][j] = cycle_data->wgt[i][vidx];
-      (*ampphase)->amplitude[bidx][cidx][j] = cabsf(cycle_data->vis[i][vidx]);
-      (*ampphase)->phase[bidx][cidx][j] = cargf(cycle_data->vis[i][vidx]);
-      (*ampphase)->raw[bidx][cidx][j] = cycle_data->vis[i][vidx];
+      if (correct_delay) {
+	delay_angle = total_delay * (*ampphase)->channel[j];
+	delay = cos(delay_angle) + I * sin(delay_angle);
+	(*ampphase)->raw[bidx][cidx][j] = cycle_data->vis[i][vidx] * delay;
+      } else {
+	(*ampphase)->raw[bidx][cidx][j] = cycle_data->vis[i][vidx];
+      }
+      (*ampphase)->amplitude[bidx][cidx][j] = cabsf((*ampphase)->raw[bidx][cidx][j]);
+      (*ampphase)->phase[bidx][cidx][j] = cargf((*ampphase)->raw[bidx][cidx][j]);
       if (band_options->phase_in_degrees == true) {
         (*ampphase)->phase[bidx][cidx][j] *= (180 / M_PI);
       }
