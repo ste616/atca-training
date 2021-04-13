@@ -270,6 +270,25 @@ that exact time - not at the midpoint of the nearest cycle.
 
 ---
 
+#### dcal
+
+Format: **dcal**
+
+This command computes the delay corrections required from the **nncal**
+cycles before (and including) the time specified by the **dat**a command, and then
+sends these delay corrections to the server which recomputes the data
+incorporating them.
+
+The delay corrections are determined by looking at the delay values that
+`nvis` knows about, so they depend on the settings of **tvch**annel,
+**delav**g and **tvmed**ian. The exact corrections are always made with
+respect to what **ref**ant is set to.
+
+The delay will only be corrected for the **nncal** cycles selected. While
+the server recomputes the data, `nvis` will continue to show the current data.
+
+---
+
 #### delavg
 
 Format: **delav**g *number of channels* [*number of channels*]
@@ -439,6 +458,12 @@ will have an "R" above the antenna number, in the same colour.
 If you want to change the reference antenna, supply the antenna number
 (one of the antenna numbers listed at the top-left of the plot) as the
 argument.
+
+---
+
+#### reset
+
+Format: **reset** *parameter*
 
 ---
 
