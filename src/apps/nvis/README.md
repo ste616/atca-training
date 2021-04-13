@@ -284,6 +284,32 @@ The delay corrections are determined by looking at the delay values that
 **delav**g and **tvmed**ian. The exact corrections are always made with
 respect to what **ref**ant is set to.
 
+This command will output something like the following to the controlling
+terminal:
+```
+NVIS> dcal
+ BAND 1, MJD 59230.931770 - 59230.932002:
+   ANT 1: X = 0.000 Y = 0.000 XY = 7.032 ns
+   ANT 2: X = 2.570 Y = -8.356 XY = -3.875 ns
+   ANT 3: X = -2.018 Y = -15.916 XY = -6.830 ns
+   ANT 4: X = -0.718 Y = -11.540 XY = -3.771 ns
+   ANT 5: X = 29.788 Y = 26.810 XY = 4.088 ns
+   ANT 6: X = 52.191 Y = 95.145 XY = 49.991 ns
+ BAND 2, MJD 59230.931770 - 59230.932002:
+   ANT 1: X = 0.000 Y = 0.000 XY = 37.744 ns
+   ANT 2: X = -43.865 Y = -86.580 XY = -5.309 ns
+   ANT 3: X = -12.906 Y = -35.238 XY = 15.392 ns
+   ANT 4: X = 53.908 Y = -37.341 XY = -54.514 ns
+   ANT 5: X = 18.134 Y = 42.308 XY = 61.888 ns
+   ANT 6: X = 60.307 Y = 5.331 XY = -17.265 ns
+```
+
+For each of the calbands, the MJD range for the corrections is specified, along
+with the delay determined from the data in ns, for each of the X and Y receptors
+(where the reference antenna is set to have 0 delay and all other antennas are
+with respect to the reference antenna), and the delay between the X and Y receptors
+given as `XY` for each antenna.
+
 The delay will only be corrected for the **nncal** cycles selected. While
 the server recomputes the data, `nvis` will continue to show the current data.
 
@@ -464,6 +490,17 @@ argument.
 #### reset
 
 Format: **reset** *parameter*
+
+This command sets the *parameter* back to its default value or state. This
+command accepts only a single argument, which must be one of the following.
+
+##### delays
+
+Format: **reset** **del**ays
+
+Remove all delay corrections from the currently selected calbands. `nvis`
+will then ask the server to recompute the data, and will continue to show
+the current data until the server responds.
 
 ---
 
