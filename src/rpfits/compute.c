@@ -1293,8 +1293,21 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
       if ((band_options->modifiers[ifnum][k]->add_delay) &&
 	  (cmjd >= band_options->modifiers[ifnum][k]->delay_start_mjd) &&
 	  (cmjd <= band_options->modifiers[ifnum][k]->delay_end_mjd)) {
-	total_delay += band_options->modifiers[ifnum][k]->delay[cycle_data->ant2[i]][pidx2] -
-	  band_options->modifiers[ifnum][k]->delay[cycle_data->ant1[i]][pidx1];
+	if (cycle_data->ant1[i] != cycle_data->ant2[i]) {
+	  total_delay += (band_options->modifiers[ifnum][k]->delay[cycle_data->ant2[i]][pidx2] -
+			  band_options->modifiers[ifnum][k]->delay[cycle_data->ant1[i]][pidx1]);
+	} else if (pol == POL_XY) {
+	  total_delay += band_options->modifiers[ifnum][k]->delay[cycle_data->ant1[i]][POL_XY];
+	} else if (pol == POL_YX) {
+	  total_delay -= band_options->modifiers[ifnum][k]->delay[cycle_data->ant1[i]][POL_XY];
+	}
+	/* printf(" baseline %d-%d pol %d, delay ant %d %.3f ns, delay ant %d %.3f ns, delay %.3f ns\n", */
+	/*        cycle_data->ant1[i], cycle_data->ant2[i], pol, */
+	/*        cycle_data->ant1[i], */
+	/*        band_options->modifiers[ifnum][k]->delay[cycle_data->ant1[i]][pidx1], */
+	/*        cycle_data->ant2[i], */
+	/*        band_options->modifiers[ifnum][k]->delay[cycle_data->ant2[i]][pidx2], */
+	/*        total_delay); */
 	correct_delay = true;
       }
     }
@@ -1302,7 +1315,9 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
       vidx = reqpol + j * scan_header_data->if_num_stokes[ifno];
       (*ampphase)->weight[bidx][cidx][j] = cycle_data->wgt[i][vidx];
       if (correct_delay) {
-	delay_angle = total_delay * (*ampphase)->channel[j];
+	delay_angle = -2.0 * M_PI * total_delay * (*ampphase)->frequency[j] / 1000.0;
+	/* printf(" delay %.3f frequency %.3f angle = %.6f\n", total_delay, (*ampphase)->frequency[j], */
+	/*        delay_angle); */
 	delay = cos(delay_angle) + I * sin(delay_angle);
 	(*ampphase)->raw[bidx][cidx][j] = cycle_data->vis[i][vidx] * delay;
       } else {

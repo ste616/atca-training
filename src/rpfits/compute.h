@@ -141,7 +141,7 @@ struct ampphase_modifiers {
 
   /*! \var delay_num_pols
    *  \brief The number of polarisations for each antenna with delay values
-   *         (should always be 3)
+   *         (should always be 6)
    */
   int delay_num_pols;
 

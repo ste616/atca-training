@@ -1091,7 +1091,7 @@ int main(int argc, char *argv[]) {
 	  [found_options->num_modifiers[visband_idx[j]] - 1];
 	modptr->add_delay = true;
 	modptr->delay_num_antennas = 7;
-	modptr->delay_num_pols = 3;
+	modptr->delay_num_pols = POL_XY + 1;
 	CALLOC(modptr->delay, modptr->delay_num_antennas);
 	for (i = 0; i < modptr->delay_num_antennas; i++) {
 	  CALLOC(modptr->delay[i], modptr->delay_num_pols);
@@ -1139,27 +1139,28 @@ int main(int argc, char *argv[]) {
 	    } else if (vis_data.vis_quantities[cycidx][visidx][k]->pol == POL_XY) {
 	      // Get the cross-pol delay per antenna.
 	      for (l = 0; l < vis_data.header_data[cycidx]->num_ants; l++) {
-		for (m = 0; m < vis_data.vis_quantities[cycidx][visidx][k]->nbaselines; m++) {
-		  base_to_ants(vis_data.vis_quantities[cycidx][visidx][k]->baseline[m],
-			       &a1, &a2);
-		  if ((a1 == vis_data.header_data[cycidx]->ant_label[l]) &&
-		      (a2 == vis_data.header_data[cycidx]->ant_label[l])) {
-		    // We get the delay and add it to the Y pol.
-		    modptr->delay[vis_data.header_data[cycidx]->ant_label[l]][POL_Y] +=
-		      vis_data.vis_quantities[cycidx][visidx][k]->delay[m][1] / (float)nncal;
-		  }
-		}
-	      }
+	    	for (m = 0; m < vis_data.vis_quantities[cycidx][visidx][k]->nbaselines; m++) {
+	    	  base_to_ants(vis_data.vis_quantities[cycidx][visidx][k]->baseline[m],
+	    		       &a1, &a2);
+	    	  if ((a1 == vis_data.header_data[cycidx]->ant_label[l]) &&
+	    	      (a2 == vis_data.header_data[cycidx]->ant_label[l])) {
+	    	    // We get the delay and add it to the Y pol.
+	    	    modptr->delay[vis_data.header_data[cycidx]->ant_label[l]][POL_XY] +=
+	    	      vis_data.vis_quantities[cycidx][visidx][k]->delay[m][1] / (float)nncal;
+	    	  }
+	    	}
+	    }
 	    }
 	  }
 	}
 	// Print out the delay corrections found.
 	snprintf(mesgout[nmesg++], VISBUFLONG, " BAND %d:\n", visband_idx[j]);
 	for (l = 0; l < vis_data.header_data[nncal_indices[0]]->num_ants; l++) {
-	  snprintf(mesgout[nmesg++], VISBUFLONG, "   ANT %d: X = %.3f Y = %.3f ns\n",
+	  snprintf(mesgout[nmesg++], VISBUFLONG, "   ANT %d: X = %.3f Y = %.3f XY = %.3f ns\n",
 		   vis_data.header_data[nncal_indices[0]]->ant_label[l],
 		   modptr->delay[vis_data.header_data[nncal_indices[0]]->ant_label[l]][POL_X],
-		   modptr->delay[vis_data.header_data[nncal_indices[0]]->ant_label[l]][POL_Y]);
+		   modptr->delay[vis_data.header_data[nncal_indices[0]]->ant_label[l]][POL_Y],
+		   modptr->delay[vis_data.header_data[nncal_indices[0]]->ant_label[l]][POL_XY]);
 	}
       }
       readline_print_messages(nmesg, mesgout);
