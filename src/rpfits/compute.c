@@ -3156,6 +3156,14 @@ void compute_closure_phase(struct scan_header_data *scan_header_data,
       vis_quantities->nbins_cross = vis_quantities->nbins[i];
     }
   }
+
+  // Clean up any previously computed closure phases (for memory management).
+  for (i = 0; i < vis_quantities->ntriangles; i++) {
+    FREE(vis_quantities->triangles[i]);
+    FREE(vis_quantities->closure_phase[i]);
+  }
+  FREE(vis_quantities->triangles);
+  FREE(vis_quantities->closure_phase);
   
   // Compute the closure phase triangles.
   vis_quantities->ntriangles = ((scan_header_data->num_ants - 1) *
