@@ -907,7 +907,8 @@ int main(int argc, char *argv[]) {
   fd_set watchset, reads;
   bool vis_device_opened = false, dump_device_opened = false;
   size_t recv_buffer_length;
-  float *timelines = NULL, *timeline_deltas = NULL, tmjd;
+  float *timelines = NULL, *timeline_deltas = NULL;
+  double tmjd;
   struct vis_quantities ***described_ptr = NULL;
   struct scan_header_data *described_hdr = NULL;
   struct panelspec dump_panelspec;
@@ -1096,17 +1097,27 @@ int main(int argc, char *argv[]) {
 	for (i = 0; i < modptr->delay_num_antennas; i++) {
 	  CALLOC(modptr->delay[i], modptr->delay_num_pols);
 	}
+	snprintf(mesgout[nmesg++], VISBUFLONG, " CYCLES:\n");
+	for (i = 0; i < nncal; i++) {
+	  snprintf(mesgout[nmesg++], VISBUFLONG, "%d (%s %.2f)\n", nncal_indices[i],
+		   vis_data.vis_quantities[nncal_indices[i]][0][0]->obsdate,
+		   vis_data.vis_quantities[nncal_indices[i]][0][0]->ut_seconds);
+	}
+	  
 	modptr->delay_start_mjd =
-	  (float)date2mjd(vis_data.vis_quantities[nncal_indices[0]][0][0]->obsdate,
-			  vis_data.vis_quantities[nncal_indices[0]][0][0]->ut_seconds);
+	  date2mjd(vis_data.vis_quantities[nncal_indices[0]][0][0]->obsdate,
+		   vis_data.vis_quantities[nncal_indices[0]][0][0]->ut_seconds);
 	modptr->delay_end_mjd =
-	  (float)date2mjd(vis_data.vis_quantities[nncal_indices[nncal - 1]][0][0]->obsdate,
-			  vis_data.vis_quantities[nncal_indices[nncal - 1]][0][0]->ut_seconds);
+	  date2mjd(vis_data.vis_quantities[nncal_indices[nncal - 1]][0][0]->obsdate,
+		   vis_data.vis_quantities[nncal_indices[nncal - 1]][0][0]->ut_seconds);
+	snprintf(mesgout[nmesg++], VISBUFLONG, " BAND %d, MJD %.6f - %.6f:\n", visband_idx[j],
+		 modptr->delay_start_mjd, modptr->delay_end_mjd);
 	if (modptr->delay_end_mjd < modptr->delay_start_mjd) {
 	  tmjd = modptr->delay_start_mjd;
 	  modptr->delay_start_mjd = modptr->delay_end_mjd;
 	  modptr->delay_end_mjd = tmjd;
 	}
+	
 	for (i = 0; i < nncal; i++) {
 	  cycidx = nncal_indices[i];
 	  for (k = 0; k < vis_data.num_pols[cycidx][visidx]; k++) {
@@ -1154,7 +1165,8 @@ int main(int argc, char *argv[]) {
 	  }
 	}
 	// Print out the delay corrections found.
-	snprintf(mesgout[nmesg++], VISBUFLONG, " BAND %d:\n", visband_idx[j]);
+	snprintf(mesgout[nmesg++], VISBUFLONG, " BAND %d, MJD %.6f - %.6f:\n", visband_idx[j],
+		 modptr->delay_start_mjd, modptr->delay_end_mjd);
 	for (l = 0; l < vis_data.header_data[nncal_indices[0]]->num_ants; l++) {
 	  snprintf(mesgout[nmesg++], VISBUFLONG, "   ANT %d: X = %.3f Y = %.3f XY = %.3f ns\n",
 		   vis_data.header_data[nncal_indices[0]]->ant_label[l],

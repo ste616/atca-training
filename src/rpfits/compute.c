@@ -923,8 +923,9 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
   int ap_created = 0, reqpol = -1, i = 0, polnum = -1, bl = -1, bidx = -1;
   int j = 0, k = 0, jflag = 0, vidx = -1, cidx = -1, ifno, syscal_if_idx = -1;
   int syscal_pol_idx = -1, pidx1, pidx2;
-  float rcheck = 0, chanwidth, firstfreq, nhalfchan, total_delay = 0, cmjd;
+  float rcheck = 0, chanwidth, firstfreq, nhalfchan, total_delay = 0;
   float delay_angle;
+  double cmjd;
   bool needs_new_options = false, correct_delay = false;
   float complex delay;
   struct ampphase_options *band_options = NULL;
@@ -1010,7 +1011,7 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
   (*ampphase)->pol = pol;
   strncpy((*ampphase)->obsdate, scan_header_data->obsdate, OBSDATE_LENGTH);
   (*ampphase)->ut_seconds = cycle_data->ut_seconds;
-  cmjd = (float)date2mjd((*ampphase)->obsdate, (*ampphase)->ut_seconds);
+  cmjd = date2mjd((*ampphase)->obsdate, (*ampphase)->ut_seconds);
   strncpy((*ampphase)->scantype, scan_header_data->obstype, OBSTYPE_LENGTH);
   if (cycle_data->source_no != NULL) {
     (*ampphase)->source_no = cycle_data->source_no[0];
@@ -1290,6 +1291,9 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
     total_delay = 0;
     correct_delay = false;
     for (k = 0; k < band_options->num_modifiers[ifnum]; k++) {
+      /* printf(" modifier found MJD %.6f - %.6f\n", */
+      /* 	     band_options->modifiers[ifnum][k]->delay_start_mjd, */
+      /* 	     band_options->modifiers[ifnum][k]->delay_end_mjd); */
       if ((band_options->modifiers[ifnum][k]->add_delay) &&
 	  (cmjd >= band_options->modifiers[ifnum][k]->delay_start_mjd) &&
 	  (cmjd <= band_options->modifiers[ifnum][k]->delay_end_mjd)) {

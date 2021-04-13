@@ -434,8 +434,8 @@ void pack_ampphase_modifiers(cmp_ctx_t *cmp, struct ampphase_modifiers *a) {
   pack_write_bool(cmp, a->add_delay);
   pack_write_sint(cmp, a->delay_num_antennas);
   pack_write_sint(cmp, a->delay_num_pols);
-  pack_write_float(cmp, a->delay_start_mjd);
-  pack_write_float(cmp, a->delay_end_mjd);
+  pack_write_double(cmp, a->delay_start_mjd);
+  pack_write_double(cmp, a->delay_end_mjd);
   for (i = 0; i < a->delay_num_antennas; i++) {
     pack_writearray_float(cmp, a->delay_num_pols, a->delay[i]);
   }
@@ -454,8 +454,8 @@ void unpack_ampphase_modifiers(cmp_ctx_t *cmp, struct ampphase_modifiers *a) {
   pack_read_bool(cmp, &(a->add_delay));
   pack_read_sint(cmp, &(a->delay_num_antennas));
   pack_read_sint(cmp, &(a->delay_num_pols));
-  pack_read_float(cmp, &(a->delay_start_mjd));
-  pack_read_float(cmp, &(a->delay_end_mjd));
+  pack_read_double(cmp, &(a->delay_start_mjd));
+  pack_read_double(cmp, &(a->delay_end_mjd));
   if (a->delay_num_antennas > 0) {
     CALLOC(a->delay, a->delay_num_antennas);
     if (a->delay_num_pols > 0) {

@@ -422,6 +422,7 @@ double cal2mjd(int day, int month, int year, float ut_seconds) {
   // ut_seconds = number of seconds passed on the specified date
   // Returns the MJD
   int m, y, c, x1, x2, x3;
+  double mjd;
   
   if ((month < 1) || (month > 12)) {
     return 0;
@@ -439,12 +440,14 @@ double cal2mjd(int day, int month, int year, float ut_seconds) {
     y = year;
   }
 
-  c = (int)((float)y / 100);
+  c = (int)((double)y / 100);
   y -= c * 100;
-  x1 = (int)(146097.0 * (float)c / 4.0);
-  x2 = (int)(1461.0 * (float)y / 4.0);
-  x3 = (int)((153.0 * (float)m + 2.0) / 5.0);
-  return ((float)(x1 + x2 + x3 + day - 678882) + (ut_seconds/ 86400.0));
+  x1 = (int)(146097.0 * (double)c / 4.0);
+  x2 = (int)(1461.0 * (double)y / 4.0);
+  x3 = (int)((153.0 * (double)m + 2.0) / 5.0);
+  mjd = ((double)(x1 + x2 + x3 + day - 678882) + ((double)ut_seconds/ 86400.0));
+  /* printf("   %4d-%02d-%02d %.6f = %.6f\n", year, month, day, ut_seconds, mjd); */
+  return (mjd);
 }
 
 double date2mjd(char *obsdate, float ut_seconds) {

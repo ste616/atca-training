@@ -148,13 +148,13 @@ struct ampphase_modifiers {
   /*! \var delay_start_mjd
    *  \brief The earliest MJD for which to correct the delay in the data
    */
-  float delay_start_mjd;
+  double delay_start_mjd;
 
   /*! \var delay_end_mjd
    *  \brief The latest MJD for which to correct the delay in the data (or 0
    *         to correct all data after \a delay_start_mjd)
    */
-  float delay_end_mjd;
+  double delay_end_mjd;
   
   /*! \var delay
    *  \brief The amount of delay (in ns) to add to each antenna and polarisation
