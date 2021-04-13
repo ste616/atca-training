@@ -1193,8 +1193,8 @@ int main(int argc, char *argv[]) {
 		     modptr->delay[vis_data.header_data[nncal_indices[0]]->ant_label[l]][POL_XY]);
 	  }
 	}
-	readline_print_messages(nmesg, mesgout);
       }
+      readline_print_messages(nmesg, mesgout);
       if (action_required & ACTION_COMPUTE_DELAYS) {
 	action_required -= ACTION_COMPUTE_DELAYS;
       }
