@@ -12,7 +12,19 @@ installed before attempting to compile this software.
 Please also ensure that you install:
 * gfortran
 * PGPLOT
+* libreadline
+
+On Ubuntu, these necessary libraries and tools can be installed with:
+```bash
+sudo apt install cmake gfortran pgplot5 libreadline-dev
+```
+
+The code also relies on the libraries:
 * [RPFITS library](https://www.atnf.csiro.au/computing/software/rpfits.html)
+* [CMP library](https://github.com/camgunz/cmp)
+* [CMP mem access library](https://github.com/Stapelzeiger/cmp_mem_access)
+
+However, these libraries are included and compiled with the code in this package.
 
 To checkout and compile this software, you may follow the instructions below.
 ```bash
