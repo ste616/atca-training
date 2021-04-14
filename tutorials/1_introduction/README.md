@@ -13,3 +13,12 @@ In this tutorial, you will learn:
 After completing this tutorial, you will be able to use the tools to learn more
 in the other tutorials.
 
+## Getting the tools
+
+We begin by getting and compiling the software. Instructions for doing this
+are on the [front page](../../) of this repository, under the "Installation"
+heading. After you have successfully compiled the software, you can continue
+this tutorial.
+
+## Starting the tools for this tutorial
+
