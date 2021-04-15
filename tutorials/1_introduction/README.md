@@ -79,3 +79,26 @@ Waiting for connections...
 
 When you see the `Waiting for connections...` output, you can start using the other
 tools.
+
+Let's begin by looking at the data with NSPD; this will give a basically unfiltered
+view of the data that is coming from CABB. To do this, in one of the other terminals:
+```bash
+./nspd -d /xs -s 127.0.0.1 -u usr123
+```
+
+You should feel free to change `-d /xs` to use a different interactive PGPLOT device
+if you'd like, and to change `-u usr123` to use a different username.
+
+You should see a PGPLOT window open and look something like the image below. The
+controlling terminal should have output something like:
+```
+ $ ./nspd -d /xs -s 127.0.0.1 -u usr123
+client ID = Ij FH93YlB\R=Vame"H
+Connected to SIMULATOR server.
+NSPD> 
+```
+
+The terminal in which `rpfitsfile_server` is running will also update with more
+information.
+
+![NSPD display upon starting](nspd_t1_startup.png)
