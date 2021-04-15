@@ -123,3 +123,5 @@ NVIS>
 
 Again, the `rpfitsfile_server` terminal should show some more output.
 
+![NVIS display upon starting](nvis_t1_startup.png)
+
