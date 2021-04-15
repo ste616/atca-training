@@ -16,9 +16,13 @@ in the other tutorials.
 ## Getting the tools
 
 We begin by getting and compiling the software. Instructions for doing this
-are on the [front page](../../) of this repository, under the "Installation"
+are on the [front page](../../README.md) of this repository, under the "Installation"
 heading. After you have successfully compiled the software, you can continue
 this tutorial.
 
 ## Starting the tools for this tutorial
+
+Open up three terminals. In one of these terminals, navigate to the path
+`atca-training/tutorials/1_introduction` and in the other two go to
+`atca-training/build`.
 

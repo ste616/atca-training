@@ -10,14 +10,26 @@ This software uses the cmake compilation manager; please ensure you have it
 installed before attempting to compile this software.
 
 Please also ensure that you install:
+* gcc
 * gfortran
 * PGPLOT
 * libreadline
+* libX11
+* libpng
+* argp (Darwin only)
 
 On Ubuntu, these necessary libraries and tools can be installed with:
 ```bash
-sudo apt install cmake gfortran pgplot5 libreadline-dev
+sudo apt install build-essential cmake gfortran pgplot5 libreadline-dev libx11-dev libpng-dev
 ```
+
+On OSX Darwin, they can be installed using Homebrew with:
+```bash
+brew install gcc gfortran cmake libreadline libx11 libpng16 argp-standalone
+```
+
+Unfortunately, PGPLOT is no longer in the Homebrew cellar. You can get it from
+MacPorts though.
 
 The code also relies on the libraries:
 * [RPFITS library](https://www.atnf.csiro.au/computing/software/rpfits.html)
@@ -49,7 +61,22 @@ ATCA observer or duty astronomer.
 [`nvis`](src/apps/nvis/)
 [`nspd`](src/apps/nspd/)
 
-Soon, we will put links here to individual tutorials.
+## Tutorials
+
+The following tutorials are designed to help you understand the data that
+the Compact Array Broadband Backend (CABB) creates, and how to assess their
+quality. Once you master the use of these tools and understand the data,
+an actual ATCA observation should be much easier!
+
+### Tutorial 1
+
+This tutorial will introduce you to how to run the software in this package,
+and run through a typical 4cm online calibration routine. It will also introduce
+some key concepts about how the correlator works.
+
+[Start tutorial 1](tutorials/1_introduction/)
+
+
 
 ## About this package
 This software was written and tested by Jamie Stevens (ste616@gmail.com, or

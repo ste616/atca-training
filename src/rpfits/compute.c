@@ -1956,7 +1956,7 @@ void calculate_system_temperatures_cycle_data(struct cycle_data *cycle_data,
     if (bidx < 0) {
       return;
     }
-    if ((cycle_data->ant1[i] == cycle_data->ant2[i])) {
+    if (cycle_data->ant1[i] == cycle_data->ant2[i]) {
       aidx = cycle_data->ant1[i] - 1;
       iidx = cycle_data->if_no[i] - 1;
       /* if (cycle_data->bin[i] == 1) { */
