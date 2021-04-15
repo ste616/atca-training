@@ -26,3 +26,7 @@ Open up three terminals. In one of these terminals, navigate to the path
 `atca-training/tutorials/1_introduction` and in the other two go to
 `atca-training/build`.
 
+You should download the RPFITS file that we will use for this tutorial
+from our website:
+[2021-01-16_2220.C999](https://www.narrabri.atnf.csiro.au/people/Jamie.Stevens/atca-training-tutorials/1_introduction/2021-01-16_2220.C999)
+
