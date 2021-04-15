@@ -102,3 +102,24 @@ The terminal in which `rpfitsfile_server` is running will also update with more
 information.
 
 ![NSPD display upon starting](nspd_t1_startup.png)
+
+Finally, let's start up NVIS; this tool is used to see a more concise overview
+of the data. To do this, in the last of the terminals:
+```bash
+./nvis -d /xs -s 127.0.0.1 -u usr123
+```
+
+Once again, you can change the PGPLOT device to whatever you want, but you should
+make sure if you changed `-u usr123` for NSPD, do the same here for NVIS.
+
+You should see another PGPLOT window open and look something like the image below.
+The controlling terminal should have output something like:
+```
+ $ ./nvis -d /xs -s 127.0.0.1 -u usr123
+Client ID = (Plwy@7=>RJw[c5{8BG
+Connected to SIMULATOR server.
+NVIS> 
+```
+
+Again, the `rpfitsfile_server` terminal should show some more output.
+
