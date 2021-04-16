@@ -125,3 +125,19 @@ Again, the `rpfitsfile_server` terminal should show some more output.
 
 ![NVIS display upon starting](nvis_t1_startup.png)
 
+## Some basic usage
+
+This data was taken during an online calibration process at the standard
+4cm frequencies of 5500 and 9000 MHz. This can be most easily seen in NVIS.
+
+The image below shows the same NVIS view as above, but annotated with the
+times that each correlator calibration command was given; these times and
+commands are:
+Time       | Command
+----       | -------
+22:22:26   | dcal
+22:24:03   | dcal
+22:25:43   | pcal
+22:27:23   | acal
+
+![NVIS display annotated](nvis_t1_cal_labelled.png)
