@@ -141,3 +141,26 @@ Time       | Command
 22:27:23   | acal
 
 ![NVIS display annotated](nvis_t1_cal_labelled.png)
+
+This is pretty typical, so it will be instructive to take a look at how
+the data changes after each command. To do this, we'll use NSPD.
+
+At the top of NSPD is a small panel of information, including the timestamp
+for the data being displayed, the name of the source being observed (in this
+case "1934-638"), the weather conditions during the cycle, the antennas
+which are on-source, and the system temperatures for each antenna, polarisation
+and continuum IF.
+
+When NSPD started, it will probably have shown you the data from 22:21:14,
+which is actually the midpoint of the cycle that started at 22:21:10. The cycle
+time for this observation was 10 seconds. So why is 22:21:14 the midpoint? That
+is just a function of the way that NSPD displays the time; the actual midpoint
+is 22:21:14.95 (because of a small period of blanking that happens during the
+cycle), and NSPD doesn't round but rather just truncates the seconds.
+
+To begin, ensure that NSPD is displaying the data from 22:21:14. If it isn't,
+you can tell it to by giving the command:
+```
+get time 22:21:14
+```
+
