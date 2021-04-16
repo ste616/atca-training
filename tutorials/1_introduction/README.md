@@ -164,3 +164,57 @@ you can tell it to by giving the command:
 get time 22:21:14
 ```
 
+Your display should look like the NSPD image above. You can see 25 panels
+in a 5x5 grid, with each panel showing the correlated amplitude for a different
+baseline. Let's run through what we're seeing. In the top-left panel, we can
+see that the title is "AMPL.: FQ:1 BSL11". This indicates that we are seeing
+the amplitude from the first IF for the baseline formed by antenna 1 with antenna
+1; this indicates that it's an autocorrelation (sort of). The X-axis goes from
+around 4500 to 6500; this is frequency in MHz. The Y-axis is amplitude, which
+in this case has units of what we call Pseudo-Jy; we'll explain this in a later tutorial.
+
+In this panel we can see four lines of different colour, and the colour key is
+at the bottom right of the panel, under the X-axis. These lines are labelled:
+Label    | Meaning
+-----    | -------
+AA       | the auto-correlation of the X-pol while the noise diode is off
+aa       | the auto-correlation of the X-pol while the noise diode is on
+BB       | the auto-correlation of the Y-pol while the noise diode is off
+bb       | the auto-correlation of the Y-pol while the noise diode is on
+
+Because the noise-diode is on for aa, you will see that its line looks almost
+exactly the same as for AA, but at slightly higher amplitude (the same for bb and BB).
+We'll discuss the operation of the noise diode later.
+
+The panels progress from left to right and then downwards. There are six panels
+containing the autocorrelations from the six individual ATCA antennas. The
+seventh panel has the title "AMPL.: FQ:1 BSL12", and only has two lines. The X-axis
+and Y-axis are exactly the same as for the autocorrelations, although the Y-axis range
+is significantly different (and lower). This panel is a cross-correlation between
+antenna 1 and antenna 2. The lines are labelled:
+Label    | Meaning
+-----    | -------
+AA       | the correlation of X-pol on the first antenna with X-pol on the second antenna
+BB       | the correlation of Y-pol on the first antenna with Y-pol on the second antenna
+
+There are fifteen cross-correlation panels, all of which look similar but none
+of them identical to any other. Throughout these tutorials, we will go through
+why these panels look the way they do, learning about the how the correlator works
+and how to judge the health of the data along the way. Here's a few questions to
+keep in mind as you go along; if you already know all the answers to these, you
+probably don't need to keep doing these tutorials! (Actually, I hope these tutorials
+will teach everybody something, but maybe not the early ones...)
+
+* What's with the slope of the lines?
+* Why do the lines drop off at the edges?
+* Why are the Y-axis scales not identical?
+* Why does the amplitude not match the flux density of 1934-638?
+
+After the six autocorrelation panels, and the fifteen cross-correlation panels from
+IF1, we get another four autocorrelation panels, this time from IF2; the X-axis
+for IF2 has a different frequency range.
+
+You can play around with how many panels are shown on a single plot with the
+`nxy` command in NSPD. This works similarly to the way it works in SPD, although SPD
+has a usable limit of 4x4, whereas NSPD's limit is 7x7. For example, you can show all
+twenty-one of the products from IF1 only with something like nxy 3 7.
