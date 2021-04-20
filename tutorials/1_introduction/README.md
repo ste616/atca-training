@@ -217,4 +217,6 @@ for IF2 has a different frequency range.
 You can play around with how many panels are shown on a single plot with the
 `nxy` command in NSPD. This works similarly to the way it works in SPD, although SPD
 has a usable limit of 4x4, whereas NSPD's limit is 7x7. For example, you can show all
-twenty-one of the products from IF1 only with something like nxy 3 7.
+twenty-one of the products from IF1 only with something like nxy 3 7; that will look
+like the image below.
+
