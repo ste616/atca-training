@@ -220,3 +220,4 @@ has a usable limit of 4x4, whereas NSPD's limit is 7x7. For example, you can sho
 twenty-one of the products from IF1 only with something like nxy 3 7; that will look
 like the image below.
 
+![NSPD display with `nxy 3 7`](nspd_t1_nxy37.png)
