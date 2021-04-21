@@ -275,3 +275,40 @@ of the noise diode, with `sel aa bb ab`. The plot you see in NSPD now should loo
 image below.
 
 ![NSPD displaying a rapidly wrapping phase](nspd_t1_phasewrapping.png)
+
+In this mode, the Y-axis is phase in degrees, which can go between -180 degrees to 
++180 degrees. In each panel we can see varying rates of phase wrapping. For example,
+the white AA line in the panel for baseline 1-4 is wrapping quite slowly, and the
+phase does not fully wrap within the tvchannel range. The AA line for baseline 3-4
+is wrapping slightly more quickly, and in the opposite direction to that seen in
+baseline 1-4. And on baseline 1-6, it appears that the phase is wrapping so quickly
+that it's difficult to discern any pattern.
+
+We can also see that in NVIS while displaying the AA products, the line labelled
+as "14AA" has the highest amplitude, followed by the line labelled by "34AA". This is
+what we would expect for vector averaging; if the vectors (on the real-imaginary plane)
+do not point in completely opposite directions, then there will be some bias towards
+some direction, resulting in non-zero magnitude.
+
+So is this the way it should look? Good question!
+
+## Online calibration
+
+To determine whether the data we're looking at is good, we have to first work out
+what we expect it to look like. For this particular observation, the telescope is
+looking at the source 1934-638, which is (for ATCA resolutions anyway) a point source
+with a well defined flux density behaviour with respect to frequency, and a 
+well-determined position.
+
+Thinking about phase first, because it's a point source, we expect a plane wave to
+hit all the antennas, with a delay between the wave hitting one antenna and another
+determined entirely by the geometry of the array. Second, because we know its position,
+we can direct our interferometer fringe patterns directly at the source, so that the
+phase of the signal should be independent of baseline length, and thus independent of
+frequency also. Thirdly, because it is a continuum source, it is generating waves at
+all frequencies at the same time.
+
+A simpler way of saying this is that we expect a continuum point source at the phase centre
+to produce a frequency-independent signal with a single phase. This is definitely not
+what we're seeing in NSPD at 22:21:14. Why not?
+
