@@ -221,3 +221,57 @@ twenty-one of the products from IF1 only with something like nxy 3 7; that will 
 like the image below.
 
 ![NSPD display with `nxy 3 7`](nspd_t1_nxy37.png)
+
+But first let's compare what we see on NSPD with what NVIS shows. To highlight the
+time that NSPD is displaying on NVIS, give NVIS the command `data 22:21:14`. You
+should see a vertical blue dashed line appear on the left side of the plot, with
+some purple cross-hatching to the left of it. Don't worry about the cross-hatching
+for now, as we'll discuss that later.
+
+At the time of the blue dashed line, all the amplitudes on NVIS are very small
+(< 0.5 PS-Jy). But on NSPD all the amplitudes are much larger than this. This is
+the case for all the "products" that NVIS displays, which you can run through
+with the commands:
+Command    | Products Displayed
+-------    | ------------------
+`sel aa`   | the cross-correlation of X-pol on the first antenna with the X-pol on the second antenna, in the first IF
+`sel bb`   | the cross-correlation of Y-pol on the first antenna with the Y-pol on the second antenna, in the first IF
+`sel cc`   | the cross-correlation of X-pol on the first antenna with the X-pol on the second antenna, in the second IF
+`sel dd`   | the cross-correlation of Y-pol on the first antenna with the Y-pol on the second antenna, in the second IF
+`sel ab`   | the cross-correlation of X-pol with the Y-pol of the same antenna, in the first IF
+`sel cd`   | the cross-correlation of X-pol with the Y-pol of the same antenna, in the second IF
+
+For each selection, the key between colour and product is shown at the bottom of the plot,
+where each product is labelled something like `12AA`, where the first antenna is the first
+digit, the second antenna is the second digit, and the polarisation letters should match
+the table above (although capitalised). NVIS currently only shows two IFs at a time (like VIS),
+and the currently selected IFs are shown at the top right of the plot, along with their
+associated polarisation codes and central frequencies in MHz. These can be changed, and we'll
+discuss that in another tutorial.
+
+To make NSPD display the products called "AB" and "CD" in NVIS, you can include `ab` in
+the NSPD select command: `sel aa bb ab`. For each of the autocorrelation panels, you will
+see a blue line at the bottom. This is the correlated amplitude of the noise-diode signal.
+Because the noise diode is designed to be roughly 5% of the system temperature of the
+receiver, it can be difficult to gauge the amplitude on the same scale as the actual
+autocorrelated signal. To examine the amplitude of the noise diode more closely, you
+can either change the amplitude scaling (for all the panels) with `a 0 50`, or you can
+select only the AB polarisation with `sel ab`. To reset the amplitude scaling, simply type
+`a`, and to reset the selection, just give another `sel` command like `sel aa bb ab`.
+
+Anyway, as you ran through the products in NVIS, you will have noticed that at 22:21:14, 
+all the amplitudes are very small, and much less than are displayed on NSPD. So why is this?
+You may notice that there are two vertical yellow dashed lines on every NSPD panel; these
+lines show the range "tvchannels", with all the channels between the two lines being
+included. The amplitude parameter shown in NVIS is a vector average of all the complex
+data in the tvchannels. That is, the NVIS amplitude depends not only on the amplitude
+of the raw data, but also its phase. Note also that I didn't say that the amplitude parameter
+was the mean of all the data, but the average; we'll discuss this in more detail in another
+tutorial.
+
+Let's look at the phase in NSPD then, to see why it is causing the NVIS amplitudes to be
+so low. To do this, give NSPD the command `p`. Let's also ensure you're looking at the phase
+of the noise diode, with `sel aa bb ab`. The plot you see in NSPD now should look like the
+image below.
+
+![NSPD displaying a rapidly wrapping phase](nspd_t1_phasewrapping.png)
