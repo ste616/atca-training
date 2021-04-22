@@ -312,3 +312,35 @@ A simpler way of saying this is that we expect a continuum point source at the p
 to produce a frequency-independent signal with a single phase. This is definitely not
 what we're seeing in NSPD at 22:21:14. Why not?
 
+Looking closely at the behaviour of the phase, you can see that the phase appears
+to vary linearly with frequency, and the slope of that line is degrees per MHz, or
+seconds. This slope represents the combined delay error for each antenna and polarisation,
+causing the wavefronts to be slightly misaligned at the correlator. These delay errors
+are not due significantly to any geometry uncertainties, but rather to differences
+in cable length, and timing differences between all the digitisers.
+
+Back to NVIS now, we have panels for phase and delay. Phase is computed in the same
+way as for amplitude, displaying the average value of the phase in the tvchannels
+range. The delay (which as we've just discussed would be better labelled as
+"delay error") is computed as the average value of the delay errors inferred by
+looking at the phase changes between each pair of adjacent channels within the
+tvchannels range. At 22:21:14, we
+can again see the correspondence between what we see in NVIS and NSPD. For example,
+the four baselines with the largest positive delay errors are 3-6, 4-6, 1-6 and
+2-6, and they do appear to be wrapping far more often on NSPD than the other baselines.
+Then we can see that the baseline 1-2 has only a small positive delay error, while the
+baseline 1-3 has a similarly small negative delay error, and this is reflected in NSPD
+where the phase is increasing with increasing frequency for baseline 1-2, and 
+decreasing for baseline 1-3. You should run through all the IF 1 products available
+in NVIS ("aa", "bb" and "ab") and check that you understand the correspondence between
+NVIS and NSPD.
+
+Looking at NVIS, we can see that something happens at 22:22:45, where the delay
+errors go to 0, the amplitudes all increase and the phase changes. Let's look at
+what the data looks like shortly after that time in NSPD, by giving it the command
+`get time 22:23`. You might see something like the picture below (if you've
+set NSPD up with the commands `sel aa bb ab`, `sel f1` and `p`).
+
+![NSPD display after the first dcal](nspd_t1_phaseafterdcal.png)
+
+
