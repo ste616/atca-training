@@ -135,7 +135,7 @@ times that each correlator calibration command was given; these times and
 commands are:
 Time       | Command
 ----       | -------
-22:22:26   | dcal
+22:22:25   | dcal
 22:24:03   | dcal
 22:25:43   | pcal
 22:27:23   | acal
@@ -343,4 +343,59 @@ set NSPD up with the commands `sel aa bb ab`, `sel f1` and `p`).
 
 ![NSPD display after the first dcal](nspd_t1_phaseafterdcal.png)
 
+Now the phase is not wrapping on any of the baselines, but it still has a slope
+on some, while it's "flat" on most of them. Let's discuss what has happened here,
+since it will give us a lot of insight as to how CABB works.
+As stated in the table shown earlier in this tutorial, a "dcal" command was given at
+22:22:25. At that time, CABB was accumulating data for the cycle between
+22:22:20 and 22:22:30, and processing the data between 22:22:10 and 22:22:20.
+However, CABB has already prepared the fringe rotation model for the next cycle
+which will run between 22:22:30 and 22:22:40. Thus the first cycle that can
+incorporate the new delay figures will run between 22:22:40 and 22:22:50, and
+that's what we see in NVIS. You should remember this: if you give CABB a "dcal"
+or a "pcal" command, the effect will not be seen in the next cycle, but only in
+the cycle after that.
+
+The top two rows of panels show a light blue phase line, and it looks very bumpy on
+a couple of the antennas. This is the correlated phase of the noise diode between
+the two receptors on each antenna. The noise diode is injected in between the
+two receptors, but each receptor will respond to the signal slightly differently, and
+thus the correlated amplitude and phase is not single-valued over the whole frequency
+range. The same is true for the correlations between antennas. But the primary reason why
+some antennas look bumpier than others in the NSPD plot is because of the narrower
+Y-axis range on some panels. It is therefore sometimes more useful to plot only the
+normal phase range so comparison between panels is easier, with `p -180 180`.
+
+We can see then that the phase slope on the products involving antenna 3, and that
+for the cross-correlations the slope is on the Y-pol but not the X-pol. Again,
+this gives some insight to how CABB works. When the dcal command was given at
+22:22:25, CABB calculated the delay corrections to be:
+```
+01-16 22:22:25:: CCOMMAND: 'dcal'
+01-16 22:22:25:: DCAL 1A: Corrections: CA01=-2.02 CA02=-4.64 CA03=0.00 CA04=-1.32 CA05=-31.80 CA06=-54.22 nS
+01-16 22:22:25:: DCAL 1B: Corrections: CA01=-15.91 CA02=-7.55 CA03=0.00 CA04=-4.37 CA05=-42.71 CA06=-111.05 nS
+01-16 22:22:25:: DCAL 1AB:Corrections: CA01=7.08 CA02=-3.90 CA03(Ref)=-6.82 CA04=-3.76 CA05=4.10 CA06=50.02 nS
+01-16 22:22:25:: DCAL 2A: Corrections: CA01=-13.26 CA02=30.98 CA03=0.00 CA04=-66.97 CA05=-31.37 CA06=-73.56 nS
+01-16 22:22:25:: DCAL 2B: Corrections: CA01=-35.57 CA02=51.68 CA03=0.00 CA04=2.45 CA05=-77.86 CA06=-40.91 nS
+01-16 22:22:25:: DCAL 2AB:Corrections: CA01=37.71 CA02=-5.31 CA03(Ref)=15.40 CA04=-54.52 CA05=61.87 CA06=-17.25 nS
+```
+
+As you can see, no corrections were made to CA03 for 1A, 1B, 2A or 2B. This is because
+it was the "reference" antenna, and all delays are with respect to this reference. However,
+there is also a delay between the two receptors on each antenna, which is measured by
+examining the noise diode delay, and assuming that the noise diode signal should hit
+the two receptors simultaneously. But again, we need a reference, and this time we
+have a reference receptor, that being the X-pol receptor, and so we add delay to the
+Y-pol receptor's signal. So the correlator is over-correcting the Y-pol of the reference
+antenna. Why? It is a known bug, which only seems to occur in the first dcal after the delays 
+have been reset to their defaults (with the "reset delays" correlator command).
+
+Another thing you might notice on this display is the odd look of the 2-6 and 5-6 baseline
+panels, where there are many vertical white strips of colour. This occurs because of a
+different type of phase wrapping. In this case, the phase of the X-pol signals on these
+baselines sits very close to -180 degrees. The natural bumpiness of this phase signal
+over the frequency range sometimes makes the phase go to less than -180 degrees, which
+is equivalent to the same phase + 360. Because we calculate the phase between -180 and 180
+degrees, the phase appears to jump between the two extremes, causing the NSPD appearance,
+even though the phase signal is no different to any of the other baselines.
 
