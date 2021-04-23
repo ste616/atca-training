@@ -136,7 +136,7 @@ commands are:
 Time       | Command
 ----       | -------
 22:22:25   | dcal
-22:24:03   | dcal
+22:24:02   | dcal
 22:25:43   | pcal
 22:27:23   | acal
 
@@ -390,7 +390,13 @@ Y-pol receptor's signal. So the correlator is over-correcting the Y-pol of the r
 antenna. Why? It is a known bug, which only seems to occur in the first dcal after the delays 
 have been reset to their defaults (with the "reset delays" correlator command).
 
-Another thing you might notice on this display is the odd look of the 2-6 and 5-6 baseline
+You can see this correspondence between the Y-pol over-correction and the cross-correlation
+delays in NVIS. Give it the commands: `hist 6m10s` and `sca d -0.3 0.3`. Then
+swap between `sel bb` and `sel ab` to see how closely the delay in 33AB matches that for
+13BB and 23BB. The delays for 34BB, 35BB and 36BB have the same magnitude but opposite
+sign; why do you think that is?
+
+Another thing you might notice on the NSPD display is the odd look of the 2-6 and 5-6 baseline
 panels, where there are many vertical white strips of colour. This occurs because of a
 different type of phase wrapping. In this case, the phase of the X-pol signals on these
 baselines sits very close to -180 degrees. The natural bumpiness of this phase signal
@@ -399,3 +405,45 @@ is equivalent to the same phase + 360. Because we calculate the phase between -1
 degrees, the phase appears to jump between the two extremes, causing the NSPD appearance,
 even though the phase signal is no different to any of the other baselines.
 
+Once again, you should be able to see the correspondence between the average phase
+in the tvchannel range as displayed on NVIS with the data displayed in NSPD.
+
+This remaining slope in phase can be corrected with another dcal, which is what
+happened at 22:24:02, with the corrections:
+```
+01-16 22:24:02:: CCOMMAND: 'dcal'
+01-16 22:24:02:: DCAL 1A: Corrections: CA01=-0.00 CA02=0.00 CA03=0.00 CA04=-0.00 CA05=-0.00 CA06=-0.00 nS
+01-16 22:24:02:: DCAL 1B: Corrections: CA01=-0.24 CA02=-0.24 CA03=0.00 CA04=-0.24 CA05=-0.25 CA06=-0.25 nS
+01-16 22:24:02:: DCAL 1AB:Corrections: CA01=0.01 CA02=0.01 CA03(Ref)=-0.24 CA04=0.00 CA05=0.01 CA06=0.00 nS
+01-16 22:24:02:: DCAL 2A: Corrections: CA01=0.00 CA02=0.00 CA03=0.00 CA04=-0.51 CA05=-0.00 CA06=-0.00 nS
+01-16 22:24:02:: DCAL 2B: Corrections: CA01=-0.24 CA02=-0.24 CA03=0.00 CA04=-0.24 CA05=-0.25 CA06=-0.25 nS
+01-16 22:24:02:: DCAL 2AB:Corrections: CA01=-0.00 CA02=-0.01 CA03(Ref)=-0.24 CA04=-0.50 CA05=-0.01 CA06=-0.00 nS
+```
+The corrections were thus incorporated into the cycle that started at 22:24:20, which
+you should now view in NSPD to confirm that the slope has gone away.
+
+Once the phase is "flat" across the band, the next step is often to correct any
+phase offsets. As you can see in NSPD, there are some baselines where the phases
+of the "AA" and "BB" correlations lie close to each other, and other baselines where
+they are separated. And the average phase of each line (as you can see from NVIS)
+is not always very close to 0. Recall that we are observing a point source at the
+phase centre, so the observed phase *should* be 0. But phase is a relative term, as it
+certainly doesn't relate to a zero-crossing of the sine wave that is the voltage
+at some frequency induced by the incoming radiation. So we're perfectly entitled to
+introduce phase offsets into our signal to assign the phase we're seeing the label
+"0". That's what the pcal command does, and at 22:25:43, that command was given.
+The correlator output the following at that time:
+```
+01-16 22:25:43:: CCOMMAND: 'pcal'
+01-16 22:25:43:: PCAL 1A: Corrections: CA01=83.97 CA02=76.85 CA03=0.00 CA04=80.99 CA05=69.43 CA06=-112.84 degs
+01-16 22:25:43:: PCAL 1B: Corrections: CA01=-3.96 CA02=-13.29 CA03=0.00 CA04=-7.80 CA05=-20.49 CA06=67.52 degs
+01-16 22:25:43:: PCAL 1AB:Corrections: CA01=-1.29 CA02=2.59 CA03(Ref)=-89.60 CA04=0.26 CA05=2.26 CA06=89.31 degs
+01-16 22:25:43:: PCAL 2A: Corrections: CA01=80.86 CA02=67.18 CA03=0.00 CA04=74.89 CA05=54.10 CA06=-63.06 degs
+01-16 22:25:43:: PCAL 2B: Corrections: CA01=-6.31 CA02=0.64 CA03=0.00 CA04=-12.42 CA05=-32.79 CA06=116.66 degs
+01-16 22:25:43:: PCAL 2AB:Corrections: CA01=-4.04 CA02=-24.30 CA03(Ref)=-90.72 CA04=-0.66 CA05=-2.15 CA06=91.43 degs
+```
+
+This phase offset is incorporated into the fringe rotation just like the delay
+model is, so again, the data only reflects the offset two cycles later, at
+22:26:00. If you view this time in NSPD, you will see something like the picture
+below.
