@@ -443,7 +443,76 @@ The correlator output the following at that time:
 01-16 22:25:43:: PCAL 2AB:Corrections: CA01=-4.04 CA02=-24.30 CA03(Ref)=-90.72 CA04=-0.66 CA05=-2.15 CA06=91.43 degs
 ```
 
+Again, CA03 is the reference, and the offsets for each antenna are equivalent
+to the phase observed on the baselines between that antenna and CA03 (and you can
+confirm this on NVIS, and you will again see that the phase corrections to CA04,
+CA05 and CA06 are opposite in sign to the phase observed on those baselines).
+
 This phase offset is incorporated into the fringe rotation just like the delay
 model is, so again, the data only reflects the offset two cycles later, at
 22:26:00. If you view this time in NSPD, you will see something like the picture
 below.
+
+![NSPD display after the pcal](nspd_t1_phaseafterpcal.png)
+
+At this point the telescope's phase is completely calibrated. We'll discuss this
+more later, but it is important that you check all the products that NSPD displays
+during a normal observation, including not only the cross-correlations, but the
+autocorrelations as well.
+
+The final step in a normal online calibration is to set the flux density scale.
+The flux density of 1934-638 is 4.965 Jy at 5500 MHz, which is clearly not
+what NVIS is showing (about 2.5 Jy). To set the proper flux density scale,
+give the acal command. **Note:** acal can take some optional arguments, and
+we'll discuss them later. For now, because 1934-638's flux density doesn't change
+over time, its model is built into caobs, and caobs will handle telling the
+correlator the correct flux density when you give the acal command. In this
+observation, the acal was given at 22:27:23. The correlator output from that time was:
+```
+01-16 22:27:23:: CCOMMAND: 'acal  4.965  2.701'
+01-16 22:27:23:: ACAL 1A: NCal (Jy): CA01=23.83 CA02=19.22 CA03=20.82 CA04=20.25 CA05=17.84 CA06=23.03
+01-16 22:27:23:: ACAL 1B: NCal (Jy): CA01=25.20 CA02=21.40 CA03=19.37 CA04=19.80 CA05=16.74 CA06=22.84
+01-16 22:27:23:: ACAL 2A: NCal (Jy): CA01=38.45 CA02=35.21 CA03=33.02 CA04=33.88 CA05=28.29 CA06=33.35
+01-16 22:27:23:: ACAL 2B: NCal (Jy): CA01=41.74 CA02=32.90 CA03=30.52 CA04=37.63 CA05=25.43 CA06=34.77
+```
+
+The correlator measures the effect of the noise diode every cycle, and the acal
+command allows the correlator to associate this effect with a known flux
+density. We'll go into how it does this in another tutorial. For now though,
+we can see that for each antenna, the flux density of the noise diode is similar,
+although not exactly the same for each of the two polarisations at each frequency,
+but it differs significantly for the two IFs.
+
+You will also notice that the amplitude in NVIS changes in the cycle that
+goes from 22:27:20 to 22:27:30, i.e. the cycle during which the acal command
+was given. This is very different to the dcal and pcal commands which only
+show their effect two cycles after they were given. Why is this? The amplitude
+is simply the magnitude of the complex correlation coefficient, which can be
+scaled without issue while preserving the phase information. So the multiplication
+scaling factor can be applied at the end of the correlation and integration process,
+whereas the delay and phase corrections are more naturally performed during the
+fringe rotation stage during the integration. We will get into much more depth
+about how this works in a future tutorial, because it is important to understand
+what effects this process has on your data.
+
+The last thing to notice now is what happens to the system temperatures when
+the acal command is given. At 22:27:14, the system temperatures (as shown at the
+top of NSPD) are (in Kelvin):
+```
+TSYS      CA01          CA02          CA03          CA04          CA05          CA06
+IF1    13.4 / 12.7   14.0 / 13.2   14.0 / 14.3   14.2 / 14.3   14.8 / 15.2   13.3 / 13.0
+IF2     9.2 /  8.8    9.4 /  9.5    9.4 / 10.2    9.7 /  9.4   10.7 / 11.2   10.0 /  9.7
+```
+
+At 22:27:24, after the acal, they are much more realistic:
+```
+TSYS      CA01          CA02          CA03          CA04          CA05          CA06
+IF1    20.8 / 20.3   19.4 / 19.4   20.3 / 19.8   20.1 / 20.2   20.2 / 19.8   20.2 / 19.6
+IF2    18.1 / 18.0   17.5 / 17.3   17.8 / 17.7   17.9 / 18.2   17.7 / 17.9   18.2 / 18.1
+```
+
+You can also see this in NVIS, which can show you both the system temperature and the
+assumed flux density of the noise diode, by showing the `n` (noise diode flux density)
+and `S` (system temperature) panels; try giving the NVIS command `apdnS-t` to see for
+yourself (or look at the image below). This is a feature that is not available in VIS.
+
