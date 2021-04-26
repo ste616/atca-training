@@ -516,4 +516,4 @@ assumed flux density of the noise diode, by showing the `n` (noise diode flux de
 and `S` (system temperature) panels; try giving the NVIS command `apdnS-t` to see for
 yourself (or look at the image below). This is a feature that is not available in VIS.
 
-![NVIS display with apdnS-t](nspd_t1_apdnSt.png)
+![NVIS display with apdnS-t](nvis_t1_apdnSt.png)

@@ -1102,7 +1102,7 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
   float ****plot_lines = NULL, min_x, max_x, min_y, max_y;
   float cxpos, dxpos, labtotalwidth, labspacing, dy, maxwidth, twidth;
   float padlabel = 0.01, cch, timeline_x[2], timeline_y[2];
-  float ***antlines = NULL, maxch = 1.1;
+  float ***antlines = NULL, maxch = 1.1, num_panels;
   double basemjd, chktime, min_time, max_time;
   char xopts[BUFSIZE], yopts[BUFSIZE], panellabel[BUFSIZE], panelunits[BUFSIZE];
   char antstring[BUFSIZE], bandstring[BUFSIZE], panelerror[BUFSIZE];
@@ -1768,7 +1768,8 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
     
     cpgswin(min_x, max_x, min_y, max_y);
     cpgsci(3);
-    cpgsch(maxch * (3.0 / (float)plot_controls->num_panels));
+    num_panels = (plot_controls->num_panels > 3) ? (float)plot_controls->num_panels : 3.0;
+    cpgsch(maxch * (3.0 / num_panels));
     if (i % 2 == 0) {
       (void)strcpy(yopts, "BCNTS");
     } else {
