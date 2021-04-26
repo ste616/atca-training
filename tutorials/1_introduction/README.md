@@ -517,3 +517,79 @@ and `S` (system temperature) panels; try giving the NVIS command `apdnS-t` to se
 yourself (or look at the image below). This is a feature that is not available in VIS.
 
 ![NVIS display with apdnS-t](nvis_t1_apdnSt.png)
+
+## What we've covered so far
+
+Before we go on, let's take a look at what we've covered so far.
+
+* You should now be able to start the rpfitsfile_server, and connect to it with
+  NSPD and NVIS.
+* You know a few commands in both 
+  [NSPD](../../src/apps/nspd/) and [NVIS](../../src/apps/nvis/); remember that 
+  the documentation pages for these tools have the complete list.
+* You've seen what the data looks like before the online calibration process
+  starts, after dcal, after pcal and after acal.
+* You know how CABB takes the data that appears in NSPD and computes the
+  amplitude, phase and delay values that appear in NVIS. You can also identify
+  correspondences between the two displays.
+* You know how CABB incorporates the correction factors for delay, phase and
+  amplitude.
+
+But we've so far focussed on IF 1, with a central frequency of 5500 MHz, and
+pretty much completely ignored IF 2, at 9000 MHz. Let's remind ourselves that these
+data represent a successful online calibration process for both IFs, and take a look
+at IF 2 to learn a few more interesting things.
+
+## The second frequency
+
+Lets go back to the time after the first dcal in NSPD, and then select IF 2, with
+the commands `get time 22:22:45`, `sel f2`, `p -180 180`. It should look like the
+image below.
+
+![NSPD IF2 after the first dcal](nspd_t1_f2_afterdcal.png)
+
+As you can see, like in IF 1, there is a residual slope in phase, although now
+it's on both CA03 and CA04, and in the X-pol as well as the Y-pol. Let's see
+what NVIS looks like, with the commands `hist 6m10s`, `sel cc`; it should look
+like the image below.
+
+![NVIS showing IF 2 X-pol after the first dcal](nvis_t1_cc.png)
+
+It looks quite different to `sel bb` does, especially for the delay panel. For
+IF 1, the delays do look noisy, but they're not jumping around every cycle
+like they seem to be doing for IF 2.
+
+Before we go any further, let's revisit how the correlator performs a dcal. When
+the dcal command is given, the correlator calculates the appropriate delay
+corrections to make and outputs the corrections for the user to see; there are
+some examples of this output in the previous section. But how does it calculate
+these delay corrections? It uses the same data that it sends to VIS, that being
+the averaged data in the tvchannel ranges. But it doesn't just rely on the most
+recent cycle to calculate these corrections, it takes the average value from the
+most recent `nncal` cycles, so as to minimise noise. For 99% of ATCA observations
+`nncal` is set to 3.
+
+Since the dcal command is given at 22:24:02, the most recent cycle that the
+correlator has finished has data from between 22:23:40 and 22:23:50, since
+the cycle that finished at 22:24:00 is still being processed. The three
+cycles used to compute the delay corrections would thus have midpoints of
+22:23:25, 22:23:35 and 22:23:45. From NVIS we can see that some of the baselines
+had +/- 1 ns jumps in their delay error values in those cycles. And yet, we know
+that the dcal was successful, so the correlator knew the right corrections to
+make. 
+
+This brings us back to something you should not forget: what is displayed
+in VIS or NVIS **is not the data**. The data (as seen in SPD or NSPD) can be
+perfectly good, or very bad, and it is possible in either case to make the
+VIS display look perfectly reasonable or horrible just by changing some
+correlator parameters.
+
+In this particular case, the correlator parameter we need to change is the
+tvchannels. It is probably fairly obvious that at frequencies between 9300 and
+9400 MHz, the phase looks fairly messy on NSPD. If you switch to looking at
+amplitude, you will see some pretty strong RFI, in this case caused by transmission
+from satellites. We can tell that these satellites are fairly close by because
+the signal is stronger on shorter baselines (or weaker on baselines to CA06). That
+is, antenna 6 is not looking directly at the same satellite even though it's pointing at
+the same azimuth and elevation as the rest of the antennas a few km away.
+
