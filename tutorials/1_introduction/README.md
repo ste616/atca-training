@@ -593,3 +593,73 @@ the signal is stronger on shorter baselines (or weaker on baselines to CA06). Th
 is, antenna 6 is not looking directly at the same satellite even though it's pointing at
 the same azimuth and elevation as the rest of the antennas a few km away.
 
+This RFI is within the tvchannels range (as illustrated in NSPD by being between
+the two yellow dashed lines). You can also find out the tvchannels range by
+giving the command `print comp` in NVIS, which will output something like:
+```
+NVIS> print comp
+VIS DATA COMPUTED WITH OPTIONS:
+Options set has 1 elements:
+  SET 0:
+     PHASE IN DEGREES: YES
+     INCLUDE FLAGGED: NO
+     TSYS CORRECTION: CORRELATOR
+     # WINDOWS: 2
+     --WINDOW 1:
+        CENTRE FREQ: 5500.0 MHz
+        BANDWIDTH: 2048.0 MHz
+        # CHANNELS: 2049
+        TVCHAN RANGE: 513 - 1537
+        DELAY AVERAGING: 1
+        AVERAGING METHOD: VECTOR MEAN
+     --WINDOW 2:
+        CENTRE FREQ: 9000.0 MHz
+        BANDWIDTH: 2048.0 MHz
+        # CHANNELS: 2049
+        TVCHAN RANGE: 513 - 1537
+        DELAY AVERAGING: 1
+        AVERAGING METHOD: VECTOR MEAN
+```
+
+Here you can see that for both of the IFs (called WINDOWS in the output),
+the tvchannel range is set to cover the channels between 513 and 1537.
+While observing for real, the current tvchannel range settings are displayed 
+near the top of the CACOR window.
+
+To switch NSPD over to display channels instead of frequency, give it the
+command `x`. The X-axis should change to display 0 on the left and about 2000
+on the right (the same command again toggles the X-axis back to frequency).
+
+Determine a channel range that excludes the RFI. You can zoom in to a narrower
+range of channels in NSPD using the `chan` command. For example, `chan f2 1000 1500`
+will display only the channels between 1000 and 1500 for IF 2 (`chan` by itself
+will reset NSPD to display all the channels again). When you've found a channel
+range that is free of RFI, change the tvchannel range in NVIS by giving the
+command `tvchan f2 low high`, where `low` and `high` should be replaced by the
+channel numbers of the lowest channel to include and the highest respectively.
+For example, you might choose the range `tvchan f2 513 1300`. After the
+server recomputes the data, you will see the yellow dashed lines move to reflect
+the change in NSPD, and you might see something like the following image in
+NVIS.
+
+![NVIS display with `tvchan f2 513 1300`](nvis_t1_f2_513_1300.png)
+
+It is important to note at this point that the way this software operates is
+very different to the way real observations work. When you change the tvchannels
+while doing real observing, only data in the future is affected; all previous
+data displayed in VIS reflects what the tvchannels were when that data was
+obtained. In this software, all NVIS data is recomputed to show the effect
+that changing the tvchannels has. This allows you to see quite clearly the
+effect of doing something, so that you can understand what is happening.
+
+It is also worth reminding you here again that when you changed the tvchannel
+range, you did not affect the actual data; only the summary data displayed
+in NVIS changed. (OK, this is not entirely true, but we'll get to that in
+another tutorial. For now, it's a harmless enough untruth.)
+
+Looking at NVIS now, we can see that the data displayed in the delay panel
+looks much more ordered, very similar to what we saw for IF 1. For reference,
+the tvchannels in IF 2 were set to be 200 - 1149. Does NVIS look any different
+when set to this range instead of what you chose? The delays and phases probably don't,
+but the amplitude might.
+
