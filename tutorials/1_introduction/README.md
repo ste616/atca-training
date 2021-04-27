@@ -719,7 +719,7 @@ Here's a few questions and challenges to see how well you understand the system.
 * Why do we need a reference antenna? (EASY)
 * Read the documentation of [NVIS](../../src/apps/nvis/) and play around with
   all the available panels. (EASY)
-* Using ONLY the information in this tutorial, make NVIS look like the following
+* Using ONLY things covered in this tutorial, make NVIS look like the following
   image, where the amplitude doesn't change before and after the two dcals. 
   (DA-LEVEL CHALLENGING)
 
