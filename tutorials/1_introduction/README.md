@@ -8,10 +8,24 @@ In this tutorial, you will learn:
 * how to use [`rpfitsfile_server`](../../src/apps/rpfitsfile_server/),
   [`nvis`](../../src/apps/nvis/) and [`nspd`](../../src/apps/nspd),
 * how the three applications interact with each other,
-* what a typical 4cm CABB online calibration looks like.
+* what a typical 4cm CABB online calibration looks like,
+* how CABB computes the data displayed in VIS and SPD,
+* how CABB incorporates corrections made online,
+* what some CABB settings do.
 
 After completing this tutorial, you will be able to use the tools to learn more
-in the other tutorials.
+in the other tutorials. You should also know what online calibration does, and
+how to do it at a basic level.
+
+Why do it this way? For several reasons:
+* You can take your time to understand this stuff without having to learn it while
+  you're trying to get high-quality science data.
+* You can get a good understanding of what's expected before you use the
+  telescope for the first time.
+* You can manipulate the data in ways not possible while operating the telescope,
+  but which will give you a better understanding of how the system works.
+
+Let's get into it.
 
 ## Getting the tools
 
