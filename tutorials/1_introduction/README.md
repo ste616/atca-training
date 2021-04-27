@@ -582,7 +582,14 @@ This brings us back to something you should not forget: what is displayed
 in VIS or NVIS **is not the data**. The data (as seen in SPD or NSPD) can be
 perfectly good, or very bad, and it is possible in either case to make the
 VIS display look perfectly reasonable or horrible just by changing some
-correlator parameters.
+correlator parameters. Before any correlator calibration command (dcal, pcal
+or acal), you need to ensure that VIS displays realistic and stable values
+for whichever thing you're calibrating (delay, phase or amplitude) for at least
+the most recent 3 cycles. Failure to do this will often result in the calibration
+command making the situation worse. This tutorial, and the next couple will
+go through all the ways that you can change correlator parameters to produce
+realistic and stable values (and ways in which changing correlator parameters
+can produce unrealistic values too, just so you can avoid doing that).
 
 In this particular case, the correlator parameter we need to change is the
 tvchannels. It is probably fairly obvious that at frequencies between 9300 and
@@ -659,7 +666,62 @@ another tutorial. For now, it's a harmless enough untruth.)
 
 Looking at NVIS now, we can see that the data displayed in the delay panel
 looks much more ordered, very similar to what we saw for IF 1. For reference,
-the tvchannels in IF 2 were set to be 200 - 1149. Does NVIS look any different
-when set to this range instead of what you chose? The delays and phases probably don't,
-but the amplitude might.
+during the observation the tvchannels in IF 2 were set to be 200 - 1149. 
+Does NVIS look any different when set to this range instead of what you chose? 
+The delays and phases probably don't, but the amplitude might.
+
+## Summary
+
+We've covered a lot of stuff in this tutorial. Let's quickly summarise what
+this tutorial should have taught you to do during the online calibration
+process.
+
+1. Look at SPD to assess the state of the amplitudes and phases in all your
+   frequency bands.
+2. Determine the appropriate range of channels to use as tvchannels to avoid
+   RFI.
+3. If there is a significant slope in phase across your bands, ensure that
+   VIS shows a delay error which is stable with time. Wait until the 3 most
+   recent cycles show effectively the same delay error (in all the products
+   that VIS displays), and then do a dcal.
+4. Repeat steps 2 & 3 if necessary until NSPD shows no significant phase slopes.
+5. Wait until at least 3 cycles after a dcal, and then do a pcal.
+6. Wait until at least 3 cycles after a dcal, and then do an acal (if you're
+   looking at 1934-638).
+7. Look at SPD to ensure the phases and amplitudes look the way you expect for
+   a properly calibrated array.
+
+You should also know:
+* How CABB takes the data that appears in NSPD and computes the
+  amplitude, phase and delay values that appear in NVIS. 
+* How to identify correspondences between NVIS and NSPD.
+* You know how CABB incorporates the correction factors for delay, phase and
+  amplitude, and how long it takes for data to be affected by changes to the
+  correction factors.
+* The relation between AA, BB, CC, DD, AB, CD products and the IFs and the actual
+  X- and Y-polarisations from the antennas.
+* That the antennas have noise diodes, and what effect they have on the
+  autocorrelations in SPD, and in the AB and CD products in VIS.
+* That the measured system temperatures rely on the noise diodes and the acal
+  command.
+* That SPD shows the only true representation of the data, and that VIS can
+  be manipulated to show an inaccurate overview.
+* Why we think that understanding how the correlator works is an important
+  part of using the telescope effectively.
+
+When you're comfortable with all the material in this tutorial (and this will
+definitely be the longest of the tutorials), progress to the
+next tutorial. We'll cover the dcal process in a bit more detail, and talk about
+the "delavg" correlator parameter.
+
+Here's a few questions and challenges to see how well you understand the system.
+
+* Why do we need a reference antenna? (EASY)
+* Read the documentation of [NVIS](../../src/apps/nvis/) and play around with
+  all the available panels. (EASY)
+* Using ONLY the information in this tutorial, make NVIS look like the following
+  image, where the amplitude doesn't change before and after the two dcals. 
+  (DA-LEVEL CHALLENGING)
+
+![NVIS challenge](nvis_t1_challenge.png)
 
