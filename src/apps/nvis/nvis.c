@@ -75,7 +75,7 @@ struct nvis_arguments {
 };
 
 // And some fun, totally necessary, global state variables.
-int action_required, server_type, n_ampphase_options;
+int action_required, action_modifier, server_type, n_ampphase_options;
 int data_selected_index, tsys_apply;
 int xaxis_type, *yaxis_type, nxpanels, nypanels, nvisbands;
 int *visband_idx, tvchan_change_min, tvchan_change_max;
@@ -198,6 +198,12 @@ static void sighandler(int sig) {
 #define ACTION_HARDCOPY_PLOT             1<<15
 #define ACTION_COMPUTE_DELAYS            1<<16
 #define ACTION_RESET_DELAYS              1<<17
+
+// The action modifier magic numbers.
+#define ACTIONMOD_NOMOD                  0
+#define ACTIONMOD_DELAYCORRECT_ALL       1
+#define ACTIONMOD_DELAYCORRECT_AFTER     2
+#define ACTIONMOD_DELAYCORRECT_BEFORE    3
 
 // Make a shortcut to stop action for those actions which can only be
 // done by a simulator.
@@ -347,7 +353,7 @@ int time_index() {
 			      vis_data.vis_quantities[nncal_indices[i - 1]][0][0]->ut_seconds) -
 	  date2mjd(vis_data.vis_quantities[closeidx - i][0][0]->obsdate,
 		   vis_data.vis_quantities[closeidx - i][0][0]->ut_seconds);
-	if (fabs(delta_time - cycletime) < 1e-9) {
+	if (fabs(delta_time - cycletime) < 1e-6) { // 1e-6 days is 0.09 sec
 	  // These are consecutive cycles.
 	  nncal_indices[i] = closeidx - i;
 	  nncal_seconds[i] = nncal_seconds[i - 1] - (float)nncal_cycletime;
@@ -382,6 +388,9 @@ static void interpret_command(char *line) {
   bool products_selected, data_time_parsed = false, product_usable, succ = false;
   bool product_backwards = false;
 
+  // Reset the modifiers.
+  action_modifier = ACTIONMOD_NOMOD;
+  
   if (line == NULL) {
     action_required = ACTION_QUIT;
     if (line == 0) {
@@ -835,6 +844,17 @@ static void interpret_command(char *line) {
 		 nncal);
 	} else {
 	  action_required = ACTION_COMPUTE_DELAYS;
+	  // Check if we have any modifiers.
+	  if (nels == 2) {
+	    if (minmatch("all", line_els[1], 3)) {
+	      // We make the correction for the entire dataset.
+	      action_modifier = ACTIONMOD_DELAYCORRECT_ALL;
+	    } else if (minmatch("after", line_els[1], 3)) {
+	      action_modifier = ACTIONMOD_DELAYCORRECT_AFTER;
+	    } else if (minmatch("before", line_els[1], 3)) {
+	      action_modifier = ACTIONMOD_DELAYCORRECT_BEFORE;
+	    }
+	  }
 	}
       }
     } else if (minmatch("reset", line_els[0], 3)) {
@@ -1038,6 +1058,7 @@ int main(int argc, char *argv[]) {
   vis_interpret_product("aa", &(vis_plotcontrols.vis_products[0]));
   vis_plotcontrols.cycletime = 10;
   action_required = 0;
+  action_modifier = ACTIONMOD_NOMOD;
   while(true) {
     reads = watchset;
     if (action_required & ACTION_NEW_DATA_RECEIVED) {
@@ -1117,13 +1138,22 @@ int main(int argc, char *argv[]) {
 	  for (i = 0; i < modptr->delay_num_antennas; i++) {
 	    CALLOC(modptr->delay[i], modptr->delay_num_pols);
 	  }
-	  
-	  modptr->delay_start_mjd =
-	    date2mjd(vis_data.vis_quantities[nncal_indices[0]][0][0]->obsdate,
-		     vis_data.vis_quantities[nncal_indices[0]][0][0]->ut_seconds);
-	  modptr->delay_end_mjd =
-	    date2mjd(vis_data.vis_quantities[nncal_indices[nncal - 1]][0][0]->obsdate,
-		     vis_data.vis_quantities[nncal_indices[nncal - 1]][0][0]->ut_seconds);
+	  if ((action_modifier == ACTIONMOD_DELAYCORRECT_ALL) ||
+	      (action_modifier == ACTIONMOD_DELAYCORRECT_BEFORE)) {
+	    modptr->delay_start_mjd = 0;
+	  } else {
+	    modptr->delay_start_mjd =
+	      date2mjd(vis_data.vis_quantities[nncal_indices[0]][0][0]->obsdate,
+		       vis_data.vis_quantities[nncal_indices[0]][0][0]->ut_seconds);
+	  }
+	  if ((action_modifier == ACTIONMOD_DELAYCORRECT_ALL) ||
+	      (action_modifier == ACTIONMOD_DELAYCORRECT_AFTER)) {
+	    modptr->delay_end_mjd = 100000; // This is 2132-SEP-01.
+	  } else {
+	    modptr->delay_end_mjd =
+	      date2mjd(vis_data.vis_quantities[nncal_indices[nncal - 1]][0][0]->obsdate,
+		       vis_data.vis_quantities[nncal_indices[nncal - 1]][0][0]->ut_seconds);
+	  }
 	  if (modptr->delay_end_mjd < modptr->delay_start_mjd) {
 	    tmjd = modptr->delay_start_mjd;
 	    modptr->delay_start_mjd = modptr->delay_end_mjd;

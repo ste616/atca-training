@@ -1266,7 +1266,7 @@ void print_options_set(int num_options, struct ampphase_options **options,
 void print_information_scan_header(struct scan_header_data *header_data,
 				   char *output, int output_length);
 void chanaverage_ampphase(struct ampphase *ampphase, struct ampphase *avg_ampphase,
-			  int averaging, int averaging_type);
+			  int averaging, int averaging_type, bool phase_in_degrees);
 float baseline_phase(struct vis_quantities *vis_quantities,
 		     int ant1, int ant2, int bin);
 void compute_closure_phase(struct scan_header_data *scan_header_data,

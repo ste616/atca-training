@@ -2735,9 +2735,10 @@ void print_information_scan_header(struct scan_header_data *header_data,
  *  \param averaging the number of channels to average together
  *  \param averaging_type bitwise-OR combination of AVERAGETYPE_* magic numbers
  *                        specifying how the average should be computed
+ *  \param phase_in_degrees whether to output phase in degrees (true) or not
  */
 void chanaverage_ampphase(struct ampphase *ampphase, struct ampphase *avg_ampphase,
-			  int averaging, int averaging_type) {
+			  int averaging, int averaging_type, bool phase_in_degrees) {
   int n_delavg_expected, i, j, k, l, n_points;
   int n_unflagged_points, chan_index, unflagged_index;
   float *median_array_amplitude = NULL, *median_array_phase = NULL;
@@ -2945,6 +2946,9 @@ void chanaverage_ampphase(struct ampphase *ampphase, struct ampphase *avg_amppha
 		  cabsf(avg_ampphase->raw[i][j][chan_index]);
 		avg_ampphase->phase[i][j][chan_index] =
 		  cargf(avg_ampphase->raw[i][j][chan_index]);
+		if (phase_in_degrees) {
+		  avg_ampphase->phase[i][j][chan_index] *= 180.0 / M_PI;
+		}
 	      }
 	    } else if (averaging_type & AVERAGETYPE_MEDIAN) {
 	      // Work out the channel and frequency first.
@@ -2970,6 +2974,9 @@ void chanaverage_ampphase(struct ampphase *ampphase, struct ampphase *avg_amppha
 		  cabsf(avg_ampphase->raw[i][j][chan_index]);
 		avg_ampphase->phase[i][j][chan_index] =
 		  cargf(avg_ampphase->raw[i][j][chan_index]);
+		if (phase_in_degrees) {
+		  avg_ampphase->phase[i][j][chan_index] *= 180.0 / M_PI;
+		}
 	      }
 	    }
 	  }
@@ -2991,6 +2998,9 @@ void chanaverage_ampphase(struct ampphase *ampphase, struct ampphase *avg_amppha
 		  cabsf(avg_ampphase->f_raw[i][j][avg_ampphase->f_nchannels[i][j]]);
 		avg_ampphase->f_phase[i][j][avg_ampphase->f_nchannels[i][j]] =
 		  cargf(avg_ampphase->f_raw[i][j][avg_ampphase->f_nchannels[i][j]]);
+		if (phase_in_degrees) {
+		  avg_ampphase->f_phase[i][j][avg_ampphase->f_nchannels[i][j]] *= 180.0 / M_PI;
+		}
 	      }
 	    } else if (averaging_type & AVERAGETYPE_MEDIAN) {
 	      qsort(median_unflagged_channel, n_unflagged_points, sizeof(float), cmpfunc_real);
@@ -3019,6 +3029,9 @@ void chanaverage_ampphase(struct ampphase *ampphase, struct ampphase *avg_amppha
 		  cabsf(avg_ampphase->f_raw[i][j][avg_ampphase->f_nchannels[i][j]]);
 		avg_ampphase->f_phase[i][j][avg_ampphase->f_nchannels[i][j]] =
 		  cargf(avg_ampphase->f_raw[i][j][avg_ampphase->f_nchannels[i][j]]);
+		if (phase_in_degrees) {
+		  avg_ampphase->f_phase[i][j][avg_ampphase->f_nchannels[i][j]] *= 180.0 / M_PI;
+		}
 	      }
 	    }
 	    // That's a successful unflagged channel.

@@ -2358,7 +2358,8 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
 	      avg_ampphase = prepare_ampphase();
 	      chanaverage_ampphase(ampphase_if[polidx[rp]], avg_ampphase,
 				   ampphase_if[polidx[rp]]->options->delay_averaging[idxif + 1],
-				   ampphase_if[polidx[rp]]->options->averaging_method[idxif + 1]);
+				   ampphase_if[polidx[rp]]->options->averaging_method[idxif + 1],
+				   ampphase_if[polidx[rp]]->options->phase_in_degrees);
 	    }
 	    
             for (bi = 0; bi < bn; bi++) {
