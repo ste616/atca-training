@@ -680,7 +680,7 @@ int main(int argc, char *argv[]) {
   size_t recv_buffer_length;
   struct requests server_request;
   struct responses server_response;
-  char send_buffer[SPDBUFSIZE], client_id[CLIENTIDLENGTH];
+  char send_buffer[SENDBUFSIZE], client_id[CLIENTIDLENGTH];
   char *recv_buffer = NULL, **mesgout = NULL, tstring[20];
   char dump_device[SPDBUFMEDIUM], dump_file[SPDBUFSIZE];
   SOCKET socket_peer;
@@ -738,12 +738,12 @@ int main(int argc, char *argv[]) {
     strncpy(server_request.client_id, client_id, CLIENTIDLENGTH);
     strncpy(server_request.client_username, arguments.username, CLIENTIDLENGTH);
     server_request.client_type = CLIENTTYPE_NSPD;
-    init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)SPDBUFSIZE);
+    init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)SENDBUFSIZE);
     pack_requests(&cmp, &server_request);
     socket_send_buffer(socket_peer, send_buffer, cmp_mem_access_get_pos(&mem));
     // Send a request for the currently available spectrum.
     server_request.request_type = REQUEST_CURRENT_SPECTRUM;
-    init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)SPDBUFSIZE);
+    init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)SENDBUFSIZE);
     pack_requests(&cmp, &server_request);
     socket_send_buffer(socket_peer, send_buffer, cmp_mem_access_get_pos(&mem));
   }
@@ -951,7 +951,7 @@ int main(int argc, char *argv[]) {
         // We could check this against the known range here, but for now
         // let's just request the data (the server also has range checking).
         server_request.request_type = REQUEST_SPECTRUM_MJD;
-        init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)SPDBUFSIZE);
+        init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)SENDBUFSIZE);
         pack_requests(&cmp, &server_request);
         /* nmesg = 1; */
         /* snprintf(mesgout[0], SPDBUFSIZE, " Requesting data at MJD %.8f\n", mjd_request); */
@@ -1097,11 +1097,11 @@ int main(int argc, char *argv[]) {
         if (server_type == SERVERTYPE_SIMULATOR) {
           // Send a request for the time information.
           server_request.request_type = REQUEST_TIMERANGE;
-          init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)SPDBUFSIZE);
+          init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)SENDBUFSIZE);
           pack_requests(&cmp, &server_request);
           socket_send_buffer(socket_peer, send_buffer, cmp_mem_access_get_pos(&mem));
           server_request.request_type = REQUEST_CYCLE_TIMES;
-          init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)SPDBUFSIZE);
+          init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)SENDBUFSIZE);
           pack_requests(&cmp, &server_request);
           socket_send_buffer(socket_peer, send_buffer, cmp_mem_access_get_pos(&mem));
         }
@@ -1125,7 +1125,7 @@ int main(int argc, char *argv[]) {
       } else if (server_response.response_type == RESPONSE_SPECTRUM_LOADED) {
         // Our new spectrum is ready, so we request it.
         server_request.request_type = REQUEST_MJD_SPECTRUM;
-        init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)SPDBUFSIZE);
+        init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)SENDBUFSIZE);
         pack_requests(&cmp, &server_request);
         socket_send_buffer(socket_peer, send_buffer, cmp_mem_access_get_pos(&mem));
       } else if (server_response.response_type == RESPONSE_CYCLE_TIMES) {

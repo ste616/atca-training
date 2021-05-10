@@ -932,7 +932,7 @@ int main(int argc, char *argv[]) {
   struct requests server_request;
   struct responses server_response;
   SOCKET socket_peer, max_socket = -1;
-  char *recv_buffer = NULL, send_buffer[VISBUFSIZE], htime[20];
+  char *recv_buffer = NULL, send_buffer[SENDBUFSIZE], htime[20];
   char **mesgout = NULL, client_id[CLIENTIDLENGTH];
   char header_string[VISBUFSIZE], dump_device[VISBUFMEDIUM], dump_file[VISBUFSIZE];
   fd_set watchset, reads;
@@ -1015,13 +1015,13 @@ int main(int argc, char *argv[]) {
     strncpy(server_request.client_id, client_id, CLIENTIDLENGTH);
     strncpy(server_request.client_username, arguments.username, CLIENTIDLENGTH);
     server_request.client_type = CLIENTTYPE_NVIS;
-    init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)VISBUFSIZE);
+    init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)SENDBUFSIZE);
     pack_requests(&cmp, &server_request);
     socket_send_buffer(socket_peer, send_buffer, cmp_mem_access_get_pos(&mem));
     
     // Send a request for the currently available VIS data.
     server_request.request_type = REQUEST_CURRENT_VISDATA;
-    init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)VISBUFSIZE);
+    init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)SENDBUFSIZE);
     pack_requests(&cmp, &server_request);
     socket_send_buffer(socket_peer, send_buffer, cmp_mem_access_get_pos(&mem));
   }
@@ -1423,7 +1423,7 @@ int main(int argc, char *argv[]) {
       // Send the new options to the server and ask for the
       // vis data to be recomputed.
       server_request.request_type = REQUEST_COMPUTE_VISDATA;
-      init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)VISBUFSIZE);
+      init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)SENDBUFSIZE);
       pack_requests(&cmp, &server_request);
       if (action_required & ACTION_OMIT_OPTIONS) {
 	// Some other client has changed the options, and we tell the server
@@ -1458,7 +1458,7 @@ int main(int argc, char *argv[]) {
       // Send the username back to the server.
       server_request.request_type = REQUEST_SUPPLY_USERNAME;
       strncpy(server_request.client_username, arguments.username, CLIENTIDLENGTH);
-      init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)VISBUFSIZE);
+      init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)SENDBUFSIZE);
       pack_requests(&cmp, &server_request);
       pack_write_string(&cmp, arguments.username, CLIENTIDLENGTH);
       socket_send_buffer(socket_peer, send_buffer, cmp_mem_access_get_pos(&mem));
@@ -1546,7 +1546,7 @@ int main(int argc, char *argv[]) {
         // We're being told new data is available after we asked for a new
         // computation. We request this new data.
         server_request.request_type = REQUEST_COMPUTED_VISDATA;
-        init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)VISBUFSIZE);
+        init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)SENDBUFSIZE);
         pack_requests(&cmp, &server_request);
         socket_send_buffer(socket_peer, send_buffer, cmp_mem_access_get_pos(&mem));
       } else if (server_response.response_type == RESPONSE_SERVERTYPE) {
