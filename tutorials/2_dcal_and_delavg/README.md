@@ -63,3 +63,24 @@ per-cycle signal-to-noise ratio of 0945-321 is low. At 5.5 GHz in 5 seconds, on
 a single baseline, in a single 1 MHz channel, the ATCA RMS noise level is around
 157 mJy.
 
+We're going to use these two different sources to explore delay calibration
+strategies.
+
+## Normal strategy
+
+Let's begin by calibrating using 0823-500, which is a normal thing to do in
+the 4cm band when 1934-638 is not available. In NSPD, look at the time 04:51
+with `get time 04:51`. You should see NSPD display the timestamp 04:51:02,
+
+Normally, when preparing for delay calibration, we will look at phase. Let's
+configure NSPD to show us all of our IF1 phases with `nxy 3 7` and
+`sel aa bb ab` and `p -180 180`. You will see that the phases are "wrapping"
+at different rates on different baselines and polarisations, but that the
+phase itself is quite well defined in each channel to make it look like
+a sawtooth pattern. You can zoom in on a smaller channel range if you'd like
+to confirm this is the case on the products where the phase is wrapping more
+rapidly.
+
+You should see much the same thing if you look at IF2 with `sel f2`, although
+the wrapping rates will not necessarily be anything like what you saw in IF2.
+This is because 
