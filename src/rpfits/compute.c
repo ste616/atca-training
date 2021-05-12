@@ -1658,10 +1658,13 @@ int ampphase_average(struct scan_header_data *scan_header_data,
                   band_options->delay_averaging[ampphase->window]);
           delavg_frequency[delavg_idx] += ampphase->f_frequency[i][k][j];
           delavg_raw[delavg_idx] += ampphase->f_raw[i][k][j];
+	  // Phase accounting should probably be optimised out at some point since
+	  // for delavg > 1 we recompute it.
 	  delavg_phase[delavg_idx] += ampphase->f_phase[i][k][j];
           delavg_n[delavg_idx] += 1;
 	  median_delavg_frequency[delavg_idx][n_delavg_median[delavg_idx]] =
 	    ampphase->f_frequency[i][k][j];
+	  // Same comment as above.
 	  median_delavg_phase[delavg_idx][n_delavg_median[delavg_idx]] =
 	    ampphase->f_phase[i][k][j];
 	  median_delavg_raw[delavg_idx][n_delavg_median[delavg_idx]] =
@@ -1676,24 +1679,29 @@ int ampphase_average(struct scan_header_data *scan_header_data,
 	  if (band_options->averaging_method[ampphase->window] & AVERAGETYPE_MEAN) {
 	    if (delavg_n[j] > 0) {
 	      delavg_raw[j] /= (float)delavg_n[j];
-	      delavg_phase[j] = cargf(delavg_raw[j]);
-	      if (band_options->phase_in_degrees) {
-		delavg_phase[j] *= 180.0 / M_PI;
-	      }
-	      /* delavg_phase[j] /= (float)delavg_n[j]; */
+	      /* delavg_phase[j] = cargf(delavg_raw[j]); */
+	      /* if (band_options->phase_in_degrees) { */
+	      /* 	delavg_phase[j] *= 180.0 / M_PI; */
+	      /* } */
 	      delavg_frequency[j] /= (float)delavg_n[j];
 	    }
 	  } else if (band_options->averaging_method[ampphase->window] & AVERAGETYPE_MEDIAN) {
 	    if (n_delavg_median[j] > 0) {
 	      qsort(median_delavg_raw[j], n_delavg_median[j], sizeof(float complex),
 		    cmpfunc_complex);
-	      qsort(median_delavg_phase[j], n_delavg_median[j], sizeof(float), cmpfunc_real);
+	      /* qsort(median_delavg_phase[j], n_delavg_median[j], sizeof(float), cmpfunc_real); */
 	      qsort(median_delavg_frequency[j], n_delavg_median[j], sizeof(float), cmpfunc_real);
 	      delavg_raw[j] = fcmedianfc(median_delavg_raw[j], n_delavg_median[j]);
-	      delavg_phase[j] = fmedianf(median_delavg_phase[j], n_delavg_median[j]);
+	      /* delavg_phase[j] = fmedianf(median_delavg_phase[j], n_delavg_median[j]); */
 	      delavg_frequency[j] = fmedianf(median_delavg_frequency[j], n_delavg_median[j]);
 	      delavg_n[j] = n_delavg_median[j];
 	    }
+	  }
+	  // Phase needs to be recomputed since wrapping is basically impossible
+	  // to deal with while averaging.
+	  delavg_phase[j] = cargf(delavg_raw[j]);
+	  if (band_options->phase_in_degrees) {
+	    delavg_phase[j] *= 180.0 / M_PI;
 	  }
         }
         // Now work out the delays calculated between each bin.
