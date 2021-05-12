@@ -1676,8 +1676,11 @@ int ampphase_average(struct scan_header_data *scan_header_data,
 	  if (band_options->averaging_method[ampphase->window] & AVERAGETYPE_MEAN) {
 	    if (delavg_n[j] > 0) {
 	      delavg_raw[j] /= (float)delavg_n[j];
-	      /* delavg_phase[j] = cargf(delavg_raw[j]); */
-	      delavg_phase[j] /= (float)delavg_n[j];
+	      delavg_phase[j] = cargf(delavg_raw[j]);
+	      if (band_options->phase_in_degrees) {
+		delavg_phase[j] *= 180.0 / M_PI;
+	      }
+	      /* delavg_phase[j] /= (float)delavg_n[j]; */
 	      delavg_frequency[j] /= (float)delavg_n[j];
 	    }
 	  } else if (band_options->averaging_method[ampphase->window] & AVERAGETYPE_MEDIAN) {
