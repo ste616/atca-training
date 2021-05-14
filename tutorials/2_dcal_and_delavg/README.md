@@ -83,4 +83,11 @@ rapidly.
 
 You should see much the same thing if you look at IF2 with `sel f2`, although
 the wrapping rates will not necessarily be anything like what you saw in IF2.
-This is because 
+This is because both IFs are, after the first conversion stage, completely
+independent of each other.
+
+In [tutorial 1](../1_introduction/) we talked about how the change of phase
+with frequency is due to a delay error being present when the correlator
+was doing its fringe rotation. Let's take a quick look at how that works
+mathematically. For any particular time period &Delta;t, that represents
+some amount of phase &Delta;&#981; for a wave with some frequency &nu;.
