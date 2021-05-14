@@ -91,3 +91,8 @@ with frequency is due to a delay error being present when the correlator
 was doing its fringe rotation. Let's take a quick look at how that works
 mathematically. For any particular time period &Delta;t, that represents
 some amount of phase &Delta;&#981; for a wave with some frequency &nu;.
+The relationship here is &Delta;&#981; = 2&#960;&nu;&Delta;t. To get the
+rate of change of phase with frequency, differentiate; here we dispense with
+calling phase &Delta;&#981; since phase can have any zero point that we like.
+So &part;&#981; / &part;&nu; = 2&#960;&Delta;t, and rearranging we get
+&Delta;t = (1 / 2&#960;) &part;&#981; / &part;&nu;.
