@@ -91,8 +91,26 @@ with frequency is due to a delay error being present when the correlator
 was doing its fringe rotation. Let's take a quick look at how that works
 mathematically. For any particular time period &Delta;t, that represents
 some amount of phase &Delta;&#981; for a wave with some frequency &nu;.
-The relationship here is &Delta;&#981; = 2&#960;&nu;&Delta;t. To get the
-rate of change of phase with frequency, differentiate; here we dispense with
+For example, 1 ns of time is a full period of a wave with frequency 1 GHz, and
+a full period is 2&#960; radians.
+The relationship here is &Delta;&#981; = 2&#960;&nu;&Delta;t.
+
+To get the rate of change of phase with frequency, differentiate; here we dispense with
 calling phase &Delta;&#981; since phase can have any zero point that we like.
 So &part;&#981; / &part;&nu; = 2&#960;&Delta;t, and rearranging we get
 &Delta;t = (1 / 2&#960;) &part;&#981; / &part;&nu;.
+
+The correlator calculates this &Delta;t for each pair of adjacent channels
+in the tvchannel range, and then takes the average value of all these pairs as
+the delay for each baseline and polarisation product. Looking at the NSPD plot
+of the wrapping phase of 0823-500 we can see a very regular pattern of phase
+vs frequency, but if you look closely (for example at the AA phase on baseline
+1-4 in IF1), you will see that there are deviations
+away from perfect linearity. These are caused because the response of each
+channel is not exactly the same; this is something that gets calibrated out
+when you solve for the bandpass function early in your reduction process.
+This is why it is better to have a wide tvchannel range for your delay
+calibration, so that any local deviations are diminished in importance by the
+averaging process, and thus you get a better estimate of the actual delay
+error.
+
