@@ -1434,7 +1434,9 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
  *          - +ive if the dereferenced \a a number is larger
  */
 int cmpfunc_real(const void *a, const void *b) {
-  return ( *(float*)a - *(float*)b );
+  const float va = *(float *)a;
+  const float vb = *(float *)b;
+  return ( (va > vb) - (va < vb) );
 }
 
 /*!
@@ -1446,7 +1448,9 @@ int cmpfunc_real(const void *a, const void *b) {
  *          - +ive if the dereferenced \a a number is larger
  */
 int cmpfunc_complex(const void *a, const void *b) {
-  return ( *(float complex*)a - *(float complex*)b );
+  const float va = cabsf(*(float complex *)a);
+  const float vb = cabsf(*(float complex *)b);
+  return ( (va > vb) - (va < vb) );
 }
 
 /*!
@@ -1770,12 +1774,12 @@ int ampphase_average(struct scan_header_data *scan_header_data,
           if (n_delay_points == 0) {
             (*vis_quantities)->delay[i][k] = 0;
           } else {
-            /* qsort(median_array_delay, n_delay_points, sizeof(float), */
-            /*       cmpfunc_real); */
-	    /* (*vis_quantities)->delay[i][k] = 1E3 * fmedianf(median_array_delay, */
-	    /* 						    n_delay_points); */
-	    (*vis_quantities)->delay[i][k] = (n_delay_points > 0) ?
-	      (1E3 * total_delay / (float)n_delay_points) : 0;
+            qsort(median_array_delay, n_delay_points, sizeof(float),
+                  cmpfunc_real);
+	    (*vis_quantities)->delay[i][k] = 1E3 * fmedianf(median_array_delay,
+	    						    n_delay_points);
+	    /* (*vis_quantities)->delay[i][k] = (n_delay_points > 0) ? */
+	    /*   (1E3 * total_delay / (float)n_delay_points) : 0; */
           }
         }
       }

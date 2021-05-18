@@ -702,6 +702,11 @@ void plotpanel_minmax(struct ampphase **plot_ampphase,
       (plot_controls->plot_options & PLOT_DELAY)) {
     *plotmin_y = INFINITY;
     *plotmax_y = -INFINITY;
+    if (plot_controls->plot_options & PLOT_DELAY) {
+      // Reset the x range as well.
+      *plotmin_x = INFINITY;
+      *plotmax_x = -INFINITY;
+    }
     for (i = 0; i < npols; i++) {
       // Don't include all pols necessarily.
       for (j = 0; j < plot_ampphase[polidx[i]]->nbins[plot_baseline_idx]; j++) {
