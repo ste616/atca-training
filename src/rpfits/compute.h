@@ -1272,3 +1272,6 @@ float baseline_phase(struct vis_quantities *vis_quantities,
 void compute_closure_phase(struct scan_header_data *scan_header_data,
 			   struct vis_quantities *vis_quantities,
 			   int reference_antenna);
+void compute_delays(struct ampphase *ampphase, bool phase_in_degrees, int min_chan, int max_chan,
+		    float ****delays, int *n_baselines, int **n_bins, int ***n_delays,
+		    float ***mean_delay, float ***median_delay);

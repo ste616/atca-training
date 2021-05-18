@@ -415,6 +415,7 @@ void changepanel(int x, int y, struct panelspec *panelspec);
 void plotnum_to_xy(struct panelspec *panelspec, int plotnum, int *px, int *py);
 void plotpanel_minmax(struct ampphase **plot_ampphase,
                       struct spd_plotcontrols *plot_controls,
+		      float ****chan_delays, int **delay_nbins, int ***delay_nchans,
                       int plot_baseline_idx, int plot_if_idx,
 		      int npols, int *polidx,
                       float *plotmin_x, float *plotmax_x,

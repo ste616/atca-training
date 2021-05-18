@@ -1770,12 +1770,12 @@ int ampphase_average(struct scan_header_data *scan_header_data,
           if (n_delay_points == 0) {
             (*vis_quantities)->delay[i][k] = 0;
           } else {
-            qsort(median_array_delay, n_delay_points, sizeof(float),
-                  cmpfunc_real);
-	    (*vis_quantities)->delay[i][k] = 1E3 * fmedianf(median_array_delay,
-	    						    n_delay_points);
-	    /* (*vis_quantities)->delay[i][k] = (n_delay_points > 0) ? */
-	    /*   (1E3 * total_delay / (float)n_delay_points) : 0; */
+            /* qsort(median_array_delay, n_delay_points, sizeof(float), */
+            /*       cmpfunc_real); */
+	    /* (*vis_quantities)->delay[i][k] = 1E3 * fmedianf(median_array_delay, */
+	    /* 						    n_delay_points); */
+	    (*vis_quantities)->delay[i][k] = (n_delay_points > 0) ?
+	      (1E3 * total_delay / (float)n_delay_points) : 0;
           }
         }
       }
@@ -3239,4 +3239,86 @@ void compute_closure_phase(struct scan_header_data *scan_header_data,
     }
   }
 }
-			   
+
+/*!
+ *  \brief Compute all the adjacent channel delays and return them
+ *  \param ampphase the raw data from which to compute the delays
+ *  \param phase_in_degrees indicates if phase is measured in degrees (true) or radians (false)
+ *  \param min_chan the lowest channel to include in the computation
+ *  \param max_chan the highest channel to include in the computation
+ *  \param delays a pointer to a variable which will hold the array of the delay
+ *                values; enough memory will be allocated here to hold the array.
+ *                index 0 = baseline, index 1 = bins, index 2 = channels
+ *  \param n_baselines on exit, this will be the length of index 0 of \a delays
+ *  \param n_bins on exit, this will be the length of index 1 of \a delays, and this
+ *                array has length \a n_baselines
+ *  \param n_delays on exit, this will be the length of index 2 of \a delays, and this
+ *                  array has length \a n_baselines on index 0, and \a n_bins on index 1
+ *  \param mean_delay on exit, this will be filled with the mean value of the \a delays
+ *                    array, for the same index 0 and index 1
+ *  \param median_delay on exit, this will be filled with the median value of the
+ *                      \a delays array, for the same index 0 and index 1
+ */
+void compute_delays(struct ampphase *ampphase, bool phase_in_degrees, int min_chan, int max_chan,
+		    float ****delays, int *n_baselines, int **n_bins, int ***n_delays,
+		    float ***mean_delay, float ***median_delay) {
+  int i, j, k, nchans;
+  float dp, p1, p2, p3, delta_phase, delta_frequency, total_delay;
+  
+  // Allocate the first index for all these arrays.
+  *n_baselines = ampphase->nbaselines;
+  CALLOC(*delays, *n_baselines);
+  CALLOC(*n_bins, *n_baselines);
+  CALLOC(*n_delays, *n_baselines);
+  CALLOC(*mean_delay, *n_baselines);
+  CALLOC(*median_delay, *n_baselines);
+  
+  for (i = 0; i < *n_baselines; i++) {
+    // How many bins on this baseline?
+    (*n_bins)[i] = ampphase->nbins[i];
+    CALLOC((*delays)[i], (*n_bins)[i]);
+    CALLOC((*n_delays)[i], (*n_bins)[i]);
+    CALLOC((*mean_delay)[i], (*n_bins)[i]);
+    CALLOC((*median_delay)[i], (*n_bins)[i]);
+    for (j = 0; j < (*n_bins)[i]; j++) {
+      // How many channels?
+      nchans = 0;
+      for (k = 0; k < ampphase->f_nchannels[i][j]; k++) {
+	if ((ampphase->f_channel[i][j][k] >= min_chan) &&
+	    (ampphase->f_channel[i][j][k] < max_chan)) {
+	  nchans++;
+	}
+      }
+      (*n_delays)[i][j] = nchans;
+      CALLOC((*delays)[i][j], (*n_delays)[i][j]);
+      for (k = 1, nchans = 0; k < ampphase->f_nchannels[i][j]; k++) {
+	if ((nchans < (*n_delays)[i][j]) &&
+	    (ampphase->f_channel[i][j][k - 1] >= min_chan) &&
+	    (ampphase->f_channel[i][j][k] <= max_chan)) {
+	  dp = (phase_in_degrees) ? 360.0 : (2 * M_PI);
+	  p1 = ampphase->f_phase[i][j][k] - ampphase->f_phase[i][j][k - 1];
+	  p2 = (ampphase->f_phase[i][j][k] + dp) - ampphase->f_phase[i][j][k - 1];
+	  p3 = (ampphase->f_phase[i][j][k] - dp) - ampphase->f_phase[i][j][k - 1];
+
+	  delta_phase = (float)smallest_abs(3, p1, p2, p3);
+	  if (phase_in_degrees) {
+	    delta_phase *= (M_PI / 180);
+	  }
+	  delta_frequency = ampphase->f_frequency[i][j][k] - ampphase->f_frequency[i][j][k - 1];
+	  (*delays)[i][j][nchans] = 1E3 * delta_phase / (2 * M_PI * delta_frequency);
+	  total_delay += (*delays)[i][j][nchans];
+	  nchans++;
+	}
+      }
+      if (nchans > 0) {
+	(*mean_delay)[i][j] = total_delay / (float)nchans;
+	qsort((*delays)[i][j], nchans, sizeof(float), cmpfunc_real);
+	(*median_delay)[i][j] = fmedianf((*delays)[i][j], nchans);
+      } else {
+	(*mean_delay)[i][j] = 0;
+	(*median_delay)[i][j] = 0;
+      }
+      
+    }
+  }
+}

@@ -408,6 +408,13 @@ static void interpret_command(char *line) {
       }
       change_spd_plotcontrols(&spd_plotcontrols, NULL, &yaxis_change_type, NULL, NULL);
       action_required = ACTION_REFRESH_PLOT;
+    } else if (minmatch("delay", line_els[0], 3)) {
+      // We've been asked to plot delay calculations.
+      spd_plotcontrols.yaxis_range_limit = NO;
+      yaxis_type = PLOT_DELAY;
+      yaxis_change_type = yaxis_type;
+      change_spd_plotcontrols(&spd_plotcontrols, NULL, &yaxis_change_type, NULL, NULL);
+      action_required = ACTION_REFRESH_PLOT;
     } else if (minmatch("scale", line_els[0], 3)) {
       if (nels == 2) {
 	// We've been asked to change how to scale the y axis.
