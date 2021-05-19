@@ -1422,9 +1422,6 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
   return 0;
 }
 
-/**
- * Sorting comparator functions for the median calculation.
- */
 /*!
  *  \brief A qsort comparator function for float real type numbers
  *  \param a a pointer to a number
@@ -3295,7 +3292,7 @@ void compute_delays(struct ampphase *ampphase, bool phase_in_degrees, int min_ch
       }
       (*n_delays)[i][j] = nchans;
       CALLOC((*delays)[i][j], (*n_delays)[i][j]);
-      for (k = 1, nchans = 0; k < ampphase->f_nchannels[i][j]; k++) {
+      for (k = 1, nchans = 0, total_delay = 0; k < ampphase->f_nchannels[i][j]; k++) {
 	if ((nchans < (*n_delays)[i][j]) &&
 	    (ampphase->f_channel[i][j][k - 1] >= min_chan) &&
 	    (ampphase->f_channel[i][j][k] <= max_chan)) {

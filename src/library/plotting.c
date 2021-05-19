@@ -2083,7 +2083,7 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
   float information_text_height, xaxis_min, xaxis_max, yaxis_min, yaxis_max, theight;
   float ylog_min, ylog_max, pollab_height, pollab_xlen, pollab_ylen, pollab_padding;
   float *plot_xvalues = NULL, *plot_yvalues = NULL, maxlen_tsys;
-  float tvchan_yvals[2], tvchan_xvals[2], tvchans[2];
+  float tvchan_yvals[2], tvchan_xvals[2], tvchans[2], hline_xvals[2], hline_yvals[2];
   float ****chan_delays = NULL, ***mean_chan_delays = NULL, ***median_chan_delays = NULL;
   char ptitle[BIGBUFSIZE], ptype[BUFSIZE], ftype[BUFSIZE], poltitle[BUFSIZE];
   char information_text[BUFSIZE], ***systemp_strings = NULL;
@@ -2184,9 +2184,12 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
 			 ampphase_if[polidx[rp]]->options->phase_in_degrees,
 			 ampphase_if[polidx[rp]]->options->min_tvchannel[idxif + 1],
 			 ampphase_if[polidx[rp]]->options->max_tvchannel[idxif + 1],
-			 &(chan_delays[rp]), &(delay_n_baselines[rp]), &(delay_n_bins[rp]),
-			 &(delay_n_delays[rp]), &(mean_chan_delays[rp]),
-			 &(median_chan_delays[rp]));
+			 &(chan_delays[polidx[rp]]),
+			 &(delay_n_baselines[polidx[rp]]),
+			 &(delay_n_bins[polidx[rp]]),
+			 &(delay_n_delays[polidx[rp]]),
+			 &(mean_chan_delays[polidx[rp]]),
+			 &(median_chan_delays[polidx[rp]]));
 	}
       }
       
@@ -2445,6 +2448,15 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
 		  plot_yvalues[ri] = chan_delays[polidx[rp]][i][bi][ri];
 		}
 		cpgpt(delay_n_delays[polidx[rp]][i][bi], plot_xvalues, plot_yvalues, -1);
+		// Plot the mean and median lines.
+		hline_xvals[0] = xaxis_min;
+		hline_xvals[1] = xaxis_max;
+		cpgsls(1);
+		hline_yvals[0] = hline_yvals[1] = mean_chan_delays[polidx[rp]][i][bi];
+		cpgline(2, hline_xvals, hline_yvals);
+		cpgsls(2);
+		hline_yvals[0] = hline_yvals[1] = median_chan_delays[polidx[rp]][i][bi];
+		cpgline(2, hline_xvals, hline_yvals);
 	      } else {
 		for (ri = 0, rj = ampphase_if[polidx[rp]]->f_nchannels[i][bi] - 1;
 		     ri < ampphase_if[polidx[rp]]->f_nchannels[i][bi];
@@ -2553,7 +2565,8 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
 	      }
 
 	      // Store the tvchannel ranges here while we know we're accessing valid data.
-	      if (plot_controls->plot_options & PLOT_TVCHANNELS) {
+	      if ((plot_controls->plot_options & PLOT_TVCHANNELS) &&
+		  (!(plot_controls->plot_options & PLOT_DELAY))) {
 		if (plot_controls->plot_options & PLOT_CHANNEL) {
 		  tvchans[0] = (float)ampphase_if[polidx[rp]]->options->min_tvchannel[idxif + 1];
 		  tvchans[1] = (float)ampphase_if[polidx[rp]]->options->max_tvchannel[idxif + 1];
