@@ -2082,7 +2082,7 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
 		   struct syscal_data *compiled_tsys_data,
                    int max_tsys_ifs, bool all_data_present) {
   int i, j, k, ant1, ant2, nants = 0, px, py, iauto = 0, icross = 0, isauto = NO;
-  int npols = 0, *polidx = NULL, poli, num_ifs = 0, panels_per_if = 0;
+  int npols = 0, *polidx = NULL, poli, num_ifs = 0, panels_per_if = 0, lw, delay_lw;
   int idxif, ni, ri, rj, rp, bi, bn, pc, inverted = NO, plot_started = NO;
   int tsys_num_ifs, *delay_n_baselines = NULL, **delay_n_bins = NULL, ***delay_n_delays = NULL;
   int **delay_avg_n_bins = NULL, ***delay_avg_n_delays = NULL, *delay_avg_n_baselines = NULL;
@@ -2498,7 +2498,19 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
 		  plot_xvalues[ri] = ri;
 		  plot_yvalues[ri] = chan_delays[polidx[rp]][i][bi][ri];
 		}
+		// Set the line width for each point size depending on how many
+		// points we have to plot. But first, get the current linewidth.
+		cpgqlw(&lw);
+		delay_lw = 20;
+		if (delay_n_delays[polidx[rp]][i][bi] > 30) {
+		  delay_lw /= 2;
+		}
+		if (delay_n_delays[polidx[rp]][i][bi] > 200) {
+		  delay_lw /= 2;
+		}
+		cpgslw(delay_lw);
 		cpgpt(delay_n_delays[polidx[rp]][i][bi], plot_xvalues, plot_yvalues, -1);
+		cpgslw(lw);
 		// Plot the mean and median lines.
 		hline_xvals[0] = xaxis_min;
 		hline_xvals[1] = xaxis_max;
@@ -2570,7 +2582,9 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
 		    plot_xvalues[ri] = ri;
 		    plot_yvalues[ri] = avg_delays[polidx[rp]][i][bi][ri];
 		  }
+		  cpgslw(delay_lw);
 		  cpgpt(delay_avg_n_delays[polidx[rp]][i][bi], plot_xvalues, plot_yvalues, -1);
+		  cpgslw(lw);
 		  // Plot the the mean and median lines.
 		  hline_xvals[0] = xaxis_min;
 		  hline_xvals[1] = xaxis_max;
