@@ -114,3 +114,12 @@ calibration, so that any local deviations are diminished in importance by the
 averaging process, and thus you get a better estimate of the actual delay
 error.
 
+You can look at the range of delays that are computed between all the pairs
+of adjacent channels using the **delay** command in NSPD. For example, let's
+look at F1 with `sel f1` and then `delay`. The display will look something like
+the picture below.
+
+![NSPD showing the delay error distributions](nspd_t2_delay_panels.png)
+
+This is a feature that isn't available in SPD, it's just here to aid
+understanding. On each of the panels
