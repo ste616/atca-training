@@ -194,6 +194,34 @@ any `nvis` clients connected with the same username however.
 
 ---
 
+#### delay
+
+Format: **delay**
+
+This command makes `nspd` display the delay errors computed from all the
+adjacent channels within the tvchannel range currently set. All calculations
+are done by `nspd` and thus communication with the server is not
+required.
+
+Each panel will show a sorted list of all the computed delay errors, with
+the lowest delays displayed on the left, and the highest on the right.
+The x-axis is simply ordinal, and represents the number of adjacent pairs
+of channels in the **tvch**annel range. The y-axis is delay error, in ns.
+
+Two horizontal lines are also plotted, one solid and one dashed. The solid
+line represents the mean value of all the delays, and the dashed line
+represents the median value. Often, these will be plotted so near to each
+other that only the solid line remains visible.
+
+If the averaged data is being displayed (via **sho**w **av**eraged command),
+then the delay errors computed between the averaged data will also be
+displayed in each panel. Of course, since the number of channels decreases
+with increasing **delav**g values, the averaged data will appear to the left
+of each panel, although the horizontal lines will continue to span the
+entire width of the plot.
+
+---
+
 #### dump
 
 Format: **dump** [*filename*]

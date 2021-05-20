@@ -635,7 +635,15 @@ void plotpanel_minmax(struct ampphase **plot_ampphase,
   }
   
   // Get the x-axis range first.
-  if (plot_controls->plot_options & PLOT_CHANNEL) {
+  if (plot_controls->plot_options & PLOT_DELAY) {
+    *plotmin_x = 0;
+    *plotmax_x = 0;
+    for (i = 0; i < npols; i++) {
+      for (j = 0; j < delay_nbins[polidx[i]][plot_baseline_idx]; j++) {
+	MAXASSIGN(*plotmax_x, delay_nchans[polidx[i]][plot_baseline_idx][j]);
+      }
+    }
+  } else if (plot_controls->plot_options & PLOT_CHANNEL) {
     *plotmin_x = 0;
     *plotmax_x = plot_ampphase[0]->nchannels;
     if (plot_controls->channel_range_limit[plot_if_idx] == 1) {
@@ -702,11 +710,11 @@ void plotpanel_minmax(struct ampphase **plot_ampphase,
       (plot_controls->plot_options & PLOT_DELAY)) {
     *plotmin_y = INFINITY;
     *plotmax_y = -INFINITY;
-    if (plot_controls->plot_options & PLOT_DELAY) {
-      // Reset the x range as well.
-      *plotmin_x = INFINITY;
-      *plotmax_x = -INFINITY;
-    }
+    /* if (plot_controls->plot_options & PLOT_DELAY) { */
+    /*   // Reset the x range as well. */
+    /*   *plotmin_x = INFINITY; */
+    /*   *plotmax_x = -INFINITY; */
+    /* } */
     for (i = 0; i < npols; i++) {
       // Don't include all pols necessarily.
       for (j = 0; j < plot_ampphase[polidx[i]]->nbins[plot_baseline_idx]; j++) {
@@ -738,9 +746,7 @@ void plotpanel_minmax(struct ampphase **plot_ampphase,
 	}
 	if (plot_controls->plot_options & PLOT_DELAY) {
 	  // We have to do something special if we've got a delay panel to plot.
-	  *plotmin_x = 0;
 	  if (j < delay_nbins[polidx[i]][plot_baseline_idx]) {
-	    MAXASSIGN(*plotmax_x, delay_nchans[polidx[i]][plot_baseline_idx][j]);
 	    for (k = 0; k < delay_nchans[polidx[i]][plot_baseline_idx][j]; k++) {
 	      MINASSIGN(*plotmin_y, chan_delays[polidx[i]][plot_baseline_idx][j][k]);
 	      MAXASSIGN(*plotmax_y, chan_delays[polidx[i]][plot_baseline_idx][j][k]);
