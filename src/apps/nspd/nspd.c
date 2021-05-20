@@ -72,10 +72,10 @@ struct nspd_arguments {
 };
 
 // And some fun, totally necessary, global state variables.
-int action_required, server_type, n_ampphase_options;
+int action_required, server_type, n_ampphase_options, tvchan_change_min, tvchan_change_max;
 int xaxis_type, yaxis_type, plot_pols, yaxis_scaling, nxpanels, nypanels, plot_decorations;
 double mjd_request, mjd_base;
-char hardcopy_filename[SPDBUFSHORT];
+char hardcopy_filename[SPDBUFSHORT], tvchan_visband[10];
 struct spd_plotcontrols spd_plotcontrols;
 struct panelspec spd_panelspec;
 struct spectrum_data spectrum_data;
@@ -194,6 +194,7 @@ static void sighandler(int sig) {
 #define ACTION_OMIT_OPTIONS              1<<8
 #define ACTION_UNKNOWN_COMMAND           1<<9
 #define ACTION_HARDCOPY_PLOT             1<<10
+#define ACTION_TVCHANNELS_CHANGED        1<<11
 
 // Make a shortcut to stop action for those actions which can only be
 // done by a simulator.
@@ -614,6 +615,17 @@ static void interpret_command(char *line) {
 	strncpy(hardcopy_filename, line_els[1], SPDBUFSHORT);
       }
       action_required = ACTION_HARDCOPY_PLOT;
+    } else if (minmatch("tvchannel", line_els[0], 4)) {
+      // Change the tvchannel range.
+      if (nels == 4) {
+	CHECKSIMULATOR;
+	// The user should have given us a visband, followed by the
+	// min and max.
+	strncpy(tvchan_visband, line_els[1], 10);
+	tvchan_change_min = atoi(line_els[2]);
+	tvchan_change_max = atoi(line_els[3]);
+	action_required = ACTION_TVCHANNELS_CHANGED;
+      }
     } else {
       action_required = ACTION_UNKNOWN_COMMAND;
     }
@@ -676,7 +688,7 @@ int main(int argc, char *argv[]) {
   bool spd_device_opened = false, action_proceed = false, dump_device_opened = false;
   struct spd_plotcontrols spd_alteredcontrols;
   fd_set watchset, reads;
-  int i, r, bytes_received, max_socket = -1, nmesg = 0, n_cycles = 0;
+  int i, r, bytes_received, max_socket = -1, nmesg = 0, n_cycles = 0, bidx;
   int nlistlines = 0, mjd_year, mjd_month, mjd_day, min_dmjd_idx = -1;
   int pending_action = -1, dump_type = FILETYPE_UNKNOWN, dump_device_number = -1;
   int spd_device_number = -1;
@@ -871,6 +883,23 @@ int main(int argc, char *argv[]) {
       FREE(tsys_data);
     }
 
+    if (action_required & ACTION_TVCHANNELS_CHANGED) {
+      // Change the tvchannels as requested.
+      bidx = find_if_name_nosafe(spectrum_data.header_data, tvchan_visband);
+      nmesg = 0;
+      if (bidx < 0) {
+	// Didn't find the specified band.
+	snprintf(mesgout[nmesg++], SPDBUFSIZE, "Band %s not found in data.\n",
+		 tvchan_visband);
+      } else {
+	found_options->min_tvchannel[bidx] = tvchan_change_min;
+	found_options->max_tvchannel[bidx] = tvchan_change_max;
+	action_required |= ACTION_TIME_REQUEST;
+      }
+      readline_print_messages(nmesg, mesgout);
+      action_required -= ACTION_TVCHANNELS_CHANGED;
+    }
+    
     if ((pending_action >= 0) && (n_cycles > 0)) {
       // Go back to request the new time.
       action_required |= pending_action;

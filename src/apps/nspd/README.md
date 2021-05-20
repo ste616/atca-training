@@ -196,12 +196,18 @@ any `nvis` clients connected with the same username however.
 
 #### delay
 
-Format: **delay**
+Format: **delay** [*min delay* *max delay*]
 
 This command makes `nspd` display the delay errors computed from all the
 adjacent channels within the tvchannel range currently set. All calculations
 are done by `nspd` and thus communication with the server is not
-required.
+required. If you would like to limit the range of each panel, you can specify
+both the *min delay* and *max delay* arguments. This will limit all
+the panels of all the IFs in the same way.
+
+If you want to reset the delay scaling to the default (which will be to
+contain all the data on each panel, which likely means that each panel has
+its own range), give this command without arguments.
 
 Each panel will show a sorted list of all the computed delay errors, with
 the lowest delays displayed on the left, and the highest on the right.
@@ -530,6 +536,23 @@ the smoothed line will be labelled as "AAv", and shown in a different colour.
 When **delavg** is 1, the two lines will be plot exactly over each other,
 and since the "v" line is drawn later than the normal product, the line visible
 on the panel will be in the "v" colour.
+
+---
+
+#### tvchannel
+
+Format: **tvch**annel [*IF* *min chan* *max chan*]
+
+This command instructs the server to recompute data with a different range
+of tvchannels.
+
+To set the channels, an *IF* argument needs to be supplied, followed
+by the *min chan* and *max chan* to use for that IF. The *IF* can be
+something like `f1` or `f2` or `z1`, and is basically whatever you would
+use to select that IF in `nspd`.
+
+While the server recomputes the data, `nspd` will continue to show the
+current data.
 
 ---
 
