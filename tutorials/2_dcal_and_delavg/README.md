@@ -122,4 +122,21 @@ the picture below.
 ![NSPD showing the delay error distributions](nspd_t2_delay_panels.png)
 
 This is a feature that isn't available in SPD, it's just here to aid
-understanding. On each of the panels
+understanding. Now each panel only has 1023 points on the x-axis, which is the
+number of adjacent pairs present in the standard tvchannel range of 513 - 1537.
+The curved "lines" visible in each panel are actually clouds of points, with
+each point being a computed delay error (the y-axis is delay error in ns).
+The points are plotted in ascending
+order from the left of the panel to the right, so that the x-coordinate of each
+point is not at all representative of where the pair of points were within the
+tvchannel range. Not surprisingly, most of the points for each polarisation and
+baseline lie within a narrow range of y-values, but there are also low-value and
+high-value tails. Why do you think the delay error distributions all look like
+this?
+
+There are also horizontal lines for each polarisation and baseline, and these
+represent the mean value for the points (the solid line) and the median value
+(the dashed line). For most of the products, these lines are so close to each
+other (again, not surprising) that they can't be distinguished. You should notice
+though that a few of the horizontal lines do appear separated.
+
