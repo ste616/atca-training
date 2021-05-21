@@ -138,5 +138,28 @@ There are also horizontal lines for each polarisation and baseline, and these
 represent the mean value for the points (the solid line) and the median value
 (the dashed line). For most of the products, these lines are so close to each
 other (again, not surprising) that they can't be distinguished. You should notice
-though that a few of the horizontal lines do appear separated.
+though that a few of the horizontal lines do appear separated. When the
+correlator parameter **tvmedian** is off, the mean value is returned as the
+delay error, while if it is on, the median value is returned.
+
+What we want while doing the delay calibration is that the value for the delay
+error computed by the correlator is as accurate as possible. One indicator
+of the accuracy of the value is stability. Looking at NVIS again, we can see that
+for most of the AA baselines the delay value does not noticeably change over
+time while the telescope is observing 0823-500. This is also a good example of
+what we mean by "flat delays". Often you may hear the instruction "make sure your
+delays are flat for at least 3 cycles before doing a dcal"; this just means that
+the delay values don't change over time.
+
+However, there are some baselines where the value is not the same every cycle.
+Does that matter? We'll see later in this tutorial. For now though, we'll
+figure out the reason for the deviations, and adjust as required.
+
+So what's going on here? To work it out, look at the NVIS lines that show the
+non-flat delay errors. In AA, it looks like the 1-2 and the 4-5 baselines have
+small deviations at various times. Now let's look at these baselines in NSPD.
+I doubt you'd see much while looking at phase, but if you look at amplitude (`a`),
+you will probably notice that these two baselines (which happen to be
+the two shortest baselines in this array configuration) have a large spike
+(> 60 pseudoJy) just below 5600 MHz.
 
