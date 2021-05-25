@@ -232,7 +232,7 @@ not currently set as a calband.
 
 #### data
 
-Format: **dat**a [*time*]
+Format: **dat**a [*time*/*off*]
 
 This command tells `nvis` to output the details of the observation configuration.
 If *time* is not specified, `nvis` will output details for the most recently
@@ -267,6 +267,9 @@ including:
 
 If a *time* has been specified, a dashed vertical line will be displayed at
 that exact time - not at the midpoint of the nearest cycle.
+
+If you want to stop plotting any time indications, give the *off* argument
+to this command.
 
 ---
 
