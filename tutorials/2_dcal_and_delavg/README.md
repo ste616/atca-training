@@ -160,6 +160,54 @@ non-flat delay errors. In AA, it looks like the 1-2 and the 4-5 baselines have
 small deviations at various times. Now let's look at these baselines in NSPD.
 I doubt you'd see much while looking at phase, but if you look at amplitude (`a`),
 you will probably notice that these two baselines (which happen to be
-the two shortest baselines in this array configuration) have a large spike
-(> 60 pseudoJy) just below 5600 MHz.
+the two shortest baselines in this array configuration; use `sort` in NVIS to
+illustrate this) have a large spike (> 60 pseudoJy) just below 5600 MHz.
 
+While we're on the subject, and while you've got the baselines sorted in length
+order, take a look at the effect of this RFI in NSPD as a function of
+increasing baseline length. You'll probably conclude that shorter baselines
+are more affected by RFI, at least for the RFI present in this observation. Why?
+There are two primary reasons. First, for some reasonably close-by and
+presumably stationary emitting source, what the ATCA antennas see will depend
+on where they are, as the source will likely be emitting non-isotropically, and
+there will be reflections etc. So the closer two antennas are to each other, the
+more the RFI signal will look the same to both antennas, and the correlation
+will be stronger. Second, the ability to discern a stationary signal from one
+which is rotating with the sky is better on longer baselines, as the fringe rotation
+required for longer baselines is much larger. Another way to put this is: does
+the time delay between the RFI signal hitting the two antennas match that of an
+astronomical signal? In this case you need to consider the effect of the delay
+over the entire cycle integration time: for a short baseline, or a short cycle time,
+the RFI signal will appear to match the geometry of the astronomical observation,
+and will thus appear in the correlation. Can you think of another situation where
+this match can occur?
+
+OK, back to the data. In this case, the RFI signal is polluting several channels
+(17 channels by my count). Zoom in on these channels in NSPD (`chan f1 1080 1120`
+will do a decent job) to confirm this. Now switch back to looking at phase, and notice
+how the linear behaviour of phase with frequency changes in the RFI-affected
+channels. Have a look at a few cycles (use `back` and `forward` in NSPD to get
+data from the previous or next cycle respectively) to see how the RFI phase changes.
+This is why the delay error is not always consistent for every cycle, because
+occasionally the RFI phase changes in a way significant to the delay computation.
+
+What should we do about it? The easiest thing to do is select tvchannels which do
+not contains the RFI. In this case, we know the RFI is in channels 1080 - 1120,
+which is within the normal tvchannel range of 513 - 1537. Let's first select
+a narrower range, by setting the tvchannels to 513 - 1070 (`tvch f1 513 1070`
+in either NSPD or NVIS). What happens to the delay errors displayed in NVIS?
+You should see something like the picture below.
+
+![NVIS after tvchannels are narrowed](nvis_t2_after_tvchan.png)
+
+The little delay error "blips" have gone on some baselines, but have been replaced
+by blips on others, albeit smaller. This could be because of other RFI, or
+it could also just be because now we have fewer channels in our tvchannels, and
+thus the expected noise level for the mean value is higher than it was previously.
+Try putting more channels in the range, with `tvch f1 200 1070`. That should
+improve the situation, but it still doesn't look perfect.
+
+The other option might be to use median averaging instead of mean to lessen
+the effect of the RFI. Change back to default tvchannels with `tvch f1 513 1537`
+and then turn on median averaging with `tvmedian on on` (we'll turn on median
+averaging for both IFs, even though we're really only focussed on IF1 for now).
