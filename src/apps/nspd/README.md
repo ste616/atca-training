@@ -556,6 +556,26 @@ current data.
 
 ---
 
+#### tvmedian
+
+Format: **tvmed**ian [*IF*] *on/off*
+
+This command instructs the server to recompute data with median averaging
+either enabled or disabled.
+
+If a single argument is given to this command, the setting will affect
+all IFs in the data currently being displayed; the setting can be *on*
+(indicating that median averaging should be used), or *off* (indicating
+that mean averaging should be used). If two arguments are given, the
+first argument must be the name of the *IF*, something like `f1`, or `f2`,
+or `z1`, and is basically whatever you would use to select that IF in
+`nspd`.
+
+While the server recomputes the data, `nspd` will continue to show the
+current data.
+
+---
+
 #### x
 
 Format: **x**
