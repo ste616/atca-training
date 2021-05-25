@@ -66,9 +66,10 @@ a single baseline, in a single 1 MHz channel, the ATCA RMS noise level is around
 We're going to use these two different sources to explore delay calibration
 strategies.
 
-## Normal strategy
+## Delay errors, in depth
 
-Let's begin by calibrating using 0823-500, which is a normal thing to do in
+Let's begin by examining the delay errors observed on 0823-500, which is
+a normal thing to do in
 the 4cm band when 1934-638 is not available. In NSPD, look at the time 04:51
 with `get time 04:51`. You should see NSPD display the timestamp 04:51:02,
 
@@ -221,4 +222,69 @@ is Gaussian, and we draw 1023 random values from the distribution, and we do
 this 30 times, the variance on the 30 median values will be ~78% higher than
 the variance on the mean values.
 
-Let's summarise this section now. We've seen that 
+Let's summarise this section. You should now understand how the correlator
+is calculating the delay errors from the phase information, and what is plotted
+in the NVIS delay panel. You now also know about a couple of ways to direct the
+delay calculations to change what is displayed in NVIS: **tvch**an and **tvmed**ian.
+And you've seen how RFI can affect the delay error calculations.
+
+## Correcting the delay
+
+All this information is useful for when it comes time for your own observation,
+and you need to correct the delays. In this section we will explore how to do
+that, and what affects the success of delay calibration.
+
+But let's cut to the chase: we're going to be correcting the delay errors in this
+data. We can do so completely successfully immediately, just to see what a good
+delay calibration should look like. To do so, quit out of everything (pressing
+ctrl-c in the server terminal will cause NSPD and NVIS to exit automatically),
+and then restart them in the same way as we did earlier. This is to ensure
+all the settings go back to their defaults.
+
+Then, in NSPD:
+```
+NSPD> get time 04:52
+NSPD> sel aa bb ab
+NSPD> p -180 180
+NSPD> nxy 3 7
+```
+
+And in NVIS:
+```
+NVIS> data 04:52
+```
+
+You will see a vertical dashed blue line appear on the NVIS display, along with
+a cross-hatched purple area. This purple area covers three cycles of data, with the
+cycle closest to 04:52 being the latest of these cycles. These three cycles will be
+used to calculate the appropriate delay corrections required. While observing for
+real, the correlator will always use the most recent three cycles to calculate the
+corrections (although as we will see later, the number of cycles can be changed).
+
+Now, to correct the delays, type `dcal` into NVIS. You should see the following
+output:
+```
+NVIS> dcal
+ BAND 1, MJD 59332.202690 - 59332.202806:
+   ANT 1: X = 0.000 Y = 0.000 XY = 61.747 ns
+   ANT 2: X = 5.819 Y = -110.607 XY = -54.664 ns
+   ANT 3: X = 41.057 Y = 23.260 XY = 43.956 ns
+   ANT 4: X = -1.252 Y = -62.857 XY = 0.143 ns
+   ANT 5: X = 22.437 Y = -66.503 XY = -27.188 ns
+   ANT 6: X = 5.574 Y = -56.939 XY = -0.772 ns
+ BAND 2, MJD 59332.202690 - 59332.202806:
+   ANT 1: X = 0.000 Y = 0.000 XY = 49.395 ns
+   ANT 2: X = -95.704 Y = -158.251 XY = -13.173 ns
+   ANT 3: X = 25.897 Y = -23.745 XY = -0.236 ns
+   ANT 4: X = -1.054 Y = -58.136 XY = -7.675 ns
+   ANT 5: X = 10.681 Y = -23.703 XY = 15.016 ns
+   ANT 6: X = 6.031 Y = -56.329 XY = -12.958 ns
+```
+
+The server will begin recomputing the data with these delay corrections applied,
+and when it has finished, NVIS and NSPD should look like the pictures below.
+
+![NVIS after the dcal](nvis_t2_example_dcal.png)
+
+![NSPD after the dcal](nspd_t2_example_dcal.png)
+
