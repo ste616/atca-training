@@ -209,5 +209,16 @@ improve the situation, but it still doesn't look perfect.
 
 The other option might be to use median averaging instead of mean to lessen
 the effect of the RFI. Change back to default tvchannels with `tvch f1 513 1537`
-and then turn on median averaging with `tvmedian on on` (we'll turn on median
-averaging for both IFs, even though we're really only focussed on IF1 for now).
+and then turn on median averaging with `tvmedian on` (in either NSPD or NVIS).
+The display should look like the picture below.
+
+![NVIS after tvmedian is enabled](nvis_t2_median_averaging.png)
+
+Now there doesn't appear to be any blips, but none of the lines are particularly
+flat. This isn't too surprising, since the noise on a median average value is
+larger than for the mean value. For example, if we assume the distribution of delay errors
+is Gaussian, and we draw 1023 random values from the distribution, and we do
+this 30 times, the variance on the 30 median values will be ~78% higher than
+the variance on the mean values.
+
+Let's summarise this section now. We've seen that 
