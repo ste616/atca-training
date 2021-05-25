@@ -502,13 +502,26 @@ static void interpret_command(char *line) {
       data_time_parsed = false;
       action_required = ACTION_DESCRIBE_DATA;
       if (nels == 2) {
-        // The second element should be the time.
-        data_time_parsed = string_to_seconds(line_els[1], &data_seconds);
-        if (data_time_parsed) {
-	  data_selected_index = time_index();
-	  // We'll also want to plot where this time is.
+	// Are we turning off the display?
+	if (strncmp(line_els[1], "off", 3) == 0) {
+	  data_seconds = 0;
+	  data_selected_index = 0;
+	  // Reset the nncal display too.
+	  for (i = 0; i < nncal; i++) {
+	    nncal_indices[i] = -1;
+	    nncal_seconds[i] = -1;
+	  }
+	  action_required -= ACTION_DESCRIBE_DATA;
 	  action_required |= ACTION_REFRESH_PLOT;
-        }
+	} else {
+	  // The second element should be the time.
+	  data_time_parsed = string_to_seconds(line_els[1], &data_seconds);
+	  if (data_time_parsed) {
+	    data_selected_index = time_index();
+	    // We'll also want to plot where this time is.
+	    action_required |= ACTION_REFRESH_PLOT;
+	  }
+	}
       }
       
     } else if (minmatch("calband", line_els[0], 4)) {
