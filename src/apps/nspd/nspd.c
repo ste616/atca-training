@@ -74,8 +74,10 @@ struct nspd_arguments {
 // And some fun, totally necessary, global state variables.
 int action_required, server_type, n_ampphase_options, tvchan_change_min, tvchan_change_max;
 int xaxis_type, yaxis_type, plot_pols, yaxis_scaling, nxpanels, nypanels, plot_decorations;
+int tvmedian_change;
 double mjd_request, mjd_base;
 char hardcopy_filename[SPDBUFSHORT], tvchan_visband[10];
+
 struct spd_plotcontrols spd_plotcontrols;
 struct panelspec spd_panelspec;
 struct spectrum_data spectrum_data;
@@ -195,6 +197,7 @@ static void sighandler(int sig) {
 #define ACTION_UNKNOWN_COMMAND           1<<9
 #define ACTION_HARDCOPY_PLOT             1<<10
 #define ACTION_TVCHANNELS_CHANGED        1<<11
+#define ACTION_TVMEDIAN_CHANGED          1<<12
 
 // Make a shortcut to stop action for those actions which can only be
 // done by a simulator.
@@ -626,6 +629,28 @@ static void interpret_command(char *line) {
 	tvchan_change_max = atoi(line_els[3]);
 	action_required = ACTION_TVCHANNELS_CHANGED;
       }
+    } else if (minmatch("tvmedian", line_els[0], 5)) {
+      // Change the averaging method.
+      if ((nels == 2) || (nels == 3)) {
+	CHECKSIMULATOR;
+	action_required = ACTION_TVMEDIAN_CHANGED;
+	if (nels == 2) {
+	  // We change the method for all IFs.
+	  sprintf(tvchan_visband, "*");
+	} else {
+	  // The user has supplied the IF.
+	  strncpy(tvchan_visband, line_els[1], 10);
+	}
+	// What state to change to?
+	if (strncmp(line_els[nels - 1], "on", 2) == 0) {
+	  tvmedian_change = AVERAGETYPE_MEDIAN;
+	} else if (strncmp(line_els[nels - 1], "off", 3) == 0) {
+	  tvmedian_change = AVERAGETYPE_MEAN;
+	} else {
+	  fprintf(stderr, "Invalid parameter supplied, must be on/off\n");
+	  action_required -= ACTION_TVMEDIAN_CHANGED;
+	}
+      }
     } else {
       action_required = ACTION_UNKNOWN_COMMAND;
     }
@@ -898,6 +923,40 @@ int main(int argc, char *argv[]) {
       }
       readline_print_messages(nmesg, mesgout);
       action_required -= ACTION_TVCHANNELS_CHANGED;
+    }
+
+    if (action_required & ACTION_TVMEDIAN_CHANGED) {
+      // Change the averaging method as requested.
+      nmesg = 0;
+      if (strncmp(tvchan_visband, "*", 1) == 0) {
+	// We make the change in all bands.
+	for (i = 1; i < found_options->num_ifs; i++) {
+	  if (found_options->averaging_method[i] & AVERAGETYPE_MEAN) {
+	    found_options->averaging_method[i] -= AVERAGETYPE_MEAN;
+	  } else if (found_options->averaging_method[i] & AVERAGETYPE_MEDIAN) {
+	    found_options->averaging_method[i] -= AVERAGETYPE_MEDIAN;
+	  }
+	  found_options->averaging_method[i] |= tvmedian_change;
+	}
+	action_required |= ACTION_TIME_REQUEST;
+      } else {
+	bidx = find_if_name_nosafe(spectrum_data.header_data, tvchan_visband);
+	if (bidx < 0) {
+	  // Didn't find the specified band.
+	  snprintf(mesgout[nmesg++], SPDBUFSIZE, "Band %s not found in data.\n",
+		   tvchan_visband);
+	} else {
+	  if (found_options->averaging_method[bidx] & AVERAGETYPE_MEAN) {
+	    found_options->averaging_method[bidx] -= AVERAGETYPE_MEAN;
+	  } else if (found_options->averaging_method[bidx] & AVERAGETYPE_MEDIAN) {
+	    found_options->averaging_method[bidx] -= AVERAGETYPE_MEDIAN;
+	  }
+	  found_options->averaging_method[bidx] |= tvmedian_change;
+	  action_required |= ACTION_TIME_REQUEST;
+	}
+      }
+      readline_print_messages(nmesg, mesgout);
+      action_required -= ACTION_TVMEDIAN_CHANGED;
     }
     
     if ((pending_action >= 0) && (n_cycles > 0)) {
