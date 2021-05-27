@@ -288,3 +288,113 @@ and when it has finished, NVIS and NSPD should look like the pictures below.
 
 ![NSPD after the dcal](nspd_t2_example_dcal.png)
 
+A lot just happened, so let's go through it.
+
+How did we determine the delay errors? NVIS did that by looking at all the
+baselines that were formed with the reference antenna. So we state that
+all the delays are relative to when the wavefront hits CA01, and do not
+add any further delay to that antenna. Then, the delays measured on the baseline
+1-2 (for each polarisation and IF) are the delay errors for CA02, etc.
+
+NVIS then measures the delay error between the X and Y pols on each antenna by
+looking at the noise diode signal, and this becomes the XY delay correction.
+
+How did we correct the data? When the server computes the phases from the raw
+complex data, it incorporates the delay corrections supplied by NVIS. For the
+baseline formed between polarisation m on antenna i and
+polarisation n on antenna j (where i < j), the delay that needs to be added
+is that between the reference antenna and antenna j for pol n, minus the
+delay between the reference antenna and antenna i for pol m.
+
+Then, for each frequency channel, the server computes how many wavelengths that
+delay would represent, and converts this into an angle. Then it rotates the
+raw complex number (let's call that R) in each channel by that
+angle (let's call it &phi;), by multiplying R * (cos(&phi) + i sin(&phi)).
+The result is the delay-corrected complex value, which can then be used to
+calculate phase and amplitude and all the averaged parameters.
+
+In NSPD, the phase is very similar in all of the frequency channels on any
+particular baseline and polarisation product; that is, the slope on the phases
+is now very close to 0. This translates into a very small delay error in NVIS in
+the three cycles that were corrected by the dcal.
+
+In these same three cycles, the NVIS amplitudes and phases change quite
+considerably as well. The phases become stable with time, and the amplitudes
+become higher. If you look at the amplitudes in NSPD for a cycle that has been
+corrected, and for a cycle which hasn't, you won't notice much difference.
+Remind yourself why the NVIS amplitudes change here, if you don't remember,
+by going back to [tutorial 1](../1_introduction/).
+
+OK great, we've seen how to do a perfect dcal. Let's recap:
+* Look at a source with a high flux density.
+* Confirm in (N)SPD that there is a slope in the phase across
+  the band; as we'll see later, (N)VIS delay errors can be misleading.
+* Wait for three cycles of data where the delay errors in (N)VIS aren't
+  significantly changing; if you need to, change the tvchannel range to
+  avoid RFI, or change the averaging method.
+* Do a dcal.
+
+Anybody who has been trained
+in how to operate ATCA will have been shown how to do this, and seen it work.
+
+But it isn't very instructive, as it leaves a lot of questions unanswered.
+* Under what conditions won't it work?
+* What do I do if it hasn't worked?
+* What if I can't look at a source with high flux density?
+* Does it matter if I need to do more than one dcal?
+
+So let's continue our examination of delay calibration.
+
+## RFI
+
+Begin by resetting the delays, by giving the command `reset delays` in
+NVIS. (By the way, this can also be done during real observing, in CACOR,
+to get back to the default delay correction if you've accidentally caused
+decorrelation to occur.)
+
+Now we'll try to calibrate using some cycles that are RFI-affected. In NVIS,
+`data 04:50:32` will select the cycle that has the biggest blip in delay error
+on baseline 12AA. If we were to give the command `dcal` now, NSPD would not
+update to show the effect since the cycle it is displaying is outside the three
+cycles that end at 04:50:32. So instead, let's give the command `dcal after` in
+NVIS. This will make the software work in basically the same way as CACOR, where
+all the data after the last cycle selected by `data` is delay calibrated.
+
+If you look at IF1 in NSPD for a cycle after 04:50:32, you'll see something
+that looks like the picture below.
+
+![NSPD IF1 after dcal with an RFI-affected cycle](nspd_t2_rfi_dcal.png)
+
+The delay calibration has made the situation quite a lot better, and for the
+autocorrelations it has worked exactly as well as before.
+But the phases from boths pols on antenna 2 still have a significant slope across
+the band. Compare the delay corrections NVIS made for this dcal to that for
+the last dcal, and you'll notice that last time the CA02 X-pol delay error was
+calculated to be 5.819 ns, whereas now it was 5.172 ns; for Y-pol it was
+-110.607 ns last time, and -110.919 ns this time. All the other delay
+errors are the same to better than 0.021 ns.
+
+Why did CA02 not work perfectly? It's because the delay on baseline 1-2 was
+most affected by RFI, and antenna 1 was the reference antenna. Since the
+delay corrections are computed by looking only at the baselines formed with
+the reference antenna, the correction for CA02 was incorrectly computed.
+So what do you think will happen if CA02 was the reference antenna instead?
+Try it out!
+```
+NVIS> reset delays
+NVIS> refant 2
+NVIS> dcal after
+```
+
+Now you should see that CA01 phases have a residual slope instead of CA02.
+Logically then, since all other antennas were corrected properly with either
+CA01 and CA02 being the reference antenna, using any other antenna as the
+reference should work fine. And of course, you should test this contention.
+If you try with CA03 or CA06 as reference, you will find this to be the case. But
+if you try with CA04 or CA05 as the reference, then either CA05 or CA04 will
+have a phase slope because the baseline 4-5 was also affected by RFI.
+
+
+
+
+
