@@ -510,3 +510,27 @@ You'll see something similar to the picture below:
 
 ![NVIS after `dcal all` on 0945-321](nvis_t2_0945_dcal_all.png)
 
+Note how the y-axis scaling on the delay panel is basically the same
+regardless of which source is used for the dcal, and it's dominated by the
+noise on 0945-321. When 0945-321 is used though, there are residual
+delay errors on 0823-500 and all these residual errors are within the noise
+range of 0945-321. Clearly then, the noise level is the limit for how
+accurately the delays can be corrected.
+
+OK, so don't use sources with low flux density, right? While you'll almost
+always have a choice of a more fluxy source, maybe the antennas would take
+a long time to point at it, or its at low elevation, or some other reason
+why you might want to use a lower flux density source. So what do we do?
+
+With the delay calibration from 0945-321, this is what NSPD might look like.
+
+![NSPD after `dcal all` on 0945-321](nspd_t2_0945_dcal.png)
+
+It's obvious that we could fit a line to the phase slopes; if only the noise
+was lower we could get a good delay calibration. This is where the **delav**g
+parameter comes in. Go back to NSPD, and give the command `show av`. You will
+see another few colours appear in the legend below each plot, which will be
+labelled with the same polarisation codes but with "v" appended; these are
+the lines as averaged by **delav**g channels. At the moment, delavg is 1, so
+the new lines will be identical to the unaveraged data. But let's change delavg
+to 2, with `delavg 2` in NSPD.
