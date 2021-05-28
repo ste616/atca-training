@@ -533,4 +533,5 @@ see another few colours appear in the legend below each plot, which will be
 labelled with the same polarisation codes but with "v" appended; these are
 the lines as averaged by **delav**g channels. At the moment, delavg is 1, so
 the new lines will be identical to the unaveraged data. But let's change delavg
-to 2, with `delavg 2` in NSPD.
+to 2, with `delavg 2` in NSPD. Now NSPD and NVIS will look something like this:
+
