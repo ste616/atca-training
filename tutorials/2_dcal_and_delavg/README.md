@@ -387,14 +387,126 @@ NVIS> dcal after
 ```
 
 Now you should see that CA01 phases have a residual slope instead of CA02.
-Logically then, since all other antennas were corrected properly with either
+Since all other antennas were corrected properly with either
 CA01 and CA02 being the reference antenna, using any other antenna as the
-reference should work fine. And of course, you should test this contention.
+reference should work fine right? Of course, you should test this contention.
 If you try with CA03 or CA06 as reference, you will find this to be the case. But
 if you try with CA04 or CA05 as the reference, then either CA05 or CA04 will
 have a phase slope because the baseline 4-5 was also affected by RFI.
 
+So you can avoid RFI by selecting a reference antenna which isn't part of any
+baseline that is affected by RFI. Since long baselines are less affected by RFI,
+why wouldn't we always use CA06 as the reference antenna? While you're observing,
+raw data from all the antennas is streaming in to the correlator at a very high
+rate, and the correlator has to have a buffer for all this data because the
+data is coming from the different antennas with different delays due to cable
+lengths, and the geometric delays are always changing as the Earth rotates.
+The memory for the buffer is of course limited, so we can't just allow for any
+possible amount of delay. The buffer is optimal used when the delay
+zero point is towards the centre of the track. That isn't to say you can't use
+CA06 as the delay reference antenna, and indeed in most cases it won't be an
+issue. However, in some circumstances, when the reference antenna is changed
+to and fro, or when multiple dcals are performed and digitisers are reset,
+or if dcals are done on opposite sides of the sky, the delay required gets
+driven towards the edge of the buffer and can cause decorrelation for some
+large hour angles. The best way to avoid this problem is to reset delays
+before doing a dcal, especially if you're changing the reference antenna.
+Or just leave the reference antenna as one of the track antennas, usually CA03.
 
+At this point you should play around with the tools, choosing different
+tvchannel ranges, different reference antennas and different calibration
+times, to see what does and doesn't work very well. Remember to `reset delays`
+between each attempt.
 
+## Bandpass shape, and the two-step dcal
 
+Sometimes you might be forced into using a small bandwidth range to do your
+initial delay calibration. This can happen at 16cm where you need to avoid
+RFI, and in 64 MHz zooms mode. These cases will both be covered in future
+tutorials. Here though we'll investigate it from a more general way.
+
+As we said earlier in this tutorial, there are deviations away from perfect
+linear phases across the band. This is due to how different frequencies are
+received by the antennas. Over wide frequency ranges, the response is
+the same on-average, but this is not the case in very small ranges. Let's
+look at that now, by doing a normal delay calibration first. Set it up
+with:
+```
+NVIS> reset delays
+NVIS> refant 3
+NVIS> tvch f1 513 1537
+NVIS> tvch f2 513 1537
+NVIS> data 04:51
+NVIS> dcal after
+```
+and
+```
+NSPD> get time 04:52
+NSPD> sel f1
+NSPD> p -180 180
+```
+
+You will see the phases go flat across the band, as before. Let's zoom in to
+a small range in NSPD with `ch f1 400 500`. You will see that in this range
+on some IF 1 baselines and pols, the phase doesn't appear to be flat. Let's try
+to dcal with a small range then:
+```
+NVIS> reset delays
+NVIS> tvch f1 400 450
+NVIS> dcal after
+```
+and
+```
+NSPD> ch
+```
+
+Now you will see something that looks like the picture below.
+
+![NSPD after a dcal using a narrow range](nspd_t2_narrowrange_dcal.png)
+
+There is still a residual delay error across the wide band, but in the
+tvchannels (as outlined by the vertical dashed yellow lines), the phase does
+indeed look pretty flat, just as we would expect. From this point, you could
+expand your tvchannel range, and redo the dcal and get a better result.
+
+Since we've already seen that we can make a good delay calibration in a single
+step with this data, this example serves only to show clearly how the phase
+can vary in localised ranges within the wider band. As I said before, future
+tutorials will expand on this in situations where you don't have any other
+choice but to do it this way.
+
+## Delay averaging and the hazards of aliasing
+
+Up until now you may have been wondering why we even observed the source
+0945-321, as we have done nothing with it. We're going to use it now, to
+illustrate one use of the **delav**g parameter, which will come in handy for
+sources with low signal-to-noise.
+
+Begin by resetting the delays, and setting tvchannels back to their defaults,
+and take a good look in NVIS at how the
+delay errors computed for 0945-321 compare to those computed for 0823-500.
+You'll notice that the order of baselines and polarisations (as in from large
+negative errors to large positive errors) is pretty much the same, although
+the magnitudes don't always exactly match, and there's a lot more variation
+in time.
+
+Look at the data in NSPD with `get time 04:48`. You'll see that you can
+still see the phase wrapping, but again, the phase signal will appear more
+noisy than it did on 0823-500.
+
+Let's first answer the question: "If we calibrate the delay errors on 0823-500,
+does the phase become flat on 0945-321?" That's easy to check. Select a time
+in NVIS that will allow you to successfully dcal on 0823-500, and then instead
+of doing `dcal after`, do `dcal all`. You will see in NSPD that the phases
+do become flat, and NVIS will look similar to the picture below.
+
+![NVIS after `dcal all`](nvis_t2_dcal_all.png)
+
+The noise on the delay errors here is the same as it was before the dcal.
+
+The next question is then: "What happens if you try to calibrate the delay
+errors using 0945-321?" Before you do it, try to predict what will happen.
+You'll see something similar to the picture below:
+
+![NVIS after `dcal all` on 0945-321](nvis_t2_0945_dcal_all.png)
 
