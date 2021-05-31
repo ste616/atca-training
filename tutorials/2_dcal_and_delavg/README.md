@@ -535,3 +535,7 @@ the lines as averaged by **delav**g channels. At the moment, delavg is 1, so
 the new lines will be identical to the unaveraged data. But let's change delavg
 to 2, with `delavg 2` in NSPD. Now NSPD and NVIS will look something like this:
 
+![NSPD with `delavg 2`](nspd_t2_delavg2.png)
+
+![NVIS with `delavg 2`](nvis_t2_delavg2.png)
+
