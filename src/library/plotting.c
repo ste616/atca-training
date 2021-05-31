@@ -626,7 +626,7 @@ void plotpanel_minmax(struct ampphase **plot_ampphase,
   int i = 0, j = 0, k = 0, bltype, ant1, ant2;
   float swapf, channelmin, channelmax;
 
-  base_to_ants(plot_ampphase[0]->baseline[plot_baseline_idx], &ant1, &ant2);
+  base_to_ants(plot_ampphase[polidx[0]]->baseline[plot_baseline_idx], &ant1, &ant2);
   if (ant1 == ant2) {
     // Autocorrelation.
     bltype = 0;
@@ -660,23 +660,23 @@ void plotpanel_minmax(struct ampphase **plot_ampphase,
     channelmin = *plotmin_x;
     channelmax = *plotmax_x;
   } else if (plot_controls->plot_options & PLOT_FREQUENCY) {
-    *plotmin_x = plot_ampphase[0]->frequency[0];
-    *plotmax_x = plot_ampphase[0]->frequency
-      [plot_ampphase[0]->nchannels - 1];
+    *plotmin_x = plot_ampphase[polidx[0]]->frequency[0];
+    *plotmax_x = plot_ampphase[polidx[0]]->frequency
+      [plot_ampphase[polidx[0]]->nchannels - 1];
     channelmin = 0;
-    channelmax = plot_ampphase[0]->nchannels;
+    channelmax = plot_ampphase[polidx[0]]->nchannels;
     if (plot_controls->channel_range_limit[plot_if_idx] == 1) {
       if ((plot_controls->channel_range_min[plot_if_idx] >= 0) &&
-          (plot_controls->channel_range_min[plot_if_idx] < plot_ampphase[0]->nchannels)) {
-        *plotmin_x = plot_ampphase[0]->frequency
+          (plot_controls->channel_range_min[plot_if_idx] < plot_ampphase[polidx[0]]->nchannels)) {
+        *plotmin_x = plot_ampphase[polidx[0]]->frequency
           [plot_controls->channel_range_min[plot_if_idx]];
 	channelmin = plot_controls->channel_range_min[plot_if_idx];
       }
       if ((plot_controls->channel_range_max[plot_if_idx] > 0) &&
-          (plot_controls->channel_range_max[plot_if_idx] < plot_ampphase[0]->nchannels) &&
+          (plot_controls->channel_range_max[plot_if_idx] < plot_ampphase[polidx[0]]->nchannels) &&
           (plot_controls->channel_range_max[plot_if_idx] >
 	   plot_controls->channel_range_min[plot_if_idx])) {
-        *plotmax_x = plot_ampphase[0]->frequency
+        *plotmax_x = plot_ampphase[polidx[0]]->frequency
           [plot_controls->channel_range_max[plot_if_idx]];
 	channelmax = plot_controls->channel_range_max[plot_if_idx];
       }
@@ -831,8 +831,8 @@ void plotpanel_minmax(struct ampphase **plot_ampphase,
       // all the plots. But we also need a different Y axis range for
       // auto and cross correlations. So we need to know what type of
       // correlation the specified baseline is first.
-      for (i = 0; i < plot_ampphase[0]->nbaselines; i++) {
-	base_to_ants(plot_ampphase[0]->baseline[i], &ant1, &ant2);
+      for (i = 0; i < plot_ampphase[polidx[0]]->nbaselines; i++) {
+	base_to_ants(plot_ampphase[polidx[0]]->baseline[i], &ant1, &ant2);
 	// TODO: check the antennas are in the array spec.
 	if (((ant1 == ant2) && (bltype == 0)) ||
 	    ((ant1 != ant2) && (bltype == 1))) {

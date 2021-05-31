@@ -539,3 +539,29 @@ to 2, with `delavg 2` in NSPD. Now NSPD and NVIS will look something like this:
 
 ![NVIS with `delavg 2`](nvis_t2_delavg2.png)
 
+In NSPD, the pink and yellow lines are now clearly within the white and
+red lines, but they are still noisy. And in NVIS, the delay error lines on
+0945-321 look like they're actually at similar values to the same lines
+on 0823-500.
+
+What's happened here? When using delavg greater than 1, phase channels are
+averaged together before measuring the delay between adjacent sets of
+averaged channels. Here, with a delavg 2, the phase that is used to calculate
+delays comes from 2 MHz averaged channels; with a tvchannel range of 513 - 1537,
+instead of having 1023 individual delays, we only calculate 511. You can see
+this if you look at `delay` in NSPD. However, these averaged channels are
+used only for delays; the phase and amplitude displayed in NVIS do not change
+with delavg. If the averaged channels were used for amplitude and phase, how
+do you expect them to change?
+
+We've obviously improved the situation with the delay errors in NVIS, but they
+are still too noisy to be usable. Try increasing the delavg parameter until the
+delay lines in NVIS look flat enough to do a successful dcal (it is traditional
+to use powers of two for delavg, but it is not limited to that). Remember to
+compare the delay errors determined on 0823-500 to those determined on 0945-321.
+Feel free to `dcal` to check if delay calibration is successful, but remember
+that if you need to `reset delays`, that will remove all previous delay calibration,
+so you will need to redo the first step each time.
+
+What you will find is that delavg of 8 will allow you to do a pretty successful
+delay calibration, but that delavg of 16 will not work very well.
