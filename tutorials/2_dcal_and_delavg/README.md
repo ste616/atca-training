@@ -564,4 +564,4 @@ that if you need to `reset delays`, that will remove all previous delay calibrat
 so you will need to redo the first step each time.
 
 What you will find is that delavg of 8 will allow you to do a pretty successful
-delay calibration, but that delavg of 16 will not work very well.
+delay calibration, but that delavg of 16 will not work very well. 

@@ -645,14 +645,14 @@ void plotpanel_minmax(struct ampphase **plot_ampphase,
     }
   } else if (plot_controls->plot_options & PLOT_CHANNEL) {
     *plotmin_x = 0;
-    *plotmax_x = plot_ampphase[0]->nchannels;
+    *plotmax_x = plot_ampphase[polidx[0]]->nchannels;
     if (plot_controls->channel_range_limit[plot_if_idx] == 1) {
       if ((plot_controls->channel_range_min[plot_if_idx] >= 0) &&
-          (plot_controls->channel_range_min[plot_if_idx] < plot_ampphase[0]->nchannels)) {
+          (plot_controls->channel_range_min[plot_if_idx] < plot_ampphase[polidx[0]]->nchannels)) {
         *plotmin_x = plot_controls->channel_range_min[plot_if_idx];
       }
       if ((plot_controls->channel_range_max[plot_if_idx] > 0) &&
-          (plot_controls->channel_range_max[plot_if_idx] < plot_ampphase[0]->nchannels) &&
+          (plot_controls->channel_range_max[plot_if_idx] < plot_ampphase[polidx[0]]->nchannels) &&
           (plot_controls->channel_range_max[plot_if_idx] > *plotmin_x)) {
         *plotmax_x = plot_controls->channel_range_max[plot_if_idx];
       }
@@ -2410,8 +2410,8 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
 			     delay_avg_n_bins, delay_avg_n_delays,
 			     i, idxif, npols, polidx,
 			     &xaxis_cmin, &xaxis_cmax, &yaxis_cmin, &yaxis_cmax);
-	    MINASSIGN(xaxis_min, xaxis_cmin);
-	    MAXASSIGN(xaxis_max, xaxis_cmax);
+	    /* MINASSIGN(xaxis_min, xaxis_cmin); */
+	    /* MAXASSIGN(xaxis_max, xaxis_cmax); */
 	    MINASSIGN(yaxis_min, yaxis_cmin);
 	    MAXASSIGN(yaxis_max, yaxis_cmax);
 	  }

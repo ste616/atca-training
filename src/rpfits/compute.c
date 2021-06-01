@@ -458,6 +458,93 @@ void set_default_ampphase_options(struct ampphase_options *options) {
   options->modifiers = NULL;
 }
 
+/*! \brief Set default options in an already existing ampphase_modifiers structure
+ *  \param modifiers the ampphase_modifiers structure to reset to default
+ */
+void set_default_ampphase_modifiers(struct ampphase_modifiers *modifiers) {
+  modifiers->add_delay = false;
+  modifiers->delay_num_antennas = 0;
+  modifiers->delay_num_pols = 0;
+  modifiers->delay_start_mjd = -1;
+  modifiers->delay_end_mjd = -1;
+  modifiers->delay = NULL;
+  modifiers->add_phase = false;
+  modifiers->phase_num_antennas = 0;
+  modifiers->phase_num_pols = 0;
+  modifiers->phase_start_mjd = -1;
+  modifiers->phase_end_mjd = -1;
+  modifiers->phase = NULL;
+}
+
+/*! \brief Add a new modifier to the list of modifiers in an options structure
+ *  \param options the ampphase_options structure to add the modifier to
+ *  \param idx the index in modifiers to add to, which is the IF index
+ *  \returns a pointer to the modifier structure added
+ */
+struct ampphase_modifiers* add_modifier(struct ampphase_options *options,
+					int idx) {
+  struct ampphase_modifiers *new_modifier = NULL;
+  options->num_modifiers[idx] += 1;
+  REALLOC(options->modifiers[idx], options->num_modifiers[idx]);
+  CALLOC(new_modifier, 1);
+  set_default_ampphase_modifiers(new_modifier);
+  options->modifiers[idx][options->num_modifiers[idx] - 1] = new_modifier;
+  return(new_modifier);
+}
+
+/*! \brief Remove some modifiers from the list of modifiers in an options
+ *         structure
+ *  \param options the ampphase_options structure to remove the modifiers from
+ *  \param idx the index in modifiers to remove from, which is the IF index
+ *  \param n_modifiers the number of modifiers in \a modidx, or -1 if all the
+ *                     modifiers should be removed
+ *  \param modidx a 1-D list of the indices of the modifiers in the list that you want
+ *                removed, with length \a n_modifiers, indexed starting at 0
+ */
+void remove_modifiers(struct ampphase_options *options, int idx, int n_modifiers,
+		      int *modidx) {
+  int *local_modidx = NULL, i, j, len_local = 0;
+
+  // Make a local copy of the modidx.
+  if ((n_modifiers > 0) && (modidx != NULL)) {
+    CALLOC(local_modidx, n_modifiers);
+    for (i = 0; i < n_modifiers; i++) {
+      local_modidx[i] = modidx[i];
+    }
+    // And sort it into ascending order.
+    len_local = n_modifiers;
+    qsort(local_modidx, len_local, sizeof(int), cmpfunc_integer);
+  } else if (n_modifiers == -1) {
+    // Make the local array contain all the indices.
+    len_local = options->num_modifiers[idx];
+    CALLOC(local_modidx, len_local);
+    for (i = 0; i < len_local; i++) {
+      local_modidx[i] = i;
+    }
+  }
+
+  // Go through the modifiers backwards.
+  for (i = (len_local - 1); i >= 0; i--) {
+    // Free the modifier memory.
+    free_ampphase_modifiers(options->modifiers[idx][local_modidx[i]]);
+    FREE(options->modifiers[idx][local_modidx[i]]);
+    // Copy all those later in the list backwards.
+    for (j = i; j < (options->num_modifiers[idx] - 1); j++) {
+      options->modifiers[idx][j] = options->modifiers[idx][j + 1];
+    }
+    options->num_modifiers[idx] -= 1;
+  }
+  // Reallocate the memory.
+  if (options->num_modifiers[idx] > 0) {
+    REALLOC(options->modifiers[idx], options->num_modifiers[idx]);
+  } else {
+    FREE(options->modifiers[idx]);
+  }
+
+  // Free our local memory.
+  FREE(local_modidx);
+}
+
 /*!
  *  \brief Copy one ampphase_modifiers structure into another
  *  \param dest the destinations structure which will be over-written
@@ -471,6 +558,11 @@ void copy_ampphase_modifiers(struct ampphase_modifiers *dest,
   STRUCTCOPY(src, dest, delay_num_pols);
   STRUCTCOPY(src, dest, delay_start_mjd);
   STRUCTCOPY(src, dest, delay_end_mjd);
+  STRUCTCOPY(src, dest, add_phase);
+  STRUCTCOPY(src, dest, phase_num_antennas);
+  STRUCTCOPY(src, dest, phase_num_pols);
+  STRUCTCOPY(src, dest, phase_start_mjd);
+  STRUCTCOPY(src, dest, phase_end_mjd);
   if (dest->delay_num_antennas > 0) {
     CALLOC(dest->delay, dest->delay_num_antennas);
     for (i = 0; i < dest->delay_num_antennas; i++) {
@@ -483,6 +575,19 @@ void copy_ampphase_modifiers(struct ampphase_modifiers *dest,
     }
   } else {
     dest->delay = NULL;
+  }
+  if (dest->phase_num_antennas > 0) {
+    CALLOC(dest->phase, dest->phase_num_antennas);
+    for (i = 0; i < dest->phase_num_antennas; i++) {
+      if (dest->phase_num_pols > 0) {
+	CALLOC(dest->phase[i], dest->phase_num_pols);
+	for (j = 0; j < dest->phase_num_pols; j++) {
+	  STRUCTCOPY(src, dest, phase[i][j]);
+	}
+      }
+    }
+  } else {
+    dest->phase = NULL;
   }
 }
 
@@ -540,6 +645,10 @@ void free_ampphase_modifiers(struct ampphase_modifiers *modifiers) {
     FREE(modifiers->delay[i]);
   }
   FREE(modifiers->delay);
+  for (i = 0; i < modifiers->phase_num_antennas; i++) {
+    FREE(modifiers->phase[i]);
+  }
+  FREE(modifiers->phase);
 }
 
 /*!
@@ -924,10 +1033,10 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
   int j = 0, k = 0, jflag = 0, vidx = -1, cidx = -1, ifno, syscal_if_idx = -1;
   int syscal_pol_idx = -1, pidx1, pidx2;
   float rcheck = 0, chanwidth, firstfreq, nhalfchan, total_delay = 0;
-  float delay_angle;
+  float phase_correction_angle, delay_angle;
   double cmjd;
-  bool needs_new_options = false, correct_delay = false;
-  float complex delay;
+  bool needs_new_options = false, correct_delay = false, correct_phase = false;
+  float complex phase_correction;
   struct ampphase_options *band_options = NULL;
   
   // Check we know about the window number we were given.
@@ -1289,11 +1398,24 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
     cidx = cycle_data->bin[i] - 1;
     // Check for a modifier which might need us to add some delay.
     total_delay = 0;
+    phase_correction_angle = 0;
     correct_delay = false;
+    correct_phase = false;
     for (k = 0; k < band_options->num_modifiers[ifnum]; k++) {
       /* printf(" modifier found MJD %.6f - %.6f\n", */
       /* 	     band_options->modifiers[ifnum][k]->delay_start_mjd, */
       /* 	     band_options->modifiers[ifnum][k]->delay_end_mjd); */
+      /* printf(" modifier found for:\n"); */
+      /* if (band_options->modifiers[ifnum][k]->add_delay) { */
+      /* 	printf("   delay (MJD %.6f - %.6f)\n", */
+      /* 	       band_options->modifiers[ifnum][k]->delay_start_mjd, */
+      /* 	       band_options->modifiers[ifnum][k]->delay_end_mjd); */
+      /* } */
+      /* if (band_options->modifiers[ifnum][k]->add_phase) { */
+      /* 	printf("   phase (MJD %.6f - %.6f)\n", */
+      /* 	       band_options->modifiers[ifnum][k]->phase_start_mjd, */
+      /* 	       band_options->modifiers[ifnum][k]->phase_end_mjd); */
+      /* } */
       if ((band_options->modifiers[ifnum][k]->add_delay) &&
 	  (cmjd >= band_options->modifiers[ifnum][k]->delay_start_mjd) &&
 	  (cmjd <= band_options->modifiers[ifnum][k]->delay_end_mjd)) {
@@ -1314,6 +1436,22 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
 	/*        total_delay); */
 	correct_delay = true;
       }
+      if ((band_options->modifiers[ifnum][k]->add_phase) &&
+	  (cmjd >= band_options->modifiers[ifnum][k]->phase_start_mjd) &&
+	  (cmjd <= band_options->modifiers[ifnum][k]->phase_end_mjd)) {
+	if (cycle_data->ant1[i] != cycle_data->ant2[i]) {
+	  phase_correction_angle +=
+	    (band_options->modifiers[ifnum][k]->phase[cycle_data->ant2[i]][pidx2] -
+	     band_options->modifiers[ifnum][k]->phase[cycle_data->ant1[i]][pidx1]);
+	} else if (pol == POL_XY) {
+	  phase_correction_angle +=
+	    band_options->modifiers[ifnum][k]->phase[cycle_data->ant1[i]][POL_XY];
+	} else if (pol == POL_YX) {
+	  phase_correction_angle -=
+	    band_options->modifiers[ifnum][k]->phase[cycle_data->ant1[i]][POL_XY];
+	}
+	correct_phase = true;
+      }
     }
     for (j = 0, jflag = 0; j < (*ampphase)->nchannels; j++) {
       vidx = reqpol + j * scan_header_data->if_num_stokes[ifno];
@@ -1322,8 +1460,13 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
 	delay_angle = -2.0 * M_PI * total_delay * (*ampphase)->frequency[j] / 1000.0;
 	/* printf(" delay %.3f frequency %.3f angle = %.6f\n", total_delay, (*ampphase)->frequency[j], */
 	/*        delay_angle); */
-	delay = cos(delay_angle) + I * sin(delay_angle);
-	(*ampphase)->raw[bidx][cidx][j] = cycle_data->vis[i][vidx] * delay;
+      } else {
+	delay_angle = 0;
+      }
+      if (correct_delay || correct_phase) {
+	phase_correction = cos(phase_correction_angle + delay_angle) +
+	  I * sin(phase_correction_angle + delay_angle);
+	(*ampphase)->raw[bidx][cidx][j] = cycle_data->vis[i][vidx] * phase_correction;
       } else {
 	(*ampphase)->raw[bidx][cidx][j] = cycle_data->vis[i][vidx];
       }
@@ -1447,6 +1590,20 @@ int cmpfunc_real(const void *a, const void *b) {
 int cmpfunc_complex(const void *a, const void *b) {
   const float va = cabsf(*(float complex *)a);
   const float vb = cabsf(*(float complex *)b);
+  return ( (va > vb) - (va < vb) );
+}
+
+/*!
+ *  \brief A qsort comparator function for integer real type numbers
+ *  \param a a pointer to a number
+ *  \param b a pointer to another number
+ *  \return - 0 if the two dereferenced numbers are equal
+ *          - -1 if the dereferenced \a b number is larger
+ *          - +1 if the dereferenced \a a number is larger
+ */
+int cmpfunc_integer(const void *a, const void *b) {
+  const int va = *(int *)a;
+  const int vb = *(int *)b;
   return ( (va > vb) - (va < vb) );
 }
 
@@ -1826,12 +1983,29 @@ bool ampphase_modifiers_match(struct ampphase_modifiers *a,
       (a->delay_num_antennas == b->delay_num_antennas) &&
       (a->delay_num_pols == b->delay_num_pols) &&
       (a->delay_start_mjd == b->delay_start_mjd) &&
-      (a->delay_end_mjd == b->delay_end_mjd)) {
+      (a->delay_end_mjd == b->delay_end_mjd) &&
+      (a->add_phase == b->add_phase) &&
+      (a->phase_num_antennas == b->phase_num_antennas) &&
+      (a->phase_num_pols == b->phase_num_pols) &&
+      (a->phase_start_mjd == b->phase_start_mjd) &&
+      (a->phase_end_mjd == b->phase_end_mjd)) {
     // Looks good so far, now check the delay settings.
     match = true;
     for (i = 0; i < a->delay_num_antennas; i++) {
       for (j = 0; j < b->delay_num_pols; j++) {
 	if (a->delay[i][j] != b->delay[i][j]) {
+	  match = false;
+	  break;
+	}
+      }
+      if (!match) {
+	break;
+      }
+    }
+    // And check the phase settings.
+    for (i = 0; i < a->phase_num_antennas; i++) {
+      for (j = 0; j < b->phase_num_pols; j++) {
+	if (a->phase[i][j] != b->phase[i][j]) {
 	  match = false;
 	  break;
 	}

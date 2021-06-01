@@ -61,6 +61,7 @@ static struct argp_option nvis_options[] = {
 #define VISBUFMEDIUM 768
 #define VISBUFLONG 1280
 #define MAXVISBANDS 2
+#define MAXNNCAL 10
 
 // The arguments structure.
 struct nvis_arguments {
@@ -198,12 +199,13 @@ static void sighandler(int sig) {
 #define ACTION_HARDCOPY_PLOT             1<<15
 #define ACTION_COMPUTE_DELAYS            1<<16
 #define ACTION_RESET_DELAYS              1<<17
+#define ACTION_COMPUTE_PHASECORRECTIONS  1<<18
 
 // The action modifier magic numbers.
 #define ACTIONMOD_NOMOD                  0
-#define ACTIONMOD_DELAYCORRECT_ALL       1
-#define ACTIONMOD_DELAYCORRECT_AFTER     2
-#define ACTIONMOD_DELAYCORRECT_BEFORE    3
+#define ACTIONMOD_CORRECT_ALL            1
+#define ACTIONMOD_CORRECT_AFTER          2
+#define ACTIONMOD_CORRECT_BEFORE         3
 
 // Make a shortcut to stop action for those actions which can only be
 // done by a simulator.
@@ -828,22 +830,31 @@ static void interpret_command(char *line) {
 	printf(" NNCAL = %d\n", nncal);
       } else {
 	succ = string_to_integer(line_els[1], &temp_nncal);
-	if (succ && (temp_nncal > 0)) {
+	if (succ && (temp_nncal > 0) && (temp_nncal <= MAXNNCAL)) {
 	  nncal = temp_nncal;
 	  REALLOC(nncal_indices, nncal);
 	  REALLOC(nncal_seconds, nncal);
 	  // Re-compute the indices if we can.
 	  time_index();
 	  action_required = ACTION_REFRESH_PLOT;
+	} else if (succ && (temp_nncal > MAXNNCAL)) {
+	  printf(" Unable to set NNCAL higher than %d\n", MAXNNCAL);
+	} else {
+	  printf(" INVALID NNCAL PARAMETER\n");
 	}
       }
-    } else if (minmatch("dcal", line_els[0], 4)) {
+    } else if ((minmatch("dcal", line_els[0], 4)) ||
+	       (minmatch("pcal", line_els[0], 4))) {
       CHECKSIMULATOR;
-      // Compute the delays required to correct the data and then tell the server
+      // Compute the delays or phases required to correct the data and then tell the server
       // to incorporate them.
       // Check if a time range has been specified.
       if (data_seconds < 0) {
-	printf(" Unable to dcal: please select a time range with data and nncal\n");
+	if (minmatch("dcal", line_els[0], 4)) {
+	  printf(" Unable to dcal: please select a time range with data and nncal\n");
+	} else if (minmatch("pcal", line_els[0], 4)) {
+	  printf(" Unable to pcal: please select a time range with data and nncal\n");
+	}
       } else {
 	// Check that we have enough cycles of data.
 	temp_nncal = 0;
@@ -853,19 +864,28 @@ static void interpret_command(char *line) {
 	  }
 	}
 	if (temp_nncal != nncal) {
-	  printf(" Unable to dcal: need %d consecutive cycles of data, please change data and/or nncal\n",
+	  if (minmatch("dcal", line_els[0], 4)) {
+	    printf(" Unable to dcal: ");
+	  } else if (minmatch("pcal", line_els[0], 4)) {
+	    printf(" Unable to pcal: ");
+	  }
+	  printf("need %d consecutive cycles of data, please change data and/or nncal\n",
 		 nncal);
 	} else {
-	  action_required = ACTION_COMPUTE_DELAYS;
+	  if (minmatch("dcal", line_els[0], 4)) {
+	    action_required = ACTION_COMPUTE_DELAYS;
+	  } else if (minmatch("pcal", line_els[0], 4)) {
+	    action_required = ACTION_COMPUTE_PHASECORRECTIONS;
+	  }
 	  // Check if we have any modifiers.
 	  if (nels == 2) {
 	    if (minmatch("all", line_els[1], 3)) {
 	      // We make the correction for the entire dataset.
-	      action_modifier = ACTIONMOD_DELAYCORRECT_ALL;
+	      action_modifier = ACTIONMOD_CORRECT_ALL;
 	    } else if (minmatch("after", line_els[1], 3)) {
-	      action_modifier = ACTIONMOD_DELAYCORRECT_AFTER;
+	      action_modifier = ACTIONMOD_CORRECT_AFTER;
 	    } else if (minmatch("before", line_els[1], 3)) {
-	      action_modifier = ACTIONMOD_DELAYCORRECT_BEFORE;
+	      action_modifier = ACTIONMOD_CORRECT_BEFORE;
 	    }
 	  }
 	}
@@ -937,9 +957,10 @@ static void interpret_command(char *line) {
 
 int main(int argc, char *argv[]) {
   struct nvis_arguments arguments;
-  int i, j, k, l, m, r, bytes_received, nmesg = 0, bidx = -1, num_timelines = 0;
+  int i, j, k, l, m, r, bytes_received, nmesg = 0, bidx = -1, num_timelines = 0, pnum;
   int dump_type = FILETYPE_UNKNOWN, dump_device_number = -1, vis_device_number = -1;
-  int *timeline_types = NULL, cycidx, visidx, a1, a2;
+  int *timeline_types = NULL, cycidx, visidx, a1, a2, *mod_remove = NULL, n_mod_remove = 0;
+  int alabel;
   cmp_ctx_t cmp;
   cmp_mem_access_t mem;
   struct requests server_request;
@@ -951,7 +972,8 @@ int main(int argc, char *argv[]) {
   fd_set watchset, reads;
   bool vis_device_opened = false, dump_device_opened = false;
   size_t recv_buffer_length;
-  float *timelines = NULL, *timeline_deltas = NULL, dsign = 1;
+  float *timelines = NULL, *timeline_deltas = NULL, dsign = 1, p1, p2, p3, pd1, pd2, pd3;
+  float phase_cals[MAXNNCAL][POL_XY + 1][MAX_ANTENNANUM];
   double tmjd;
   struct vis_quantities ***described_ptr = NULL;
   struct scan_header_data *described_hdr = NULL;
@@ -1122,57 +1144,111 @@ int main(int argc, char *argv[]) {
     }
 
     if ((action_required & ACTION_COMPUTE_DELAYS) ||
-	(action_required & ACTION_RESET_DELAYS)) {
+	(action_required & ACTION_RESET_DELAYS) ||
+	(action_required & ACTION_COMPUTE_PHASECORRECTIONS)) {
       action_required |= ACTION_AMPPHASE_OPTIONS_CHANGED;
       nmesg = 0;
       for (j = 0; j < nvisbands; j++) {
 	visidx = visband_idx[j] - 1;
 	if (action_required & ACTION_RESET_DELAYS) {
-	  // Remove all modifiers in the options.
+	  // Remove all modifiers that have delay corrections in the options.
+	  n_mod_remove = 0;
+	  mod_remove = NULL;
 	  for (i = 0; i < found_options->num_modifiers[visband_idx[j]]; i++) {
-	    free_ampphase_modifiers(found_options->modifiers[visband_idx[j]][i]);
-	    FREE(found_options->modifiers[visband_idx[j]][i]);
+	    if (found_options->modifiers[visband_idx[j]][i]->add_delay) {
+	      n_mod_remove += 1;
+	      REALLOC(mod_remove, n_mod_remove);
+	      mod_remove[n_mod_remove - 1] = i;
+	    }
+	    /* free_ampphase_modifiers(found_options->modifiers[visband_idx[j]][i]); */
+	    /* FREE(found_options->modifiers[visband_idx[j]][i]); */
 	  }
-	  found_options->num_modifiers[visband_idx[j]] = 0;
-	  FREE(found_options->modifiers[visband_idx[j]]);
-	} else if (action_required & ACTION_COMPUTE_DELAYS) {
+	  remove_modifiers(found_options, visband_idx[j], n_mod_remove, mod_remove);
+	  FREE(mod_remove);
+	  /* found_options->num_modifiers[visband_idx[j]] = 0; */
+	  /* FREE(found_options->modifiers[visband_idx[j]]); */
+	} else if ((action_required & ACTION_COMPUTE_DELAYS) ||
+		   (action_required & ACTION_COMPUTE_PHASECORRECTIONS)) {
 	  // Create a new modifier in the options.
-	  found_options->num_modifiers[visband_idx[j]] += 1;
-	  REALLOC(found_options->modifiers[visband_idx[j]],
-		  found_options->num_modifiers[visband_idx[j]]);
-	  CALLOC(found_options->modifiers[visband_idx[j]]
-		 [found_options->num_modifiers[visband_idx[j]] - 1], 1);
-	  modptr = found_options->modifiers[visband_idx[j]]
-	    [found_options->num_modifiers[visband_idx[j]] - 1];
-	  modptr->add_delay = true;
-	  modptr->delay_num_antennas = 7;
-	  modptr->delay_num_pols = POL_XY + 1;
-	  CALLOC(modptr->delay, modptr->delay_num_antennas);
-	  for (i = 0; i < modptr->delay_num_antennas; i++) {
-	    CALLOC(modptr->delay[i], modptr->delay_num_pols);
+	  modptr = add_modifier(found_options, visband_idx[j]);
+	  /* found_options->num_modifiers[visband_idx[j]] += 1; */
+	  /* REALLOC(found_options->modifiers[visband_idx[j]], */
+	  /* 	  found_options->num_modifiers[visband_idx[j]]); */
+	  /* CALLOC(found_options->modifiers[visband_idx[j]] */
+	  /* 	 [found_options->num_modifiers[visband_idx[j]] - 1], 1); */
+	  /* modptr = found_options->modifiers[visband_idx[j]] */
+	  /*   [found_options->num_modifiers[visband_idx[j]] - 1]; */
+	  if (action_required & ACTION_COMPUTE_DELAYS) {
+	    modptr->add_delay = true;
+	    modptr->delay_num_antennas = 7;
+	    modptr->delay_num_pols = POL_XY + 1;
+	    CALLOC(modptr->delay, modptr->delay_num_antennas);
+	    for (i = 0; i < modptr->delay_num_antennas; i++) {
+	      CALLOC(modptr->delay[i], modptr->delay_num_pols);
+	    }
 	  }
-	  if ((action_modifier == ACTIONMOD_DELAYCORRECT_ALL) ||
-	      (action_modifier == ACTIONMOD_DELAYCORRECT_BEFORE)) {
-	    modptr->delay_start_mjd = 0;
+	  if (action_required & ACTION_COMPUTE_PHASECORRECTIONS) {
+	    modptr->add_phase = true;
+	    modptr->phase_num_antennas = 7;
+	    modptr->phase_num_pols = POL_XY + 1;
+	    CALLOC(modptr->phase, modptr->phase_num_antennas);
+	    for (i = 0; i < modptr->phase_num_antennas; i++) {
+	      CALLOC(modptr->phase[i], modptr->phase_num_pols);
+	    }
+	  }
+	  if ((action_modifier == ACTIONMOD_CORRECT_ALL) ||
+	      (action_modifier == ACTIONMOD_CORRECT_BEFORE)) {
+	    if (action_required & ACTION_COMPUTE_DELAYS) {
+	      modptr->delay_start_mjd = 0;
+	    }
+	    if (action_required & ACTION_COMPUTE_PHASECORRECTIONS) {
+	      modptr->phase_start_mjd = 0;
+	    }
 	  } else {
-	    modptr->delay_start_mjd =
-	      date2mjd(vis_data.vis_quantities[nncal_indices[0]][0][0]->obsdate,
-		       vis_data.vis_quantities[nncal_indices[0]][0][0]->ut_seconds);
+	    if (action_required & ACTION_COMPUTE_DELAYS) {
+	      modptr->delay_start_mjd =
+		date2mjd(vis_data.vis_quantities[nncal_indices[0]][0][0]->obsdate,
+			 vis_data.vis_quantities[nncal_indices[0]][0][0]->ut_seconds);
+	    }
+	    if (action_required & ACTION_COMPUTE_PHASECORRECTIONS) {
+	      modptr->phase_start_mjd =
+		date2mjd(vis_data.vis_quantities[nncal_indices[0]][0][0]->obsdate,
+			 vis_data.vis_quantities[nncal_indices[0]][0][0]->ut_seconds);
+	    }
 	  }
-	  if ((action_modifier == ACTIONMOD_DELAYCORRECT_ALL) ||
-	      (action_modifier == ACTIONMOD_DELAYCORRECT_AFTER)) {
-	    modptr->delay_end_mjd = 100000; // This is 2132-SEP-01.
+	  if ((action_modifier == ACTIONMOD_CORRECT_ALL) ||
+	      (action_modifier == ACTIONMOD_CORRECT_AFTER)) {
+	    if (action_required & ACTION_COMPUTE_DELAYS) {
+	      modptr->delay_end_mjd = 100000; // This is 2132-SEP-01.
+	    }
+	    if (action_required & ACTION_COMPUTE_PHASECORRECTIONS) {
+	      modptr->phase_end_mjd = 100000;
+	    }
 	  } else {
-	    modptr->delay_end_mjd =
-	      date2mjd(vis_data.vis_quantities[nncal_indices[nncal - 1]][0][0]->obsdate,
-		       vis_data.vis_quantities[nncal_indices[nncal - 1]][0][0]->ut_seconds);
+	    if (action_required & ACTION_COMPUTE_DELAYS) {
+	      modptr->delay_end_mjd =
+		date2mjd(vis_data.vis_quantities[nncal_indices[nncal - 1]][0][0]->obsdate,
+			 vis_data.vis_quantities[nncal_indices[nncal - 1]][0][0]->ut_seconds);
+	    }
+	    if (action_required & ACTION_COMPUTE_PHASECORRECTIONS) {
+	      modptr->phase_end_mjd =
+		date2mjd(vis_data.vis_quantities[nncal_indices[nncal - 1]][0][0]->obsdate,
+			 vis_data.vis_quantities[nncal_indices[nncal - 1]][0][0]->ut_seconds);
+	    }
 	  }
-	  if (modptr->delay_end_mjd < modptr->delay_start_mjd) {
+	  if ((action_required & ACTION_COMPUTE_DELAYS) &&
+	      (modptr->delay_end_mjd < modptr->delay_start_mjd)) {
 	    tmjd = modptr->delay_start_mjd;
 	    modptr->delay_start_mjd = modptr->delay_end_mjd;
 	    modptr->delay_end_mjd = tmjd;
 	  }
-	  
+	  if ((action_required & ACTION_COMPUTE_PHASECORRECTIONS) &&
+	      (modptr->phase_end_mjd < modptr->phase_start_mjd)) {
+	    tmjd = modptr->phase_start_mjd;
+	    modptr->phase_start_mjd = modptr->phase_end_mjd;
+	    modptr->phase_end_mjd = tmjd;
+	  }
+
 	  for (i = 0; i < nncal; i++) {
 	    cycidx = nncal_indices[i];
 	    for (k = 0; k < vis_data.num_pols[cycidx][visidx]; k++) {
@@ -1202,9 +1278,19 @@ int main(int argc, char *argv[]) {
 		      /* 	     cycidx, visidx, */
 		      /* 	     vis_data.vis_quantities[cycidx][visidx][k]->pol, a1, a2, */
 		      /* 	     vis_data.vis_quantities[cycidx][visidx][k]->delay[m][0]); */
-		      modptr->delay[vis_data.header_data[cycidx]->ant_label[l]]
-			[vis_data.vis_quantities[cycidx][visidx][k]->pol - 2] += dsign *
-			vis_data.vis_quantities[cycidx][visidx][k]->delay[m][0] / (float)nncal;
+		      if (action_required & ACTION_COMPUTE_DELAYS) {
+			modptr->delay[vis_data.header_data[cycidx]->ant_label[l]]
+			  [vis_data.vis_quantities[cycidx][visidx][k]->pol - 2] += dsign *
+			  vis_data.vis_quantities[cycidx][visidx][k]->delay[m][0] / (float)nncal;
+		      }
+		      if (action_required & ACTION_COMPUTE_PHASECORRECTIONS) {
+			phase_cals[i][vis_data.vis_quantities[cycidx][visidx][k]->pol - 2]
+			  [vis_data.header_data[cycidx]->ant_label[l]] =
+			  vis_data.vis_quantities[cycidx][visidx][k]->phase[m][0];
+			/* modptr->phase[vis_data.header_data[cycidx]->ant_label[l]] */
+			/*   [vis_data.vis_quantities[cycidx][visidx][k]->pol - 2] += dsign * */
+			/*   vis_data.vis_quantities[cycidx][visidx][k]->phase[m][0] / (float)nncal; */
+		      }
 		    }
 		  }
 		}
@@ -1216,30 +1302,83 @@ int main(int argc, char *argv[]) {
 				 &a1, &a2);
 		    if ((a1 == vis_data.header_data[cycidx]->ant_label[l]) &&
 			(a2 == vis_data.header_data[cycidx]->ant_label[l])) {
-		      // We get the delay and add it to the Y pol.
-		      modptr->delay[vis_data.header_data[cycidx]->ant_label[l]][POL_XY] +=
-			vis_data.vis_quantities[cycidx][visidx][k]->delay[m][1] / (float)nncal;
+		      if (action_required & ACTION_COMPUTE_DELAYS) {
+			// We get the delay and add it to the Y pol.
+			modptr->delay[vis_data.header_data[cycidx]->ant_label[l]][POL_XY] +=
+			  vis_data.vis_quantities[cycidx][visidx][k]->delay[m][1] / (float)nncal;
+		      }
+		      if (action_required & ACTION_COMPUTE_PHASECORRECTIONS) {
+			phase_cals[i][POL_XY]
+			  [vis_data.header_data[cycidx]->ant_label[l]] =
+			  vis_data.vis_quantities[cycidx][visidx][k]->phase[m][0];
+		      }
 		    }
 		  }
 		}
 	      }
 	    }
 	  }
-	  // Print out the delay corrections found.
-	  snprintf(mesgout[nmesg++], VISBUFLONG, " BAND %d, MJD %.6f - %.6f:\n", visband_idx[j],
-		   modptr->delay_start_mjd, modptr->delay_end_mjd);
-	  for (l = 0; l < vis_data.header_data[nncal_indices[0]]->num_ants; l++) {
-	    snprintf(mesgout[nmesg++], VISBUFLONG, "   ANT %d: X = %.3f Y = %.3f XY = %.3f ns\n",
-		     vis_data.header_data[nncal_indices[0]]->ant_label[l],
-		     modptr->delay[vis_data.header_data[nncal_indices[0]]->ant_label[l]][POL_X],
-		     modptr->delay[vis_data.header_data[nncal_indices[0]]->ant_label[l]][POL_Y],
-		     modptr->delay[vis_data.header_data[nncal_indices[0]]->ant_label[l]][POL_XY]);
+	  if (action_required & ACTION_COMPUTE_DELAYS) {
+	    // Print out the delay corrections found.
+	    snprintf(mesgout[nmesg++], VISBUFLONG, " BAND %d, MJD %.6f - %.6f:\n", visband_idx[j],
+		     modptr->delay_start_mjd, modptr->delay_end_mjd);
+	    for (l = 0; l < vis_data.header_data[nncal_indices[0]]->num_ants; l++) {
+	      snprintf(mesgout[nmesg++], VISBUFLONG, "   ANT %d: X = %.3f Y = %.3f XY = %.3f ns\n",
+		       vis_data.header_data[nncal_indices[0]]->ant_label[l],
+		       modptr->delay[vis_data.header_data[nncal_indices[0]]->ant_label[l]][POL_X],
+		       modptr->delay[vis_data.header_data[nncal_indices[0]]->ant_label[l]][POL_Y],
+		       modptr->delay[vis_data.header_data[nncal_indices[0]]->ant_label[l]][POL_XY]);
+	    }
+	  }
+	  if (action_required & ACTION_COMPUTE_PHASECORRECTIONS) {
+	    // We first have to rationalise the phase terms so we don't get affected
+	    // by wrapping.
+	    for (k = 0; k < 3; k++) {
+	      switch (k) {
+	      case 0:
+		pnum = POL_X;
+		break;
+	      case 1:
+		pnum = POL_Y;
+		break;
+	      case 2:
+		pnum = POL_XY;
+		break;
+	      }
+	      for (l = 0; l < vis_data.header_data[nncal_indices[0]]->num_ants; l++) {
+		alabel = vis_data.header_data[nncal_indices[0]]->ant_label[l];
+		for (i = 1; i < nncal; i++) {
+		  // Generate 3 options for this phase.
+		  p1 = phase_cals[i][pnum][alabel];
+		  p2 = phase_cals[i][pnum][alabel] + 180;
+		  p3 = phase_cals[i][pnum][alabel] - 180;
+		  // And then measure the difference between these options and the
+		  // last phase value.
+		  pd1 = fabsf(p1 - phase_cals[i - 1][pnum][alabel]);
+		  pd2 = fabsf(p2 - phase_cals[i - 1][pnum][alabel]);
+		  pd3 = fabsf(p3 - phase_cals[i - 1][pnum][alabel]);
+		  // Set this phase now to the value with the smallest difference.
+		  if (pd2 < pd1) {
+		    phase_cals[i][pnum][alabel] = p2;
+		    pd1 = pd2;
+		  }
+		  if (pd3 < pd1) {
+		    phase_cals[i][pnum][alabel] = p3;
+		  }
+		}
+		// Now set the correction value.
+		
+	      }
+	    }
 	  }
 	}
       }
       readline_print_messages(nmesg, mesgout);
       if (action_required & ACTION_COMPUTE_DELAYS) {
 	action_required -= ACTION_COMPUTE_DELAYS;
+      }
+      if (action_required & ACTION_COMPUTE_PHASECORRECTIONS) {
+	action_required -= ACTION_COMPUTE_PHASECORRECTIONS;
       }
       if (action_required & ACTION_RESET_DELAYS) {
 	action_required -= ACTION_RESET_DELAYS;

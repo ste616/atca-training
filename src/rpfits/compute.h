@@ -159,11 +159,50 @@ struct ampphase_modifiers {
   /*! \var delay
    *  \brief The amount of delay (in ns) to add to each antenna and polarisation
    *
-   * This is a 2-D array of floats. The first index has size `num_antennas` and is
-   * indexed starting at 1, while the second index has size `num_pols` and is indexed
+   * This is a 2-D array of floats. The first index has size `delay_num_antennas` and is
+   * indexed starting at 1, while the second index has size `delay_num_pols` and is indexed
    * starting at `POL_X` and ending at `POL_Y`.
    */
   float **delay;
+
+  /*! \var add_phase
+   *  \brief Flag to indicate whether the phase parameters in this structure hold
+   *         values that should be added to the data (if set to true) or ignored
+   *         (if set to false)
+   */
+  bool add_phase;
+
+  /*! \var phase_num_antennas
+   *  \brief The number of antennas with phase values (should always be 7)
+   */
+  int phase_num_antennas;
+
+  /*! \var phase_num_pols
+   *  \brief The number of polarisations for each antenna with phase values
+   *         (should always be 6)
+   */
+  int phase_num_pols;
+
+  /*! \var phase_start_mjd
+   *  \brief The earliest MJD for which to correct the phase in the data
+   */
+  double phase_start_mjd;
+
+  /*! \var phase_end_mjd
+   *  \brief The latest MJD for which to correct the phase in the data (or 0
+   *         to correct all data after \a phase_start_mjd)
+   */
+  double phase_end_mjd;
+
+  /*! \var phase
+   *  \brief The amount of phase (in radians) to add to each antenna and
+   *         polarisation
+   *
+   * This is a 2-D array of floats. The first index has size `phase_num_antennas` and
+   * is indexed starting at 1, which the second index has size `phase_num_pols` and is
+   * indexed starting at `POL_X` and ending at `POL_Y`.
+   */
+  float **phase;
   
 };
 
@@ -1212,6 +1251,10 @@ void free_vis_quantities(struct vis_quantities **vis_quantities);
 int polarisation_number(char *polstring);
 struct ampphase_options ampphase_options_default(void);
 void set_default_ampphase_options(struct ampphase_options *options);
+void set_default_ampphase_modifiers(struct ampphase_modifiers *modifiers);
+struct ampphase_modifiers* add_modifier(struct ampphase_options *options, int idx);
+void remove_modifiers(struct ampphase_options *options, int idx, int n_modifiers,
+		      int *modidx);
 void copy_ampphase_modifiers(struct ampphase_modifiers *dest,
 			     struct ampphase_modifiers *src);
 void copy_ampphase_options(struct ampphase_options *dest,
@@ -1239,6 +1282,7 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
                  struct ampphase_options ***options);
 int cmpfunc_real(const void *a, const void *b);
 int cmpfunc_complex(const void *a, const void *b);
+int cmpfunc_integer(const void *a, const void *b);
 int ampphase_average(struct scan_header_data *scan_header_data,
 		     struct ampphase *ampphase,
                      struct vis_quantities **vis_quantities,
