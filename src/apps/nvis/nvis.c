@@ -973,7 +973,7 @@ int main(int argc, char *argv[]) {
   bool vis_device_opened = false, dump_device_opened = false;
   size_t recv_buffer_length;
   float *timelines = NULL, *timeline_deltas = NULL, dsign = 1, p1, p2, p3, pd1, pd2, pd3;
-  float phase_cals[MAXNNCAL][POL_XY + 1][MAX_ANTENNANUM];
+  float phase_cals[POL_XY + 1][MAX_ANTENNANUM][MAXNNCAL];
   double tmjd;
   struct vis_quantities ***described_ptr = NULL;
   struct scan_header_data *described_hdr = NULL;
@@ -1284,8 +1284,8 @@ int main(int argc, char *argv[]) {
 			  vis_data.vis_quantities[cycidx][visidx][k]->delay[m][0] / (float)nncal;
 		      }
 		      if (action_required & ACTION_COMPUTE_PHASECORRECTIONS) {
-			phase_cals[i][vis_data.vis_quantities[cycidx][visidx][k]->pol - 2]
-			  [vis_data.header_data[cycidx]->ant_label[l]] =
+			phase_cals[vis_data.vis_quantities[cycidx][visidx][k]->pol - 2]
+			  [vis_data.header_data[cycidx]->ant_label[l]][i] = dsign *
 			  vis_data.vis_quantities[cycidx][visidx][k]->phase[m][0];
 			/* modptr->phase[vis_data.header_data[cycidx]->ant_label[l]] */
 			/*   [vis_data.vis_quantities[cycidx][visidx][k]->pol - 2] += dsign * */
@@ -1308,8 +1308,8 @@ int main(int argc, char *argv[]) {
 			  vis_data.vis_quantities[cycidx][visidx][k]->delay[m][1] / (float)nncal;
 		      }
 		      if (action_required & ACTION_COMPUTE_PHASECORRECTIONS) {
-			phase_cals[i][POL_XY]
-			  [vis_data.header_data[cycidx]->ant_label[l]] =
+			phase_cals[POL_XY]
+			  [vis_data.header_data[cycidx]->ant_label[l]][i] =
 			  vis_data.vis_quantities[cycidx][visidx][k]->phase[m][0];
 		      }
 		    }
@@ -1349,14 +1349,14 @@ int main(int argc, char *argv[]) {
 		alabel = vis_data.header_data[nncal_indices[0]]->ant_label[l];
 		for (i = 1; i < nncal; i++) {
 		  // Generate 3 options for this phase.
-		  p1 = phase_cals[i][pnum][alabel];
-		  p2 = phase_cals[i][pnum][alabel] + 180;
-		  p3 = phase_cals[i][pnum][alabel] - 180;
+		  p1 = phase_cals[pnum][alabel][i];
+		  p2 = phase_cals[pnum][alabel][i] + 180;
+		  p3 = phase_cals[pnum][alabel][i] - 180;
 		  // And then measure the difference between these options and the
 		  // last phase value.
-		  pd1 = fabsf(p1 - phase_cals[i - 1][pnum][alabel]);
-		  pd2 = fabsf(p2 - phase_cals[i - 1][pnum][alabel]);
-		  pd3 = fabsf(p3 - phase_cals[i - 1][pnum][alabel]);
+		  pd1 = fabsf(p1 - phase_cals[pnum][alabel][i - 1]);
+		  pd2 = fabsf(p2 - phase_cals[pnum][alabel][i - 1]);
+		  pd3 = fabsf(p3 - phase_cals[pnum][alabel][i - 1]);
 		  // Set this phase now to the value with the smallest difference.
 		  if (pd2 < pd1) {
 		    phase_cals[i][pnum][alabel] = p2;
@@ -1367,8 +1367,23 @@ int main(int argc, char *argv[]) {
 		  }
 		}
 		// Now set the correction value.
-		
+		modptr->phase[alabel][pnum] =
+		  fmeanf(phase_cals[pnum][alabel], nncal) * M_PI / 180;
 	      }
+	    }
+	    // Print out the phase corrections.
+	    snprintf(mesgout[nmesg++], VISBUFLONG, " BAND %d, MJD %.6f - %.6f:\n",
+		     visband_idx[j], modptr->phase_start_mjd, modptr->phase_end_mjd);
+	    for (l = 0; l < vis_data.header_data[nncal_indices[0]]->num_ants; l++) {
+	      snprintf(mesgout[nmesg++], VISBUFLONG,
+		       "   ANT %d: X = %.1f Y = %.1f XY = %.1f deg\n",
+		       vis_data.header_data[nncal_indices[0]]->ant_label[l],
+		       modptr->phase[vis_data.header_data[nncal_indices[0]]->ant_label[l]][POL_X] *
+		       180 / M_PI,
+		       modptr->phase[vis_data.header_data[nncal_indices[0]]->ant_label[l]][POL_Y] *
+		       180 / M_PI,
+		       modptr->phase[vis_data.header_data[nncal_indices[0]]->ant_label[l]][POL_XY] *
+		       180 / M_PI);
 	    }
 	  }
 	}

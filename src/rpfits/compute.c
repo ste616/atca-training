@@ -1464,8 +1464,8 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
 	delay_angle = 0;
       }
       if (correct_delay || correct_phase) {
-	phase_correction = cos(phase_correction_angle + delay_angle) +
-	  I * sin(phase_correction_angle + delay_angle);
+	phase_correction = cos(delay_angle - phase_correction_angle) +
+	  I * sin(delay_angle - phase_correction_angle);
 	(*ampphase)->raw[bidx][cidx][j] = cycle_data->vis[i][vidx] * phase_correction;
       } else {
 	(*ampphase)->raw[bidx][cidx][j] = cycle_data->vis[i][vidx];
