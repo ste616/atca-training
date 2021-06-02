@@ -275,7 +275,7 @@ to this command.
 
 #### dcal
 
-Format: **dcal**
+Format: **dcal** [*before*/*after*/*all*]
 
 This command computes the delay corrections required from the **nncal**
 cycles before (and including) the time specified by the **dat**a command, and then
@@ -313,8 +313,14 @@ with the delay determined from the data in ns, for each of the X and Y receptors
 with respect to the reference antenna), and the delay between the X and Y receptors
 given as `XY` for each antenna.
 
-The delay will only be corrected for the **nncal** cycles selected. While
-the server recomputes the data, `nvis` will continue to show the current data.
+When used without arguments, the delay will only be corrected for the **nncal** cycles
+selected. If used with the *before* argument, all cycles up to and including
+the first cycle in the **nncal** selection will be corrected. If used with the
+*after* argument, all cycles beginning with the last cycle in the **nncal** selection
+and afterwards will be corrected. If used with the *all* argument, all data will
+be corrected.
+
+While the server recomputes the data, `nvis` will continue to show the current data.
 
 ---
 
@@ -417,6 +423,56 @@ in the array specification are tracking the same source position.
 
 ---
 
+#### pcal
+
+Format: **pcal** [*before*/*after*/*all*]
+
+This command computes the phase corrections required from the **ncal**
+cycles before (and including) the time specified by the **dat**a command, and
+then sends these phase corrections to the server which recomputes the data
+incorporating them.
+
+The phase corrections are determiend by looking at the phase values that `nvis`
+knows about, so they depend on the settings of **tvch** and **tvmed**ian. The
+exact corrections are always made with respect to what **ref**ant is set to.
+
+This command will output something like the following to the controlling
+terminal:
+```
+NVIS> pcal
+ BAND 1, MJD 59332.201996 - 59332.202111:
+   ANT 1: X = -56.5 Y = -30.1 XY = 148.3 deg
+   ANT 2: X = -47.3 Y = 90.3 XY = -127.8 deg
+   ANT 3: X = 0.0 Y = 0.0 XY = 86.4 deg
+   ANT 4: X = -88.2 Y = -78.7 XY = 80.1 deg
+   ANT 5: X = -167.9 Y = -88.4 XY = -175.5 deg
+   ANT 6: X = 51.2 Y = 14.8 XY = 82.6 deg
+ BAND 2, MJD 59332.201996 - 59332.202111:
+   ANT 1: X = -82.7 Y = 90.2 XY = 69.3 deg
+   ANT 2: X = -14.7 Y = -21.4 XY = -47.4 deg
+   ANT 3: X = 0.0 Y = 0.0 XY = -151.4 deg
+   ANT 4: X = 95.3 Y = -28.4 XY = 122.8 deg
+   ANT 5: X = 28.4 Y = 119.9 XY = -67.8 deg
+   ANT 6: X = -48.2 Y = 63.0 XY = 32.1 deg
+```
+
+For each of the calbands, the MJD range for the corrections is specified,
+along with the phase determined from the data in degrees, for each of the X
+and Y receptors (where the reference antenna is set to have 0 phase and
+all other antennas are with respect to the reference antenna), and the phase
+between the X and Y receptors given as `XY` for each antenna.
+
+When used without arguments, the phases will only be corrected for the **nncal**
+cycles selected. If used with the *before* argument, all cycles up to and including
+the first cycle in the **nncal** selection will be corrected. If used with the
+*after* argument, all cycles beginning with the last cycle in the **nncal** selection
+and afterwards will be corrected. If used with the *all* argument, all data will
+be corrected.
+
+While the server recomputes the data, `nvis` will continue to show the curent data.
+
+---
+
 #### print
 
 Format: **pr**int *quantity*
@@ -497,6 +553,14 @@ Format: **reset** *parameter*
 This command sets the *parameter* back to its default value or state. This
 command accepts only a single argument, which must be one of the following.
 
+##### all
+
+Format: **reset** **all**
+
+Remove all phase and delay corrections from the currently selected
+calbands. `nvis` will then ask the server to recompute the data, and will
+continue to show the current data until the server responds.
+
 ##### delays
 
 Format: **reset** **del**ays
@@ -504,6 +568,15 @@ Format: **reset** **del**ays
 Remove all delay corrections from the currently selected calbands. `nvis`
 will then ask the server to recompute the data, and will continue to show
 the current data until the server responds.
+
+##### phases
+
+Format: **reset** **pha**ses
+
+Remove all phase corrections from the currently selected calbands. `nvis`
+will then ask the server to recompute the data, and will continue to show
+the current data until the server responds.
+
 
 ---
 

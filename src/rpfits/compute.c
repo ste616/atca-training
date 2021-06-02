@@ -529,7 +529,7 @@ void remove_modifiers(struct ampphase_options *options, int idx, int n_modifiers
     free_ampphase_modifiers(options->modifiers[idx][local_modidx[i]]);
     FREE(options->modifiers[idx][local_modidx[i]]);
     // Copy all those later in the list backwards.
-    for (j = i; j < (options->num_modifiers[idx] - 1); j++) {
+    for (j = local_modidx[i]; j < (options->num_modifiers[idx] - 1); j++) {
       options->modifiers[idx][j] = options->modifiers[idx][j + 1];
     }
     options->num_modifiers[idx] -= 1;

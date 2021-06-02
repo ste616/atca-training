@@ -200,6 +200,7 @@ static void sighandler(int sig) {
 #define ACTION_COMPUTE_DELAYS            1<<16
 #define ACTION_RESET_DELAYS              1<<17
 #define ACTION_COMPUTE_PHASECORRECTIONS  1<<18
+#define ACTION_RESET_PHASECORRECTIONS    1<<19
 
 // The action modifier magic numbers.
 #define ACTIONMOD_NOMOD                  0
@@ -894,11 +895,18 @@ static void interpret_command(char *line) {
       CHECKSIMULATOR;
       if (nels == 1) {
 	// Can't reset nothing, need another argument.
-	printf(" Reset needs an argument (delays)\n");
+	printf(" Reset needs an argument (delays/phases/all)\n");
       } else if (minmatch("delays", line_els[1], 3)) {
 	// Remove any delay modifiers from our correction list, and then tell the server
 	// to do its thing.
 	action_required = ACTION_RESET_DELAYS;
+      } else if (minmatch("phases", line_els[1], 3)) {
+	// Remove any phase correction modifiers from our list, and then tell the server
+	// to do its thing.
+	action_required = ACTION_RESET_PHASECORRECTIONS;
+      } else if (minmatch("all", line_els[1], 3)) {
+	// Remove all modifiers.
+	action_required = ACTION_RESET_DELAYS | ACTION_RESET_PHASECORRECTIONS;
       }
     } else {
       if (nels == 1) {
@@ -972,7 +980,8 @@ int main(int argc, char *argv[]) {
   fd_set watchset, reads;
   bool vis_device_opened = false, dump_device_opened = false;
   size_t recv_buffer_length;
-  float *timelines = NULL, *timeline_deltas = NULL, dsign = 1, p1, p2, p3, pd1, pd2, pd3;
+  float *timelines = NULL, *timeline_deltas = NULL, dsign = 1;
+  float p1 = 0, p2 = 0, p3 = 0, pd1 = 0, pd2 = 0, pd3 = 0;
   float phase_cals[POL_XY + 1][MAX_ANTENNANUM][MAXNNCAL];
   double tmjd;
   struct vis_quantities ***described_ptr = NULL;
@@ -1145,17 +1154,22 @@ int main(int argc, char *argv[]) {
 
     if ((action_required & ACTION_COMPUTE_DELAYS) ||
 	(action_required & ACTION_RESET_DELAYS) ||
-	(action_required & ACTION_COMPUTE_PHASECORRECTIONS)) {
+	(action_required & ACTION_COMPUTE_PHASECORRECTIONS) ||
+	(action_required & ACTION_RESET_PHASECORRECTIONS)) {
       action_required |= ACTION_AMPPHASE_OPTIONS_CHANGED;
       nmesg = 0;
       for (j = 0; j < nvisbands; j++) {
 	visidx = visband_idx[j] - 1;
-	if (action_required & ACTION_RESET_DELAYS) {
+	if ((action_required & ACTION_RESET_DELAYS) ||
+	    (action_required & ACTION_RESET_PHASECORRECTIONS)) {
 	  // Remove all modifiers that have delay corrections in the options.
 	  n_mod_remove = 0;
 	  mod_remove = NULL;
 	  for (i = 0; i < found_options->num_modifiers[visband_idx[j]]; i++) {
-	    if (found_options->modifiers[visband_idx[j]][i]->add_delay) {
+	    if (((action_required & ACTION_RESET_DELAYS) &&
+		 (found_options->modifiers[visband_idx[j]][i]->add_delay)) ||
+		((action_required & ACTION_RESET_PHASECORRECTIONS) &&
+		 (found_options->modifiers[visband_idx[j]][i]->add_phase))) {
 	      n_mod_remove += 1;
 	      REALLOC(mod_remove, n_mod_remove);
 	      mod_remove[n_mod_remove - 1] = i;
@@ -1397,6 +1411,9 @@ int main(int argc, char *argv[]) {
       }
       if (action_required & ACTION_RESET_DELAYS) {
 	action_required -= ACTION_RESET_DELAYS;
+      }
+      if (action_required & ACTION_RESET_PHASECORRECTIONS) {
+	action_required -= ACTION_RESET_PHASECORRECTIONS;
       }
     }
     
