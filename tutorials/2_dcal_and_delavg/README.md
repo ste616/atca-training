@@ -402,13 +402,14 @@ rate, and the correlator has to have a buffer for all this data because the
 data is coming from the different antennas with different delays due to cable
 lengths, and the geometric delays are always changing as the Earth rotates.
 The memory for the buffer is of course limited, so we can't just allow for any
-possible amount of delay. The buffer is optimal used when the delay
+possible amount of delay. The buffer is optimally used when the delay
 zero point is towards the centre of the track. That isn't to say you can't use
 CA06 as the delay reference antenna, and indeed in most cases it won't be an
 issue. However, in some circumstances, when the reference antenna is changed
 to and fro, or when multiple dcals are performed and digitisers are reset,
 or if dcals are done on opposite sides of the sky, the delay required gets
-driven towards the edge of the buffer and can cause decorrelation for some
+driven towards the edge of the buffer (because each dcal is additive to the
+total delay) and can cause decorrelation for some
 large hour angles. The best way to avoid this problem is to reset delays
 before doing a dcal, especially if you're changing the reference antenna.
 Or just leave the reference antenna as one of the track antennas, usually CA03.
@@ -561,7 +562,44 @@ to use powers of two for delavg, but it is not limited to that). Remember to
 compare the delay errors determined on 0823-500 to those determined on 0945-321.
 Feel free to `dcal` to check if delay calibration is successful, but remember
 that if you need to `reset delays`, that will remove all previous delay calibration,
-so you will need to redo the first step each time.
+so you will need to redo the first step each time. (Side note: this is the
+primary purpose of this tutorial and this software, to enable you to play around
+at your own pace and learn what works and doesn't.)
 
-What you will find is that delavg of 8 will allow you to do a pretty successful
-delay calibration, but that delavg of 16 will not work very well. 
+You will find that there isn't one perfect way to do this multi-step dcal. Between each
+dcal you might need to increase delavg, or change tvchannels, or change the
+time that you select in NVIS. Try to do the dcal with different times.
+
+With each dcal, you want to get the phase to wrap less. But it is definitely
+possible to make the situation worse and get the phase to wrap even more.
+For example, you might start, after one dcal with `delavg 1`, with the situation
+pictured below.
+
+![NSPD, after a dcal, with `delavg 32`](nspd_t2_delavg32.png)
+
+Here, after the dcal I have set `delavg 32`, and now the yellow and pink lines
+are much less noisy. For most baseline and polarisation products, these averaged
+lines follow their unaveraged equivalents very well. However, let's look more closely
+at a smaller range of channels.
+
+![NSPD, after a dcal, with `delavg 32`, looking at a narrow channel range](nspd_t2_delavg32_narrow.png)
+
+For all the AA white lines, the pink lines match very well. But for the BB
+red lines on baselines involving antenna 2, the yellow lines don't seem to
+line up properly. And we can see this also on NVIS.
+
+![NVIS, after a dcal, with `delavg 32`](nvis_t2_delavg32_bb.png)
+
+On 0945-321, on the antenna 2 BB baselines, the delay errors don't appear stable, but
+all the other baselines look quite good. The problem here is one of aliasing, since the
+phase is wrapping in less than 32 channels. Hence, more than an entire wrap of the phase will
+be averaged into some value, which when considered with the adjacent averaged phases will
+result in a misestimation of the delay error. Indeed, if you look closely at the
+phase on baseline 1-2, you will notice that the red BB phase looks to be wrapping with a
+decreasing slope with increasing frequency, implying a negative delay error. In contrast,
+the yellow averaged BB phase appears to be increasing with increasing frequency; and in
+NVIS you can see that the 12BB delay error does appear to have a positive value.
+
+If we were to dcal now then, we could in fact make the delay error worse! (Try it though.)
+
+While 
