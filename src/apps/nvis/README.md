@@ -121,7 +121,9 @@ C         | Computed System Temperature: the system temperature of each antenna,
 d         | Delay: the delay error as determined by examining the phases as a function of frequency
 D         | Wind Direction: the direction the wind is coming from
 G         | GTP: the gated total power measured online
+h         | Hour angle, which is LST - source RA
 H         | Humidity: as reported by the site weather station
+L         | Local Sidereal Time, in hours
 n         | The amplitude of the noise diode in Jy: this is measured per antenna
 N         | SDO: the synchronously-demodulated output measured online
 p         | Phase: the average phase on each baseline per cycle
@@ -131,7 +133,9 @@ S         | System Temperature: the system temperature of each antenna, as compu
 t         | Time: the UTC, can be used as an x-axis
 T         | Temperature: as reported by the site weather station
 V         | Wind Speed: as reported by the site weather station
+x         | Source Right Ascension, in hours
 X         | Seeing Monitor Phase: the phase measured on the seeing monitor interferometer
+y         | Source Declination, in degrees
 Y         | Seeing Monitor RMS Phase: the phase RMS noise measured on the seeing monitor interferometer
 
 For each panel, a label indicating what it is can be found on the left of the
