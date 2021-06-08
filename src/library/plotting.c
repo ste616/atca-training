@@ -267,7 +267,7 @@ void change_vis_plotcontrols_limits(struct vis_plotcontrols *plotcontrols,
   }
 }
 
-#define NAVAILABLE_PANELS 17
+#define NAVAILABLE_PANELS 21
 const int available_panels[NAVAILABLE_PANELS] = { VIS_PLOTPANEL_AMPLITUDE,
                                                   VIS_PLOTPANEL_PHASE,
                                                   VIS_PLOTPANEL_DELAY,
@@ -284,7 +284,11 @@ const int available_panels[NAVAILABLE_PANELS] = { VIS_PLOTPANEL_AMPLITUDE,
                                                   VIS_PLOTPANEL_GTP,
                                                   VIS_PLOTPANEL_SDO,
                                                   VIS_PLOTPANEL_CALJY,
-						  VIS_PLOTPANEL_CLOSUREPHASE };
+						  VIS_PLOTPANEL_CLOSUREPHASE,
+						  VIS_PLOTPANEL_HOURANGLE,
+						  VIS_PLOTPANEL_RIGHTASCENSION,
+						  VIS_PLOTPANEL_DECLINATION,
+						  VIS_PLOTPANEL_SIDEREALTIME };
 
 bool product_can_be_x(int product) {
   switch (product) {
@@ -1132,7 +1136,7 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
   float cxpos, dxpos, labtotalwidth, labspacing, dy, maxwidth, twidth;
   float padlabel = 0.01, cch, timeline_x[2], timeline_y[2];
   float ***antlines = NULL, maxch = 1.1, num_panels;
-  double basemjd, chktime, min_time, max_time;
+  double basemjd, chktime, min_time, max_time, lst;
   char xopts[BUFSIZE], yopts[BUFSIZE], panellabel[BUFSIZE], panelunits[BUFSIZE];
   char antstring[BUFSIZE], bandstring[BUFSIZE], panelerror[BUFSIZE];
   struct vis_line **vis_lines = NULL, **tsys_vis_lines = NULL, **meta_vis_line = NULL;
@@ -1610,7 +1614,11 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
                (plot_controls->panel_type[i] == VIS_PLOTPANEL_WINDDIR) ||
                (plot_controls->panel_type[i] == VIS_PLOTPANEL_RAINGAUGE) ||
                (plot_controls->panel_type[i] == VIS_PLOTPANEL_SEEMONPHASE) ||
-               (plot_controls->panel_type[i] == VIS_PLOTPANEL_SEEMONRMS)) {
+               (plot_controls->panel_type[i] == VIS_PLOTPANEL_SEEMONRMS) ||
+	       (plot_controls->panel_type[i] == VIS_PLOTPANEL_RIGHTASCENSION) ||
+	       (plot_controls->panel_type[i] == VIS_PLOTPANEL_DECLINATION) ||
+	       (plot_controls->panel_type[i] == VIS_PLOTPANEL_HOURANGLE) ||
+	       (plot_controls->panel_type[i] == VIS_PLOTPANEL_SIDEREALTIME)) {
       // Make a metadata plot that only has a single site-based line.
       panel_n_vis_lines[i] = 1;
       MALLOC(plot_lines[i], 1);
@@ -1667,7 +1675,26 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
             } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_SEEMONRMS) {
               plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
                 metinfo[k]->seemon_rms;
-            }
+            } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_RIGHTASCENSION) {
+	      plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
+		header_data[k]->rightascension_hours[cycle_vis_quantities[k][l][m]->source_no];
+	    } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_DECLINATION) {
+	      plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
+		header_data[k]->declination_degrees[cycle_vis_quantities[k][l][m]->source_no];
+	    } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_HOURANGLE) {
+	      // We'll need to fix this to get the correct dUT1 for any particular
+	      // date, and perhaps to programmatically decide longitude based on array.
+	      lst = mjd2lst(date2mjd(cycle_vis_quantities[k][l][m]->obsdate,
+				     cycle_vis_quantities[k][l][m]->ut_seconds),
+			    ATCA_LONGITUDE_TURNS, 37);
+	      plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
+		lst - header_data[k]->rightascension_hours[cycle_vis_quantities[k][l][m]->source_no];
+	    } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_SIDEREALTIME) {
+	      plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
+		mjd2lst(date2mjd(cycle_vis_quantities[k][l][m]->obsdate,
+				 cycle_vis_quantities[k][l][m]->ut_seconds),
+			ATCA_LONGITUDE_TURNS, 37);
+	    }
             MINASSIGN(min_y, plot_lines[i][j][1][n_plot_lines[i][j] - 1]);
             MAXASSIGN(max_y, plot_lines[i][j][1][n_plot_lines[i][j] - 1]);
             dbrk = 1;
@@ -1862,6 +1889,18 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
     } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_CLOSUREPHASE) {
       (void)strcpy(panellabel, "Closure Phase");
       (void)strcpy(panelunits, "(degrees)");
+    } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_RIGHTASCENSION) {
+      (void)strcpy(panellabel, "Right Asc.");
+      (void)strcpy(panelunits, "(hours)");
+    } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_DECLINATION) {
+      (void)strcpy(panellabel, "Declination");
+      (void)strcpy(panelunits, "(degrees)");
+    } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_HOURANGLE) {
+      (void)strcpy(panellabel, "Hour Angle");
+      (void)strcpy(panelunits, "(hours)");
+    } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_SIDEREALTIME) {
+      (void)strcpy(panellabel, "Sidereal Time");
+      (void)strcpy(panelunits, "(hours)");
     }
     cpgmtxt("L", 2.2, 0.5, 0.5, panellabel);
     cpgmtxt("R", 2.2, 0.5, 0.5, panelunits);

@@ -388,6 +388,11 @@ void generate_client_id(char *client_id, size_t maxlen) {
   *p = 0;
 }
 
+/*!
+ *  \brief Indicate if a year is a leap year
+ *  \param year an integer full year number (eg. 2021)
+ *  \returns 1 if \a year is a leap year, or 0 otherwise
+ */
 int leap(int year) {
   // Return 1 if the year is a leap year.
   return (((!(year % 4)) &&
@@ -395,6 +400,13 @@ int leap(int year) {
 	  (!(year % 400)));
 }
 
+/*!
+ *  \brief Indicate if the day number is OK, given a month and year
+ *  \param day integer day number of the month (1 - 31)
+ *  \param month integer month number of the year (1 - 12)
+ *  \param year integer full year
+ *  \returns 1 if \a day is valid for \a month in \a year, or 0 otherwise
+ */
 int dayOK(int day, int month, int year) {
   int ndays = 31;
   if ((month == 4) || (month == 6) ||
@@ -413,6 +425,14 @@ int dayOK(int day, int month, int year) {
   return 1;
 }
 
+/*!
+ *  \brief Convert a calendar date (UTC) into MJD number
+ *  \param day integer day number of the month (1 - 31)
+ *  \param month integer month number of the year (1 - 12)
+ *  \param year integer full year
+ *  \param ut_seconds the number of seconds past midnight on the specified date
+ *  \returns the MJD as a double
+ */
 double cal2mjd(int day, int month, int year, float ut_seconds) {
   // Converts a calendar date (Universal Time) into modified
   // Julian day number.
@@ -450,6 +470,14 @@ double cal2mjd(int day, int month, int year, float ut_seconds) {
   return (mjd);
 }
 
+/*!
+ *  \brief Convert RPFITS time fields into MJD
+ *  \param obsdate the RPFITS-style string representing the date
+ *  \param ut_seconds the RPFITS time value
+ *  \returns the MJD as a double
+ *
+ * This routine uses the cal2mjd routine internally.
+ */
 double date2mjd(char *obsdate, float ut_seconds) {
   // Parse the RPFITS obsdate.
   int year, month, day;
@@ -459,6 +487,37 @@ double date2mjd(char *obsdate, float ut_seconds) {
   }
 
   return 0;
+}
+
+/*!
+ *  \brief Convert MJD to sidereal time at Greenwich
+ *  \param mjd the MJD
+ *  \param dut1 the offset between UTC and UT1, in seconds
+ *  \returns the GMST in turns
+ */
+double mjd2gst(double mjd, int dut1) {
+  double a, b, e, d, tu, sidtim, gmst;
+  
+  a = 101.0 + 24110.54581 / 86400.0;
+  b = 8640184.812886 / 86400.0;
+  e = 0.093104 / 86400.0;
+  d = 0.0000062 / 86400.0;
+  tu = (mjd - (2451545.0 - 2400000.5)) / 36525.0;
+  sidtim = turn_fraction(a + tu * (b + tu * (e - tu * d)));
+  gmst = turn_fraction(sidtim + (mjd - floor(mjd) + (double)dut1 / 86400.0) *
+		       1.002737909350795);
+  return (gmst);
+}
+
+/*!
+ *  \brief Convert MJD to sidereal time as some longitude
+ *  \param mjd the MJD
+ *  \param longitude the longitude to calculate sidereal time at
+ *  \param dut1 the offset between UTC and UT1, in seconds
+ *  \returns the LST in hours
+ */
+double mjd2lst(double mjd, double longitude, int dut1) {
+  return (24.0 * turn_fraction(mjd2gst(mjd, dut1) + longitude));
 }
 
 void mjd2cal(double mjd, int *year, int *month, int *day, float *ut_seconds) {
@@ -870,4 +929,27 @@ void current_time_string(char *s, size_t l) {
   timeinfo = localtime(&now);
   
   strftime(s, l, "%Y-%m-%d_%H%M%S", timeinfo);
+}
+
+/*!
+ *  \brief Given any number, put it between 0 and some other number
+ *  \param n the number
+ *  \param b the maximum value to return
+ */
+double number_bounds(double n, double b) {
+  while (n > b) {
+    n -= b;
+  }
+  while (n < 0) {
+    n += b;
+  }
+  return n;
+}
+
+/*!
+ *  \brief Specific version of number_bounds, for turns, b = 1.
+ *  \param f the number
+ */
+double turn_fraction(double f) {
+  return(number_bounds(f, 1));
 }

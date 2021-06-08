@@ -271,8 +271,12 @@ int char_to_product(char pstring) {
     return VIS_PLOTPANEL_WINDDIR;
   case 'G':
     return VIS_PLOTPANEL_GTP;
+  case 'h':
+    return VIS_PLOTPANEL_HOURANGLE;
   case 'H':
     return VIS_PLOTPANEL_HUMIDITY;
+  case 'L':
+    return VIS_PLOTPANEL_SIDEREALTIME;
   case 'n':
     return VIS_PLOTPANEL_CALJY;
   case 'N':
@@ -292,8 +296,12 @@ int char_to_product(char pstring) {
     return VIS_PLOTPANEL_TEMPERATURE;
   case 'V':
     return VIS_PLOTPANEL_WINDSPEED;
+  case 'x':
+    return VIS_PLOTPANEL_RIGHTASCENSION;
   case 'X':
     return VIS_PLOTPANEL_SEEMONPHASE;
+  case 'y':
+    return VIS_PLOTPANEL_DECLINATION;
   case 'Y':
     return VIS_PLOTPANEL_SEEMONRMS;
   }

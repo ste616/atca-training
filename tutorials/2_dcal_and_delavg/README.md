@@ -592,14 +592,38 @@ line up properly. And we can see this also on NVIS.
 
 On 0945-321, on the antenna 2 BB baselines, the delay errors don't appear stable, but
 all the other baselines look quite good. The problem here is one of aliasing, since the
-phase is wrapping in less than 32 channels. Hence, more than an entire wrap of the phase will
+phase is wrapping in fewer than 32 channels. Hence, more than an entire wrap of the phase will
 be averaged into some value, which when considered with the adjacent averaged phases will
 result in a misestimation of the delay error. Indeed, if you look closely at the
-phase on baseline 1-2, you will notice that the red BB phase looks to be wrapping with a
-decreasing slope with increasing frequency, implying a negative delay error. In contrast,
+phase on baseline 1-2, you will notice that the red BB phase looks to be wrapping with
+decreasing value with increasing frequency, implying a negative delay error. In contrast,
 the yellow averaged BB phase appears to be increasing with increasing frequency; and in
 NVIS you can see that the 12BB delay error does appear to have a positive value.
 
 If we were to dcal now then, we could in fact make the delay error worse! (Try it though.)
 
-While 
+Try as you might though, you'll never be able to drive the delays to a point where
+the amplitude drops. While using the telescope though, it is very possible
+to do this. Practice with this software to make sure that you'll be comfortable
+with the process when you need to do it for real.
+
+## Summary
+
+This tutorial covered the dcal process in detail. You should now know:
+
+* How delay error is measured from the correlated phases
+* How RFI can affect the phases, and how to avoid RFI with tvchannels, or
+  lessen its effect with tvmedian
+* How the chosen reference antenna affects the dcal
+* How to determine if a dcal will work from the delays shown in (N)VIS
+* How to determine if a dcal is needed at all, with (N)SPD
+* How delavg works, and its pitfalls
+* That the values shown in (N)VIS have several manipulations applied which
+  can make the (N)VIS display misleading
+
+Here's a few questions and challenges to see how well you understand the
+system.
+
+* Take a look back at the first NVIS plot we showed in this tutorial. Why does the
+  12AA line look like a sine-squared function while observing 0823-500? Hint: change
+  the tvchannels to make the signal clearer. (MODERATE)
