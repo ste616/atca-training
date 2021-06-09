@@ -34,6 +34,13 @@
 #define PLOT_TVCHANNELS           1<<15
 #define PLOT_AVERAGED_DATA        1<<16
 
+#define PLOTTIME_UTC              1
+#define PLOTTIME_AEST             2
+#define PLOTTIME_AEDT             3
+#define PLOTTIME_AWST             4
+#define PLOTTIME_GMST             5
+#define PLOTTIME_LST              6
+
 #define PLOT_FLAG_POL_XX             1<<1
 #define PLOT_FLAG_POL_YY             1<<2
 #define PLOT_FLAG_POL_XY             1<<3
@@ -305,6 +312,11 @@ struct vis_plotcontrols {
    *         PLOT_* magic numbers defined in this header
    */
   int x_axis_type;
+  /*! \var time_type
+   *  \brief The type of time to plot, as one of the PLOTTIME_* magic
+   *         numbers defined in this header
+   */
+  int time_type;
   /*! \var history_length
    *  \brief The maximum amount of history to plot, in minutes
    */

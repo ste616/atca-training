@@ -81,7 +81,7 @@ int data_selected_index, tsys_apply;
 int xaxis_type, *yaxis_type, nxpanels, nypanels, nvisbands;
 int *visband_idx, tvchan_change_min, tvchan_change_max;
 int reference_antenna_index, nncal, deladd_antnum, deladd_polnum, deladd_ifnum;
-int *nncal_indices, nncal_cycletime;
+int *nncal_indices, nncal_cycletime, new_timetype;
 char **visband, tvchan_visband[10], hardcopy_filename[VISBUFSHORT];
 // Whether to order the baselines in length order (true/false).
 bool sort_baselines;
@@ -202,6 +202,7 @@ static void sighandler(int sig) {
 #define ACTION_COMPUTE_PHASECORRECTIONS  1<<18
 #define ACTION_RESET_PHASECORRECTIONS    1<<19
 #define ACTION_ADD_DELAYS                1<<20
+#define ACTION_CHANGE_TIMETYPE           1<<21
 
 // The action modifier magic numbers.
 #define ACTIONMOD_NOMOD                  0
@@ -958,6 +959,31 @@ static void interpret_command(char *line) {
 	// Remove all modifiers.
 	action_required = ACTION_RESET_DELAYS | ACTION_RESET_PHASECORRECTIONS;
       }
+    } else if (minmatch("time", line_els[0], 3)) {
+      // Change which type of time we display on the bottom.
+      if (nels != 2) {
+	printf(" please supply an argument [UT/AEST/AEDT/AWST/GMST/LST]\n");
+      } else {
+	action_required = ACTION_CHANGE_TIMETYPE;
+	if (strncasecmp(line_els[1], "gmst", 4) == 0) {
+	  new_timetype = PLOTTIME_GMST;
+	} else if ((strncasecmp(line_els[1], "gm", 2) == 0) ||
+		   (strncasecmp(line_els[1], "ut", 2) == 0)) {
+	  new_timetype = PLOTTIME_UTC;
+	} else if (strcasecmp(line_els[1], "lst") == 0) {
+	  new_timetype = PLOTTIME_LST;
+	} else if (strcasecmp(line_els[1], "aest") == 0) {
+	  new_timetype = PLOTTIME_AEST;
+	} else if (strcasecmp(line_els[1], "aedt") == 0) {
+	  new_timetype = PLOTTIME_AEDT;
+	} else if (strcasecmp(line_els[1], "awst") == 0) {
+	  new_timetype = PLOTTIME_AWST;
+	} else {
+	  printf(" please supply an argument [UT/AEST/AEDT/AWST/GMST/LST]\n");
+	  action_required -= ACTION_CHANGE_TIMETYPE;
+	}
+      }
+      
     } else {
       if (nels == 1) {
         // We try to interpret the string as the panels to show.
@@ -1537,6 +1563,12 @@ int main(int argc, char *argv[]) {
       action_required |= ACTION_REFRESH_PLOT;
     }
 
+    if (action_required & ACTION_CHANGE_TIMETYPE) {
+      vis_plotcontrols.time_type = new_timetype;
+      action_required -= ACTION_CHANGE_TIMETYPE;
+      action_required |= ACTION_REFRESH_PLOT;
+    }
+    
     if ((action_required & ACTION_HARDCOPY_PLOT) ||
 	(action_required & ACTION_REFRESH_PLOT)) {
       if (data_seconds > 0) {

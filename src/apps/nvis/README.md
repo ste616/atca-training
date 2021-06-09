@@ -647,6 +647,29 @@ controlling terminal.
 
 ---
 
+#### time
+
+Format: **time** [*ut*/*utc*/*gmt*/*aest*/*aedt*/*awst*/*lst*/*gmst*]
+
+Change the time when it is the x-axis, to the selected time.
+
+This command accepts only a single argument, that being one of the
+following:
+- *ut*/*utc*/*gmt*: the time will be plotted in the Universal Time zone,
+  and labelled as "UT"
+- *aest*: the time will be plotted in the Australian Eastern Standard
+  Time zone (UT + 10h), and labelled as "AEST"
+- *aedt*: the time will be plotted in the Australian Eastern Daylight
+  Time zone (UT + 11h), and labelled as "AEDT"
+- *awst*: the time will be plotted in the Australian Western Standard
+  Time zone (UT + 8h), and labelled as "AWST"
+- *lst*: the sidereal time at the ATCA will be plotted, and labelled as
+  "LST"
+- *gmst*: the sidereal time at Greenwich observatory will be plotted,
+  and labelled as "GMST"
+
+---
+
 #### tsys
 
 Format: **tsys** [* **off**/**cor**relator/**comp**uted *]

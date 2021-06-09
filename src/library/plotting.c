@@ -379,6 +379,7 @@ void init_vis_plotcontrols(struct vis_plotcontrols *plotcontrols,
   }
   plotcontrols->plot_options = 0;
   plotcontrols->x_axis_type = xaxis_type;
+  plotcontrols->time_type = PLOTTIME_UTC;
 
   // Count the number of panels we need.
   plotcontrols->num_panels = 0;
@@ -1136,9 +1137,9 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
   float cxpos, dxpos, labtotalwidth, labspacing, dy, maxwidth, twidth;
   float padlabel = 0.01, cch, timeline_x[2], timeline_y[2];
   float ***antlines = NULL, maxch = 1.1, num_panels;
-  double basemjd, chktime, min_time, max_time, lst;
+  double basemjd, basest, chkmjd, chktime, min_time, max_time, lst;
   char xopts[BUFSIZE], yopts[BUFSIZE], panellabel[BUFSIZE], panelunits[BUFSIZE];
-  char antstring[BUFSIZE], bandstring[BUFSIZE], panelerror[BUFSIZE];
+  char antstring[BUFSIZE], bandstring[BUFSIZE], panelerror[BUFSIZE], timetypestring[BUFSIZE];
   struct vis_line **vis_lines = NULL, **tsys_vis_lines = NULL, **meta_vis_line = NULL;
   struct vis_line ***plot_vis_lines = NULL, **closure_vis_lines = NULL;
   struct scan_header_data *vlh = NULL;
@@ -1409,8 +1410,41 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
   }
   // Remove the base date.
   basemjd = floor(min_time);
-  min_x = (float)((min_time - basemjd) * 86400.0);
-  max_x = (float)((max_time - basemjd) * 86400.0);
+  if (plot_controls->time_type == PLOTTIME_GMST) {
+    basest = 86400.0 * mjd2gst(basemjd, 37);
+  } else if (plot_controls->time_type == PLOTTIME_LST) {
+    basest = 3600.0 * mjd2lst(basemjd, ATCA_LONGITUDE_TURNS, 37);
+  }
+  if ((plot_controls->time_type == PLOTTIME_UTC) ||
+      (plot_controls->time_type == PLOTTIME_AEST) ||
+      (plot_controls->time_type == PLOTTIME_AEDT) ||
+      (plot_controls->time_type == PLOTTIME_AWST)) {
+    min_x = (float)((min_time - basemjd) * 86400.0);
+    max_x = (float)((max_time - basemjd) * 86400.0);
+    if (plot_controls->time_type == PLOTTIME_AEST) {
+      min_x += 10.0 * 3600.0;
+      max_x += 10.0 * 3600.0;
+    } else if (plot_controls->time_type == PLOTTIME_AEDT) {
+      min_x += 11.0 * 3600.0;
+      max_x += 11.0 * 3600.0;
+    } else if (plot_controls->time_type == PLOTTIME_AWST) {
+      min_x += 8.0 * 3600.0;
+      max_x += 8.0 * 3600.0;
+    }
+  } else if ((plot_controls->time_type == PLOTTIME_GMST) ||
+	     (plot_controls->time_type == PLOTTIME_LST)) {
+    if (plot_controls->time_type == PLOTTIME_GMST) {
+      min_x = (float)(86400.0 * mjd2gst(min_time, 37));
+      max_x = (float)(86400.0 * mjd2gst(max_time, 37));
+    } else if (plot_controls->time_type == PLOTTIME_LST) {
+      min_x = (float)(3600.0 * mjd2lst(min_time, ATCA_LONGITUDE_TURNS, 37));
+      max_x = (float)(3600.0 * mjd2lst(max_time, ATCA_LONGITUDE_TURNS, 37));
+    }
+    if (max_x < min_x) {
+      // The time has wrapped.
+      max_x += ceilf(max_time - min_time);
+    }
+  }
   // Adjust the time constraints based on the history specification.
   MAXASSIGN(min_x, (max_x - plot_controls->history_start * 60));
   MINASSIGN(max_x, (min_x + plot_controls->history_length * 60));
@@ -1453,9 +1487,36 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
           for (l = 0; l < cycle_numifs[k]; l++) {
             for (m = 0; m < npols; m++) {
               // Exclude data outside our history range.
-	      chktime = (date2mjd(cycle_vis_quantities[k][l][m]->obsdate,
-				  cycle_vis_quantities[k][l][m]->ut_seconds) -
-			 basemjd) * 86400.0;
+	      // Modify the time appropriately.
+	      if ((plot_controls->time_type == PLOTTIME_UTC) ||
+		  (plot_controls->time_type == PLOTTIME_AEST) ||
+		  (plot_controls->time_type == PLOTTIME_AEDT) ||
+		  (plot_controls->time_type == PLOTTIME_AWST)) {
+		chktime = (date2mjd(cycle_vis_quantities[k][l][m]->obsdate,
+				    cycle_vis_quantities[k][l][m]->ut_seconds) -
+			   basemjd) * 86400.0;
+		if (plot_controls->time_type == PLOTTIME_AEST) {
+		  chktime += 10.0 * 3600.0;
+		} else if (plot_controls->time_type == PLOTTIME_AEDT) {
+		  chktime += 11.0 * 3600.0;
+		} else if (plot_controls->time_type == PLOTTIME_AWST) {
+		  chktime += 8.0 * 3600.0;
+		}
+	      } else if ((plot_controls->time_type == PLOTTIME_GMST) ||
+			 (plot_controls->time_type == PLOTTIME_LST)) {
+		chkmjd = date2mjd(cycle_vis_quantities[k][l][m]->obsdate,
+				  cycle_vis_quantities[k][l][m]->ut_seconds);
+		if (plot_controls->time_type == PLOTTIME_GMST) {
+		  chktime = 86400.0 * mjd2gst(chkmjd, 37);
+		} else if (plot_controls->time_type == PLOTTIME_LST) {
+		  chktime = 3600.0 * mjd2lst(chkmjd, ATCA_LONGITUDE_TURNS, 37);
+		}
+		if (chktime < basest) {
+		  chktime += ceil(chkmjd - basemjd);
+		} else {
+		  chktime += floor(chkmjd - basemjd);
+		}
+	      }
               if (((float)chktime < min_x) || ((float)chktime > max_x)) {
                 break;
               }
@@ -1533,9 +1594,36 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
         for (k = 0; k < ncycles; k++) {
           for (l = 0; l < cycle_numifs[k]; l++) {
             for (m = 0; m < npols; m++) {
-	      chktime = (date2mjd(cycle_vis_quantities[k][l][m]->obsdate,
-					 cycle_vis_quantities[k][l][m]->ut_seconds) -
-			 basemjd) * 86400.0;
+	      // Modify the time appropriately.
+	      if ((plot_controls->time_type == PLOTTIME_UTC) ||
+		  (plot_controls->time_type == PLOTTIME_AEST) ||
+		  (plot_controls->time_type == PLOTTIME_AEDT) ||
+		  (plot_controls->time_type == PLOTTIME_AWST)) {
+		chktime = (date2mjd(cycle_vis_quantities[k][l][m]->obsdate,
+				    cycle_vis_quantities[k][l][m]->ut_seconds) -
+			   basemjd) * 86400.0;
+		if (plot_controls->time_type == PLOTTIME_AEST) {
+		  chktime += 10.0 * 3600.0;
+		} else if (plot_controls->time_type == PLOTTIME_AEDT) {
+		  chktime += 11.0 * 3600.0;
+		} else if (plot_controls->time_type == PLOTTIME_AWST) {
+		  chktime += 8.0 * 3600.0;
+		}
+	      } else if ((plot_controls->time_type == PLOTTIME_GMST) ||
+			 (plot_controls->time_type == PLOTTIME_LST)) {
+		chkmjd = date2mjd(cycle_vis_quantities[k][l][m]->obsdate,
+				  cycle_vis_quantities[k][l][m]->ut_seconds);
+		if (plot_controls->time_type == PLOTTIME_GMST) {
+		  chktime = 86400.0 * mjd2gst(chkmjd, 37);
+		} else if (plot_controls->time_type == PLOTTIME_LST) {
+		  chktime = 3600.0 * mjd2lst(chkmjd, ATCA_LONGITUDE_TURNS, 37);
+		}
+		if (chktime < basest) {
+		  chktime += ceil(chkmjd - basemjd);
+		} else {
+		  chktime += floor(chkmjd - basemjd);
+		}
+	      }
               if (((float)chktime < min_x) || ((float)chktime > max_x)) {
                 break;
               }
@@ -1632,9 +1720,36 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
         dbrk = 0;
         for (l = 0; l < cycle_numifs[k]; l++) {
           for (m = 0; m < npols; m++) {
-	    chktime = (date2mjd(cycle_vis_quantities[k][l][m]->obsdate,
-				cycle_vis_quantities[k][l][m]->ut_seconds) -
-		       basemjd) * 86400.0;
+	    // Modify the time appropriately.
+	    if ((plot_controls->time_type == PLOTTIME_UTC) ||
+		(plot_controls->time_type == PLOTTIME_AEST) ||
+		(plot_controls->time_type == PLOTTIME_AEDT) ||
+		(plot_controls->time_type == PLOTTIME_AWST)) {
+	      chktime = (date2mjd(cycle_vis_quantities[k][l][m]->obsdate,
+				  cycle_vis_quantities[k][l][m]->ut_seconds) -
+			 basemjd) * 86400.0;
+	      if (plot_controls->time_type == PLOTTIME_AEST) {
+		chktime += 10.0 * 3600.0;
+	      } else if (plot_controls->time_type == PLOTTIME_AEDT) {
+		chktime += 11.0 * 3600.0;
+	      } else if (plot_controls->time_type == PLOTTIME_AWST) {
+		chktime += 8.0 * 3600.0;
+	      }
+	    } else if ((plot_controls->time_type == PLOTTIME_GMST) ||
+		       (plot_controls->time_type == PLOTTIME_LST)) {
+	      chkmjd = date2mjd(cycle_vis_quantities[k][l][m]->obsdate,
+				cycle_vis_quantities[k][l][m]->ut_seconds);
+	      if (plot_controls->time_type == PLOTTIME_GMST) {
+		chktime = 86400.0 * mjd2gst(chkmjd, 37);
+	      } else if (plot_controls->time_type == PLOTTIME_LST) {
+		chktime = 3600.0 * mjd2lst(chkmjd, ATCA_LONGITUDE_TURNS, 37);
+	      }
+	      if (chktime < basest) {
+		chktime += ceil(chkmjd - basemjd);
+	      } else {
+		chktime += floor(chkmjd - basemjd);
+	      }
+	    }
             if (((float)chktime < min_x) || ((float)chktime > max_x)) {
               break;
             }
@@ -1723,9 +1838,36 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
 	  for (l = 0; l < cycle_numifs[k]; l++) {
 	    for (m = 0; m < npols; m++) {
 	      // Exclude data outside our history range.
-	      chktime = (date2mjd(cycle_vis_quantities[k][l][m]->obsdate,
-				  cycle_vis_quantities[k][l][m]->ut_seconds) -
-			 basemjd) * 86400.0;
+	      // Modify the time appropriately.
+	      if ((plot_controls->time_type == PLOTTIME_UTC) ||
+		  (plot_controls->time_type == PLOTTIME_AEST) ||
+		  (plot_controls->time_type == PLOTTIME_AEDT) ||
+		  (plot_controls->time_type == PLOTTIME_AWST)) {
+		chktime = (date2mjd(cycle_vis_quantities[k][l][m]->obsdate,
+				    cycle_vis_quantities[k][l][m]->ut_seconds) -
+			   basemjd) * 86400.0;
+		if (plot_controls->time_type == PLOTTIME_AEST) {
+		  chktime += 10.0 * 3600.0;
+		} else if (plot_controls->time_type == PLOTTIME_AEDT) {
+		  chktime += 11.0 * 3600.0;
+		} else if (plot_controls->time_type == PLOTTIME_AWST) {
+		  chktime += 8.0 * 3600.0;
+		}
+	      } else if ((plot_controls->time_type == PLOTTIME_GMST) ||
+			 (plot_controls->time_type == PLOTTIME_LST)) {
+		chkmjd = date2mjd(cycle_vis_quantities[k][l][m]->obsdate,
+				  cycle_vis_quantities[k][l][m]->ut_seconds);
+		if (plot_controls->time_type == PLOTTIME_GMST) {
+		  chktime = 86400.0 * mjd2gst(chkmjd, 37);
+		} else if (plot_controls->time_type == PLOTTIME_LST) {
+		  chktime = 3600.0 * mjd2lst(chkmjd, ATCA_LONGITUDE_TURNS, 37);
+		}
+		if (chktime < basest) {
+		  chktime += ceil(chkmjd - basemjd);
+		} else {
+		  chktime += floor(chkmjd - basemjd);
+		}
+	      }
 	      if (((float)chktime < min_x) || ((float)chktime > max_x)) {
 		break;
 	      }
@@ -1909,7 +2051,20 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
       cpgmtxt("T", -2.0, 0.5, 0.5, panelerror);
     }
     if (i == (plot_controls->num_panels - 1)) {
-      cpgmtxt("B", 3, 0.5, 0.5, "UT");
+      if (plot_controls->time_type == PLOTTIME_UTC) {
+	strcpy(timetypestring, "UT");
+      } else if (plot_controls->time_type == PLOTTIME_AEST) {
+	strcpy(timetypestring, "AEST");
+      } else if (plot_controls->time_type == PLOTTIME_AEDT) {
+	strcpy(timetypestring, "AEDT");
+      } else if (plot_controls->time_type == PLOTTIME_AWST) {
+	strcpy(timetypestring, "AWST");
+      } else if (plot_controls->time_type == PLOTTIME_GMST) {
+	strcpy(timetypestring, "GMST");
+      } else if (plot_controls->time_type == PLOTTIME_LST) {
+	strcpy(timetypestring, "LST");
+      }
+      cpgmtxt("B", 3, 0.5, 0.5, timetypestring);
       // Print the baselines on the bottom.
       labtotalwidth = 0;
       for (j = 0; j < n_vis_lines; j++) {
@@ -2964,3 +3119,4 @@ int filename_to_pgplot_device(char *f, char *d, size_t l, int type, char *a, siz
     return(FILETYPE_UNKNOWN);
   }
 }
+
