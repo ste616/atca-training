@@ -627,3 +627,9 @@ system.
 * Take a look back at the first NVIS plot we showed in this tutorial. Why does the
   12AA line look like a sine-squared function while observing 0823-500? Hint: change
   the tvchannels to make the signal clearer. (MODERATE)
+* Speaking of the 12 baseline, take a look at the data at 04:47 in NSPD,
+  specifically at the BB cross-correlation; it looks weird don't you think. Why?
+  Hint: use some other panels in NVIS (perhaps `x` and `D`) and consider the
+  array that was used for the observations (use `print array` in NVIS).
+  (MODERATE)
+  ![NSPD showing a weird-looking baseline amplitude](nspd_t2_weird_amplitude.png)
