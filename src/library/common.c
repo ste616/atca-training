@@ -953,3 +953,29 @@ double number_bounds(double n, double b) {
 double turn_fraction(double f) {
   return(number_bounds(f, 1));
 }
+
+/*!
+ *  \brief Add a formatted string to the end of another string, or print
+ *         it to the screen
+ *  \param o the string to add to, or NULL if you want the output to go to
+ *           the screen
+ *  \param olen the maximum length available in the \a o variable
+ *  \param fmt the printf-compatible format specifier
+ *  \param ... the arguments required by \a fmt
+ */
+void info_print(char *o, int olen, char *fmt, ...) {
+  int tmp_len;
+  char tmp_string[TMPSTRINGLEN];
+  va_list ap;
+
+  va_start(ap, fmt);
+  tmp_len = vsnprintf(tmp_string, TMPSTRINGLEN, fmt, ap);
+  va_end(ap);
+
+  if ((o != NULL) && (((int)strlen(o) + tmp_len) < olen)) {
+    strncat(o, tmp_string, tmp_len);
+  } else {
+    printf("%s", tmp_string);
+  }
+  
+}

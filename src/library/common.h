@@ -233,3 +233,4 @@ void strip_end_spaces(char *s, char *r, size_t rlen);
 void current_time_string(char *s, size_t l);
 double number_bounds(double n, double b);
 double turn_fraction(double f);
+void info_print(char *o, int olen, char *fmt, ...);

@@ -203,6 +203,7 @@ static void sighandler(int sig) {
 #define ACTION_RESET_PHASECORRECTIONS    1<<19
 #define ACTION_ADD_DELAYS                1<<20
 #define ACTION_CHANGE_TIMETYPE           1<<21
+#define ACTION_ARRAY_CONFIGURATION_PRINT 1<<22
 
 // The action modifier magic numbers.
 #define ACTIONMOD_NOMOD                  0
@@ -665,7 +666,10 @@ static void interpret_command(char *line) {
         if (minmatch("computation", line_els[1], 4)) {
           // Print the options used during computation.
           action_required = ACTION_AMPPHASE_OPTIONS_PRINT;
-        }
+        } else if (minmatch("array", line_els[1], 3)) {
+	  // Print out details about the array configuration.
+	  action_required = ACTION_ARRAY_CONFIGURATION_PRINT;
+	}
       }
     } else if (minmatch("delavg", line_els[0], 5)) {
       CHECKSIMULATOR;
@@ -1661,6 +1665,15 @@ int main(int argc, char *argv[]) {
       action_required -= ACTION_AMPPHASE_OPTIONS_PRINT;
     }
 
+    if (action_required & ACTION_ARRAY_CONFIGURATION_PRINT) {
+      // Output details about the array at the selected index.
+      nmesg = 0;
+      snprintf(mesgout[nmesg++], VISBUFLONG, "ARRAY CONFIGURATION:\n");
+      print_array_configuration(described_hdr, mesgout[nmesg++], VISBUFLONG);
+      readline_print_messages(nmesg, mesgout);
+      action_required -= ACTION_ARRAY_CONFIGURATION_PRINT;
+    }
+    
     if (action_required & ACTION_TVCHANNELS_CHANGED) {
       // Change the tvchannels as requested after finding the correct
       // specified band to change.

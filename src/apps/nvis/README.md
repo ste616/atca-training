@@ -483,6 +483,32 @@ Format: **pr**int *quantity*
 
 This command prints some *quantity* about the data. These commands are:
 
+##### array
+
+Fomat: **pr**int **arr**ay
+
+Print out details about the array configuration in place when the data
+was obtained.
+
+The output will look something like this:
+
+```
+NVIS> print array
+ARRAY CONFIGURATION:
+ ANTENNAS     1    2    3    4    5    6
+     NAME  CA01 CA02 CA03 CA04 CA05 CA06
+  STATION  W100 W102 W128 W140 W147 W392
+    ARRAY 750D
+ BASELINE LENGTHS (m):
+           1        2        3        4        5        6
+  1      0.0     30.6    428.6    612.2    719.4   4469.4
+  2     30.6      0.0    398.0    581.6    688.8   4438.8
+  3    428.6    398.0      0.0    183.7    290.8   4040.8
+  4    612.2    581.6    183.7      0.0    107.1   3857.1
+  5    719.4    688.8    290.8    107.1      0.0   3750.0
+  6   4469.4   4438.8   4040.8   3857.1   3750.0      0.0
+```
+
 ##### computation
 
 Format: **pr**int **comp**utation

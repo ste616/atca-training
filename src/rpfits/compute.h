@@ -1302,7 +1302,6 @@ void spectrum_data_compile_system_temperatures(struct spectrum_data *spectrum_da
 					       struct syscal_data **syscal_data);
 void system_temperature_modifier(int action, struct cycle_data *cycle_data,
 				 struct scan_header_data *scan_header_data);
-void info_print(char *o, int olen, char *fmt, ...);
 void averaging_type_string(int averaging_type, char *output,
 			   int output_length);
 void print_options_set(int num_options, struct ampphase_options **options,
