@@ -157,6 +157,9 @@
  */
 #define FINDARRAYCONFIG_NOT_FOUND 3
 
+#define ATCA_LONGITUDE (double)149.5501388
+#define ATCA_LONGITUDE_TURNS (ATCA_LONGITUDE / 360.0)
+
 /*! \struct array_information
  *  \brief Information about each antenna position, station and the array
  *         configuration
@@ -215,6 +218,8 @@ int leap(int year);
 int dayOK(int day, int month, int year);
 double cal2mjd(int day, int month, int year, float ut_seconds);
 double date2mjd(char *obsdate, float ut_seconds);
+double mjd2gst(double mjd, int dut1);
+double mjd2lst(double mjd, double longitude, int dut1);
 void mjd2cal(double mjd, int *year, int *month, int *day, float *ut_seconds);
 void stringappend(char **dest, const char *src);
 void angle_to_string(float angle, char *angle_string, int conversion_type,
@@ -226,3 +231,6 @@ int scan_header_to_array(struct scan_header_data *scan_header_data,
 void free_array_information(struct array_information **array_information);
 void strip_end_spaces(char *s, char *r, size_t rlen);
 void current_time_string(char *s, size_t l);
+double number_bounds(double n, double b);
+double turn_fraction(double f);
+void info_print(char *o, int olen, char *fmt, ...);

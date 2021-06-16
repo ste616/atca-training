@@ -194,6 +194,40 @@ any `nvis` clients connected with the same username however.
 
 ---
 
+#### delay
+
+Format: **delay** [*min delay* *max delay*]
+
+This command makes `nspd` display the delay errors computed from all the
+adjacent channels within the tvchannel range currently set. All calculations
+are done by `nspd` and thus communication with the server is not
+required. If you would like to limit the range of each panel, you can specify
+both the *min delay* and *max delay* arguments. This will limit all
+the panels of all the IFs in the same way.
+
+If you want to reset the delay scaling to the default (which will be to
+contain all the data on each panel, which likely means that each panel has
+its own range), give this command without arguments.
+
+Each panel will show a sorted list of all the computed delay errors, with
+the lowest delays displayed on the left, and the highest on the right.
+The x-axis is simply ordinal, and represents the number of adjacent pairs
+of channels in the **tvch**annel range. The y-axis is delay error, in ns.
+
+Two horizontal lines are also plotted, one solid and one dashed. The solid
+line represents the mean value of all the delays, and the dashed line
+represents the median value. Often, these will be plotted so near to each
+other that only the solid line remains visible.
+
+If the averaged data is being displayed (via **sho**w **av**eraged command),
+then the delay errors computed between the averaged data will also be
+displayed in each panel. Of course, since the number of channels decreases
+with increasing **delav**g values, the averaged data will appear to the left
+of each panel, although the horizontal lines will continue to span the
+entire width of the plot.
+
+---
+
 #### dump
 
 Format: **dump** [*filename*]
@@ -502,6 +536,43 @@ the smoothed line will be labelled as "AAv", and shown in a different colour.
 When **delavg** is 1, the two lines will be plot exactly over each other,
 and since the "v" line is drawn later than the normal product, the line visible
 on the panel will be in the "v" colour.
+
+---
+
+#### tvchannel
+
+Format: **tvch**annel [*IF* *min chan* *max chan*]
+
+This command instructs the server to recompute data with a different range
+of tvchannels.
+
+To set the channels, an *IF* argument needs to be supplied, followed
+by the *min chan* and *max chan* to use for that IF. The *IF* can be
+something like `f1` or `f2` or `z1`, and is basically whatever you would
+use to select that IF in `nspd`.
+
+While the server recomputes the data, `nspd` will continue to show the
+current data.
+
+---
+
+#### tvmedian
+
+Format: **tvmed**ian [*IF*] *on/off*
+
+This command instructs the server to recompute data with median averaging
+either enabled or disabled.
+
+If a single argument is given to this command, the setting will affect
+all IFs in the data currently being displayed; the setting can be *on*
+(indicating that median averaging should be used), or *off* (indicating
+that mean averaging should be used). If two arguments are given, the
+first argument must be the name of the *IF*, something like `f1`, or `f2`,
+or `z1`, and is basically whatever you would use to select that IF in
+`nspd`.
+
+While the server recomputes the data, `nspd` will continue to show the
+current data.
 
 ---
 

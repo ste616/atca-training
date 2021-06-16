@@ -78,6 +78,14 @@
  */
 #define MAX_BASELINENUM 25700
 
+/*! \def MAX_ANTENNANUM
+ *  \brief The largest antenna number we support.
+ *
+ * This parameter should be set appropriately to allow baselines within
+ * MAX_BASELINENUM.
+ */
+#define MAX_ANTENNANUM 99
+
 /*! \def FILENAME_LENGTH
  *  \brief The maximum length of a filename we can use.
  *
@@ -835,6 +843,7 @@ struct rpfits_index {
 
 void base_to_ants(int baseline, int *ant1, int *ant2);
 int ants_to_base(int ant1, int ant2);
+void print_array_configuration(struct scan_header_data *header_data, char *o, int o_len);
 
 #include "reader.h"
 #include "compute.h"

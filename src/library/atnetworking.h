@@ -42,6 +42,8 @@
 #define DEBUG_NBYTES 16
 #define SOCKBUFSIZE 1024
 #define CLIENTIDLENGTH 20
+#define SENDBUFSIZE 8192
+
 
 /*! \def SERVERTYPE_SIMULATOR
  *  \brief The server makes pre-made data available and allows for

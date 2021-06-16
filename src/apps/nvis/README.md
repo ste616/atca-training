@@ -121,7 +121,9 @@ C         | Computed System Temperature: the system temperature of each antenna,
 d         | Delay: the delay error as determined by examining the phases as a function of frequency
 D         | Wind Direction: the direction the wind is coming from
 G         | GTP: the gated total power measured online
+h         | Hour angle, which is LST - source RA
 H         | Humidity: as reported by the site weather station
+L         | Local Sidereal Time, in hours
 n         | The amplitude of the noise diode in Jy: this is measured per antenna
 N         | SDO: the synchronously-demodulated output measured online
 p         | Phase: the average phase on each baseline per cycle
@@ -131,7 +133,9 @@ S         | System Temperature: the system temperature of each antenna, as compu
 t         | Time: the UTC, can be used as an x-axis
 T         | Temperature: as reported by the site weather station
 V         | Wind Speed: as reported by the site weather station
+x         | Source Right Ascension, in hours
 X         | Seeing Monitor Phase: the phase measured on the seeing monitor interferometer
+y         | Source Declination, in degrees
 Y         | Seeing Monitor RMS Phase: the phase RMS noise measured on the seeing monitor interferometer
 
 For each panel, a label indicating what it is can be found on the left of the
@@ -232,7 +236,7 @@ not currently set as a calband.
 
 #### data
 
-Format: **dat**a [*time*]
+Format: **dat**a [*time*/*off*]
 
 This command tells `nvis` to output the details of the observation configuration.
 If *time* is not specified, `nvis` will output details for the most recently
@@ -268,11 +272,14 @@ including:
 If a *time* has been specified, a dashed vertical line will be displayed at
 that exact time - not at the midpoint of the nearest cycle.
 
+If you want to stop plotting any time indications, give the *off* argument
+to this command.
+
 ---
 
 #### dcal
 
-Format: **dcal**
+Format: **dcal** [*before*/*after*/*all*]
 
 This command computes the delay corrections required from the **nncal**
 cycles before (and including) the time specified by the **dat**a command, and then
@@ -310,8 +317,14 @@ with the delay determined from the data in ns, for each of the X and Y receptors
 with respect to the reference antenna), and the delay between the X and Y receptors
 given as `XY` for each antenna.
 
-The delay will only be corrected for the **nncal** cycles selected. While
-the server recomputes the data, `nvis` will continue to show the current data.
+When used without arguments, the delay will only be corrected for the **nncal** cycles
+selected. If used with the *before* argument, all cycles up to and including
+the first cycle in the **nncal** selection will be corrected. If used with the
+*after* argument, all cycles beginning with the last cycle in the **nncal** selection
+and afterwards will be corrected. If used with the *all* argument, all data will
+be corrected.
+
+While the server recomputes the data, `nvis` will continue to show the current data.
 
 ---
 
@@ -414,11 +427,87 @@ in the array specification are tracking the same source position.
 
 ---
 
+#### pcal
+
+Format: **pcal** [*before*/*after*/*all*]
+
+This command computes the phase corrections required from the **ncal**
+cycles before (and including) the time specified by the **dat**a command, and
+then sends these phase corrections to the server which recomputes the data
+incorporating them.
+
+The phase corrections are determiend by looking at the phase values that `nvis`
+knows about, so they depend on the settings of **tvch** and **tvmed**ian. The
+exact corrections are always made with respect to what **ref**ant is set to.
+
+This command will output something like the following to the controlling
+terminal:
+```
+NVIS> pcal
+ BAND 1, MJD 59332.201996 - 59332.202111:
+   ANT 1: X = -56.5 Y = -30.1 XY = 148.3 deg
+   ANT 2: X = -47.3 Y = 90.3 XY = -127.8 deg
+   ANT 3: X = 0.0 Y = 0.0 XY = 86.4 deg
+   ANT 4: X = -88.2 Y = -78.7 XY = 80.1 deg
+   ANT 5: X = -167.9 Y = -88.4 XY = -175.5 deg
+   ANT 6: X = 51.2 Y = 14.8 XY = 82.6 deg
+ BAND 2, MJD 59332.201996 - 59332.202111:
+   ANT 1: X = -82.7 Y = 90.2 XY = 69.3 deg
+   ANT 2: X = -14.7 Y = -21.4 XY = -47.4 deg
+   ANT 3: X = 0.0 Y = 0.0 XY = -151.4 deg
+   ANT 4: X = 95.3 Y = -28.4 XY = 122.8 deg
+   ANT 5: X = 28.4 Y = 119.9 XY = -67.8 deg
+   ANT 6: X = -48.2 Y = 63.0 XY = 32.1 deg
+```
+
+For each of the calbands, the MJD range for the corrections is specified,
+along with the phase determined from the data in degrees, for each of the X
+and Y receptors (where the reference antenna is set to have 0 phase and
+all other antennas are with respect to the reference antenna), and the phase
+between the X and Y receptors given as `XY` for each antenna.
+
+When used without arguments, the phases will only be corrected for the **nncal**
+cycles selected. If used with the *before* argument, all cycles up to and including
+the first cycle in the **nncal** selection will be corrected. If used with the
+*after* argument, all cycles beginning with the last cycle in the **nncal** selection
+and afterwards will be corrected. If used with the *all* argument, all data will
+be corrected.
+
+While the server recomputes the data, `nvis` will continue to show the curent data.
+
+---
+
 #### print
 
 Format: **pr**int *quantity*
 
 This command prints some *quantity* about the data. These commands are:
+
+##### array
+
+Fomat: **pr**int **arr**ay
+
+Print out details about the array configuration in place when the data
+was obtained.
+
+The output will look something like this:
+
+```
+NVIS> print array
+ARRAY CONFIGURATION:
+ ANTENNAS     1    2    3    4    5    6
+     NAME  CA01 CA02 CA03 CA04 CA05 CA06
+  STATION  W100 W102 W128 W140 W147 W392
+    ARRAY 750D
+ BASELINE LENGTHS (m):
+           1        2        3        4        5        6
+  1      0.0     30.6    428.6    612.2    719.4   4469.4
+  2     30.6      0.0    398.0    581.6    688.8   4438.8
+  3    428.6    398.0      0.0    183.7    290.8   4040.8
+  4    612.2    581.6    183.7      0.0    107.1   3857.1
+  5    719.4    688.8    290.8    107.1      0.0   3750.0
+  6   4469.4   4438.8   4040.8   3857.1   3750.0      0.0
+```
 
 ##### computation
 
@@ -494,6 +583,14 @@ Format: **reset** *parameter*
 This command sets the *parameter* back to its default value or state. This
 command accepts only a single argument, which must be one of the following.
 
+##### all
+
+Format: **reset** **all**
+
+Remove all phase and delay corrections from the currently selected
+calbands. `nvis` will then ask the server to recompute the data, and will
+continue to show the current data until the server responds.
+
 ##### delays
 
 Format: **reset** **del**ays
@@ -501,6 +598,15 @@ Format: **reset** **del**ays
 Remove all delay corrections from the currently selected calbands. `nvis`
 will then ask the server to recompute the data, and will continue to show
 the current data until the server responds.
+
+##### phases
+
+Format: **reset** **pha**ses
+
+Remove all phase corrections from the currently selected calbands. `nvis`
+will then ask the server to recompute the data, and will continue to show
+the current data until the server responds.
+
 
 ---
 
@@ -564,6 +670,29 @@ otherwise they are ordered numerically; this is 12, 13, 14, ..., 45, 46, 56.
 
 This command always prints the sorting order method to the
 controlling terminal.
+
+---
+
+#### time
+
+Format: **time** [*ut*/*utc*/*gmt*/*aest*/*aedt*/*awst*/*lst*/*gmst*]
+
+Change the time when it is the x-axis, to the selected time.
+
+This command accepts only a single argument, that being one of the
+following:
+- *ut*/*utc*/*gmt*: the time will be plotted in the Universal Time zone,
+  and labelled as "UT"
+- *aest*: the time will be plotted in the Australian Eastern Standard
+  Time zone (UT + 10h), and labelled as "AEST"
+- *aedt*: the time will be plotted in the Australian Eastern Daylight
+  Time zone (UT + 11h), and labelled as "AEDT"
+- *awst*: the time will be plotted in the Australian Western Standard
+  Time zone (UT + 8h), and labelled as "AWST"
+- *lst*: the sidereal time at the ATCA will be plotted, and labelled as
+  "LST"
+- *gmst*: the sidereal time at Greenwich observatory will be plotted,
+  and labelled as "GMST"
 
 ---
 

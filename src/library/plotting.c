@@ -111,6 +111,9 @@ void change_spd_plotcontrols(struct spd_plotcontrols *plotcontrols,
     if (plotcontrols->plot_options & PLOT_CONSISTENT_YRANGE) {
       plotcontrols->plot_options -= PLOT_CONSISTENT_YRANGE;
     }
+    if (plotcontrols->plot_options & PLOT_DELAY) {
+      plotcontrols->plot_options -= PLOT_DELAY;
+    }
     plotcontrols->plot_options |= *yaxis_type;
   }
 
@@ -264,7 +267,7 @@ void change_vis_plotcontrols_limits(struct vis_plotcontrols *plotcontrols,
   }
 }
 
-#define NAVAILABLE_PANELS 17
+#define NAVAILABLE_PANELS 21
 const int available_panels[NAVAILABLE_PANELS] = { VIS_PLOTPANEL_AMPLITUDE,
                                                   VIS_PLOTPANEL_PHASE,
                                                   VIS_PLOTPANEL_DELAY,
@@ -281,7 +284,11 @@ const int available_panels[NAVAILABLE_PANELS] = { VIS_PLOTPANEL_AMPLITUDE,
                                                   VIS_PLOTPANEL_GTP,
                                                   VIS_PLOTPANEL_SDO,
                                                   VIS_PLOTPANEL_CALJY,
-						  VIS_PLOTPANEL_CLOSUREPHASE };
+						  VIS_PLOTPANEL_CLOSUREPHASE,
+						  VIS_PLOTPANEL_HOURANGLE,
+						  VIS_PLOTPANEL_RIGHTASCENSION,
+						  VIS_PLOTPANEL_DECLINATION,
+						  VIS_PLOTPANEL_SIDEREALTIME };
 
 bool product_can_be_x(int product) {
   switch (product) {
@@ -372,6 +379,7 @@ void init_vis_plotcontrols(struct vis_plotcontrols *plotcontrols,
   }
   plotcontrols->plot_options = 0;
   plotcontrols->x_axis_type = xaxis_type;
+  plotcontrols->time_type = PLOTTIME_UTC;
 
   // Count the number of panels we need.
   plotcontrols->num_panels = 0;
@@ -611,6 +619,7 @@ void plotnum_to_xy(struct panelspec *panelspec, int plotnum,
 
 void plotpanel_minmax(struct ampphase **plot_ampphase,
 		      struct spd_plotcontrols *plot_controls,
+		      float ****chan_delays, int **delay_nbins, int ***delay_nchans,
 		      int plot_baseline_idx, int plot_if_idx,
 		      int npols, int *polidx,
 		      float *plotmin_x, float *plotmax_x,
@@ -622,7 +631,7 @@ void plotpanel_minmax(struct ampphase **plot_ampphase,
   int i = 0, j = 0, k = 0, bltype, ant1, ant2;
   float swapf, channelmin, channelmax;
 
-  base_to_ants(plot_ampphase[0]->baseline[plot_baseline_idx], &ant1, &ant2);
+  base_to_ants(plot_ampphase[polidx[0]]->baseline[plot_baseline_idx], &ant1, &ant2);
   if (ant1 == ant2) {
     // Autocorrelation.
     bltype = 0;
@@ -631,16 +640,24 @@ void plotpanel_minmax(struct ampphase **plot_ampphase,
   }
   
   // Get the x-axis range first.
-  if (plot_controls->plot_options & PLOT_CHANNEL) {
+  if (plot_controls->plot_options & PLOT_DELAY) {
     *plotmin_x = 0;
-    *plotmax_x = plot_ampphase[0]->nchannels;
+    *plotmax_x = 0;
+    for (i = 0; i < npols; i++) {
+      for (j = 0; j < delay_nbins[polidx[i]][plot_baseline_idx]; j++) {
+	MAXASSIGN(*plotmax_x, delay_nchans[polidx[i]][plot_baseline_idx][j]);
+      }
+    }
+  } else if (plot_controls->plot_options & PLOT_CHANNEL) {
+    *plotmin_x = 0;
+    *plotmax_x = plot_ampphase[polidx[0]]->nchannels;
     if (plot_controls->channel_range_limit[plot_if_idx] == 1) {
       if ((plot_controls->channel_range_min[plot_if_idx] >= 0) &&
-          (plot_controls->channel_range_min[plot_if_idx] < plot_ampphase[0]->nchannels)) {
+          (plot_controls->channel_range_min[plot_if_idx] < plot_ampphase[polidx[0]]->nchannels)) {
         *plotmin_x = plot_controls->channel_range_min[plot_if_idx];
       }
       if ((plot_controls->channel_range_max[plot_if_idx] > 0) &&
-          (plot_controls->channel_range_max[plot_if_idx] < plot_ampphase[0]->nchannels) &&
+          (plot_controls->channel_range_max[plot_if_idx] < plot_ampphase[polidx[0]]->nchannels) &&
           (plot_controls->channel_range_max[plot_if_idx] > *plotmin_x)) {
         *plotmax_x = plot_controls->channel_range_max[plot_if_idx];
       }
@@ -648,23 +665,23 @@ void plotpanel_minmax(struct ampphase **plot_ampphase,
     channelmin = *plotmin_x;
     channelmax = *plotmax_x;
   } else if (plot_controls->plot_options & PLOT_FREQUENCY) {
-    *plotmin_x = plot_ampphase[0]->frequency[0];
-    *plotmax_x = plot_ampphase[0]->frequency
-      [plot_ampphase[0]->nchannels - 1];
+    *plotmin_x = plot_ampphase[polidx[0]]->frequency[0];
+    *plotmax_x = plot_ampphase[polidx[0]]->frequency
+      [plot_ampphase[polidx[0]]->nchannels - 1];
     channelmin = 0;
-    channelmax = plot_ampphase[0]->nchannels;
+    channelmax = plot_ampphase[polidx[0]]->nchannels;
     if (plot_controls->channel_range_limit[plot_if_idx] == 1) {
       if ((plot_controls->channel_range_min[plot_if_idx] >= 0) &&
-          (plot_controls->channel_range_min[plot_if_idx] < plot_ampphase[0]->nchannels)) {
-        *plotmin_x = plot_ampphase[0]->frequency
+          (plot_controls->channel_range_min[plot_if_idx] < plot_ampphase[polidx[0]]->nchannels)) {
+        *plotmin_x = plot_ampphase[polidx[0]]->frequency
           [plot_controls->channel_range_min[plot_if_idx]];
 	channelmin = plot_controls->channel_range_min[plot_if_idx];
       }
       if ((plot_controls->channel_range_max[plot_if_idx] > 0) &&
-          (plot_controls->channel_range_max[plot_if_idx] < plot_ampphase[0]->nchannels) &&
+          (plot_controls->channel_range_max[plot_if_idx] < plot_ampphase[polidx[0]]->nchannels) &&
           (plot_controls->channel_range_max[plot_if_idx] >
 	   plot_controls->channel_range_min[plot_if_idx])) {
-        *plotmax_x = plot_ampphase[0]->frequency
+        *plotmax_x = plot_ampphase[polidx[0]]->frequency
           [plot_controls->channel_range_max[plot_if_idx]];
 	channelmax = plot_controls->channel_range_max[plot_if_idx];
       }
@@ -694,9 +711,15 @@ void plotpanel_minmax(struct ampphase **plot_ampphase,
 
   // Now if we're not plotting the entire channel range and haven't got
   // a range set, we work out the values ourselves by looking at the data.
-  if (plot_controls->channel_range_limit[plot_if_idx] == 1) {
+  if ((plot_controls->channel_range_limit[plot_if_idx] == 1) ||
+      (plot_controls->plot_options & PLOT_DELAY)) {
     *plotmin_y = INFINITY;
     *plotmax_y = -INFINITY;
+    /* if (plot_controls->plot_options & PLOT_DELAY) { */
+    /*   // Reset the x range as well. */
+    /*   *plotmin_x = INFINITY; */
+    /*   *plotmax_x = -INFINITY; */
+    /* } */
     for (i = 0; i < npols; i++) {
       // Don't include all pols necessarily.
       for (j = 0; j < plot_ampphase[polidx[i]]->nbins[plot_baseline_idx]; j++) {
@@ -724,6 +747,16 @@ void plotpanel_minmax(struct ampphase **plot_ampphase,
 			       (!(plot_controls->plot_flags & PLOT_FLAG_POL_YX))))) {
 	  // Don't show the cross-pols in the cross-correlations without
 	  // explicit instruction.
+	  continue;
+	}
+	if (plot_controls->plot_options & PLOT_DELAY) {
+	  // We have to do something special if we've got a delay panel to plot.
+	  if (j < delay_nbins[polidx[i]][plot_baseline_idx]) {
+	    for (k = 0; k < delay_nchans[polidx[i]][plot_baseline_idx][j]; k++) {
+	      MINASSIGN(*plotmin_y, chan_delays[polidx[i]][plot_baseline_idx][j][k]);
+	      MAXASSIGN(*plotmax_y, chan_delays[polidx[i]][plot_baseline_idx][j][k]);
+	    }
+	  }
 	  continue;
 	}
 	for (k = 0; k < plot_ampphase[polidx[i]]->f_nchannels[plot_baseline_idx][j]; k++) {
@@ -803,8 +836,8 @@ void plotpanel_minmax(struct ampphase **plot_ampphase,
       // all the plots. But we also need a different Y axis range for
       // auto and cross correlations. So we need to know what type of
       // correlation the specified baseline is first.
-      for (i = 0; i < plot_ampphase[0]->nbaselines; i++) {
-	base_to_ants(plot_ampphase[0]->baseline[i], &ant1, &ant2);
+      for (i = 0; i < plot_ampphase[polidx[0]]->nbaselines; i++) {
+	base_to_ants(plot_ampphase[polidx[0]]->baseline[i], &ant1, &ant2);
 	// TODO: check the antennas are in the array spec.
 	if (((ant1 == ant2) && (bltype == 0)) ||
 	    ((ant1 != ant2) && (bltype == 1))) {
@@ -834,6 +867,7 @@ void plotpanel_minmax(struct ampphase **plot_ampphase,
 	}
       }
     }
+
   }
   
   // Check that the min and max are not the same.
@@ -1103,9 +1137,9 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
   float cxpos, dxpos, labtotalwidth, labspacing, dy, maxwidth, twidth;
   float padlabel = 0.01, cch, timeline_x[2], timeline_y[2];
   float ***antlines = NULL, maxch = 1.1, num_panels;
-  double basemjd, chktime, min_time, max_time;
+  double basemjd, basest, chkmjd, chktime, min_time, max_time, lst;
   char xopts[BUFSIZE], yopts[BUFSIZE], panellabel[BUFSIZE], panelunits[BUFSIZE];
-  char antstring[BUFSIZE], bandstring[BUFSIZE], panelerror[BUFSIZE];
+  char antstring[BUFSIZE], bandstring[BUFSIZE], panelerror[BUFSIZE], timetypestring[BUFSIZE];
   struct vis_line **vis_lines = NULL, **tsys_vis_lines = NULL, **meta_vis_line = NULL;
   struct vis_line ***plot_vis_lines = NULL, **closure_vis_lines = NULL;
   struct scan_header_data *vlh = NULL;
@@ -1376,8 +1410,41 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
   }
   // Remove the base date.
   basemjd = floor(min_time);
-  min_x = (float)((min_time - basemjd) * 86400.0);
-  max_x = (float)((max_time - basemjd) * 86400.0);
+  if (plot_controls->time_type == PLOTTIME_GMST) {
+    basest = 86400.0 * mjd2gst(basemjd, 37);
+  } else if (plot_controls->time_type == PLOTTIME_LST) {
+    basest = 3600.0 * mjd2lst(basemjd, ATCA_LONGITUDE_TURNS, 37);
+  }
+  if ((plot_controls->time_type == PLOTTIME_UTC) ||
+      (plot_controls->time_type == PLOTTIME_AEST) ||
+      (plot_controls->time_type == PLOTTIME_AEDT) ||
+      (plot_controls->time_type == PLOTTIME_AWST)) {
+    min_x = (float)((min_time - basemjd) * 86400.0);
+    max_x = (float)((max_time - basemjd) * 86400.0);
+    if (plot_controls->time_type == PLOTTIME_AEST) {
+      min_x += 10.0 * 3600.0;
+      max_x += 10.0 * 3600.0;
+    } else if (plot_controls->time_type == PLOTTIME_AEDT) {
+      min_x += 11.0 * 3600.0;
+      max_x += 11.0 * 3600.0;
+    } else if (plot_controls->time_type == PLOTTIME_AWST) {
+      min_x += 8.0 * 3600.0;
+      max_x += 8.0 * 3600.0;
+    }
+  } else if ((plot_controls->time_type == PLOTTIME_GMST) ||
+	     (plot_controls->time_type == PLOTTIME_LST)) {
+    if (plot_controls->time_type == PLOTTIME_GMST) {
+      min_x = (float)(86400.0 * mjd2gst(min_time, 37));
+      max_x = (float)(86400.0 * mjd2gst(max_time, 37));
+    } else if (plot_controls->time_type == PLOTTIME_LST) {
+      min_x = (float)(3600.0 * mjd2lst(min_time, ATCA_LONGITUDE_TURNS, 37));
+      max_x = (float)(3600.0 * mjd2lst(max_time, ATCA_LONGITUDE_TURNS, 37));
+    }
+    if (max_x < min_x) {
+      // The time has wrapped.
+      max_x += ceilf(max_time - min_time);
+    }
+  }
   // Adjust the time constraints based on the history specification.
   MAXASSIGN(min_x, (max_x - plot_controls->history_start * 60));
   MINASSIGN(max_x, (min_x + plot_controls->history_length * 60));
@@ -1420,9 +1487,36 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
           for (l = 0; l < cycle_numifs[k]; l++) {
             for (m = 0; m < npols; m++) {
               // Exclude data outside our history range.
-	      chktime = (date2mjd(cycle_vis_quantities[k][l][m]->obsdate,
-				  cycle_vis_quantities[k][l][m]->ut_seconds) -
-			 basemjd) * 86400.0;
+	      // Modify the time appropriately.
+	      if ((plot_controls->time_type == PLOTTIME_UTC) ||
+		  (plot_controls->time_type == PLOTTIME_AEST) ||
+		  (plot_controls->time_type == PLOTTIME_AEDT) ||
+		  (plot_controls->time_type == PLOTTIME_AWST)) {
+		chktime = (date2mjd(cycle_vis_quantities[k][l][m]->obsdate,
+				    cycle_vis_quantities[k][l][m]->ut_seconds) -
+			   basemjd) * 86400.0;
+		if (plot_controls->time_type == PLOTTIME_AEST) {
+		  chktime += 10.0 * 3600.0;
+		} else if (plot_controls->time_type == PLOTTIME_AEDT) {
+		  chktime += 11.0 * 3600.0;
+		} else if (plot_controls->time_type == PLOTTIME_AWST) {
+		  chktime += 8.0 * 3600.0;
+		}
+	      } else if ((plot_controls->time_type == PLOTTIME_GMST) ||
+			 (plot_controls->time_type == PLOTTIME_LST)) {
+		chkmjd = date2mjd(cycle_vis_quantities[k][l][m]->obsdate,
+				  cycle_vis_quantities[k][l][m]->ut_seconds);
+		if (plot_controls->time_type == PLOTTIME_GMST) {
+		  chktime = 86400.0 * mjd2gst(chkmjd, 37);
+		} else if (plot_controls->time_type == PLOTTIME_LST) {
+		  chktime = 3600.0 * mjd2lst(chkmjd, ATCA_LONGITUDE_TURNS, 37);
+		}
+		if (chktime < basest) {
+		  chktime += ceil(chkmjd - basemjd);
+		} else {
+		  chktime += floor(chkmjd - basemjd);
+		}
+	      }
               if (((float)chktime < min_x) || ((float)chktime > max_x)) {
                 break;
               }
@@ -1500,9 +1594,36 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
         for (k = 0; k < ncycles; k++) {
           for (l = 0; l < cycle_numifs[k]; l++) {
             for (m = 0; m < npols; m++) {
-	      chktime = (date2mjd(cycle_vis_quantities[k][l][m]->obsdate,
-					 cycle_vis_quantities[k][l][m]->ut_seconds) -
-			 basemjd) * 86400.0;
+	      // Modify the time appropriately.
+	      if ((plot_controls->time_type == PLOTTIME_UTC) ||
+		  (plot_controls->time_type == PLOTTIME_AEST) ||
+		  (plot_controls->time_type == PLOTTIME_AEDT) ||
+		  (plot_controls->time_type == PLOTTIME_AWST)) {
+		chktime = (date2mjd(cycle_vis_quantities[k][l][m]->obsdate,
+				    cycle_vis_quantities[k][l][m]->ut_seconds) -
+			   basemjd) * 86400.0;
+		if (plot_controls->time_type == PLOTTIME_AEST) {
+		  chktime += 10.0 * 3600.0;
+		} else if (plot_controls->time_type == PLOTTIME_AEDT) {
+		  chktime += 11.0 * 3600.0;
+		} else if (plot_controls->time_type == PLOTTIME_AWST) {
+		  chktime += 8.0 * 3600.0;
+		}
+	      } else if ((plot_controls->time_type == PLOTTIME_GMST) ||
+			 (plot_controls->time_type == PLOTTIME_LST)) {
+		chkmjd = date2mjd(cycle_vis_quantities[k][l][m]->obsdate,
+				  cycle_vis_quantities[k][l][m]->ut_seconds);
+		if (plot_controls->time_type == PLOTTIME_GMST) {
+		  chktime = 86400.0 * mjd2gst(chkmjd, 37);
+		} else if (plot_controls->time_type == PLOTTIME_LST) {
+		  chktime = 3600.0 * mjd2lst(chkmjd, ATCA_LONGITUDE_TURNS, 37);
+		}
+		if (chktime < basest) {
+		  chktime += ceil(chkmjd - basemjd);
+		} else {
+		  chktime += floor(chkmjd - basemjd);
+		}
+	      }
               if (((float)chktime < min_x) || ((float)chktime > max_x)) {
                 break;
               }
@@ -1581,7 +1702,11 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
                (plot_controls->panel_type[i] == VIS_PLOTPANEL_WINDDIR) ||
                (plot_controls->panel_type[i] == VIS_PLOTPANEL_RAINGAUGE) ||
                (plot_controls->panel_type[i] == VIS_PLOTPANEL_SEEMONPHASE) ||
-               (plot_controls->panel_type[i] == VIS_PLOTPANEL_SEEMONRMS)) {
+               (plot_controls->panel_type[i] == VIS_PLOTPANEL_SEEMONRMS) ||
+	       (plot_controls->panel_type[i] == VIS_PLOTPANEL_RIGHTASCENSION) ||
+	       (plot_controls->panel_type[i] == VIS_PLOTPANEL_DECLINATION) ||
+	       (plot_controls->panel_type[i] == VIS_PLOTPANEL_HOURANGLE) ||
+	       (plot_controls->panel_type[i] == VIS_PLOTPANEL_SIDEREALTIME)) {
       // Make a metadata plot that only has a single site-based line.
       panel_n_vis_lines[i] = 1;
       MALLOC(plot_lines[i], 1);
@@ -1595,9 +1720,36 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
         dbrk = 0;
         for (l = 0; l < cycle_numifs[k]; l++) {
           for (m = 0; m < npols; m++) {
-	    chktime = (date2mjd(cycle_vis_quantities[k][l][m]->obsdate,
-				cycle_vis_quantities[k][l][m]->ut_seconds) -
-		       basemjd) * 86400.0;
+	    // Modify the time appropriately.
+	    if ((plot_controls->time_type == PLOTTIME_UTC) ||
+		(plot_controls->time_type == PLOTTIME_AEST) ||
+		(plot_controls->time_type == PLOTTIME_AEDT) ||
+		(plot_controls->time_type == PLOTTIME_AWST)) {
+	      chktime = (date2mjd(cycle_vis_quantities[k][l][m]->obsdate,
+				  cycle_vis_quantities[k][l][m]->ut_seconds) -
+			 basemjd) * 86400.0;
+	      if (plot_controls->time_type == PLOTTIME_AEST) {
+		chktime += 10.0 * 3600.0;
+	      } else if (plot_controls->time_type == PLOTTIME_AEDT) {
+		chktime += 11.0 * 3600.0;
+	      } else if (plot_controls->time_type == PLOTTIME_AWST) {
+		chktime += 8.0 * 3600.0;
+	      }
+	    } else if ((plot_controls->time_type == PLOTTIME_GMST) ||
+		       (plot_controls->time_type == PLOTTIME_LST)) {
+	      chkmjd = date2mjd(cycle_vis_quantities[k][l][m]->obsdate,
+				cycle_vis_quantities[k][l][m]->ut_seconds);
+	      if (plot_controls->time_type == PLOTTIME_GMST) {
+		chktime = 86400.0 * mjd2gst(chkmjd, 37);
+	      } else if (plot_controls->time_type == PLOTTIME_LST) {
+		chktime = 3600.0 * mjd2lst(chkmjd, ATCA_LONGITUDE_TURNS, 37);
+	      }
+	      if (chktime < basest) {
+		chktime += ceil(chkmjd - basemjd);
+	      } else {
+		chktime += floor(chkmjd - basemjd);
+	      }
+	    }
             if (((float)chktime < min_x) || ((float)chktime > max_x)) {
               break;
             }
@@ -1638,7 +1790,26 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
             } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_SEEMONRMS) {
               plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
                 metinfo[k]->seemon_rms;
-            }
+            } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_RIGHTASCENSION) {
+	      plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
+		header_data[k]->rightascension_hours[cycle_vis_quantities[k][l][m]->source_no];
+	    } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_DECLINATION) {
+	      plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
+		header_data[k]->declination_degrees[cycle_vis_quantities[k][l][m]->source_no];
+	    } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_HOURANGLE) {
+	      // We'll need to fix this to get the correct dUT1 for any particular
+	      // date, and perhaps to programmatically decide longitude based on array.
+	      lst = mjd2lst(date2mjd(cycle_vis_quantities[k][l][m]->obsdate,
+				     cycle_vis_quantities[k][l][m]->ut_seconds),
+			    ATCA_LONGITUDE_TURNS, 37);
+	      plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
+		lst - header_data[k]->rightascension_hours[cycle_vis_quantities[k][l][m]->source_no];
+	    } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_SIDEREALTIME) {
+	      plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
+		mjd2lst(date2mjd(cycle_vis_quantities[k][l][m]->obsdate,
+				 cycle_vis_quantities[k][l][m]->ut_seconds),
+			ATCA_LONGITUDE_TURNS, 37);
+	    }
             MINASSIGN(min_y, plot_lines[i][j][1][n_plot_lines[i][j] - 1]);
             MAXASSIGN(max_y, plot_lines[i][j][1][n_plot_lines[i][j] - 1]);
             dbrk = 1;
@@ -1667,9 +1838,36 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
 	  for (l = 0; l < cycle_numifs[k]; l++) {
 	    for (m = 0; m < npols; m++) {
 	      // Exclude data outside our history range.
-	      chktime = (date2mjd(cycle_vis_quantities[k][l][m]->obsdate,
-				  cycle_vis_quantities[k][l][m]->ut_seconds) -
-			 basemjd) * 86400.0;
+	      // Modify the time appropriately.
+	      if ((plot_controls->time_type == PLOTTIME_UTC) ||
+		  (plot_controls->time_type == PLOTTIME_AEST) ||
+		  (plot_controls->time_type == PLOTTIME_AEDT) ||
+		  (plot_controls->time_type == PLOTTIME_AWST)) {
+		chktime = (date2mjd(cycle_vis_quantities[k][l][m]->obsdate,
+				    cycle_vis_quantities[k][l][m]->ut_seconds) -
+			   basemjd) * 86400.0;
+		if (plot_controls->time_type == PLOTTIME_AEST) {
+		  chktime += 10.0 * 3600.0;
+		} else if (plot_controls->time_type == PLOTTIME_AEDT) {
+		  chktime += 11.0 * 3600.0;
+		} else if (plot_controls->time_type == PLOTTIME_AWST) {
+		  chktime += 8.0 * 3600.0;
+		}
+	      } else if ((plot_controls->time_type == PLOTTIME_GMST) ||
+			 (plot_controls->time_type == PLOTTIME_LST)) {
+		chkmjd = date2mjd(cycle_vis_quantities[k][l][m]->obsdate,
+				  cycle_vis_quantities[k][l][m]->ut_seconds);
+		if (plot_controls->time_type == PLOTTIME_GMST) {
+		  chktime = 86400.0 * mjd2gst(chkmjd, 37);
+		} else if (plot_controls->time_type == PLOTTIME_LST) {
+		  chktime = 3600.0 * mjd2lst(chkmjd, ATCA_LONGITUDE_TURNS, 37);
+		}
+		if (chktime < basest) {
+		  chktime += ceil(chkmjd - basemjd);
+		} else {
+		  chktime += floor(chkmjd - basemjd);
+		}
+	      }
 	      if (((float)chktime < min_x) || ((float)chktime > max_x)) {
 		break;
 	      }
@@ -1833,6 +2031,18 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
     } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_CLOSUREPHASE) {
       (void)strcpy(panellabel, "Closure Phase");
       (void)strcpy(panelunits, "(degrees)");
+    } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_RIGHTASCENSION) {
+      (void)strcpy(panellabel, "Right Asc.");
+      (void)strcpy(panelunits, "(hours)");
+    } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_DECLINATION) {
+      (void)strcpy(panellabel, "Declination");
+      (void)strcpy(panelunits, "(degrees)");
+    } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_HOURANGLE) {
+      (void)strcpy(panellabel, "Hour Angle");
+      (void)strcpy(panelunits, "(hours)");
+    } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_SIDEREALTIME) {
+      (void)strcpy(panellabel, "Sidereal Time");
+      (void)strcpy(panelunits, "(hours)");
     }
     cpgmtxt("L", 2.2, 0.5, 0.5, panellabel);
     cpgmtxt("R", 2.2, 0.5, 0.5, panelunits);
@@ -1841,7 +2051,20 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
       cpgmtxt("T", -2.0, 0.5, 0.5, panelerror);
     }
     if (i == (plot_controls->num_panels - 1)) {
-      cpgmtxt("B", 3, 0.5, 0.5, "UT");
+      if (plot_controls->time_type == PLOTTIME_UTC) {
+	strcpy(timetypestring, "UT");
+      } else if (plot_controls->time_type == PLOTTIME_AEST) {
+	strcpy(timetypestring, "AEST");
+      } else if (plot_controls->time_type == PLOTTIME_AEDT) {
+	strcpy(timetypestring, "AEDT");
+      } else if (plot_controls->time_type == PLOTTIME_AWST) {
+	strcpy(timetypestring, "AWST");
+      } else if (plot_controls->time_type == PLOTTIME_GMST) {
+	strcpy(timetypestring, "GMST");
+      } else if (plot_controls->time_type == PLOTTIME_LST) {
+	strcpy(timetypestring, "LST");
+      }
+      cpgmtxt("B", 3, 0.5, 0.5, timetypestring);
       // Print the baselines on the bottom.
       labtotalwidth = 0;
       for (j = 0; j < n_vis_lines; j++) {
@@ -2053,17 +2276,21 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
 		   struct syscal_data *compiled_tsys_data,
                    int max_tsys_ifs, bool all_data_present) {
   int i, j, k, ant1, ant2, nants = 0, px, py, iauto = 0, icross = 0, isauto = NO;
-  int npols = 0, *polidx = NULL, poli, num_ifs = 0, panels_per_if = 0;
+  int npols = 0, *polidx = NULL, poli, num_ifs = 0, panels_per_if = 0, lw, delay_lw;
   int idxif, ni, ri, rj, rp, bi, bn, pc, inverted = NO, plot_started = NO;
-  int tsys_num_ifs;
+  int tsys_num_ifs, *delay_n_baselines = NULL, **delay_n_bins = NULL, ***delay_n_delays = NULL;
+  int **delay_avg_n_bins = NULL, ***delay_avg_n_delays = NULL, *delay_avg_n_baselines = NULL;
   float **panel_plotted = NULL, information_x_pos = 0.01, information_text_width;
   float information_text_height, xaxis_min, xaxis_max, yaxis_min, yaxis_max, theight;
+  float xaxis_cmin, xaxis_cmax, yaxis_cmin, yaxis_cmax;
   float ylog_min, ylog_max, pollab_height, pollab_xlen, pollab_ylen, pollab_padding;
   float *plot_xvalues = NULL, *plot_yvalues = NULL, maxlen_tsys;
-  float tvchan_yvals[2], tvchan_xvals[2], tvchans[2];
+  float tvchan_yvals[2], tvchan_xvals[2], tvchans[2], hline_xvals[2], hline_yvals[2];
+  float ****chan_delays = NULL, ***mean_chan_delays = NULL, ***median_chan_delays = NULL;
+  float ****avg_delays = NULL, ***mean_avg_delays = NULL, ***median_avg_delays = NULL;
   char ptitle[BIGBUFSIZE], ptype[BUFSIZE], ftype[BUFSIZE], poltitle[BUFSIZE];
   char information_text[BUFSIZE], ***systemp_strings = NULL;
-  struct ampphase **ampphase_if = NULL, *avg_ampphase;
+  struct ampphase **ampphase_if = NULL, *avg_ampphase = NULL, **all_avg_ampphase = NULL;
 
   // Definitions of some magic numbers that we use.
   // The height above the top axis for the plot title.
@@ -2146,6 +2373,60 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
           polidx[npols - 1] = poli;
         }
       }
+
+      if (plot_controls->plot_options & PLOT_AVERAGED_DATA) {
+	CALLOC(all_avg_ampphase, npols);
+	for (rp = 0; rp < npols; rp++) {
+	  all_avg_ampphase[polidx[rp]] = prepare_ampphase();
+	  chanaverage_ampphase(ampphase_if[polidx[rp]], all_avg_ampphase[polidx[rp]],
+			       ampphase_if[polidx[rp]]->options->delay_averaging[idxif + 1],
+			       ampphase_if[polidx[rp]]->options->averaging_method[idxif + 1],
+			       ampphase_if[polidx[rp]]->options->phase_in_degrees);
+	}
+      }
+      
+      if (plot_controls->plot_options & PLOT_DELAY) {
+	// We calculate all the adjacent channel delays.
+	CALLOC(chan_delays, npols);
+	CALLOC(delay_n_baselines, npols);
+	CALLOC(delay_n_bins, npols);
+	CALLOC(delay_n_delays, npols);
+	CALLOC(mean_chan_delays, npols);
+	CALLOC(median_chan_delays, npols);
+	// Allocate some memory if we do averaging later.
+	if (plot_controls->plot_options & PLOT_AVERAGED_DATA) {
+	  CALLOC(avg_delays, npols);
+	  CALLOC(delay_avg_n_baselines, npols);
+	  CALLOC(delay_avg_n_bins, npols);
+	  CALLOC(delay_avg_n_delays, npols);
+	  CALLOC(mean_avg_delays, npols);
+	  CALLOC(median_avg_delays, npols);
+	}
+	for (rp = 0; rp < npols; rp++) {
+	  compute_delays(ampphase_if[polidx[rp]],
+			 ampphase_if[polidx[rp]]->options->phase_in_degrees,
+			 ampphase_if[polidx[rp]]->options->min_tvchannel[idxif + 1],
+			 ampphase_if[polidx[rp]]->options->max_tvchannel[idxif + 1],
+			 &(chan_delays[polidx[rp]]),
+			 &(delay_n_baselines[polidx[rp]]),
+			 &(delay_n_bins[polidx[rp]]),
+			 &(delay_n_delays[polidx[rp]]),
+			 &(mean_chan_delays[polidx[rp]]),
+			 &(median_chan_delays[polidx[rp]]));
+	  if (plot_controls->plot_options & PLOT_AVERAGED_DATA) {
+	    compute_delays(all_avg_ampphase[polidx[rp]],
+			   ampphase_if[polidx[rp]]->options->phase_in_degrees,
+			   ampphase_if[polidx[rp]]->options->min_tvchannel[idxif + 1],
+			   ampphase_if[polidx[rp]]->options->max_tvchannel[idxif + 1],
+			   &(avg_delays[polidx[rp]]),
+			   &(delay_avg_n_baselines[polidx[rp]]),
+			   &(delay_avg_n_bins[polidx[rp]]),
+			   &(delay_avg_n_delays[polidx[rp]]),
+			   &(mean_avg_delays[polidx[rp]]),
+			   &(median_avg_delays[polidx[rp]]));
+	  }
+	}
+      }
       
       for (i = 0; i < ampphase_if[0]->nbaselines; i++) {
         // Work out the antennas in this baseline.
@@ -2193,6 +2474,7 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
             changepanel(PANEL_INFORMATION, PANEL_INFORMATION, panelspec);
             cpgswin(0, 1, 0, 1);
             cpgsci(1);
+	    cpgsls(1);
             cpgbox("BC", 0, 0, "BC", 0, 0);
             cpgptxt(information_x_pos, YPOS_LINE(0), 0, 0, cycle_ampphase[0][0]->obsdate);
             cpglen(4, cycle_ampphase[0][0]->obsdate, &information_text_width,
@@ -2281,7 +2563,9 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
           }
           changepanel(px, py, panelspec);
           // Set the title for the plot.
-          if (plot_controls->plot_options & PLOT_AMPLITUDE) {
+	  if (plot_controls->plot_options & PLOT_DELAY) {
+	    snprintf(ptype, BUFSIZE, "DELAYS");
+	  } else if (plot_controls->plot_options & PLOT_AMPLITUDE) {
             if (plot_controls->plot_options & PLOT_AMPLITUDE_LOG) {
               snprintf(ptype, BUFSIZE, "LOG(dB) AMPL.");
             } else {
@@ -2310,8 +2594,21 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
           snprintf(ptitle, BIGBUFSIZE, "%s: %s BSL%d%d",
                    ptype, ftype, ant1, ant2);
           
-          plotpanel_minmax(ampphase_if, plot_controls, i, idxif, npols, polidx,
+          plotpanel_minmax(ampphase_if, plot_controls, chan_delays,
+			   delay_n_bins, delay_n_delays,
+			   i, idxif, npols, polidx,
                            &xaxis_min, &xaxis_max, &yaxis_min, &yaxis_max);
+	  if (plot_controls->plot_options & PLOT_AVERAGED_DATA) {
+	    // Do the range checks again with the averaged data.
+	    plotpanel_minmax(all_avg_ampphase, plot_controls, avg_delays,
+			     delay_avg_n_bins, delay_avg_n_delays,
+			     i, idxif, npols, polidx,
+			     &xaxis_cmin, &xaxis_cmax, &yaxis_cmin, &yaxis_cmax);
+	    /* MINASSIGN(xaxis_min, xaxis_cmin); */
+	    /* MAXASSIGN(xaxis_max, xaxis_cmax); */
+	    MINASSIGN(yaxis_min, yaxis_cmin);
+	    MAXASSIGN(yaxis_max, yaxis_cmax);
+	  }
           /* printf("max/max x = %.6f / %.6f, y = %.6f / %.6f\n", */
           /* 	 xaxis_min, xaxis_max, yaxis_min, yaxis_max); */
 
@@ -2326,6 +2623,7 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
           if (panel_plotted[px][py] == 0) {
             // Only plot the borders and title once.
             cpgsci(1);
+	    cpgsls(1);
             cpgswin(xaxis_min, xaxis_max, yaxis_min, yaxis_max);
             cpgbox("BCNTS1", 0, 0, "BCNTS", 0, 0);
             cpgmtxt("T", theight, 0.5, 0.5, ptitle);
@@ -2355,10 +2653,8 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
           for (rp = 0; rp < npols; rp++) {
 	    // Do some averaging if the user wants us to plot the averaged data.
 	    if (plot_controls->plot_options & PLOT_AVERAGED_DATA) {
-	      avg_ampphase = prepare_ampphase();
-	      chanaverage_ampphase(ampphase_if[polidx[rp]], avg_ampphase,
-				   ampphase_if[polidx[rp]]->options->delay_averaging[idxif + 1],
-				   ampphase_if[polidx[rp]]->options->averaging_method[idxif + 1]);
+	      //avg_ampphase = prepare_ampphase();
+	      avg_ampphase = all_avg_ampphase[polidx[rp]];
 	    }
 	    
             for (bi = 0; bi < bn; bi++) {
@@ -2390,114 +2686,163 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
                 // explicit instruction.
                 continue;
               }
-              for (ri = 0, rj = ampphase_if[polidx[rp]]->f_nchannels[i][bi] - 1;
-                   ri < ampphase_if[polidx[rp]]->f_nchannels[i][bi];
-                   ri++, rj--) {
-                if (inverted == YES) {
-                  // Swap the frequencies.
-		  if (plot_controls->plot_options & PLOT_FREQUENCY) {
-		    plot_xvalues[ri] =
-		      ampphase_if[polidx[rp]]->f_frequency[i][bi][rj];
-		  } else if (plot_controls->plot_options & PLOT_CHANNEL) {
-		    plot_xvalues[ri] =
-		      ampphase_if[polidx[rp]]->f_channel[i][bi][rj];
-		  }
-                  if (plot_controls->plot_options & PLOT_AMPLITUDE) {
-                    if (plot_controls->plot_options & PLOT_AMPLITUDE_LOG) {
-                      LOGAMP(ampphase_if[polidx[rp]]->f_amplitude[i][bi][rj], ylog_max,
-                             plot_yvalues[ri]);
-                    } else {
-                      plot_yvalues[ri] = 
-                        ampphase_if[polidx[rp]]->f_amplitude[i][bi][rj];
-                    }
-                  } else if (plot_controls->plot_options & PLOT_PHASE) {
-                    plot_yvalues[ri] =
-                      ampphase_if[polidx[rp]]->f_phase[i][bi][rj];
-                  } else if (plot_controls->plot_options & PLOT_REAL) {
-                    plot_yvalues[ri] = crealf(ampphase_if[polidx[rp]]->f_raw[i][bi][rj]);
-                  } else if (plot_controls->plot_options & PLOT_IMAG) {
-                    plot_yvalues[ri] = cimagf(ampphase_if[polidx[rp]]->f_raw[i][bi][rj]);
-                  }
-                } else {
-                  if (plot_controls->plot_options & PLOT_FREQUENCY) {
-                    plot_xvalues[ri] = ampphase_if[polidx[rp]]->f_frequency[i][bi][ri];
-                  } else if (plot_controls->plot_options & PLOT_CHANNEL) {
-                    plot_xvalues[ri] = ampphase_if[polidx[rp]]->f_channel[i][bi][ri];
-                  }
-                  if (plot_controls->plot_options & PLOT_AMPLITUDE) {
-                    if (plot_controls->plot_options & PLOT_AMPLITUDE_LOG) {
-                      LOGAMP(ampphase_if[polidx[rp]]->f_amplitude[i][bi][ri], ylog_max,
-                             plot_yvalues[ri]);
-                    } else {
-                      plot_yvalues[ri] = ampphase_if[polidx[rp]]->f_amplitude[i][bi][ri];
-                    }
-                  } else if (plot_controls->plot_options & PLOT_PHASE) {
-                    plot_yvalues[ri] = ampphase_if[polidx[rp]]->f_phase[i][bi][ri];
-                  } else if (plot_controls->plot_options & PLOT_REAL) {
-                    plot_yvalues[ri] = crealf(ampphase_if[polidx[rp]]->f_raw[i][bi][ri]);
-                  } else if (plot_controls->plot_options & PLOT_IMAG) {
-                    plot_yvalues[ri] = cimagf(ampphase_if[polidx[rp]]->f_raw[i][bi][ri]);
-                  }
-                }
-              }
               cpgsci(pc);
-              cpgline(ampphase_if[polidx[rp]]->f_nchannels[i][bi],
-                      plot_xvalues, plot_yvalues);
-	      // Check if the user wants to display the averaged data.
-	      if (plot_controls->plot_options & PLOT_AVERAGED_DATA) {
-		// Remake the plot values again with the averaged data.
-		for (ri = 0, rj = avg_ampphase->f_nchannels[i][bi] - 1;
-		     ri < avg_ampphase->f_nchannels[i][bi]; ri++, rj--) {
+	      if (plot_controls->plot_options & PLOT_DELAY) {
+		for (ri = 0; ri < delay_n_delays[polidx[rp]][i][bi]; ri++) {
+		  plot_xvalues[ri] = ri;
+		  plot_yvalues[ri] = chan_delays[polidx[rp]][i][bi][ri];
+		}
+		// Set the line width for each point size depending on how many
+		// points we have to plot. But first, get the current linewidth.
+		cpgqlw(&lw);
+		delay_lw = 20;
+		if (delay_n_delays[polidx[rp]][i][bi] > 30) {
+		  delay_lw /= 2;
+		}
+		if (delay_n_delays[polidx[rp]][i][bi] > 200) {
+		  delay_lw /= 2;
+		}
+		cpgslw(delay_lw);
+		cpgpt(delay_n_delays[polidx[rp]][i][bi], plot_xvalues, plot_yvalues, -1);
+		cpgslw(lw);
+		// Plot the mean and median lines.
+		hline_xvals[0] = xaxis_min;
+		hline_xvals[1] = xaxis_max;
+		cpgsls(1);
+		hline_yvals[0] = hline_yvals[1] = mean_chan_delays[polidx[rp]][i][bi];
+		cpgline(2, hline_xvals, hline_yvals);
+		cpgsls(2);
+		hline_yvals[0] = hline_yvals[1] = median_chan_delays[polidx[rp]][i][bi];
+		cpgline(2, hline_xvals, hline_yvals);
+	      } else {
+		for (ri = 0, rj = ampphase_if[polidx[rp]]->f_nchannels[i][bi] - 1;
+		     ri < ampphase_if[polidx[rp]]->f_nchannels[i][bi];
+		     ri++, rj--) {
 		  if (inverted == YES) {
 		    // Swap the frequencies.
 		    if (plot_controls->plot_options & PLOT_FREQUENCY) {
-		      plot_xvalues[ri] = avg_ampphase->f_frequency[i][bi][rj];
+		      plot_xvalues[ri] =
+			ampphase_if[polidx[rp]]->f_frequency[i][bi][rj];
 		    } else if (plot_controls->plot_options & PLOT_CHANNEL) {
-		      plot_xvalues[ri] = avg_ampphase->f_channel[i][bi][rj];
+		      plot_xvalues[ri] =
+			ampphase_if[polidx[rp]]->f_channel[i][bi][rj];
 		    }
 		    if (plot_controls->plot_options & PLOT_AMPLITUDE) {
 		      if (plot_controls->plot_options & PLOT_AMPLITUDE_LOG) {
-			LOGAMP(avg_ampphase->f_amplitude[i][bi][rj], ylog_max,
+			LOGAMP(ampphase_if[polidx[rp]]->f_amplitude[i][bi][rj], ylog_max,
 			       plot_yvalues[ri]);
 		      } else {
-			plot_yvalues[ri] = avg_ampphase->f_amplitude[i][bi][rj];
+			plot_yvalues[ri] = 
+			  ampphase_if[polidx[rp]]->f_amplitude[i][bi][rj];
 		      }
 		    } else if (plot_controls->plot_options & PLOT_PHASE) {
-		      plot_yvalues[ri] = avg_ampphase->f_phase[i][bi][rj];
+		      plot_yvalues[ri] =
+			ampphase_if[polidx[rp]]->f_phase[i][bi][rj];
 		    } else if (plot_controls->plot_options & PLOT_REAL) {
-		      plot_yvalues[ri] = crealf(avg_ampphase->f_raw[i][bi][rj]);
+		      plot_yvalues[ri] = crealf(ampphase_if[polidx[rp]]->f_raw[i][bi][rj]);
 		    } else if (plot_controls->plot_options & PLOT_IMAG) {
-		      plot_yvalues[ri] = cimagf(avg_ampphase->f_raw[i][bi][rj]);
+		      plot_yvalues[ri] = cimagf(ampphase_if[polidx[rp]]->f_raw[i][bi][rj]);
 		    }
 		  } else {
 		    if (plot_controls->plot_options & PLOT_FREQUENCY) {
-		      plot_xvalues[ri] = avg_ampphase->f_frequency[i][bi][ri];
+		      plot_xvalues[ri] = ampphase_if[polidx[rp]]->f_frequency[i][bi][ri];
 		    } else if (plot_controls->plot_options & PLOT_CHANNEL) {
-		      plot_xvalues[ri] = avg_ampphase->f_channel[i][bi][ri];
+		      plot_xvalues[ri] = ampphase_if[polidx[rp]]->f_channel[i][bi][ri];
 		    }
 		    if (plot_controls->plot_options & PLOT_AMPLITUDE) {
 		      if (plot_controls->plot_options & PLOT_AMPLITUDE_LOG) {
-			LOGAMP(avg_ampphase->f_amplitude[i][bi][ri], ylog_max,
+			LOGAMP(ampphase_if[polidx[rp]]->f_amplitude[i][bi][ri], ylog_max,
 			       plot_yvalues[ri]);
 		      } else {
-			plot_yvalues[ri] = avg_ampphase->f_amplitude[i][bi][ri];
+			plot_yvalues[ri] = ampphase_if[polidx[rp]]->f_amplitude[i][bi][ri];
 		      }
 		    } else if (plot_controls->plot_options & PLOT_PHASE) {
-		      plot_yvalues[ri] = avg_ampphase->f_phase[i][bi][ri];
+		      plot_yvalues[ri] = ampphase_if[polidx[rp]]->f_phase[i][bi][ri];
 		    } else if (plot_controls->plot_options & PLOT_REAL) {
-		      plot_yvalues[ri] = crealf(avg_ampphase->f_raw[i][bi][ri]);
+		      plot_yvalues[ri] = crealf(ampphase_if[polidx[rp]]->f_raw[i][bi][ri]);
 		    } else if (plot_controls->plot_options & PLOT_IMAG) {
-		      plot_yvalues[ri] = cimagf(avg_ampphase->f_raw[i][bi][ri]);
+		      plot_yvalues[ri] = cimagf(ampphase_if[polidx[rp]]->f_raw[i][bi][ri]);
 		    }
 		  }
 		}
+		cpgline(ampphase_if[polidx[rp]]->f_nchannels[i][bi],
+			plot_xvalues, plot_yvalues);
+	      }
+	      // Check if the user wants to display the averaged data.
+	      if (plot_controls->plot_options & PLOT_AVERAGED_DATA) {
 		cpgsci(plot_colour_averaging(pc));
-		cpgline(avg_ampphase->f_nchannels[i][bi], plot_xvalues, plot_yvalues);
+		if (plot_controls->plot_options & PLOT_DELAY) {
+		  for (ri = 0; ri < delay_avg_n_delays[polidx[rp]][i][bi]; ri++) {
+		    plot_xvalues[ri] = ri;
+		    plot_yvalues[ri] = avg_delays[polidx[rp]][i][bi][ri];
+		  }
+		  cpgslw(delay_lw);
+		  cpgpt(delay_avg_n_delays[polidx[rp]][i][bi], plot_xvalues, plot_yvalues, -1);
+		  cpgslw(lw);
+		  // Plot the the mean and median lines.
+		  hline_xvals[0] = xaxis_min;
+		  hline_xvals[1] = xaxis_max;
+		  cpgsls(1);
+		  hline_yvals[0] = hline_yvals[1] = mean_avg_delays[polidx[rp]][i][bi];
+		  cpgline(2, hline_xvals, hline_yvals);
+		  cpgsls(2);
+		  hline_yvals[0] = hline_yvals[1] = median_avg_delays[polidx[rp]][i][bi];
+		  cpgline(2, hline_xvals, hline_yvals);
+		} else {
+		  // Remake the plot values again with the averaged data.
+		  for (ri = 0, rj = avg_ampphase->f_nchannels[i][bi] - 1;
+		       ri < avg_ampphase->f_nchannels[i][bi]; ri++, rj--) {
+		    if (inverted == YES) {
+		      // Swap the frequencies.
+		      if (plot_controls->plot_options & PLOT_FREQUENCY) {
+			plot_xvalues[ri] = avg_ampphase->f_frequency[i][bi][rj];
+		      } else if (plot_controls->plot_options & PLOT_CHANNEL) {
+			plot_xvalues[ri] = avg_ampphase->f_channel[i][bi][rj];
+		      }
+		      if (plot_controls->plot_options & PLOT_AMPLITUDE) {
+			if (plot_controls->plot_options & PLOT_AMPLITUDE_LOG) {
+			  LOGAMP(avg_ampphase->f_amplitude[i][bi][rj], ylog_max,
+				 plot_yvalues[ri]);
+			} else {
+			  plot_yvalues[ri] = avg_ampphase->f_amplitude[i][bi][rj];
+			}
+		      } else if (plot_controls->plot_options & PLOT_PHASE) {
+			plot_yvalues[ri] = avg_ampphase->f_phase[i][bi][rj];
+		      } else if (plot_controls->plot_options & PLOT_REAL) {
+			plot_yvalues[ri] = crealf(avg_ampphase->f_raw[i][bi][rj]);
+		      } else if (plot_controls->plot_options & PLOT_IMAG) {
+			plot_yvalues[ri] = cimagf(avg_ampphase->f_raw[i][bi][rj]);
+		      }
+		    } else {
+		      if (plot_controls->plot_options & PLOT_FREQUENCY) {
+			plot_xvalues[ri] = avg_ampphase->f_frequency[i][bi][ri];
+		      } else if (plot_controls->plot_options & PLOT_CHANNEL) {
+			plot_xvalues[ri] = avg_ampphase->f_channel[i][bi][ri];
+		      }
+		      if (plot_controls->plot_options & PLOT_AMPLITUDE) {
+			if (plot_controls->plot_options & PLOT_AMPLITUDE_LOG) {
+			  LOGAMP(avg_ampphase->f_amplitude[i][bi][ri], ylog_max,
+				 plot_yvalues[ri]);
+			} else {
+			  plot_yvalues[ri] = avg_ampphase->f_amplitude[i][bi][ri];
+			}
+		      } else if (plot_controls->plot_options & PLOT_PHASE) {
+			plot_yvalues[ri] = avg_ampphase->f_phase[i][bi][ri];
+		      } else if (plot_controls->plot_options & PLOT_REAL) {
+			plot_yvalues[ri] = crealf(avg_ampphase->f_raw[i][bi][ri]);
+		      } else if (plot_controls->plot_options & PLOT_IMAG) {
+			plot_yvalues[ri] = cimagf(avg_ampphase->f_raw[i][bi][ri]);
+		      }
+		    }
+		  }
+		  cpgline(avg_ampphase->f_nchannels[i][bi], plot_xvalues, plot_yvalues);
+		}
 		cpgsci(pc);
 	      }
 
 	      // Store the tvchannel ranges here while we know we're accessing valid data.
-	      if (plot_controls->plot_options & PLOT_TVCHANNELS) {
+	      if ((plot_controls->plot_options & PLOT_TVCHANNELS) &&
+		  (!(plot_controls->plot_options & PLOT_DELAY))) {
 		if (plot_controls->plot_options & PLOT_CHANNEL) {
 		  tvchans[0] = (float)ampphase_if[polidx[rp]]->options->min_tvchannel[idxif + 1];
 		  tvchans[1] = (float)ampphase_if[polidx[rp]]->options->max_tvchannel[idxif + 1];
@@ -2584,12 +2929,9 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
 	      
               pc++;
             }
-	    // Free memory if required.
-	    if (plot_controls->plot_options & PLOT_AVERAGED_DATA) {
-	      free_ampphase(&avg_ampphase);
-	    }
           }
-	  if (plot_controls->plot_options & PLOT_TVCHANNELS) {
+	  if ((plot_controls->plot_options & PLOT_TVCHANNELS) &&
+	      (!(plot_controls->plot_options & PLOT_DELAY))) {
 	    // Show the tvchannel range.
 	    cpgsls(2);
 	    cpgsci(7);
@@ -2608,6 +2950,63 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
       }
       num_ifs++;
       ni++;
+
+      if (plot_controls->plot_options & PLOT_DELAY) {
+	for (rp = 0; rp < npols; rp++) {
+	  for (i = 0; i < delay_n_baselines[rp]; i++) {
+	    for (j = 0; j < delay_n_bins[rp][i]; j++) {
+	      FREE(chan_delays[rp][i][j]);
+	      if (plot_controls->plot_options & PLOT_AVERAGED_DATA) {
+		FREE(avg_delays[rp][i][j]);
+	      }
+	    }
+	    FREE(mean_chan_delays[rp][i]);
+	    FREE(median_chan_delays[rp][i]);
+	    FREE(chan_delays[rp][i]);
+	    FREE(delay_n_delays[rp][i]);
+	    if (plot_controls->plot_options & PLOT_AVERAGED_DATA) {
+	      FREE(mean_avg_delays[rp][i]);
+	      FREE(median_avg_delays[rp][i]);
+	      FREE(avg_delays[rp][i]);
+	      FREE(delay_avg_n_delays[rp][i]);
+	    }
+	  }
+	  FREE(mean_chan_delays[rp]);
+	  FREE(median_chan_delays[rp]);
+	  FREE(chan_delays[rp]);
+	  FREE(delay_n_delays[rp]);
+	  FREE(delay_n_bins[rp]);
+	  if (plot_controls->plot_options & PLOT_AVERAGED_DATA) {
+	    FREE(mean_avg_delays[rp]);
+	    FREE(median_avg_delays[rp]);
+	    FREE(avg_delays[rp]);
+	    FREE(delay_avg_n_delays[rp]);
+	    FREE(delay_avg_n_bins[rp]);
+	  }
+	}
+	FREE(mean_chan_delays);
+	FREE(median_chan_delays);
+	FREE(chan_delays);
+	FREE(delay_n_delays);
+	FREE(delay_n_bins);
+	FREE(delay_n_baselines);
+	if (plot_controls->plot_options & PLOT_AVERAGED_DATA) {
+	  FREE(mean_avg_delays);
+	  FREE(median_avg_delays);
+	  FREE(avg_delays);
+	  FREE(delay_avg_n_delays);
+	  FREE(delay_avg_n_bins);
+	  FREE(delay_avg_n_baselines);
+	}
+      }
+
+      if (plot_controls->plot_options & PLOT_AVERAGED_DATA) {
+	for (rp = 0; rp < npols; rp++) {
+	  free_ampphase(&(all_avg_ampphase[polidx[rp]]));
+	}
+	FREE(all_avg_ampphase);
+      }
+      
     } else if (all_data_present == true) {
       ni++;
     }
@@ -2720,3 +3119,4 @@ int filename_to_pgplot_device(char *f, char *d, size_t l, int type, char *a, siz
     return(FILETYPE_UNKNOWN);
   }
 }
+

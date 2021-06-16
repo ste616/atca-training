@@ -61,6 +61,7 @@ static struct argp_option nvis_options[] = {
 #define VISBUFMEDIUM 768
 #define VISBUFLONG 1280
 #define MAXVISBANDS 2
+#define MAXNNCAL 10
 
 // The arguments structure.
 struct nvis_arguments {
@@ -75,16 +76,16 @@ struct nvis_arguments {
 };
 
 // And some fun, totally necessary, global state variables.
-int action_required, server_type, n_ampphase_options;
+int action_required, action_modifier, server_type, n_ampphase_options;
 int data_selected_index, tsys_apply;
 int xaxis_type, *yaxis_type, nxpanels, nypanels, nvisbands;
 int *visband_idx, tvchan_change_min, tvchan_change_max;
-int reference_antenna_index, nncal;
-int *nncal_indices, nncal_cycletime;
+int reference_antenna_index, nncal, deladd_antnum, deladd_polnum, deladd_ifnum;
+int *nncal_indices, nncal_cycletime, new_timetype;
 char **visband, tvchan_visband[10], hardcopy_filename[VISBUFSHORT];
 // Whether to order the baselines in length order (true/false).
 bool sort_baselines;
-float data_seconds, *nncal_seconds;
+float data_seconds, *nncal_seconds, deladd_value;
 struct vis_plotcontrols vis_plotcontrols;
 struct panelspec vis_panelspec;
 struct vis_data vis_data;
@@ -198,6 +199,17 @@ static void sighandler(int sig) {
 #define ACTION_HARDCOPY_PLOT             1<<15
 #define ACTION_COMPUTE_DELAYS            1<<16
 #define ACTION_RESET_DELAYS              1<<17
+#define ACTION_COMPUTE_PHASECORRECTIONS  1<<18
+#define ACTION_RESET_PHASECORRECTIONS    1<<19
+#define ACTION_ADD_DELAYS                1<<20
+#define ACTION_CHANGE_TIMETYPE           1<<21
+#define ACTION_ARRAY_CONFIGURATION_PRINT 1<<22
+
+// The action modifier magic numbers.
+#define ACTIONMOD_NOMOD                  0
+#define ACTIONMOD_CORRECT_ALL            1
+#define ACTIONMOD_CORRECT_AFTER          2
+#define ACTIONMOD_CORRECT_BEFORE         3
 
 // Make a shortcut to stop action for those actions which can only be
 // done by a simulator.
@@ -261,8 +273,12 @@ int char_to_product(char pstring) {
     return VIS_PLOTPANEL_WINDDIR;
   case 'G':
     return VIS_PLOTPANEL_GTP;
+  case 'h':
+    return VIS_PLOTPANEL_HOURANGLE;
   case 'H':
     return VIS_PLOTPANEL_HUMIDITY;
+  case 'L':
+    return VIS_PLOTPANEL_SIDEREALTIME;
   case 'n':
     return VIS_PLOTPANEL_CALJY;
   case 'N':
@@ -282,8 +298,12 @@ int char_to_product(char pstring) {
     return VIS_PLOTPANEL_TEMPERATURE;
   case 'V':
     return VIS_PLOTPANEL_WINDSPEED;
+  case 'x':
+    return VIS_PLOTPANEL_RIGHTASCENSION;
   case 'X':
     return VIS_PLOTPANEL_SEEMONPHASE;
+  case 'y':
+    return VIS_PLOTPANEL_DECLINATION;
   case 'Y':
     return VIS_PLOTPANEL_SEEMONRMS;
   }
@@ -347,7 +367,7 @@ int time_index() {
 			      vis_data.vis_quantities[nncal_indices[i - 1]][0][0]->ut_seconds) -
 	  date2mjd(vis_data.vis_quantities[closeidx - i][0][0]->obsdate,
 		   vis_data.vis_quantities[closeidx - i][0][0]->ut_seconds);
-	if (fabs(delta_time - cycletime) < 1e-9) {
+	if (fabs(delta_time - cycletime) < 1e-6) { // 1e-6 days is 0.09 sec
 	  // These are consecutive cycles.
 	  nncal_indices[i] = closeidx - i;
 	  nncal_seconds[i] = nncal_seconds[i - 1] - (float)nncal_cycletime;
@@ -382,6 +402,9 @@ static void interpret_command(char *line) {
   bool products_selected, data_time_parsed = false, product_usable, succ = false;
   bool product_backwards = false;
 
+  // Reset the modifiers.
+  action_modifier = ACTIONMOD_NOMOD;
+  
   if (line == NULL) {
     action_required = ACTION_QUIT;
     if (line == 0) {
@@ -493,13 +516,26 @@ static void interpret_command(char *line) {
       data_time_parsed = false;
       action_required = ACTION_DESCRIBE_DATA;
       if (nels == 2) {
-        // The second element should be the time.
-        data_time_parsed = string_to_seconds(line_els[1], &data_seconds);
-        if (data_time_parsed) {
-	  data_selected_index = time_index();
-	  // We'll also want to plot where this time is.
+	// Are we turning off the display?
+	if (strncmp(line_els[1], "off", 3) == 0) {
+	  data_seconds = 0;
+	  data_selected_index = 0;
+	  // Reset the nncal display too.
+	  for (i = 0; i < nncal; i++) {
+	    nncal_indices[i] = -1;
+	    nncal_seconds[i] = -1;
+	  }
+	  action_required -= ACTION_DESCRIBE_DATA;
 	  action_required |= ACTION_REFRESH_PLOT;
-        }
+	} else {
+	  // The second element should be the time.
+	  data_time_parsed = string_to_seconds(line_els[1], &data_seconds);
+	  if (data_time_parsed) {
+	    data_selected_index = time_index();
+	    // We'll also want to plot where this time is.
+	    action_required |= ACTION_REFRESH_PLOT;
+	  }
+	}
       }
       
     } else if (minmatch("calband", line_els[0], 4)) {
@@ -630,7 +666,10 @@ static void interpret_command(char *line) {
         if (minmatch("computation", line_els[1], 4)) {
           // Print the options used during computation.
           action_required = ACTION_AMPPHASE_OPTIONS_PRINT;
-        }
+        } else if (minmatch("array", line_els[1], 3)) {
+	  // Print out details about the array configuration.
+	  action_required = ACTION_ARRAY_CONFIGURATION_PRINT;
+	}
       }
     } else if (minmatch("delavg", line_els[0], 5)) {
       CHECKSIMULATOR;
@@ -806,22 +845,31 @@ static void interpret_command(char *line) {
 	printf(" NNCAL = %d\n", nncal);
       } else {
 	succ = string_to_integer(line_els[1], &temp_nncal);
-	if (succ && (temp_nncal > 0)) {
+	if (succ && (temp_nncal > 0) && (temp_nncal <= MAXNNCAL)) {
 	  nncal = temp_nncal;
 	  REALLOC(nncal_indices, nncal);
 	  REALLOC(nncal_seconds, nncal);
 	  // Re-compute the indices if we can.
 	  time_index();
 	  action_required = ACTION_REFRESH_PLOT;
+	} else if (succ && (temp_nncal > MAXNNCAL)) {
+	  printf(" Unable to set NNCAL higher than %d\n", MAXNNCAL);
+	} else {
+	  printf(" INVALID NNCAL PARAMETER\n");
 	}
       }
-    } else if (minmatch("dcal", line_els[0], 4)) {
+    } else if ((minmatch("dcal", line_els[0], 4)) ||
+	       (minmatch("pcal", line_els[0], 4))) {
       CHECKSIMULATOR;
-      // Compute the delays required to correct the data and then tell the server
+      // Compute the delays or phases required to correct the data and then tell the server
       // to incorporate them.
       // Check if a time range has been specified.
       if (data_seconds < 0) {
-	printf(" Unable to dcal: please select a time range with data and nncal\n");
+	if (minmatch("dcal", line_els[0], 4)) {
+	  printf(" Unable to dcal: please select a time range with data and nncal\n");
+	} else if (minmatch("pcal", line_els[0], 4)) {
+	  printf(" Unable to pcal: please select a time range with data and nncal\n");
+	}
       } else {
 	// Check that we have enough cycles of data.
 	temp_nncal = 0;
@@ -831,22 +879,115 @@ static void interpret_command(char *line) {
 	  }
 	}
 	if (temp_nncal != nncal) {
-	  printf(" Unable to dcal: need %d consecutive cycles of data, please change data and/or nncal\n",
+	  if (minmatch("dcal", line_els[0], 4)) {
+	    printf(" Unable to dcal: ");
+	  } else if (minmatch("pcal", line_els[0], 4)) {
+	    printf(" Unable to pcal: ");
+	  }
+	  printf("need %d consecutive cycles of data, please change data and/or nncal\n",
 		 nncal);
 	} else {
-	  action_required = ACTION_COMPUTE_DELAYS;
+	  if (minmatch("dcal", line_els[0], 4)) {
+	    action_required = ACTION_COMPUTE_DELAYS;
+	  } else if (minmatch("pcal", line_els[0], 4)) {
+	    action_required = ACTION_COMPUTE_PHASECORRECTIONS;
+	  }
+	  // Check if we have any modifiers.
+	  if (nels == 2) {
+	    if (minmatch("all", line_els[1], 3)) {
+	      // We make the correction for the entire dataset.
+	      action_modifier = ACTIONMOD_CORRECT_ALL;
+	    } else if (minmatch("after", line_els[1], 3)) {
+	      action_modifier = ACTIONMOD_CORRECT_AFTER;
+	    } else if (minmatch("before", line_els[1], 3)) {
+	      action_modifier = ACTIONMOD_CORRECT_BEFORE;
+	    }
+	  }
+	}
+      }
+    } else if (minmatch("deladd", line_els[0], 6)) {
+      CHECKSIMULATOR;
+      // Add some amount of delay to some antenna, IF and pol combination.
+      // The arguments should be antenna, if, pol, value, and optional modifier
+      if (nels < 5) {
+	printf(" deladd requires antenna, IF, pol and arguments\n");
+      } else if (data_seconds < 0) {
+	printf(" deladd needs a time range selected with data and nncal\n");
+      } else {
+	deladd_antnum = atoi(line_els[1]);
+	deladd_ifnum = atoi(line_els[2]);
+	if ((strcasecmp(line_els[3], "x") == 0) ||
+	    (strcasecmp(line_els[3], "a") == 0)) {
+	  deladd_polnum = POL_X;
+	} else if ((strcasecmp(line_els[3], "y") == 0) ||
+		   (strcasecmp(line_els[3], "b") == 0)) {
+	  deladd_polnum = POL_Y;
+	} else if ((strcasecmp(line_els[3], "xy") == 0) ||
+		   (strcasecmp(line_els[3], "ab") == 0)) {
+	  deladd_polnum = POL_XY;
+	} else {
+	  deladd_polnum = -1;
+	}
+	deladd_value = strtof(line_els[4], NULL);
+	// Do a sanity check.
+	if ((deladd_antnum > 0) && (deladd_antnum < MAX_ANTENNANUM) &&
+	    (deladd_polnum != -1) && (deladd_ifnum > 0) && (deladd_ifnum < MAXVISBANDS)) {
+	  action_required = ACTION_ADD_DELAYS;
+	  if (nels >= 6) {
+	    if (minmatch("all", line_els[5], 3)) {
+	      action_modifier = ACTIONMOD_CORRECT_ALL;
+	    } else if (minmatch("after", line_els[5], 3)) {
+	      action_modifier = ACTIONMOD_CORRECT_AFTER;
+	    } else if (minmatch("before", line_els[5], 3)) {
+	      action_modifier = ACTIONMOD_CORRECT_BEFORE;
+	    }
+	  }
+	} else {
+	  printf(" arguments supplied to deladd are invalid\n");
 	}
       }
     } else if (minmatch("reset", line_els[0], 3)) {
       CHECKSIMULATOR;
       if (nels == 1) {
 	// Can't reset nothing, need another argument.
-	printf(" Reset needs an argument (delays)\n");
+	printf(" Reset needs an argument (delays/phases/all)\n");
       } else if (minmatch("delays", line_els[1], 3)) {
 	// Remove any delay modifiers from our correction list, and then tell the server
 	// to do its thing.
 	action_required = ACTION_RESET_DELAYS;
+      } else if (minmatch("phases", line_els[1], 3)) {
+	// Remove any phase correction modifiers from our list, and then tell the server
+	// to do its thing.
+	action_required = ACTION_RESET_PHASECORRECTIONS;
+      } else if (minmatch("all", line_els[1], 3)) {
+	// Remove all modifiers.
+	action_required = ACTION_RESET_DELAYS | ACTION_RESET_PHASECORRECTIONS;
       }
+    } else if (minmatch("time", line_els[0], 3)) {
+      // Change which type of time we display on the bottom.
+      if (nels != 2) {
+	printf(" please supply an argument [UT/AEST/AEDT/AWST/GMST/LST]\n");
+      } else {
+	action_required = ACTION_CHANGE_TIMETYPE;
+	if (strncasecmp(line_els[1], "gmst", 4) == 0) {
+	  new_timetype = PLOTTIME_GMST;
+	} else if ((strncasecmp(line_els[1], "gm", 2) == 0) ||
+		   (strncasecmp(line_els[1], "ut", 2) == 0)) {
+	  new_timetype = PLOTTIME_UTC;
+	} else if (strcasecmp(line_els[1], "lst") == 0) {
+	  new_timetype = PLOTTIME_LST;
+	} else if (strcasecmp(line_els[1], "aest") == 0) {
+	  new_timetype = PLOTTIME_AEST;
+	} else if (strcasecmp(line_els[1], "aedt") == 0) {
+	  new_timetype = PLOTTIME_AEDT;
+	} else if (strcasecmp(line_els[1], "awst") == 0) {
+	  new_timetype = PLOTTIME_AWST;
+	} else {
+	  printf(" please supply an argument [UT/AEST/AEDT/AWST/GMST/LST]\n");
+	  action_required -= ACTION_CHANGE_TIMETYPE;
+	}
+      }
+      
     } else {
       if (nels == 1) {
         // We try to interpret the string as the panels to show.
@@ -904,21 +1045,24 @@ static void interpret_command(char *line) {
 
 int main(int argc, char *argv[]) {
   struct nvis_arguments arguments;
-  int i, j, k, l, m, r, bytes_received, nmesg = 0, bidx = -1, num_timelines = 0;
+  int i, j, k, l, m, r, bytes_received, nmesg = 0, bidx = -1, num_timelines = 0, pnum;
   int dump_type = FILETYPE_UNKNOWN, dump_device_number = -1, vis_device_number = -1;
-  int *timeline_types = NULL, cycidx, visidx, a1, a2;
+  int *timeline_types = NULL, cycidx, visidx, a1, a2, *mod_remove = NULL, n_mod_remove = 0;
+  int alabel;
   cmp_ctx_t cmp;
   cmp_mem_access_t mem;
   struct requests server_request;
   struct responses server_response;
   SOCKET socket_peer, max_socket = -1;
-  char *recv_buffer = NULL, send_buffer[VISBUFSIZE], htime[20];
+  char *recv_buffer = NULL, send_buffer[SENDBUFSIZE], htime[20];
   char **mesgout = NULL, client_id[CLIENTIDLENGTH];
   char header_string[VISBUFSIZE], dump_device[VISBUFMEDIUM], dump_file[VISBUFSIZE];
   fd_set watchset, reads;
   bool vis_device_opened = false, dump_device_opened = false;
   size_t recv_buffer_length;
   float *timelines = NULL, *timeline_deltas = NULL, dsign = 1;
+  float p1 = 0, p2 = 0, p3 = 0, pd1 = 0, pd2 = 0, pd3 = 0;
+  float phase_cals[POL_XY + 1][MAX_ANTENNANUM][MAXNNCAL];
   double tmjd;
   struct vis_quantities ***described_ptr = NULL;
   struct scan_header_data *described_hdr = NULL;
@@ -995,13 +1139,13 @@ int main(int argc, char *argv[]) {
     strncpy(server_request.client_id, client_id, CLIENTIDLENGTH);
     strncpy(server_request.client_username, arguments.username, CLIENTIDLENGTH);
     server_request.client_type = CLIENTTYPE_NVIS;
-    init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)VISBUFSIZE);
+    init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)SENDBUFSIZE);
     pack_requests(&cmp, &server_request);
     socket_send_buffer(socket_peer, send_buffer, cmp_mem_access_get_pos(&mem));
     
     // Send a request for the currently available VIS data.
     server_request.request_type = REQUEST_CURRENT_VISDATA;
-    init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)VISBUFSIZE);
+    init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)SENDBUFSIZE);
     pack_requests(&cmp, &server_request);
     socket_send_buffer(socket_peer, send_buffer, cmp_mem_access_get_pos(&mem));
   }
@@ -1038,6 +1182,7 @@ int main(int argc, char *argv[]) {
   vis_interpret_product("aa", &(vis_plotcontrols.vis_products[0]));
   vis_plotcontrols.cycletime = 10;
   action_required = 0;
+  action_modifier = ACTIONMOD_NOMOD;
   while(true) {
     reads = watchset;
     if (action_required & ACTION_NEW_DATA_RECEIVED) {
@@ -1088,109 +1233,269 @@ int main(int argc, char *argv[]) {
     }
 
     if ((action_required & ACTION_COMPUTE_DELAYS) ||
-	(action_required & ACTION_RESET_DELAYS)) {
+	(action_required & ACTION_RESET_DELAYS) ||
+	(action_required & ACTION_ADD_DELAYS) ||
+	(action_required & ACTION_COMPUTE_PHASECORRECTIONS) ||
+	(action_required & ACTION_RESET_PHASECORRECTIONS)) {
       action_required |= ACTION_AMPPHASE_OPTIONS_CHANGED;
       nmesg = 0;
       for (j = 0; j < nvisbands; j++) {
 	visidx = visband_idx[j] - 1;
-	if (action_required & ACTION_RESET_DELAYS) {
-	  // Remove all modifiers in the options.
+	if ((action_required & ACTION_RESET_DELAYS) ||
+	    (action_required & ACTION_RESET_PHASECORRECTIONS)) {
+	  // Remove all modifiers that have delay corrections in the options.
+	  n_mod_remove = 0;
+	  mod_remove = NULL;
 	  for (i = 0; i < found_options->num_modifiers[visband_idx[j]]; i++) {
-	    free_ampphase_modifiers(found_options->modifiers[visband_idx[j]][i]);
-	    FREE(found_options->modifiers[visband_idx[j]][i]);
+	    if (((action_required & ACTION_RESET_DELAYS) &&
+		 (found_options->modifiers[visband_idx[j]][i]->add_delay)) ||
+		((action_required & ACTION_RESET_PHASECORRECTIONS) &&
+		 (found_options->modifiers[visband_idx[j]][i]->add_phase))) {
+	      n_mod_remove += 1;
+	      REALLOC(mod_remove, n_mod_remove);
+	      mod_remove[n_mod_remove - 1] = i;
+	    }
+	    /* free_ampphase_modifiers(found_options->modifiers[visband_idx[j]][i]); */
+	    /* FREE(found_options->modifiers[visband_idx[j]][i]); */
 	  }
-	  found_options->num_modifiers[visband_idx[j]] = 0;
-	  FREE(found_options->modifiers[visband_idx[j]]);
-	} else if (action_required & ACTION_COMPUTE_DELAYS) {
+	  remove_modifiers(found_options, visband_idx[j], n_mod_remove, mod_remove);
+	  FREE(mod_remove);
+	  /* found_options->num_modifiers[visband_idx[j]] = 0; */
+	  /* FREE(found_options->modifiers[visband_idx[j]]); */
+	} else if ((action_required & ACTION_COMPUTE_DELAYS) ||
+		   (action_required & ACTION_ADD_DELAYS) ||
+		   (action_required & ACTION_COMPUTE_PHASECORRECTIONS)) {
 	  // Create a new modifier in the options.
-	  found_options->num_modifiers[visband_idx[j]] += 1;
-	  REALLOC(found_options->modifiers[visband_idx[j]],
-		  found_options->num_modifiers[visband_idx[j]]);
-	  CALLOC(found_options->modifiers[visband_idx[j]]
-		 [found_options->num_modifiers[visband_idx[j]] - 1], 1);
-	  modptr = found_options->modifiers[visband_idx[j]]
-	    [found_options->num_modifiers[visband_idx[j]] - 1];
-	  modptr->add_delay = true;
-	  modptr->delay_num_antennas = 7;
-	  modptr->delay_num_pols = POL_XY + 1;
-	  CALLOC(modptr->delay, modptr->delay_num_antennas);
-	  for (i = 0; i < modptr->delay_num_antennas; i++) {
-	    CALLOC(modptr->delay[i], modptr->delay_num_pols);
+	  modptr = add_modifier(found_options, visband_idx[j]);
+	  /* found_options->num_modifiers[visband_idx[j]] += 1; */
+	  /* REALLOC(found_options->modifiers[visband_idx[j]], */
+	  /* 	  found_options->num_modifiers[visband_idx[j]]); */
+	  /* CALLOC(found_options->modifiers[visband_idx[j]] */
+	  /* 	 [found_options->num_modifiers[visband_idx[j]] - 1], 1); */
+	  /* modptr = found_options->modifiers[visband_idx[j]] */
+	  /*   [found_options->num_modifiers[visband_idx[j]] - 1]; */
+	  if ((action_required & ACTION_COMPUTE_DELAYS) ||
+	      (action_required & ACTION_ADD_DELAYS)) {
+	    modptr->add_delay = true;
+	    modptr->delay_num_antennas = 7;
+	    modptr->delay_num_pols = POL_XY + 1;
+	    CALLOC(modptr->delay, modptr->delay_num_antennas);
+	    for (i = 0; i < modptr->delay_num_antennas; i++) {
+	      CALLOC(modptr->delay[i], modptr->delay_num_pols);
+	    }
 	  }
-	  
-	  modptr->delay_start_mjd =
-	    date2mjd(vis_data.vis_quantities[nncal_indices[0]][0][0]->obsdate,
-		     vis_data.vis_quantities[nncal_indices[0]][0][0]->ut_seconds);
-	  modptr->delay_end_mjd =
-	    date2mjd(vis_data.vis_quantities[nncal_indices[nncal - 1]][0][0]->obsdate,
-		     vis_data.vis_quantities[nncal_indices[nncal - 1]][0][0]->ut_seconds);
-	  if (modptr->delay_end_mjd < modptr->delay_start_mjd) {
+	  if (action_required & ACTION_COMPUTE_PHASECORRECTIONS) {
+	    modptr->add_phase = true;
+	    modptr->phase_num_antennas = 7;
+	    modptr->phase_num_pols = POL_XY + 1;
+	    CALLOC(modptr->phase, modptr->phase_num_antennas);
+	    for (i = 0; i < modptr->phase_num_antennas; i++) {
+	      CALLOC(modptr->phase[i], modptr->phase_num_pols);
+	    }
+	  }
+	  if ((action_modifier == ACTIONMOD_CORRECT_ALL) ||
+	      (action_modifier == ACTIONMOD_CORRECT_BEFORE)) {
+	    if ((action_required & ACTION_COMPUTE_DELAYS) ||
+		(action_required & ACTION_ADD_DELAYS)) {
+	      modptr->delay_start_mjd = 0;
+	    }
+	    if (action_required & ACTION_COMPUTE_PHASECORRECTIONS) {
+	      modptr->phase_start_mjd = 0;
+	    }
+	  } else {
+	    if ((action_required & ACTION_COMPUTE_DELAYS) ||
+		(action_required & ACTION_ADD_DELAYS)) {
+	      modptr->delay_start_mjd =
+		date2mjd(vis_data.vis_quantities[nncal_indices[0]][0][0]->obsdate,
+			 vis_data.vis_quantities[nncal_indices[0]][0][0]->ut_seconds);
+	    }
+	    if (action_required & ACTION_COMPUTE_PHASECORRECTIONS) {
+	      modptr->phase_start_mjd =
+		date2mjd(vis_data.vis_quantities[nncal_indices[0]][0][0]->obsdate,
+			 vis_data.vis_quantities[nncal_indices[0]][0][0]->ut_seconds);
+	    }
+	  }
+	  if ((action_modifier == ACTIONMOD_CORRECT_ALL) ||
+	      (action_modifier == ACTIONMOD_CORRECT_AFTER)) {
+	    if ((action_required & ACTION_COMPUTE_DELAYS) ||
+		(action_required & ACTION_ADD_DELAYS)) {
+	      modptr->delay_end_mjd = 100000; // This is 2132-SEP-01.
+	    }
+	    if (action_required & ACTION_COMPUTE_PHASECORRECTIONS) {
+	      modptr->phase_end_mjd = 100000;
+	    }
+	  } else {
+	    if ((action_required & ACTION_COMPUTE_DELAYS) ||
+		(action_required & ACTION_ADD_DELAYS)) {
+	      modptr->delay_end_mjd =
+		date2mjd(vis_data.vis_quantities[nncal_indices[nncal - 1]][0][0]->obsdate,
+			 vis_data.vis_quantities[nncal_indices[nncal - 1]][0][0]->ut_seconds);
+	    }
+	    if (action_required & ACTION_COMPUTE_PHASECORRECTIONS) {
+	      modptr->phase_end_mjd =
+		date2mjd(vis_data.vis_quantities[nncal_indices[nncal - 1]][0][0]->obsdate,
+			 vis_data.vis_quantities[nncal_indices[nncal - 1]][0][0]->ut_seconds);
+	    }
+	  }
+	  if (((action_required & ACTION_COMPUTE_DELAYS) ||
+	       (action_required & ACTION_ADD_DELAYS)) &&
+	      (modptr->delay_end_mjd < modptr->delay_start_mjd)) {
 	    tmjd = modptr->delay_start_mjd;
 	    modptr->delay_start_mjd = modptr->delay_end_mjd;
 	    modptr->delay_end_mjd = tmjd;
 	  }
-	  
-	  for (i = 0; i < nncal; i++) {
-	    cycidx = nncal_indices[i];
-	    for (k = 0; k < vis_data.num_pols[cycidx][visidx]; k++) {
-	      if ((vis_data.vis_quantities[cycidx][visidx][k]->pol == POL_XX) ||
-		  (vis_data.vis_quantities[cycidx][visidx][k]->pol == POL_YY)) {
-		// Gather the delay data for the interferometer.
-		for (l = 0; l < vis_data.header_data[cycidx]->num_ants; l++) {
-		  if (l == reference_antenna_index) {
-		    continue;
-		  }
-		  if (l < reference_antenna_index) {
-		    // The sign needs reversing.
-		    dsign = -1;
-		  } else {
-		    dsign = 1;
-		  }
-		  for (m = 0; m < vis_data.vis_quantities[cycidx][visidx][k]->nbaselines; m++) {
-		    base_to_ants(vis_data.vis_quantities[cycidx][visidx][k]->baseline[m],
-				 &a1, &a2);
-		    if (((a1 == vis_data.header_data[cycidx]->ant_label[reference_antenna_index]) ||
-			 (a2 == vis_data.header_data[cycidx]->ant_label[reference_antenna_index])) &&
-			((a1 == vis_data.header_data[cycidx]->ant_label[l]) ||
-			 (a2 == vis_data.header_data[cycidx]->ant_label[l]))) {
-		      // We can read off the delay here.
-		      /* snprintf(mesgout[nmesg++], VISBUFLONG, */
-		      /* 	     " CYC %d BAND %d POL %d DELAY %d-%d = %.5f ns\n", */
-		      /* 	     cycidx, visidx, */
-		      /* 	     vis_data.vis_quantities[cycidx][visidx][k]->pol, a1, a2, */
-		      /* 	     vis_data.vis_quantities[cycidx][visidx][k]->delay[m][0]); */
-		      modptr->delay[vis_data.header_data[cycidx]->ant_label[l]]
-			[vis_data.vis_quantities[cycidx][visidx][k]->pol - 2] += dsign *
-			vis_data.vis_quantities[cycidx][visidx][k]->delay[m][0] / (float)nncal;
+	  if ((action_required & ACTION_COMPUTE_PHASECORRECTIONS) &&
+	      (modptr->phase_end_mjd < modptr->phase_start_mjd)) {
+	    tmjd = modptr->phase_start_mjd;
+	    modptr->phase_start_mjd = modptr->phase_end_mjd;
+	    modptr->phase_end_mjd = tmjd;
+	  }
+
+	  if (action_required & ACTION_ADD_DELAYS) {
+	    // No need to compute anything.
+	    // All the addition is 0 by default.
+	    if (visidx == (deladd_ifnum - 1)) {
+	      modptr->delay[deladd_antnum][deladd_polnum] = deladd_value;
+	    }
+	  } else {
+	    for (i = 0; i < nncal; i++) {
+	      cycidx = nncal_indices[i];
+	      for (k = 0; k < vis_data.num_pols[cycidx][visidx]; k++) {
+		if ((vis_data.vis_quantities[cycidx][visidx][k]->pol == POL_XX) ||
+		    (vis_data.vis_quantities[cycidx][visidx][k]->pol == POL_YY)) {
+		  // Gather the delay data for the interferometer.
+		  for (l = 0; l < vis_data.header_data[cycidx]->num_ants; l++) {
+		    if (l == reference_antenna_index) {
+		      continue;
+		    }
+		    if (l < reference_antenna_index) {
+		      // The sign needs reversing.
+		      dsign = -1;
+		    } else {
+		      dsign = 1;
+		    }
+		    for (m = 0; m < vis_data.vis_quantities[cycidx][visidx][k]->nbaselines; m++) {
+		      base_to_ants(vis_data.vis_quantities[cycidx][visidx][k]->baseline[m],
+				   &a1, &a2);
+		      if (((a1 == vis_data.header_data[cycidx]->ant_label[reference_antenna_index]) ||
+			   (a2 == vis_data.header_data[cycidx]->ant_label[reference_antenna_index])) &&
+			  ((a1 == vis_data.header_data[cycidx]->ant_label[l]) ||
+			   (a2 == vis_data.header_data[cycidx]->ant_label[l]))) {
+			// We can read off the delay here.
+			/* snprintf(mesgout[nmesg++], VISBUFLONG, */
+			/* 	     " CYC %d BAND %d POL %d DELAY %d-%d = %.5f ns\n", */
+			/* 	     cycidx, visidx, */
+			/* 	     vis_data.vis_quantities[cycidx][visidx][k]->pol, a1, a2, */
+			/* 	     vis_data.vis_quantities[cycidx][visidx][k]->delay[m][0]); */
+			if (action_required & ACTION_COMPUTE_DELAYS) {
+			  modptr->delay[vis_data.header_data[cycidx]->ant_label[l]]
+			    [vis_data.vis_quantities[cycidx][visidx][k]->pol - 2] += dsign *
+			    vis_data.vis_quantities[cycidx][visidx][k]->delay[m][0] / (float)nncal;
+			}
+			if (action_required & ACTION_COMPUTE_PHASECORRECTIONS) {
+			  phase_cals[vis_data.vis_quantities[cycidx][visidx][k]->pol - 2]
+			    [vis_data.header_data[cycidx]->ant_label[l]][i] = dsign *
+			    vis_data.vis_quantities[cycidx][visidx][k]->phase[m][0];
+			  /* modptr->phase[vis_data.header_data[cycidx]->ant_label[l]] */
+			  /*   [vis_data.vis_quantities[cycidx][visidx][k]->pol - 2] += dsign * */
+			  /*   vis_data.vis_quantities[cycidx][visidx][k]->phase[m][0] / (float)nncal; */
+			}
+		      }
 		    }
 		  }
-		}
-	      } else if (vis_data.vis_quantities[cycidx][visidx][k]->pol == POL_XY) {
-		// Get the cross-pol delay per antenna.
-		for (l = 0; l < vis_data.header_data[cycidx]->num_ants; l++) {
-		  for (m = 0; m < vis_data.vis_quantities[cycidx][visidx][k]->nbaselines; m++) {
-		    base_to_ants(vis_data.vis_quantities[cycidx][visidx][k]->baseline[m],
-				 &a1, &a2);
-		    if ((a1 == vis_data.header_data[cycidx]->ant_label[l]) &&
-			(a2 == vis_data.header_data[cycidx]->ant_label[l])) {
-		      // We get the delay and add it to the Y pol.
-		      modptr->delay[vis_data.header_data[cycidx]->ant_label[l]][POL_XY] +=
-			vis_data.vis_quantities[cycidx][visidx][k]->delay[m][1] / (float)nncal;
+		} else if (vis_data.vis_quantities[cycidx][visidx][k]->pol == POL_XY) {
+		  // Get the cross-pol delay per antenna.
+		  for (l = 0; l < vis_data.header_data[cycidx]->num_ants; l++) {
+		    for (m = 0; m < vis_data.vis_quantities[cycidx][visidx][k]->nbaselines; m++) {
+		      base_to_ants(vis_data.vis_quantities[cycidx][visidx][k]->baseline[m],
+				   &a1, &a2);
+		      if ((a1 == vis_data.header_data[cycidx]->ant_label[l]) &&
+			  (a2 == vis_data.header_data[cycidx]->ant_label[l])) {
+			if (action_required & ACTION_COMPUTE_DELAYS) {
+			  // We get the delay and add it to the Y pol.
+			  modptr->delay[vis_data.header_data[cycidx]->ant_label[l]][POL_XY] +=
+			    vis_data.vis_quantities[cycidx][visidx][k]->delay[m][1] / (float)nncal;
+			}
+			if (action_required & ACTION_COMPUTE_PHASECORRECTIONS) {
+			  phase_cals[POL_XY]
+			    [vis_data.header_data[cycidx]->ant_label[l]][i] =
+			    vis_data.vis_quantities[cycidx][visidx][k]->phase[m][0];
+			}
+		      }
 		    }
 		  }
 		}
 	      }
 	    }
 	  }
-	  // Print out the delay corrections found.
-	  snprintf(mesgout[nmesg++], VISBUFLONG, " BAND %d, MJD %.6f - %.6f:\n", visband_idx[j],
-		   modptr->delay_start_mjd, modptr->delay_end_mjd);
-	  for (l = 0; l < vis_data.header_data[nncal_indices[0]]->num_ants; l++) {
-	    snprintf(mesgout[nmesg++], VISBUFLONG, "   ANT %d: X = %.3f Y = %.3f XY = %.3f ns\n",
-		     vis_data.header_data[nncal_indices[0]]->ant_label[l],
-		     modptr->delay[vis_data.header_data[nncal_indices[0]]->ant_label[l]][POL_X],
-		     modptr->delay[vis_data.header_data[nncal_indices[0]]->ant_label[l]][POL_Y],
-		     modptr->delay[vis_data.header_data[nncal_indices[0]]->ant_label[l]][POL_XY]);
+	  if ((action_required & ACTION_COMPUTE_DELAYS) ||
+	      (action_required & ACTION_ADD_DELAYS)) {
+	    // Print out the delay corrections found.
+	    snprintf(mesgout[nmesg++], VISBUFLONG, " BAND %d, MJD %.6f - %.6f:\n", visband_idx[j],
+		     modptr->delay_start_mjd, modptr->delay_end_mjd);
+	    for (l = 0; l < vis_data.header_data[nncal_indices[0]]->num_ants; l++) {
+	      snprintf(mesgout[nmesg++], VISBUFLONG, "   ANT %d: X = %.3f Y = %.3f XY = %.3f ns\n",
+		       vis_data.header_data[nncal_indices[0]]->ant_label[l],
+		       modptr->delay[vis_data.header_data[nncal_indices[0]]->ant_label[l]][POL_X],
+		       modptr->delay[vis_data.header_data[nncal_indices[0]]->ant_label[l]][POL_Y],
+		       modptr->delay[vis_data.header_data[nncal_indices[0]]->ant_label[l]][POL_XY]);
+	    }
+	  }
+	  if (action_required & ACTION_COMPUTE_PHASECORRECTIONS) {
+	    // We first have to rationalise the phase terms so we don't get affected
+	    // by wrapping.
+	    for (k = 0; k < 3; k++) {
+	      switch (k) {
+	      case 0:
+		pnum = POL_X;
+		break;
+	      case 1:
+		pnum = POL_Y;
+		break;
+	      case 2:
+		pnum = POL_XY;
+		break;
+	      }
+	      for (l = 0; l < vis_data.header_data[nncal_indices[0]]->num_ants; l++) {
+		alabel = vis_data.header_data[nncal_indices[0]]->ant_label[l];
+		for (i = 1; i < nncal; i++) {
+		  // Generate 3 options for this phase.
+		  p1 = phase_cals[pnum][alabel][i];
+		  p2 = phase_cals[pnum][alabel][i] + 180;
+		  p3 = phase_cals[pnum][alabel][i] - 180;
+		  // And then measure the difference between these options and the
+		  // last phase value.
+		  pd1 = fabsf(p1 - phase_cals[pnum][alabel][i - 1]);
+		  pd2 = fabsf(p2 - phase_cals[pnum][alabel][i - 1]);
+		  pd3 = fabsf(p3 - phase_cals[pnum][alabel][i - 1]);
+		  // Set this phase now to the value with the smallest difference.
+		  if (pd2 < pd1) {
+		    phase_cals[i][pnum][alabel] = p2;
+		    pd1 = pd2;
+		  }
+		  if (pd3 < pd1) {
+		    phase_cals[i][pnum][alabel] = p3;
+		  }
+		}
+		// Now set the correction value.
+		modptr->phase[alabel][pnum] =
+		  fmeanf(phase_cals[pnum][alabel], nncal) * M_PI / 180;
+	      }
+	    }
+	    // Print out the phase corrections.
+	    snprintf(mesgout[nmesg++], VISBUFLONG, " BAND %d, MJD %.6f - %.6f:\n",
+		     visband_idx[j], modptr->phase_start_mjd, modptr->phase_end_mjd);
+	    for (l = 0; l < vis_data.header_data[nncal_indices[0]]->num_ants; l++) {
+	      snprintf(mesgout[nmesg++], VISBUFLONG,
+		       "   ANT %d: X = %.1f Y = %.1f XY = %.1f deg\n",
+		       vis_data.header_data[nncal_indices[0]]->ant_label[l],
+		       modptr->phase[vis_data.header_data[nncal_indices[0]]->ant_label[l]][POL_X] *
+		       180 / M_PI,
+		       modptr->phase[vis_data.header_data[nncal_indices[0]]->ant_label[l]][POL_Y] *
+		       180 / M_PI,
+		       modptr->phase[vis_data.header_data[nncal_indices[0]]->ant_label[l]][POL_XY] *
+		       180 / M_PI);
+	    }
 	  }
 	}
       }
@@ -1198,8 +1503,17 @@ int main(int argc, char *argv[]) {
       if (action_required & ACTION_COMPUTE_DELAYS) {
 	action_required -= ACTION_COMPUTE_DELAYS;
       }
+      if (action_required & ACTION_ADD_DELAYS) {
+	action_required -= ACTION_ADD_DELAYS;
+      }
+      if (action_required & ACTION_COMPUTE_PHASECORRECTIONS) {
+	action_required -= ACTION_COMPUTE_PHASECORRECTIONS;
+      }
       if (action_required & ACTION_RESET_DELAYS) {
 	action_required -= ACTION_RESET_DELAYS;
+      }
+      if (action_required & ACTION_RESET_PHASECORRECTIONS) {
+	action_required -= ACTION_RESET_PHASECORRECTIONS;
       }
     }
     
@@ -1253,6 +1567,12 @@ int main(int argc, char *argv[]) {
       action_required |= ACTION_REFRESH_PLOT;
     }
 
+    if (action_required & ACTION_CHANGE_TIMETYPE) {
+      vis_plotcontrols.time_type = new_timetype;
+      action_required -= ACTION_CHANGE_TIMETYPE;
+      action_required |= ACTION_REFRESH_PLOT;
+    }
+    
     if ((action_required & ACTION_HARDCOPY_PLOT) ||
 	(action_required & ACTION_REFRESH_PLOT)) {
       if (data_seconds > 0) {
@@ -1345,6 +1665,15 @@ int main(int argc, char *argv[]) {
       action_required -= ACTION_AMPPHASE_OPTIONS_PRINT;
     }
 
+    if (action_required & ACTION_ARRAY_CONFIGURATION_PRINT) {
+      // Output details about the array at the selected index.
+      nmesg = 0;
+      snprintf(mesgout[nmesg++], VISBUFLONG, "ARRAY CONFIGURATION:\n");
+      print_array_configuration(described_hdr, mesgout[nmesg++], VISBUFLONG);
+      readline_print_messages(nmesg, mesgout);
+      action_required -= ACTION_ARRAY_CONFIGURATION_PRINT;
+    }
+    
     if (action_required & ACTION_TVCHANNELS_CHANGED) {
       // Change the tvchannels as requested after finding the correct
       // specified band to change.
@@ -1393,7 +1722,7 @@ int main(int argc, char *argv[]) {
       // Send the new options to the server and ask for the
       // vis data to be recomputed.
       server_request.request_type = REQUEST_COMPUTE_VISDATA;
-      init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)VISBUFSIZE);
+      init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)SENDBUFSIZE);
       pack_requests(&cmp, &server_request);
       if (action_required & ACTION_OMIT_OPTIONS) {
 	// Some other client has changed the options, and we tell the server
@@ -1428,7 +1757,7 @@ int main(int argc, char *argv[]) {
       // Send the username back to the server.
       server_request.request_type = REQUEST_SUPPLY_USERNAME;
       strncpy(server_request.client_username, arguments.username, CLIENTIDLENGTH);
-      init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)VISBUFSIZE);
+      init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)SENDBUFSIZE);
       pack_requests(&cmp, &server_request);
       pack_write_string(&cmp, arguments.username, CLIENTIDLENGTH);
       socket_send_buffer(socket_peer, send_buffer, cmp_mem_access_get_pos(&mem));
@@ -1516,7 +1845,7 @@ int main(int argc, char *argv[]) {
         // We're being told new data is available after we asked for a new
         // computation. We request this new data.
         server_request.request_type = REQUEST_COMPUTED_VISDATA;
-        init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)VISBUFSIZE);
+        init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)SENDBUFSIZE);
         pack_requests(&cmp, &server_request);
         socket_send_buffer(socket_peer, send_buffer, cmp_mem_access_get_pos(&mem));
       } else if (server_response.response_type == RESPONSE_SERVERTYPE) {

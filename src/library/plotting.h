@@ -34,6 +34,13 @@
 #define PLOT_TVCHANNELS           1<<15
 #define PLOT_AVERAGED_DATA        1<<16
 
+#define PLOTTIME_UTC              1
+#define PLOTTIME_AEST             2
+#define PLOTTIME_AEDT             3
+#define PLOTTIME_AWST             4
+#define PLOTTIME_GMST             5
+#define PLOTTIME_LST              6
+
 #define PLOT_FLAG_POL_XX             1<<1
 #define PLOT_FLAG_POL_YY             1<<2
 #define PLOT_FLAG_POL_XY             1<<3
@@ -63,6 +70,10 @@
 #define VIS_PLOTPANEL_SDO              15
 #define VIS_PLOTPANEL_CALJY            16
 #define VIS_PLOTPANEL_CLOSUREPHASE     17
+#define VIS_PLOTPANEL_HOURANGLE        18
+#define VIS_PLOTPANEL_RIGHTASCENSION   19
+#define VIS_PLOTPANEL_DECLINATION      20
+#define VIS_PLOTPANEL_SIDEREALTIME     21
 
 #define PANEL_ORIGINAL    -1
 #define PANEL_INFORMATION -2
@@ -301,6 +312,11 @@ struct vis_plotcontrols {
    *         PLOT_* magic numbers defined in this header
    */
   int x_axis_type;
+  /*! \var time_type
+   *  \brief The type of time to plot, as one of the PLOTTIME_* magic
+   *         numbers defined in this header
+   */
+  int time_type;
   /*! \var history_length
    *  \brief The maximum amount of history to plot, in minutes
    */
@@ -415,6 +431,7 @@ void changepanel(int x, int y, struct panelspec *panelspec);
 void plotnum_to_xy(struct panelspec *panelspec, int plotnum, int *px, int *py);
 void plotpanel_minmax(struct ampphase **plot_ampphase,
                       struct spd_plotcontrols *plot_controls,
+		      float ****chan_delays, int **delay_nbins, int ***delay_nchans,
                       int plot_baseline_idx, int plot_if_idx,
 		      int npols, int *polidx,
                       float *plotmin_x, float *plotmax_x,
