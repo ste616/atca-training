@@ -76,6 +76,13 @@ some key concepts about how the correlator works.
 
 [Start tutorial 1](tutorials/1_introduction/)
 
+### Tutorial 2
+
+This tutorial will describe in detail the goals of delay calibration, how the
+corrections are computed and applied. You'll also learn how to avoid RFI, and
+increase signal-to-noise ratio to successfully calibrate the telescope delays.
+
+[Start tutorial 2](tutorials/2_dcal_and_delavg/)
 
 
 ## About this package
