@@ -1481,6 +1481,64 @@ void unpack_syscal_data(cmp_ctx_t *cmp, struct syscal_data *a) {
   
 }
 
+/*!
+ *  \brief Pack a fluxdensity_specification structure into the data stream
+ *  \param cmp the CMP buffer object
+ *  \param a the fluxdensity_specification structure
+ */
+void pack_fluxdensity_specification(cmp_ctx_t *cmp, struct fluxdensity_specification *a) {
+  int i;
+  
+  // The number of models.
+  pack_write_sint(cmp, a->num_models);
+
+  // The frequency and tolerance arrays.
+  pack_writearray_float(cmp, a->num_models, a->model_frequency);
+  pack_writearray_float(cmp, a->num_models, a->model_frequency_tolerance);
+
+  // The number of terms in each model.
+  pack_writearray_sint(cmp, a->num_models, a->model_num_terms);
+
+  // The models.
+  for (i = 0; i < a->num_models; i++) {
+    pack_writearray_float(cmp, a->model_num_terms[i], a->model_terms[i]);
+  }
+}
+
+/*! 
+ *  \brief Unpack a fluxdensity_specification structure from the data stream
+ *  \param cmp the CMP buffer object
+ *  \param a the fluxdensity_specification structure
+ */
+void unpack_fluxdensity_specification(cmp_ctx_t *cmp, struct fluxdensity_specification *a) {
+  int i;
+
+  // The number of models.
+  pack_read_sint(cmp, &(a->num_models));
+
+  if (a->num_models <= 0) {
+    return;
+  }
+  
+  CALLOC(a->model_frequency, a->num_models);
+  CALLOC(a->model_frequency_tolerance, a->num_models);
+  CALLOC(a->model_num_terms, a->num_models);
+  CALLOC(a->model_terms, a->num_models);
+
+  // The frequency and tolerance arrays.
+  pack_readarray_float(cmp, a->num_models, a->model_frequency);
+  pack_readarray_float(cmp, a->num_models, a->model_frequency_tolerance);
+
+  // The number of terms in each model.
+  pack_readarray_sint(cmp, a->num_models, a->model_num_terms);
+
+  // The models.
+  for (i = 0; i < a->num_models; i++) {
+    CALLOC(a->model_terms[i], a->model_num_terms[i]);
+    pack_readarray_float(cmp, a->model_num_terms[i], a->model_terms[i]);
+  }
+}
+
 void init_cmp_memory_buffer(cmp_ctx_t *cmp, cmp_mem_access_t *mem, void *buffer,
                             size_t buffer_len) {
   cmp_mem_access_init(cmp, mem, buffer, buffer_len);

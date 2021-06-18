@@ -563,6 +563,11 @@ void copy_ampphase_modifiers(struct ampphase_modifiers *dest,
   STRUCTCOPY(src, dest, phase_num_pols);
   STRUCTCOPY(src, dest, phase_start_mjd);
   STRUCTCOPY(src, dest, phase_end_mjd);
+  STRUCTCOPY(src, dest, set_noise_diode_amplitude);
+  STRUCTCOPY(src, dest, noise_diode_num_antennas);
+  STRUCTCOPY(src, dest, noise_diode_num_pols);
+  STRUCTCOPY(src, dest, noise_diode_start_mjd);
+  STRUCTCOPY(src, dest, noise_diode_end_mjd);
   if (dest->delay_num_antennas > 0) {
     CALLOC(dest->delay, dest->delay_num_antennas);
     for (i = 0; i < dest->delay_num_antennas; i++) {
@@ -588,6 +593,19 @@ void copy_ampphase_modifiers(struct ampphase_modifiers *dest,
     }
   } else {
     dest->phase = NULL;
+  }
+  if (dest->noise_diode_num_antennas > 0) {
+    CALLOC(dest->noise_diode_amplitude, dest->noise_diode_num_antennas);
+    for (i = 0; i < dest->noise_diode_num_antennas; i++) {
+      if (dest->noise_diode_num_pols > 0) {
+	CALLOC(dest->noise_diode_amplitude[i], dest->noise_diode_num_pols);
+	for (j = 0; j < dest->noise_diode_num_pols; j++) {
+	  STRUCTCOPY(src, dest, noise_diode_amplitude[i][j]);
+	}
+      }
+    }
+  } else {
+    dest->noise_diode_amplitude = NULL;
   }
 }
 
@@ -649,6 +667,10 @@ void free_ampphase_modifiers(struct ampphase_modifiers *modifiers) {
     FREE(modifiers->phase[i]);
   }
   FREE(modifiers->phase);
+  for (i = 0; i < modifiers->noise_diode_num_antennas; i++) {
+    FREE(modifiers->noise_diode_amplitude[i]);
+  }
+  FREE(modifiers->noise_diode_amplitude);
 }
 
 /*!
@@ -2397,7 +2419,7 @@ void calculate_system_temperatures(struct ampphase *ampphase,
         } else {
           dx = 99.995 * 99.995;
         }
-        // The memory for the computed_tsys is alloacted at the same
+        // The memory for the computed_tsys is allocated at the same
         // time as for the online_tsys.
         ampphase->syscal_data->computed_tsys[i][window_idx][pol_idx] =
           sqrtf(dx);
@@ -3471,3 +3493,81 @@ void compute_delays(struct ampphase *ampphase, bool phase_in_degrees, int min_ch
     }
   }
 }
+
+/*!
+ *  \brief Free memory in a fluxdensity_specification structure, but don't
+ *         free the pointer memory itself
+ *  \param a the pointer to the structure to free
+ */
+void free_fluxdensity_specification(struct fluxdensity_specification *a) {
+  int i;
+
+  for (i = 0; i < a->num_models; i++) {
+    FREE(a->model_terms[i]);
+  }
+  FREE(a->model_terms);
+  FREE(a->model_frequency);
+  FREE(a->model_frequency_tolerance);
+
+  a->num_models = 0;
+}
+
+/*!
+ *  \brief Take some ampphase cycle data and calculate the noise diode amplitudes
+ *         given a supplied flux density
+ *  \param fluxdensity_models the flux density models for the source
+ *  \param num_cycles the number of cycles in the \a cycle_ampphase array
+ *  \param window the IF to look at
+ *  \param options the options structure to direct which channels to use
+ *  \param cycle_spectra the array of cycle data, with length \a num_cycles
+ *  \param noise_diode_modifier a pointer to a variable which upon exit will be
+ *         a modifier structure filled with the derived noise diode amplitudes
+ */
+void compute_noise_diode_amplitudes(struct fluxdensity_specification *fluxdensity_models,
+				    int num_cycles, int window, struct ampphase_options *options,
+				    struct spectrum_data **cycle_spectra,
+				    struct ampphase_modifiers **noise_diode_modifier) {
+  int i, polidx, winidx = -1;
+  double cmjd;
+
+  // Figure out the IF index.
+  for (i = 0; i < cycle_spectra[0]->num_ifs; i++) {
+    if (cycle_spectra[0]->spectrum[i][0]->window == window) {
+      winidx = i;
+      break;
+    }
+  }
+  if (winidx == -1) {
+    // We don't know about this window.
+    return;
+  }
+  
+  // Check if we're supposed to create a modifier structure.
+  if (*noise_diode_modifier == NULL) {
+    CALLOC(*noise_diode_modifier, 1);
+    (*noise_diode_modifier)->set_noise_diode_amplitude = true;
+    (*noise_diode_modifier)->noise_diode_num_antennas = 7;
+    (*noise_diode_modifier)->noise_diode_num_pols = POL_Y + 1;
+    CALLOC((*noise_diode_modifier)->noise_diode_amplitude,
+	   (*noise_diode_modifier)->noise_diode_num_antennas);
+    for (i = 0; i < (*noise_diode_modifier)->noise_diode_num_antennas; i++) {
+      CALLOC((*noise_diode_modifier)->noise_diode_amplitude[i],
+	     (*noise_diode_modifier)->noise_diode_num_pols);
+    }
+    // Take the dates from the cycles.
+    (*noise_diode_modifier)->noise_diode_start_mjd =
+      date2mjd(cycle_spectra[0]->spectrum[winidx][0]->obsdate,
+	       cycle_spectra[0]->spectrum[winidx][0]->ut_seconds);
+    (*noise_diode_modifier)->noise_diode_end_mjd =
+      (*noise_diode_modifier)->noise_diode_start_mjd;
+    for (i = 1; i < num_cycles; i++) {
+      cmjd = date2mjd(cycle_ampphase[i]->spectrum[winidx][0]->obsdate,
+		      cycle_ampphase[i]->spectrum[winidx][0]->ut_seconds);
+      MINASSIGN((*noise_diode_modifier)->noise_diode_start_mjd, cmjd);
+      MAXASSIGN((*noise_diode_modifier)->noise_diode_end_mjd, cmjd);
+    }
+  }
+
+  
+}
+

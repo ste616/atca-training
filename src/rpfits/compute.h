@@ -199,11 +199,51 @@ struct ampphase_modifiers {
    *         polarisation
    *
    * This is a 2-D array of floats. The first index has size `phase_num_antennas` and
-   * is indexed starting at 1, which the second index has size `phase_num_pols` and is
+   * is indexed starting at 1, while the second index has size `phase_num_pols` and is
    * indexed starting at `POL_X` and ending at `POL_Y`.
    */
   float **phase;
-  
+
+  /*! \var set_noise_diode_amplitude
+   *  \brief flag to indicate whether the amplitude parameters in this structure hold
+   *         values that should be used to determine the system temperatures (if set
+   *         to true) or ignored (if set to false)
+   */
+  bool set_noise_diode_amplitude;
+
+  /*! \var noise_diode_num_antennas
+   *  \brief The number of antennas with noise diode amplitude values (should
+   *         always be 7)
+   */
+  int noise_diode_num_antennas;
+
+  /*! \var noise_diode_num_pols
+   *  \brief The number of polarisations with noise diode amplitude values
+   *         (should always be 6)
+   */
+  int noise_diode_num_pols;
+
+  /*! \var noise_diode_start_mjd
+   *  \brief The earliest MJD for which to correct the system temperature in
+   *         the data
+   */
+  double noise_diode_start_mjd;
+
+  /*! \var noise_diode_end_mjd
+   *  \brief The latest MJD for which to correct the system temperature in the
+   *         data
+   */
+  double noise_diode_end_mjd;
+
+  /*! \var noise_diode_amplitude
+   *  \brief The amplitude of each noise diode (in Jy)
+   *
+   * This is a 2-D array of floats. The first index has size
+   * `noise_diode_num_antennas` and is indexed starting at 1, while the second index
+   * has size `noise_diode_num_pols` and is indexed starting at `POL_X` and ending
+   * at `POL_Y`.
+   */
+  float **noise_diode_amplitude;
 };
 
 /*! \struct ampphase_options
@@ -1236,6 +1276,50 @@ struct vis_data {
   struct ampphase_options **options;
 };
 
+/*! \struct fluxdensity_specification
+ *  \brief A way to specify flux densities required for amplitude calibration
+ */
+struct fluxdensity_specification {
+  /*! \var num_models
+   *  \brief The number of models described in this structure
+   */
+  int num_models;
+
+  /*! \var model_frequency
+   *  \brief The frequency (in MHz) at which each model is valid
+   *
+   * This array has length `num_models` and is indexed starting at 0.
+   */
+  float *model_frequency;
+
+  /*! \var model_frequency_tolerance
+   *  \brief The frequency range (in MHz) over which each model is valid
+   *
+   * This array has length `num_models` and is indexed starting at 0.
+   *
+   * The valid frequency range for each model goes from
+   * `model_frequency - model_frequency_tolerance` to 
+   * `model_frequency + model_frequency_tolerance`.
+   */
+  float *model_frequency_tolerance;
+
+  /*! \var model_num_terms
+   *  \brief The number of terms in each model
+   *
+   * This array has length `num_models` as is indexed starting at 0.
+   */
+  int *model_num_terms;
+
+  /*! \var model_terms
+   *  \brief The model coefficients
+   *
+   * This 2-D array has length `num_models` in the first index, and
+   * `model_num_terms[i]` in the second index, where `i` is the position
+   * along the first index. Both indexes start at 0.
+   */
+  float **model_terms;
+};
+
 float fmedianf(float *a, int n);
 float complex fcmedianfc(float complex *a, int n);
 float fsumf(float *a, int n);
@@ -1318,3 +1402,8 @@ void compute_closure_phase(struct scan_header_data *scan_header_data,
 void compute_delays(struct ampphase *ampphase, bool phase_in_degrees, int min_chan, int max_chan,
 		    float ****delays, int *n_baselines, int **n_bins, int ***n_delays,
 		    float ***mean_delay, float ***median_delay);
+void free_fluxdensity_specification(struct fluxdensity_specification *a);
+void compute_noise_diode_amplitudes(struct fluxdensity_specification *fluxdensity_models,
+				    int num_cycles, int window, struct ampphase_options *options,
+				    struct spectrum_data **cycle_spectra,
+				    struct ampphase_modifiers **noise_diode_modifier);
