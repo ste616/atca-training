@@ -3527,7 +3527,9 @@ void compute_noise_diode_amplitudes(struct fluxdensity_specification *fluxdensit
 				    int num_cycles, int window, struct ampphase_options *options,
 				    struct spectrum_data **cycle_spectra,
 				    struct ampphase_modifiers **noise_diode_modifier) {
-  int i, polidx, winidx = -1;
+  int i, j, k, a, b, c, ant_label, polidx, winidx = -1, num_triplets = 0;
+  int bnt_label, cnt_label, x1, y1, x2, y2, x3, y3;
+  bool aons, bons, cons;
   double cmjd;
 
   // Figure out the IF index.
@@ -3561,13 +3563,102 @@ void compute_noise_diode_amplitudes(struct fluxdensity_specification *fluxdensit
     (*noise_diode_modifier)->noise_diode_end_mjd =
       (*noise_diode_modifier)->noise_diode_start_mjd;
     for (i = 1; i < num_cycles; i++) {
-      cmjd = date2mjd(cycle_ampphase[i]->spectrum[winidx][0]->obsdate,
-		      cycle_ampphase[i]->spectrum[winidx][0]->ut_seconds);
+      cmjd = date2mjd(cycle_spectra[i]->spectrum[winidx][0]->obsdate,
+		      cycle_spectra[i]->spectrum[winidx][0]->ut_seconds);
       MINASSIGN((*noise_diode_modifier)->noise_diode_start_mjd, cmjd);
       MAXASSIGN((*noise_diode_modifier)->noise_diode_end_mjd, cmjd);
     }
   }
 
-  
+  // Loop over the polarisations.
+  for (i = POL_XX; i <= POL_YY; i++) {
+    // Find the polarisation.
+    polidx = -1;
+    for (j = 0; j < cycle_spectra[0]->num_pols; j++) {
+      if (cycle_spectra[0]->spectrum[winidx][j]->pol == i) {
+	// Found it.
+	polidx = j;
+      }
+    }
+    if (polidx == -1) {
+      // Weren't able to find this pol, we're in trouble!
+      (*noise_diode_modifier)->set_noise_diode_amplitude = false;
+      return;
+    }
+    // We have to find the noise diode amplitude per antenna, so it is
+    // most sensible to loop over the antennas here, and do the same
+    // procedure for each.
+    for (a = 0; a < cycle_spectra[0]->header_data->num_ants; a++) {
+      ant_label = cycle_spectra[0]->header_data->ant_label[a];
+      // This antenna has to be on source for all the cycles to count.
+      aons = true;
+      for (j = 0; j < num_cycles; j++) {
+	aons &=
+	  (!(cycle_spectra[j]->spectrum[winidx][polidx]->syscal_data->flagging[ant_label - 1] & 1));
+      }
+      if (!aons) {
+	// Mark this antenna as off-source in the modifier.
+	(*noise_diode_modifier)->noise_diode_amplitude[ant_label][POL_X] =
+	  (*noise_diode_modifier)->noise_diode_amplitude[ant_label][POL_Y] = -1.0;
+	continue;
+      }
+      // Now determine all the gain triplets that can be made with this
+      // antenna.
+      num_triplets = 0;
+      for (b = 0; b < cycle_spectra[0]->header_data->num_ants; b++) {
+	bnt_label = cycle_spectra[0]->header_data->ant_label[b];
+	if (bnt_label != ant_label) {
+	  bons = true;
+	  for (j = 0; j < num_cycles; j++) {
+	    bons &=
+	      (!(cycle_spectra[j]->spectrum[winidx][polidx]->syscal_data->flagging[bnt_label - 1] & 1));
+	  }
+	  if (bons) {
+	    for (c = b + 1; c < cycle_spectra[0]->header_data->num_ants; c++) {
+	      cnt_label = cycle_spectra[0]->header_data->ant_label[c];
+	      if ((cnt_label != bnt_label) && (cnt_label != ant_label)) {
+		cons = true;
+		for (j = 0; j < num_cycles; j++) {
+		  cons &=
+		    (!(cycle_spectra[j]->spectrum[winidx][polidx]->syscal_data->flagging[cnt_label - 1] & 1));
+		}
+		if (cons) {
+		  // All three antennas are unique and on-source.
+		  if (ant_label < bnt_label) {
+		    x1 = ant_label;
+		    y1 = bnt_label;
+		  } else {
+		    x1 = bnt_label;
+		    y1 = ant_label;
+		  }
+		  if (ant_label < cnt_label) {
+		    x2 = ant_label;
+		    y2 = cnt_label;
+		  } else {
+		    x2 = cnt_label;
+		    y2 = ant_label;
+		  }
+		  if (bnt_label < cnt_label) {
+		    x3 = bnt_label;
+		    y3 = cnt_label;
+		  } else {
+		    x3 = cnt_label;
+		    y3 = bnt_label;
+		  }
+		  // Now we collect data over the baselines and cycles and put them in memory
+		  // to do calculations later.
+		  for (j = 0; j < num_cycles; j++) {
+		    for (k = 0; k < cycle_spectra[j]->spectrum[winidx][polidx]->nbaselines; k++) {
+		      
+		    }
+		  }
+		}
+	      }
+	    }
+	  }
+	}
+      }
+    }
+  }
 }
 
