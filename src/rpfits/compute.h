@@ -1407,3 +1407,5 @@ void compute_noise_diode_amplitudes(struct fluxdensity_specification *fluxdensit
 				    int num_cycles, int window, struct ampphase_options *options,
 				    struct spectrum_data **cycle_spectra,
 				    struct ampphase_modifiers **noise_diode_modifier);
+void sum_vis(struct ampphase *ampphase, int baseline_idx, struct ampphase_options *options,
+	     int *nbins, float **rsum, float **isum, float **asum);

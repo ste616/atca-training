@@ -834,19 +834,28 @@ bool get_cache_vis_data(int num_options, struct ampphase_options **options,
  * and COMPUTE_VIS_PRODUCTS.
  */
 #define GRAB_SPECTRUM        1<<3
+/*! \def GRAB_MJDS_SPECTRA
+ *  \brief Magic number to tell data_reader that we would like to get several
+ *         spectrum products, determined by a list of MJDs passed to the routine
+ *
+ * This magic number can be combined in a bitwise-OR with READ_SCAN_METADATA,
+ * COMPUTE_VIS_PRODUCTS and GRAB_SPECTRUM.
+ */
+#define GRAB_MJDS_SPECTRA    1<<4
 
 void data_reader(int read_type, int n_rpfits_files,
                  double mjd_required, double mjd_low, double mjd_high,
-		 int *num_options,
+		 int num_mjds, double *mjds, int *num_options,
                  struct ampphase_options ***ampphase_options,
                  struct rpfits_file_information **info_rpfits_files,
                  struct spectrum_data **spectrum_data,
-                 struct vis_data **vis_data) {
+                 struct vis_data **vis_data,
+		 struct spectrum_data ***spectrum_mjds) {
   int i, j, res, n, calcres, curr_header, idx_if, idx_pol, local_num_options;
-  int pols[4] = { POL_XX, POL_YY, POL_XY, POL_YX };
+  int pols[4] = { POL_XX, POL_YY, POL_XY, POL_YX }, idx_return;
   bool open_file, keep_reading, header_free, read_cycles, keep_cycling;
   bool cycle_free, spectrum_return, vis_cycled, cache_hit_vis_data;
-  bool cache_hit_spectrum_data, nocompute;
+  bool cache_hit_spectrum_data, nocompute, *mjds_cache_hit = NULL;
   double cycle_mjd, cycle_start, cycle_end, half_cycle;
   struct scan_header_data *sh = NULL;
   struct cycle_data *cycle_data = NULL;
@@ -914,6 +923,25 @@ void data_reader(int read_type, int n_rpfits_files,
       read_type -= GRAB_SPECTRUM;
     }
   }
+  if (read_type & GRAB_MJDS_SPECTRA) {
+    // Do some initialisation checks.
+    if ((num_mjds <= 0) || (spectrum_mjds == NULL)) {
+      // Can't do anything.
+      read_type -= GRAB_MJDS_SPECTRA;
+    }
+  }
+  if (read_type & GRAB_MJDS_SPECTRA) {
+    // Are we allocating memory?
+    if (*spectrum_mjds == NULL) {
+      CALLOC(*spectrum_mjds, num_mjds);
+    }
+    CALLOC(mjds_cache_hit, num_mjds);
+    // Check whether we have cached products for any of these MJDs.
+    for (i = 0; i < num_mjds; i++) {
+      mjds_cache_hit[i] = get_cache_spd_data(*num_options, *ampphase_options, mjds[i],
+					     half_cycle, &((*spectrum_mjds)[i]));
+    }
+  }
 
   /* printf("[data_reader] Entry to routine\n"); */
   /* print_options_set(*num_options, *ampphase_options); */
@@ -937,6 +965,16 @@ void data_reader(int read_type, int n_rpfits_files,
         /* } else { */
         /* 	printf("File %s does not cover the requested MJD %.6f\n", */
         /* 	       info_rpfits_files[i]->filename, mjd_required); */
+      }
+    }
+    if (read_type & GRAB_MJDS_SPECTRA) {
+      // Does this file encompass any of the times we want.
+      for (j = 0; j < num_mjds; j++) {
+	if ((mjds[j] >= (info_rpfits_files[i]->scan_start_mjd[0] - half_cycle)) &&
+	    (mjds[j] <= (info_rpfits_files[i]->scan_end_mjd[info_rpfits_files[i]->n_scans - 1]
+			 + half_cycle))) {
+	  open_file = true;
+	}
       }
     }
     if (read_type & COMPUTE_VIS_PRODUCTS) {
@@ -1032,6 +1070,16 @@ void data_reader(int read_type, int n_rpfits_files,
             /*   printf("ignoring this scan\n"); */
           }
         }
+	if (read_type & GRAB_MJDS_SPECTRA) {
+	  // Check if this scan contains a cycle with an MJD we want.
+	  for (j = 0; j < num_mjds; j++) {
+	    if ((mjds_cache_hit[j] == false) &&
+		(mjds[j] >= info_rpfits_files[i]->scan_start_mjd[curr_header]) &&
+		(mjds[j] <= info_rpfits_files[i]->scan_end_mjd[curr_header])) {
+	      read_cycles = true;
+	    }
+	  }
+	}
         if (read_cycles && (res & READER_DATA_AVAILABLE)) {
           /* printf("[data_reader] reading cycles from this scan...\n"); */
           keep_cycling = true;
@@ -1073,6 +1121,7 @@ void data_reader(int read_type, int n_rpfits_files,
                 cycle_mjd;
             }
             if ((read_type & GRAB_SPECTRUM) ||
+		(read_type & GRAB_MJDS_SPECTRA) ||
                 (read_type & COMPUTE_VIS_PRODUCTS)) {
               spectrum_return = false;
               if (read_type & COMPUTE_VIS_PRODUCTS) {
@@ -1097,6 +1146,17 @@ void data_reader(int read_type, int n_rpfits_files,
                   (mjd_required < cycle_end)) {
                 spectrum_return = true;
               }
+	      idx_return = -1;
+	      if (read_type & GRAB_MJDS_SPECTRA) {
+		for (j = 0; j < num_mjds; j++) {
+		  if ((mjds_cache_hit[j] == false) &&
+		      (mjds[j] >= cycle_start) &&
+		      (mjds[j] < cycle_end)) {
+		    spectrum_return = true;
+		    idx_return = j;
+		  }
+		}
+	      }
               if ((read_type & COMPUTE_VIS_PRODUCTS) ||
                   (spectrum_return)) {
                 // We need this cycle.
@@ -1234,7 +1294,13 @@ void data_reader(int read_type, int n_rpfits_files,
                 }
                 if (spectrum_return) {
                   // Copy the pointer.
-                  *spectrum_data = temp_spectrum;
+		  if (read_type & GRAB_SPECTRUM) {
+		    *spectrum_data = temp_spectrum;
+		  }
+		  if ((read_type & GRAB_MJDS_SPECTRA) &&
+		      (idx_return >= 0)) {
+		    (*spectrum_mjds)[idx_return] = temp_spectrum;
+		  }
                 } else {
                   // Free the temporary spectrum memory.
                   for (idx_if = 0; idx_if < temp_spectrum->num_ifs; idx_if++) {
@@ -1671,16 +1737,17 @@ int main(int argc, char *argv[]) {
   struct rpfitsfile_server_arguments arguments;
   int i, j, k, l, ri, rj, bytes_received, r, n_cycle_mjd = 0, n_client_options = 0;
   int n_alert_sockets = 0, n_ampphase_options = 0, *client_indices = NULL;
-  int removed_client_type, total_n_scans = 0, loop_limit;
+  int removed_client_type, total_n_scans = 0, loop_limit, n_acal_cycles = 0;
   bool pointer_found = false, vis_cache_updated = false, notify_required = false;
   bool spd_cache_updated = false, outside_mjd_range = false, succ = false;
   bool client_added = false, determine_params = false;
   bool quit_when_closed = false;
   double mjd_grab, earliest_mjd, latest_mjd, mjd_cycletime;
-  double *all_cycle_mjd = NULL;
+  double *all_cycle_mjd = NULL, *acal_cycle_mjds = NULL;
   struct rpfits_file_information **info_rpfits_files = NULL;
   struct ampphase_options **ampphase_options = NULL, **client_options = NULL;
   struct spectrum_data *spectrum_data = NULL, *child_spectrum_data = NULL;
+  struct spectrum_data **acal_spectra = NULL;
   struct vis_data *vis_data = NULL, *child_vis_data = NULL;
   FILE *fh = NULL;
   cmp_ctx_t cmp, child_cmp;
@@ -1790,9 +1857,9 @@ int main(int argc, char *argv[]) {
     info_rpfits_files[i] = new_rpfits_file();
     strncpy(info_rpfits_files[i]->filename, arguments.rpfits_files[i], RPSBUFSIZE);
   }
-  data_reader(READ_SCAN_METADATA, arguments.n_rpfits_files, 0.0, -1, -1,
+  data_reader(READ_SCAN_METADATA, arguments.n_rpfits_files, 0.0, -1, -1, 0, NULL,
 	      &n_ampphase_options, &ampphase_options,
-              info_rpfits_files, &spectrum_data, &vis_data);
+              info_rpfits_files, &spectrum_data, &vis_data, NULL);
   // We can now work out which time range we cover and the cycle time.
   for (i = 0, determine_params = true; i < arguments.n_rpfits_files; i++) {
     total_n_scans += info_rpfits_files[i]->n_scans;
@@ -1861,7 +1928,8 @@ int main(int argc, char *argv[]) {
   }
   printf(" grabbing from random scan %d from file %d, MJD %.6f\n", rj, ri, mjd_grab);
   data_reader(GRAB_SPECTRUM | COMPUTE_VIS_PRODUCTS, arguments.n_rpfits_files, mjd_grab, -1, -1,
-              &n_ampphase_options, &ampphase_options, info_rpfits_files, &spectrum_data, &vis_data);
+	      0, NULL, &n_ampphase_options, &ampphase_options, info_rpfits_files, &spectrum_data,
+	      &vis_data, NULL);
   // This first grab of the vis_data goes into the default client slot.
   add_client_vis_data(&client_vis_data, "DEFAULT", vis_data);
   vis_cache_updated = add_cache_vis_data(n_ampphase_options, ampphase_options, vis_data);
@@ -2160,8 +2228,8 @@ int main(int argc, char *argv[]) {
                 printf("CHILD STARTED! Computing data...\n");
                 
                 data_reader(COMPUTE_VIS_PRODUCTS, arguments.n_rpfits_files, mjd_grab, -1, -1,
-			    &n_client_options, &client_options, info_rpfits_files,
-			    &spectrum_data, &child_vis_data);
+			    0, NULL, &n_client_options, &client_options, info_rpfits_files,
+			    &spectrum_data, &child_vis_data, NULL);
                 // We send the data back to our parent over the network.
                 if (prepare_client_connection("127.0.0.1", arguments.port_number,
                                               &child_socket, false)) {
@@ -2417,9 +2485,9 @@ int main(int argc, char *argv[]) {
                 // Now grab the spectrum.
                 printf("CHILD STARTED! Grabbing spectrum...\n");
                 
-                data_reader(GRAB_SPECTRUM, arguments.n_rpfits_files, mjd_grab, -1, -1,
+                data_reader(GRAB_SPECTRUM, arguments.n_rpfits_files, mjd_grab, -1, -1, 0, NULL,
 			    &n_client_options, &client_options, info_rpfits_files,
-			    &child_spectrum_data, NULL);
+			    &child_spectrum_data, NULL, NULL);
                 // We send the data back to our parent over the network.
                 if (prepare_client_connection("127.0.0.1", arguments.port_number,
                                               &child_socket, false)) {
@@ -2631,6 +2699,119 @@ int main(int argc, char *argv[]) {
 			    client_request.client_username, -1);
 	      // We don't send any reply here.
 	      bytes_sent = 0;
+	    } else if (client_request.request_type == REQUEST_ACAL) {
+	      // We need to compute the noise diode amplitudes from the data range
+	      // supplied.
+	      // We unpack some options structures.
+	      pack_read_sint(&cmp, &n_client_options);
+	      if (n_client_options > 0) {
+		MALLOC(client_options, n_client_options);
+		for (i = 0; i < n_client_options; i++) {
+		  CALLOC(client_options[i], 1);
+		  unpack_ampphase_options(&cmp, client_options[i]);
+		}
+	      } else {
+		// Try to get the options that this user has used before.
+		succ = get_client_ampphase_options(&client_ampphase_options,
+						   client_request.client_id,
+						   client_request.client_username,
+						   &n_client_options, &client_options);
+		if (succ == false) {
+		  // Use the default options.
+		  get_client_ampphase_options(&client_ampphase_options,
+					      "DEFAULT", "", &n_client_options,
+					      &client_options);
+		}
+	      }
+	      // And then an array of MJDs to use for the calibration cycles.
+	      pack_read_sint(&cmp, &n_acal_cycles);
+	      if (n_acal_cycles > 0) {
+		CALLOC(acal_cycle_mjds, n_acal_cycles);
+		pack_readarray_double(&cmp, n_acal_cycles, acal_cycle_mjds);
+	      }
+	      // Check all these cycles have MJDs are within the range we know about.
+	      outside_mjd_range = false;
+	      for (i = 0; i < n_acal_cycles; i++) {
+		if ((acal_cycle_mjds[i] < earliest_mjd) || (acal_cycle_mjds[i] > latest_mjd)) {
+		  outside_mjd_range = true;
+		}
+	      }
+	      if ((outside_mjd_range == false) && (n_acal_cycles > 0)) {
+		// We're going to fork and compute in the background.
+		pid = fork();
+	      } else {
+		pid = 1;
+	      }
+	      if (pid == 0) {
+		// We're the child.
+		// First close our sockets.
+		CLOSESOCKET(socket_listen);
+		CLOSESOCKET(loop_i);
+		printf("CHILD STARTED! Calculating acal parameters...\n");
+		// Get the cycles.
+		data_reader(GRAB_MJDS_SPECTRA, arguments.n_rpfits_files, -1, -1, -1,
+			    n_acal_cycles, acal_cycle_mjds, &n_client_options,
+			    &client_options, info_rpfits_files,
+			    NULL, NULL, &acal_spectra);
+		// And compute the amplitude calibration parameters.
+		
+		// We send the data back to our parent over the network.
+		if (prepare_client_connection("127.0.0.1", arguments.port_number,
+					      &child_socket, false)) {
+		  // We have a connection.
+		  child_request.request_type = CHILDREQUEST_MJDS_SPECTRA;
+		  strncpy(child_request.client_id, client_request.client_id, CLIENTIDLENGTH);
+		  strncpy(child_request.client_username, client_request.client_username,
+			  CLIENTIDLENGTH);
+		  child_request.client_type = CLIENTTYPE_CHILD;
+		  MALLOC(child_send_buffer, RPSENDBUFSIZE);
+		  init_cmp_memory_buffer(&child_cmp, &child_mem, child_send_buffer,
+					 (size_t)RPSENDBUFSIZE);
+		  pack_requests(&child_cmp, &child_request);
+
+		  printf("[CHILD] %s for client %s.\n",
+			 get_type_string(TYPE_REQUEST, child_request.request_type),
+			 client_request.client_id);
+		  bytes_sent = socket_send_buffer(child_socket, child_send_buffer,
+						  cmp_mem_access_get_pos(&child_mem));
+		  FREE(child_send_buffer);
+		}
+		// Don't bother with the response.
+		CLOSESOCKET(child_socket);
+		// Clean up.
+		for (i = 0; i < n_client_options; i++) {
+		  free_ampphase_options(client_options[i]);
+		  FREE(client_options[i]);
+		}
+		FREE(client_options);
+		// Die.
+		printf("CHILD IS FINISHED!\n");
+		exit(0);
+	      } else {
+		for (i = 0; i < n_client_options; i++) {
+		  free_ampphase_options(client_options[i]);
+		  FREE(client_options[i]);
+		}
+		FREE(client_options);
+		n_client_options = 0;
+		if (pid == 1) {
+		  // Return an error code.
+		  client_response.response_type = RESPONSE_ACAL_REQUEST_INVALID;
+		} else {
+		  client_response.response_type = RESPONSE_ACAL_COMPUTING;
+		}
+		strncpy(client_response.client_id, client_request.client_id, CLIENTIDLENGTH);
+		comp_buffer_length = JUSTRESPONSESIZE;
+		MALLOC(send_buffer, comp_buffer_length);
+		init_cmp_memory_buffer(&cmp, &mem, send_buffer, comp_buffer_length);
+		pack_responses(&cmp, &client_response);
+		printf(" %s to client %s.\n",
+		       get_type_string(TYPE_RESPONSE, client_response.response_type),
+		       client_response.client_id);
+		bytes_sent = socket_send_buffer(loop_i, send_buffer,
+						cmp_mem_access_get_pos(&mem));
+		FREE(send_buffer);
+	      }
 	    }
             printf(" Sent %ld bytes\n", bytes_sent);
 

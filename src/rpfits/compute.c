@@ -3527,9 +3527,13 @@ void compute_noise_diode_amplitudes(struct fluxdensity_specification *fluxdensit
 				    int num_cycles, int window, struct ampphase_options *options,
 				    struct spectrum_data **cycle_spectra,
 				    struct ampphase_modifiers **noise_diode_modifier) {
-  int i, j, k, a, b, c, ant_label, polidx, winidx = -1, num_triplets = 0;
-  int bnt_label, cnt_label, x1, y1, x2, y2, x3, y3;
+  int i, j, k, a, b, c, ant_label, polidx[POL_YY + 1], winidx = -1;
+  int bnt_label, cnt_label, x1, y1, x2, y2, x3, y3, a1, a2, nbins1, nbins2, nbins3;
+  int *gains_nbins = NULL, nbinsa, nfreqmatch = 0, maxfreqmatch = 0, freqmatchidx;
+  int ***gainsum_numtriplets = NULL, nbins_gainsum = 0;
   bool aons, bons, cons;
+  float *rsum1, *rsum2, *rsum3, *isum1, *isum2, *isum3, **gains = NULL, *asuma;
+  float nd_amp, src_fd, ***gainsum = NULL;
   double cmjd;
 
   // Figure out the IF index.
@@ -3570,31 +3574,70 @@ void compute_noise_diode_amplitudes(struct fluxdensity_specification *fluxdensit
     }
   }
 
-  // Loop over the polarisations.
+  // Find the polarisations.
   for (i = POL_XX; i <= POL_YY; i++) {
-    // Find the polarisation.
-    polidx = -1;
+    polidx[i] = -1;
     for (j = 0; j < cycle_spectra[0]->num_pols; j++) {
       if (cycle_spectra[0]->spectrum[winidx][j]->pol == i) {
-	// Found it.
-	polidx = j;
+	polidx[i] = j;
       }
     }
-    if (polidx == -1) {
-      // Weren't able to find this pol, we're in trouble!
-      (*noise_diode_modifier)->set_noise_diode_amplitude = false;
-      return;
+  }
+
+  if ((polidx[POL_XX] < 0) || (polidx[POL_YY] < 0)) {
+    // Weren't able to find this pol, we're in trouble!
+    (*noise_diode_modifier)->set_noise_diode_amplitude = false;
+    return;
+  }
+  
+  // Work out which flux density model we use.
+  maxfreqmatch = 0;
+  freqmatchidx = -1;
+  for (i = 0; i < fluxdensity_models->num_models; i++) {
+    nfreqmatch = 0;
+    for (j = 0; j < cycle_spectra[0]->spectrum[winidx][polidx[POL_XX]]->nchannels; j++) {
+      if ((cycle_spectra[0]->spectrum[winidx][polidx[POL_XX]]->frequency[j] >=
+	   fluxdensity_models->model_frequency[i] -
+	   fluxdensity_models->model_frequency_tolerance[i]) &&
+	  (cycle_spectra[0]->spectrum[winidx][polidx[POL_XX]]->frequency[j] <=
+	   fluxdensity_models->model_frequency[i] +
+	   fluxdensity_models->model_frequency_tolerance[i])) {
+	nfreqmatch++;
+      }
     }
+    if (nfreqmatch > maxfreqmatch) {
+      maxfreqmatch = nfreqmatch;
+      freqmatchidx = i;
+    }
+  }
+
+  if ((freqmatchidx < 0) ||
+      (fluxdensity_models->model_num_terms[freqmatchidx] <= 0)) {
+    // No usable frequency model.
+    (*noise_diode_modifier)->set_noise_diode_amplitude = false;
+    return;
+  }
+  
+  // Loop over the polarisations.
+  CALLOC(gainsum, num_cycles);
+  CALLOC(gainsum_numtriplets, num_cycles);
+  for (i = POL_XX; i <= POL_YY; i++) {
     // We have to find the noise diode amplitude per antenna, so it is
     // most sensible to loop over the antennas here, and do the same
     // procedure for each.
+    CALLOC(gains, cycle_spectra[0]->header_data->num_ants);
+    for (j = 0; j < num_cycles; j++) {
+      CALLOC(gainsum[j], cycle_spectra[0]->header_data->num_ants);
+      CALLOC(gainsum_numtriplets[j], cycle_spectra[0]->header_data->num_ants);
+    }
+    CALLOC(gains_nbins, cycle_spectra[0]->header_data->num_ants);
     for (a = 0; a < cycle_spectra[0]->header_data->num_ants; a++) {
       ant_label = cycle_spectra[0]->header_data->ant_label[a];
       // This antenna has to be on source for all the cycles to count.
       aons = true;
       for (j = 0; j < num_cycles; j++) {
 	aons &=
-	  (!(cycle_spectra[j]->spectrum[winidx][polidx]->syscal_data->flagging[ant_label - 1] & 1));
+	  (!(cycle_spectra[j]->spectrum[winidx][polidx[i]]->syscal_data->flagging[ant_label - 1] & 1));
       }
       if (!aons) {
 	// Mark this antenna as off-source in the modifier.
@@ -3604,14 +3647,13 @@ void compute_noise_diode_amplitudes(struct fluxdensity_specification *fluxdensit
       }
       // Now determine all the gain triplets that can be made with this
       // antenna.
-      num_triplets = 0;
       for (b = 0; b < cycle_spectra[0]->header_data->num_ants; b++) {
 	bnt_label = cycle_spectra[0]->header_data->ant_label[b];
 	if (bnt_label != ant_label) {
 	  bons = true;
 	  for (j = 0; j < num_cycles; j++) {
 	    bons &=
-	      (!(cycle_spectra[j]->spectrum[winidx][polidx]->syscal_data->flagging[bnt_label - 1] & 1));
+	      (!(cycle_spectra[j]->spectrum[winidx][polidx[i]]->syscal_data->flagging[bnt_label - 1] & 1));
 	  }
 	  if (bons) {
 	    for (c = b + 1; c < cycle_spectra[0]->header_data->num_ants; c++) {
@@ -3620,7 +3662,7 @@ void compute_noise_diode_amplitudes(struct fluxdensity_specification *fluxdensit
 		cons = true;
 		for (j = 0; j < num_cycles; j++) {
 		  cons &=
-		    (!(cycle_spectra[j]->spectrum[winidx][polidx]->syscal_data->flagging[cnt_label - 1] & 1));
+		    (!(cycle_spectra[j]->spectrum[winidx][polidx[i]]->syscal_data->flagging[cnt_label - 1] & 1));
 		}
 		if (cons) {
 		  // All three antennas are unique and on-source.
@@ -3648,8 +3690,60 @@ void compute_noise_diode_amplitudes(struct fluxdensity_specification *fluxdensit
 		  // Now we collect data over the baselines and cycles and put them in memory
 		  // to do calculations later.
 		  for (j = 0; j < num_cycles; j++) {
-		    for (k = 0; k < cycle_spectra[j]->spectrum[winidx][polidx]->nbaselines; k++) {
-		      
+		    for (k = 0; k < cycle_spectra[j]->spectrum[winidx][polidx[i]]->nbaselines; k++) {
+		      base_to_ants(cycle_spectra[j]->spectrum[winidx][polidx[i]]->baseline[k],
+				   &a1, &a2);
+		      if ((a1 == x1) && (a2 == y1)) {
+			rsum1 = isum1 = NULL;
+			nbins1 = 0;
+			sum_vis(cycle_spectra[j]->spectrum[winidx][polidx[i]], k, options,
+				&nbins1, &rsum1, &isum1, NULL);
+		      } else if ((a1 == x2) && (a2 == y2)) {
+			rsum2 = isum2 = NULL;
+			nbins2 = 0;
+			sum_vis(cycle_spectra[j]->spectrum[winidx][polidx[i]], k, options,
+				&nbins2, &rsum2, &isum2, NULL);
+		      } else if ((a1 == x3) && (a2 == y3)) {
+			rsum3 = isum3 = NULL;
+			nbins3 = 0;
+			sum_vis(cycle_spectra[j]->spectrum[winidx][polidx[i]], k, options,
+				&nbins3, &rsum3, &isum3, NULL);
+		      } else if ((a1 == ant_label) && (a2 == ant_label)) {
+			// This is the autocorrelation, and we want to use this to
+			// get the noise diode amplitude.
+			asuma = NULL;
+			nbinsa = 0;
+			sum_vis(cycle_spectra[j]->spectrum[winidx][polidx[i]], k, options,
+				&nbinsa, NULL, NULL, &asuma);
+		      }
+		    }
+		    if ((nbins1 == nbins2) && (nbins1 == nbins3)) {
+		      nbins_gainsum = nbins1;
+		      CALLOC(gains[ant_label - 1], nbins1);
+		      if (gainsum[j][ant_label - 1] == NULL) {
+			CALLOC(gainsum[j][ant_label - 1], nbins1);
+			CALLOC(gainsum_numtriplets[j][ant_label - 1], nbins1);
+		      }
+		      for (k = 0; k < nbins1; k++) {
+			gains[ant_label - 1][k] = sqrtf((rsum1[k] * rsum1[k] + isum1[k] * isum1[k]) *
+							(rsum2[k] * rsum2[k] + isum2[k] * isum2[k]) /
+							(rsum3[k] * rsum3[k] + isum3[k] * isum3[k]));
+		      }
+		      if (nbinsa == 2) {
+			// We need the autos to have the niose diode on-off bins.
+			nd_amp = asuma[1] - asuma[0];
+		      } else {
+			nd_amp = 0;
+		      }
+		      // In the CABB method, the flux density of the source is just the
+		      // first term of the model.
+		      src_fd = fluxdensity_models->model_terms[freqmatchidx][0];
+		      // Now calculate the noise diode strength in Jy.
+		      for (k = 0; k < nbins1; k++) {
+			gainsum[j][ant_label - 1][k] += (src_fd * nd_amp) / gains[ant_label - 1][k];
+			gainsum_numtriplets[j][ant_label - 1][k] += 1;
+		      }
+		      FREE(gains[ant_label - 1]);
 		    }
 		  }
 		}
@@ -3659,6 +3753,107 @@ void compute_noise_diode_amplitudes(struct fluxdensity_specification *fluxdensit
 	}
       }
     }
+    // At this point, we have an array with all the antennas and all the cycles
+    // filled in with the noise diode strengths. Calculate the average noise
+    // diode strength.
+    for (j = 0; j < num_cycles; j++) {
+      for (a = 0; a < cycle_spectra[0]->header_data->num_ants; a++) {
+	for (k = 0; k < nbins_gainsum; k++) {
+	  (*noise_diode_modifier)->noise_diode_amplitude[a + 1][polidx[i]] +=
+	    gainsum[j][a][k] / (gainsum_numtriplets[j][a][k] * nbins_gainsum);
+	}
+      }
+    }
+    
+    FREE(gains);
+    FREE(gains_nbins);
   }
+
+  for (j = 0; j < num_cycles; j++) {
+    for (a = 0; a < cycle_spectra[0]->header_data->num_ants; a++) {
+      FREE(gainsum[j][a]);
+      FREE(gainsum_numtriplets[j][a]);
+    }
+    FREE(gainsum[j]);
+    FREE(gainsum_numtriplets[j]);
+  }
+  FREE(gainsum);
+  FREE(gainsum_numtriplets);
+
+  FREE(rsum1);
+  FREE(rsum2);
+  FREE(rsum3);
+  FREE(isum1);
+  FREE(isum2);
+  FREE(isum3);
 }
 
+
+/*!
+ *  \brief Create sums of imaginary and real variables over tvchannels
+ *  \param ampphase the ampphase structure with the data to sum
+ *  \param baseline_idx the index of the baseline to sum
+ *  \param options the specification of the tvchannels
+ *  \param nbins a pointer which will be filled with the length of \a rsum and \a isum
+ *  \param rsum a pointer that will be filled with an array of length \a nbins, with each
+ *              element being the sum of the real components of all the tvchannels in each bin
+ *  \param isum a pointer that will be filled with an array of length \a nbins, with each
+ *              element being the sum of the imaginary components of all the tvchannels in each bin
+ *  \param asum a pointer that will be filled with an array of length \a nbins, with each
+ *              element being the sum of the amplitude of all the tvchannels in each bin
+ *
+ * Each of \a rsum, \a isum and \a asum can be sent as NULL to tell this routine not to
+ * return that parameter.
+ */
+void sum_vis(struct ampphase *ampphase, int baseline_idx, struct ampphase_options *options,
+	     int *nbins, float **rsum, float **isum, float **asum) {
+  int oidx, i, j;
+  
+  // Allocate the memory.
+  *nbins = ampphase->nbins[baseline_idx];
+  if (rsum != NULL) {
+    REALLOC(*rsum, *nbins);
+  }
+  if (isum != NULL) {
+    REALLOC(*isum, *nbins);
+  }
+  if (asum != NULL) {
+    REALLOC(*asum, *nbins);
+  }
+  for (i = 0; i < *nbins; i++) {
+    if (rsum != NULL) {
+      (*rsum)[i] = 0;
+    }
+    if (isum != NULL) {
+      (*isum)[i] = 0;
+    }
+    if (asum != NULL) {
+      (*asum)[i] = 0;
+    }
+  }
+  
+  // For now we assume the window index works for the options.
+  oidx = ampphase->window;
+  if (oidx > options->num_ifs) {
+    // Bad.
+    return;
+  }
+
+  for (i = 0; i < *nbins; i++) {
+    for (j = 0; j < ampphase->f_nchannels[baseline_idx][i]; j++) {
+      if ((ampphase->f_channel[baseline_idx][i][j] >= options->min_tvchannel[oidx]) &&
+	  (ampphase->f_channel[baseline_idx][i][j] <= options->max_tvchannel[oidx])) {
+	if (rsum != NULL) {
+	  (*rsum)[i] += crealf(ampphase->f_raw[baseline_idx][i][j]);
+	}
+	if (isum != NULL) {
+	  (*isum)[i] += cimagf(ampphase->f_raw[baseline_idx][i][j]);
+	}
+	if (asum != NULL) {
+	  (*asum)[i] += ampphase->f_amplitude[baseline_idx][i][j];
+	}
+      }
+    }
+  }
+
+}
