@@ -1738,14 +1738,18 @@ int main(int argc, char *argv[]) {
   int i, j, k, l, ri, rj, bytes_received, r, n_cycle_mjd = 0, n_client_options = 0;
   int n_alert_sockets = 0, n_ampphase_options = 0, *client_indices = NULL;
   int removed_client_type, total_n_scans = 0, loop_limit, n_acal_cycles = 0;
+  int acal_window, acal_model_num_terms = 0, n_acal_fluxdensities = 0;
+  int n_copied_options = 0;
   bool pointer_found = false, vis_cache_updated = false, notify_required = false;
   bool spd_cache_updated = false, outside_mjd_range = false, succ = false;
   bool client_added = false, determine_params = false;
-  bool quit_when_closed = false;
+  bool quit_when_closed = false, acal_source_recognised = false, acal_model_log = false;
+  float acal_fd, *acal_model_terms = NULL, *acal_fluxdensities = NULL;
   double mjd_grab, earliest_mjd, latest_mjd, mjd_cycletime;
   double *all_cycle_mjd = NULL, *acal_cycle_mjds = NULL;
   struct rpfits_file_information **info_rpfits_files = NULL;
   struct ampphase_options **ampphase_options = NULL, **client_options = NULL;
+  struct ampphase_options *spectrum_options = NULL, **copied_options = NULL;
   struct spectrum_data *spectrum_data = NULL, *child_spectrum_data = NULL;
   struct spectrum_data **acal_spectra = NULL;
   struct vis_data *vis_data = NULL, *child_vis_data = NULL;
@@ -1756,6 +1760,7 @@ int main(int argc, char *argv[]) {
   char port_string[RPSBUFSIZE], address_buffer[RPSBUFSIZE], clienttype_string[RPSBUFSIZE];
   char *recv_buffer = NULL, *send_buffer = NULL, *child_send_buffer = NULL;
   char removed_id[CLIENTIDLENGTH], removed_username[CLIENTIDLENGTH];
+  char *acal_source = NULL;
   SOCKET socket_listen, max_socket, loop_i, socket_client, child_socket;
   SOCKET *alert_socket = NULL;
   fd_set master, reads;
@@ -1771,6 +1776,8 @@ int main(int argc, char *argv[]) {
   struct client_sockets clients;
   struct client_ampphase_options client_ampphase_options;
   struct file_instructions *testing_instructions = NULL, *file_instructions_ptr = NULL;
+  struct fluxdensity_specification fd_spec;
+  struct ampphase_modifiers *fd_modifier = NULL;
   
   // Set the defaults for the arguments.
   arguments.n_rpfits_files = 0;
@@ -2729,6 +2736,12 @@ int main(int argc, char *argv[]) {
 		CALLOC(acal_cycle_mjds, n_acal_cycles);
 		pack_readarray_double(&cmp, n_acal_cycles, acal_cycle_mjds);
 	      }
+	      // And then check if we have some user-specified amplitudes.
+	      pack_read_sint(&cmp, &n_acal_fluxdensities);
+	      if (n_acal_fluxdensities > 0) {
+		CALLOC(acal_fluxdensities, n_acal_fluxdensities);
+		pack_readarray_float(&cmp, n_acal_fluxdensities, acal_fluxdensities);
+	      }
 	      // Check all these cycles have MJDs are within the range we know about.
 	      outside_mjd_range = false;
 	      for (i = 0; i < n_acal_cycles; i++) {
@@ -2748,12 +2761,90 @@ int main(int argc, char *argv[]) {
 		CLOSESOCKET(socket_listen);
 		CLOSESOCKET(loop_i);
 		printf("CHILD STARTED! Calculating acal parameters...\n");
+		// Keep a copy of the options to send later.
+		n_copied_options = n_client_options;
+		MALLOC(copied_options, n_client_options);
+		for (i = 0; i < n_copied_options; i++) {
+		  CALLOC(copied_options[i], 1);
+		  copy_ampphase_options(copied_options[i], client_options[i]);
+		}
 		// Get the cycles.
 		data_reader(GRAB_MJDS_SPECTRA, arguments.n_rpfits_files, -1, -1, -1,
 			    n_acal_cycles, acal_cycle_mjds, &n_client_options,
 			    &client_options, info_rpfits_files,
 			    NULL, NULL, &acal_spectra);
 		// And compute the amplitude calibration parameters.
+		if (n_acal_fluxdensities <= 0) {
+		  acal_source =
+		    acal_spectra[0]->header_data->source_name[acal_spectra[0]->spectrum[0][0]->source_no];
+		  // We make a very simplistic flux density specifier here, but this will
+		  // need to be changed when we want to move to a better method of acal.
+		  // We do this now to match how CABB acal works.
+		  fd_spec.num_models = 1;
+		} else {
+		  // We use the numbers that came along with the request.
+		  fd_spec.num_models = n_acal_fluxdensities;
+		}
+		CALLOC(fd_spec.model_frequency, fd_spec.num_models);
+		CALLOC(fd_spec.model_frequency_tolerance, fd_spec.num_models);
+		CALLOC(fd_spec.model_num_terms, fd_spec.num_models);
+		CALLOC(fd_spec.model_terms, fd_spec.num_models);
+		// Find the correct set of options.
+		spectrum_options = find_ampphase_options(n_client_options,
+							 client_options,
+							 acal_spectra[0]->header_data);
+		if (n_acal_fluxdensities > 0) {
+		  j = 0;
+		  for (i = 0; i < n_acal_fluxdensities; i++) {
+		    // We find the next available continuum band.
+		    for (k = j; k < acal_spectra[0]->num_ifs; k++) {
+		      if (acal_spectra[0]->header_data->if_bandwidth[k] > 1000) {
+			j = k + 1;
+			fd_spec.model_frequency[i] =
+			  acal_spectra[0]->header_data->if_centre_freq[k];
+			fd_spec.model_frequency_tolerance[i] =
+			  acal_spectra[0]->header_data->if_bandwidth[k] / 2;
+			break;
+		      }
+		    }
+		    fd_spec.model_num_terms[i] = 1;
+		    CALLOC(fd_spec.model_terms[i], fd_spec.model_num_terms[i]);
+		    fd_spec.model_terms[i][0] = acal_fluxdensities[i];
+		  }
+		}
+		for (i = 0; i < acal_spectra[0]->num_ifs; i++) {
+		  // Find the correct window number.
+		  acal_window = acal_spectra[0]->header_data->if_label[i];
+		  if (n_acal_fluxdensities == 0) {
+		    // Work out the correct flux density to use.
+		    acal_source_recognised =
+		      source_model(acal_source,
+				   acal_spectra[0]->header_data->if_centre_freq[i],
+				   &acal_model_num_terms, &acal_model_log,
+				   &acal_model_terms);
+		    fd_spec.model_frequency[0] = acal_spectra[0]->header_data->if_centre_freq[i];
+		    fd_spec.model_frequency_tolerance[0] =
+		      acal_spectra[0]->header_data->if_bandwidth[i] / 2;
+		    fd_spec.model_num_terms[0] = 1;
+		    REALLOC(fd_spec.model_terms[0], fd_spec.model_num_terms[0]);
+		    if (acal_source_recognised) {
+		      acal_fd =
+			fluxdensity_model_evaluate(acal_model_num_terms, acal_model_log,
+						   acal_model_terms,
+						   acal_spectra[0]->header_data->if_centre_freq[i]);
+		      fd_spec.model_terms[0][0] = acal_fd;
+		    } else {
+		      fd_spec.model_terms[0][0] = 1;
+		    }
+		  }
+		  compute_noise_diode_amplitudes(&fd_spec, n_acal_cycles, acal_window,
+						 spectrum_options,
+						 acal_spectra, &fd_modifier);
+		  // Attach the modifier to the options now.
+		  add_modifier(spectrum_options, acal_window, fd_modifier);
+		  free_ampphase_modifiers(fd_modifier);
+		  FREE(fd_modifier);
+		}
 		
 		// We send the data back to our parent over the network.
 		if (prepare_client_connection("127.0.0.1", arguments.port_number,
@@ -2768,7 +2859,23 @@ int main(int argc, char *argv[]) {
 		  init_cmp_memory_buffer(&child_cmp, &child_mem, child_send_buffer,
 					 (size_t)RPSENDBUFSIZE);
 		  pack_requests(&child_cmp, &child_request);
-
+		  // Send the original options back for caching.
+		  pack_write_sint(&child_cmp, n_copied_options);
+		  for (i = 0; i < n_copied_options; i++) {
+		    pack_ampphase_options(&child_cmp, copied_options[i]);
+		  }
+		  // Send back the new options with the modifiers.
+		  pack_write_sint(&child_cmp, n_client_options);
+		  for (i = 0; i < n_client_options; i++) {
+		    pack_ampphase_options(&child_cmp, client_options[i]);
+		  }
+		  // Pack the MJDs of each of the data grabs. We send the grabs back so
+		  // they can be cached.
+		  pack_write_sint(&child_cmp, n_acal_cycles);
+		  pack_writearray_double(&child_cmp, n_acal_cycles, acal_cycle_mjds);
+		  for (i = 0; i < n_acal_cycles; i++) {
+		    pack_spectrum_data(&child_cmp, acal_spectra[i]);
+		  }
 		  printf("[CHILD] %s for client %s.\n",
 			 get_type_string(TYPE_REQUEST, child_request.request_type),
 			 client_request.client_id);
@@ -2784,16 +2891,25 @@ int main(int argc, char *argv[]) {
 		  FREE(client_options[i]);
 		}
 		FREE(client_options);
+		for (i = 0; i < n_copied_options; i++) {
+		  free_ampphase_options(copied_options[i]);
+		  FREE(copied_options[i]);
+		}
 		// Die.
 		printf("CHILD IS FINISHED!\n");
 		exit(0);
 	      } else {
+		// Free the memory we used.
 		for (i = 0; i < n_client_options; i++) {
 		  free_ampphase_options(client_options[i]);
 		  FREE(client_options[i]);
 		}
 		FREE(client_options);
 		n_client_options = 0;
+		FREE(acal_cycle_mjds);
+		n_acal_cycles = 0;
+		FREE(acal_fluxdensities);
+		n_acal_fluxdensities = 0;
 		if (pid == 1) {
 		  // Return an error code.
 		  client_response.response_type = RESPONSE_ACAL_REQUEST_INVALID;
@@ -2812,6 +2928,95 @@ int main(int argc, char *argv[]) {
 						cmp_mem_access_get_pos(&mem));
 		FREE(send_buffer);
 	      }
+	    } else if (client_request.request_type == CHILDREQUEST_MJDS_SPECTRA) {
+	      // Receive some information coming back from an acal request.
+	      // Free the current client ampphase options.
+	      for (i = 0; i < n_client_options; i++) {
+		free_ampphase_options(client_options[i]);
+		FREE(client_options[i]);
+	      }
+	      FREE(client_options);
+	      n_client_options = 0;
+	      for (i = 0; i < n_copied_options; i++) {
+		free_ampphase_options(copied_options[i]);
+		FREE(copied_options[i]);
+	      }
+	      FREE(copied_options);
+	      n_copied_options = 0;
+	      // Read the original options now to label the cache.
+	      pack_read_sint(&cmp, &n_copied_options);
+	      MALLOC(copied_options, n_copied_options);
+	      for (i = 0; i < n_copied_options; i++) {
+		CALLOC(copied_options[i], 1);
+		unpack_ampphase_options(&cmp, copied_options[i]);
+	      }
+	      // And read the new client options now.
+	      pack_read_sint(&cmp, &n_client_options);
+	      MALLOC(client_options, n_client_options);
+	      for (i = 0; i < n_client_options; i++) {
+		CALLOC(client_options[i], 1);
+		unpack_ampphase_options(&cmp, client_options[i]);
+	      }
+	      // Unpack the MJDs of each of the cycles that were requested, as
+	      // we will cache them for later use.
+	      pack_read_sint(&cmp, &n_acal_cycles);
+	      CALLOC(acal_cycle_mjds, n_acal_cycles);
+	      pack_readarray_double(&cmp, n_acal_cycles, acal_cycle_mjds);
+	      for (i = 0; i < n_acal_cycles; i++) {
+		unpack_spectrum_data(&cmp, spectrum_data);
+		spd_cache_updated = add_cache_spd_data(n_copied_options,
+						       copied_options, spectrum_data);
+		if (spd_cache_updated == false) {
+		  // The unpacked data can be freed.
+		  free_scan_header_data(spectrum_data->header_data);
+		  FREE(spectrum_data->header_data);
+		  free_spectrum_data(spectrum_data);
+		}
+	      }
+	      // Tell the client their acal information is ready.
+	      // Find the client's socket.
+	      find_client(&clients, client_request.client_id, "",
+			  &n_alert_sockets, &alert_socket, NULL);
+	      for (i = 0; i < n_alert_sockets; i++) {
+		if (ISVALIDSOCKET(alert_socket[i])) {
+		  fprintf(stderr, " alerting client %s\n", client_request.client_id);
+		  client_response.response_type = RESPONSE_ACAL_COMPUTED;
+		  strncpy(client_response.client_id, client_request.client_id,
+			  CLIENTIDLENGTH);
+		  MALLOC(send_buffer, RPSBUFSIZE);
+		  pack_responses(&cmp, &client_response);
+		  // Send the new options with the modifiers.
+		  pack_write_sint(&cmp, n_client_options);
+		  for (i = 0; i < n_client_options; i++) {
+		    pack_ampphase_options(&cmp, client_options[i]);
+		  }
+		  printf(" %s to client %s.\n",
+			 get_type_string(TYPE_RESPONSE, client_response.response_type),
+			 client_request.client_id);
+		  bytes_sent = socket_send_buffer(alert_socket[i], send_buffer,
+						  cmp_mem_access_get_pos(&mem));
+		  FREE(send_buffer);
+		}
+	      }
+	      FREE(alert_socket);
+	      n_alert_sockets = 0;
+	      // Free the options again.
+	      for (i = 0; i < n_client_options; i++) {
+		free_ampphase_options(client_options[i]);
+		FREE(client_options[i]);
+	      }
+	      FREE(client_options);
+	      n_client_options = 0;
+	      for (i = 0; i < n_copied_options; i++) {
+		free_ampphase_options(copied_options[i]);
+		FREE(copied_options[i]);
+	      }
+	      FREE(copied_options);
+	      n_copied_options = 0;
+	      // And free the other received memory.
+	      FREE(acal_cycle_mjds);
+	      n_acal_cycles = 0;
+	      
 	    }
             printf(" Sent %ld bytes\n", bytes_sent);
 

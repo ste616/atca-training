@@ -179,6 +179,7 @@ struct requests {
 #define RESPONSE_COMPUTED_ACAL          18
 #define RESPONSE_ACAL_COMPUTING         19
 #define RESPONSE_ACAL_REQUEST_INVALID   20
+#define RESPONSE_ACAL_COMPUTED          21
 
 /*! \struct responses
  *  \brief Structure to use when responding to a request

@@ -193,7 +193,7 @@ const char *get_type_string(int type, int id) {
   // Get a string representation of the type of request or response,
   // specified by type=TYPE_REQUEST or TYPE_RESPONSE, and
   // id being one of the definitions in the header.
-  int max_request = 15, max_response = 21;
+  int max_request = 15, max_response = 22;
   const char* const request_strings[] = { "",
                                           "REQUEST_CURRENT_SPECTRUM",
                                           "REQUEST_CURRENT_VISDATA",
@@ -230,7 +230,8 @@ const char *get_type_string(int type, int id) {
 					   "RESPONSE_SHUTDOWN",
 					   "RESPONSE_COMPUTED_ACAL",
 					   "RESPONSE_ACAL_COMPUTING",
-					   "RESPONSE_ACAL_REQUEST_INVALID"
+					   "RESPONSE_ACAL_REQUEST_INVALID",
+					   "RESPONSE_ACAL_COMPUTED"
   };
 
   if ((type == TYPE_REQUEST) && (id >= 0) && (id < max_request)) {

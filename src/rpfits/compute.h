@@ -1336,7 +1336,8 @@ int polarisation_number(char *polstring);
 struct ampphase_options ampphase_options_default(void);
 void set_default_ampphase_options(struct ampphase_options *options);
 void set_default_ampphase_modifiers(struct ampphase_modifiers *modifiers);
-struct ampphase_modifiers* add_modifier(struct ampphase_options *options, int idx);
+struct ampphase_modifiers* add_modifier(struct ampphase_options *options, int idx,
+					struct ampphase_modifiers *modifier_to_add);
 void remove_modifiers(struct ampphase_options *options, int idx, int n_modifiers,
 		      int *modidx);
 void copy_ampphase_modifiers(struct ampphase_modifiers *dest,
@@ -1409,3 +1410,7 @@ void compute_noise_diode_amplitudes(struct fluxdensity_specification *fluxdensit
 				    struct ampphase_modifiers **noise_diode_modifier);
 void sum_vis(struct ampphase *ampphase, int baseline_idx, struct ampphase_options *options,
 	     int *nbins, float **rsum, float **isum, float **asum);
+float fluxdensity_model_evaluate(int num_terms, bool log_terms, float *terms,
+				 float eval_freq);
+bool source_model(char *source_name, float eval_freq, int *num_terms, bool *log_terms,
+		  float **terms);

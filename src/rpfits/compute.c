@@ -479,15 +479,22 @@ void set_default_ampphase_modifiers(struct ampphase_modifiers *modifiers) {
 /*! \brief Add a new modifier to the list of modifiers in an options structure
  *  \param options the ampphase_options structure to add the modifier to
  *  \param idx the index in modifiers to add to, which is the IF index
+ *  \param modifier_to_add an already created modifier that you may wish to add to the
+ *                         list; specify this as NULL to make this routine add a default
+ *                         modifier instead
  *  \returns a pointer to the modifier structure added
  */
 struct ampphase_modifiers* add_modifier(struct ampphase_options *options,
-					int idx) {
+					int idx, struct ampphase_modifiers *modifier_to_add) {
   struct ampphase_modifiers *new_modifier = NULL;
   options->num_modifiers[idx] += 1;
   REALLOC(options->modifiers[idx], options->num_modifiers[idx]);
   CALLOC(new_modifier, 1);
-  set_default_ampphase_modifiers(new_modifier);
+  if (modifier_to_add == NULL) {
+    set_default_ampphase_modifiers(new_modifier);
+  } else {
+    copy_ampphase_modifiers(new_modifier, modifier_to_add);
+  }
   options->modifiers[idx][options->num_modifiers[idx] - 1] = new_modifier;
   return(new_modifier);
 }
@@ -3856,4 +3863,91 @@ void sum_vis(struct ampphase *ampphase, int baseline_idx, struct ampphase_option
     }
   }
 
+}
+
+/*!
+ *  \brief Take a flux density model, evaluate it at a particular frequency, and
+ *         return the flux density
+ *  \param num_terms the number of terms in the model, and length of \a terms array
+ *  \param log_terms flag to indicate if the model is in log S log nu space (true), or
+ *                   in linear S nu (false)
+ *  \param terms an array of the model terms
+ *  \param eval_freq the frequency (in MHz) at which to evaluate the model
+ *  \returns the flux density (in Jy) the model specifies at the \a eval_freq
+ */
+float fluxdensity_model_evaluate(int num_terms, bool log_terms, float *terms,
+				 float eval_freq) {
+  int i;
+  float fd = 0, freq;
+
+  if (log_terms) {
+    freq = log10f(eval_freq);
+  } else {
+    freq = eval_freq;
+  }
+  if (num_terms > 0) {
+    fd = terms[0];
+    for (i = 1; i < num_terms; i++) {
+      fd += terms[i] * powf(freq, i);
+    }
+  }
+
+  if (log_terms) {
+    fd = powf(10, fd);
+  }
+  
+  return (fd);
+}
+
+/*!
+ *  \brief Return a flux density model for a source
+ *  \param source_name the name of the source
+ *  \param eval_freq the frequency (in MHz) at which the model must be valid for (which
+ *                   is required for several models which are frequency-dependent)
+ *  \param num_terms a pointer to a variable which will be filled with the number of
+ *                   terms in the returned model
+ *  \param log_terms a pointer to a variable which will be filled with a flag that indicates
+ *                   if the model is in log S log nu space (true), or in linear S nu (false)
+ *  \param terms a pointer to a variable which will be allocated into an array of length
+ *               \a num_terms with the model terms
+ *  \returns a flag indicating if a model is returned for the specified source (true),
+ *           or if no model matched (false)
+ */
+bool source_model(char *source_name, float eval_freq, int *num_terms, bool *log_terms,
+		  float **terms) {
+  int i;
+  float model_1934_low[4] = { -30.7667, 26.4908, -7.0977, 0.605334 };
+  float model_1934_high[2] = { 5.887, -1.3763 };
+  float model_0823[4] = { -51.0361, 41.4101, -10.7771, 0.90468 };
+  float *model_ptr = NULL;
+  
+  // Branch based on source name (a primitive way to do this I know, I'm sorry).
+  if (strcmp(source_name, "1934-638") == 0) {
+    // Our best flux density calibrator, has a frequency-dependent model.
+    *log_terms = true;
+    if (eval_freq < 11150) {
+      *num_terms = 4;
+      model_ptr = model_1934_low;
+    } else {
+      *num_terms = 2;
+      model_ptr = model_1934_high;
+    }
+  } else if (strcmp(source_name, "0823-500") == 0) {
+    // This is not a very good model, since 0823-500 varies over time.
+    *log_terms = true;
+    *num_terms = 4;
+    model_ptr = model_0823;
+  }
+
+  if (model_ptr == NULL) {
+    // No match.
+    return (false);
+  }
+
+  // Copy the model over.
+  CALLOC(*terms, *num_terms);
+  for (i = 0; i < *num_terms; i++) {
+    (*terms)[i] = model_ptr[i];
+  }
+  return (true);
 }

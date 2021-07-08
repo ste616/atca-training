@@ -1266,7 +1266,7 @@ int main(int argc, char *argv[]) {
 		   (action_required & ACTION_ADD_DELAYS) ||
 		   (action_required & ACTION_COMPUTE_PHASECORRECTIONS)) {
 	  // Create a new modifier in the options.
-	  modptr = add_modifier(found_options, visband_idx[j]);
+	  modptr = add_modifier(found_options, visband_idx[j], NULL);
 	  /* found_options->num_modifiers[visband_idx[j]] += 1; */
 	  /* REALLOC(found_options->modifiers[visband_idx[j]], */
 	  /* 	  found_options->num_modifiers[visband_idx[j]]); */
