@@ -257,6 +257,14 @@ void minutes_representation(float minutes, char *representation) {
   }
 }
 
+/*!
+ *  \brief Try to convert a string to a floating point number using strtof,
+ *         and indicate if this works or not
+ *  \param s the string to convert to a float
+ *  \param v a pointer to the variable to hold the parsed float
+ *  \returns a boolean indicator of whether the conversion was made (true)
+ *           or failed (false)
+ */
 bool string_to_float(char *s, float *v) {
   // This routine wraps around strtof to indicate if the parsing is
   // successful.

@@ -1739,7 +1739,7 @@ int main(int argc, char *argv[]) {
   int n_alert_sockets = 0, n_ampphase_options = 0, *client_indices = NULL;
   int removed_client_type, total_n_scans = 0, loop_limit, n_acal_cycles = 0;
   int acal_window, acal_model_num_terms = 0, n_acal_fluxdensities = 0;
-  int n_copied_options = 0;
+  int n_copied_options = 0, acal_options_idx;
   bool pointer_found = false, vis_cache_updated = false, notify_required = false;
   bool spd_cache_updated = false, outside_mjd_range = false, succ = false;
   bool client_added = false, determine_params = false;
@@ -2792,7 +2792,8 @@ int main(int argc, char *argv[]) {
 		// Find the correct set of options.
 		spectrum_options = find_ampphase_options(n_client_options,
 							 client_options,
-							 acal_spectra[0]->header_data);
+							 acal_spectra[0]->header_data,
+							 &acal_options_idx);
 		if (n_acal_fluxdensities > 0) {
 		  j = 0;
 		  for (i = 0; i < n_acal_fluxdensities; i++) {
@@ -2869,6 +2870,8 @@ int main(int argc, char *argv[]) {
 		  for (i = 0; i < n_client_options; i++) {
 		    pack_ampphase_options(&child_cmp, client_options[i]);
 		  }
+		  // Specify the index of the options we modified.
+		  pack_write_sint(&child_cmp, acal_options_idx);
 		  // Pack the MJDs of each of the data grabs. We send the grabs back so
 		  // they can be cached.
 		  pack_write_sint(&child_cmp, n_acal_cycles);
@@ -2957,6 +2960,8 @@ int main(int argc, char *argv[]) {
 		CALLOC(client_options[i], 1);
 		unpack_ampphase_options(&cmp, client_options[i]);
 	      }
+	      // Read the index of the modified options.
+	      pack_read_sint(&cmp, &acal_options_idx);
 	      // Unpack the MJDs of each of the cycles that were requested, as
 	      // we will cache them for later use.
 	      pack_read_sint(&cmp, &n_acal_cycles);
@@ -2990,6 +2995,8 @@ int main(int argc, char *argv[]) {
 		  for (i = 0; i < n_client_options; i++) {
 		    pack_ampphase_options(&cmp, client_options[i]);
 		  }
+		  // Tell them which index was modified.
+		  pack_write_sint(&cmp, acal_options_idx);
 		  printf(" %s to client %s.\n",
 			 get_type_string(TYPE_RESPONSE, client_response.response_type),
 			 client_request.client_id);

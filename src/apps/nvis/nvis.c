@@ -81,11 +81,11 @@ int data_selected_index, tsys_apply;
 int xaxis_type, *yaxis_type, nxpanels, nypanels, nvisbands;
 int *visband_idx, tvchan_change_min, tvchan_change_max;
 int reference_antenna_index, nncal, deladd_antnum, deladd_polnum, deladd_ifnum;
-int *nncal_indices, nncal_cycletime, new_timetype;
+int *nncal_indices, nncal_cycletime, new_timetype, n_acal_fluxdensities;
 char **visband, tvchan_visband[10], hardcopy_filename[VISBUFSHORT];
 // Whether to order the baselines in length order (true/false).
 bool sort_baselines;
-float data_seconds, *nncal_seconds, deladd_value;
+float data_seconds, *nncal_seconds, deladd_value, *acal_fluxdensities;
 struct vis_plotcontrols vis_plotcontrols;
 struct panelspec vis_panelspec;
 struct vis_data vis_data;
@@ -204,6 +204,8 @@ static void sighandler(int sig) {
 #define ACTION_ADD_DELAYS                1<<20
 #define ACTION_CHANGE_TIMETYPE           1<<21
 #define ACTION_ARRAY_CONFIGURATION_PRINT 1<<22
+#define ACTION_COMPUTE_ACAL              1<<23
+#define ACTION_ENACT_ACAL                1<<24
 
 // The action modifier magic numbers.
 #define ACTIONMOD_NOMOD                  0
@@ -395,7 +397,7 @@ static void interpret_command(char *line) {
   int nels, i, j, k, array_change_spec, nproducts, pr;
   int change_panel = PLOT_ALL_PANELS, iarg, plen = 0, temp_xaxis_type;
   int *temp_yaxis_type = NULL, temp_nypanels, idx_low, idx_high, ty;
-  int temp_refant, temp_nncal;
+  int temp_refant, temp_nncal, acal_idx_offset = 0;
   float histlength;
   float limit_min, limit_max;
   struct vis_product **vis_products = NULL, *tproduct = NULL;
@@ -859,16 +861,19 @@ static void interpret_command(char *line) {
 	}
       }
     } else if ((minmatch("dcal", line_els[0], 4)) ||
-	       (minmatch("pcal", line_els[0], 4))) {
+	       (minmatch("pcal", line_els[0], 4)) ||
+	       (minmatch("acal", line_els[0], 4))) {
       CHECKSIMULATOR;
-      // Compute the delays or phases required to correct the data and then tell the server
-      // to incorporate them.
+      // Compute the delays, phases or amplitudes required to correct the data and then
+      // tell the server to incorporate them.
       // Check if a time range has been specified.
       if (data_seconds < 0) {
 	if (minmatch("dcal", line_els[0], 4)) {
 	  printf(" Unable to dcal: please select a time range with data and nncal\n");
 	} else if (minmatch("pcal", line_els[0], 4)) {
 	  printf(" Unable to pcal: please select a time range with data and nncal\n");
+	} else if (minmatch("acal", line_els[0], 4)) {
+	  printf(" Unable to acal: please select a time range with data and nncal\n");
 	}
       } else {
 	// Check that we have enough cycles of data.
@@ -883,6 +888,8 @@ static void interpret_command(char *line) {
 	    printf(" Unable to dcal: ");
 	  } else if (minmatch("pcal", line_els[0], 4)) {
 	    printf(" Unable to pcal: ");
+	  } else if (minmatch("acal", line_els[0], 4)) {
+	    printf(" Unable to acal: ");
 	  }
 	  printf("need %d consecutive cycles of data, please change data and/or nncal\n",
 		 nncal);
@@ -891,15 +898,33 @@ static void interpret_command(char *line) {
 	    action_required = ACTION_COMPUTE_DELAYS;
 	  } else if (minmatch("pcal", line_els[0], 4)) {
 	    action_required = ACTION_COMPUTE_PHASECORRECTIONS;
+	  } else if (minmatch("acal", line_els[0], 4)) {
+	    action_required = ACTION_COMPUTE_ACAL;
+	    if ((nels == 3) || (nels == 4)) {
+	      // We've been given some flux densities to use.
+	      n_acal_fluxdensities = 2;
+	      CALLOC(acal_fluxdensities, n_acal_fluxdensities);
+	      acal_idx_offset = 2;
+	      // Parse the arguments and see if they look correct.
+	      succ = string_to_float(line_els[1], &(acal_fluxdensities[0])) &
+		string_to_float(line_els[2], &(acal_fluxdensities[1]));
+	      if (!succ) {
+		printf(" Unabel to acal: supplied flux densities not valid\n");
+		action_required -= ACTION_COMPUTE_ACAL;
+		FREE(acal_fluxdensities);
+		n_acal_fluxdensities = 0;
+		acal_idx_offset = 0;
+	      }
+	    }
 	  }
 	  // Check if we have any modifiers.
-	  if (nels == 2) {
-	    if (minmatch("all", line_els[1], 3)) {
+	  if (nels == (2 + acal_idx_offset)) {
+	    if (minmatch("all", line_els[1 + acal_idx_offset], 3)) {
 	      // We make the correction for the entire dataset.
 	      action_modifier = ACTIONMOD_CORRECT_ALL;
-	    } else if (minmatch("after", line_els[1], 3)) {
+	    } else if (minmatch("after", line_els[1 + acal_idx_offset], 3)) {
 	      action_modifier = ACTIONMOD_CORRECT_AFTER;
-	    } else if (minmatch("before", line_els[1], 3)) {
+	    } else if (minmatch("before", line_els[1 + acal_idx_offset], 3)) {
 	      action_modifier = ACTIONMOD_CORRECT_BEFORE;
 	    }
 	  }
@@ -1048,7 +1073,7 @@ int main(int argc, char *argv[]) {
   int i, j, k, l, m, r, bytes_received, nmesg = 0, bidx = -1, num_timelines = 0, pnum;
   int dump_type = FILETYPE_UNKNOWN, dump_device_number = -1, vis_device_number = -1;
   int *timeline_types = NULL, cycidx, visidx, a1, a2, *mod_remove = NULL, n_mod_remove = 0;
-  int alabel;
+  int alabel, acal_modified_idx;
   cmp_ctx_t cmp;
   cmp_mem_access_t mem;
   struct requests server_request;
@@ -1063,7 +1088,7 @@ int main(int argc, char *argv[]) {
   float *timelines = NULL, *timeline_deltas = NULL, dsign = 1;
   float p1 = 0, p2 = 0, p3 = 0, pd1 = 0, pd2 = 0, pd3 = 0;
   float phase_cals[POL_XY + 1][MAX_ANTENNANUM][MAXNNCAL];
-  double tmjd;
+  double tmjd, *amjds = NULL;
   struct vis_quantities ***described_ptr = NULL;
   struct scan_header_data *described_hdr = NULL;
   struct panelspec dump_panelspec;
@@ -1089,6 +1114,8 @@ int main(int argc, char *argv[]) {
   ampphase_options = NULL;
   found_options = NULL;
   reference_antenna_index = 0;
+  n_acal_fluxdensities = 0;
+  acal_fluxdensities = NULL;
 
   // Set the default for the arguments.
   arguments.use_file = false;
@@ -1209,7 +1236,7 @@ int main(int argc, char *argv[]) {
       print_information_scan_header(described_hdr, header_string, VISBUFSIZE);
       /* snprintf(mesgout[nmesg++], VISBUFSIZE, " header at index:\n%s\n", header_string); */
       found_options = find_ampphase_options(n_ampphase_options, ampphase_options,
-					    described_hdr);
+					    described_hdr, NULL);
       /* print_options_set(1, &found_options, header_string, VISBUFSIZE); */
       /* snprintf(mesgout[nmesg++], VISBUFSIZE, "%s", header_string); */
       readline_print_messages(nmesg, mesgout);
@@ -1236,7 +1263,8 @@ int main(int argc, char *argv[]) {
 	(action_required & ACTION_RESET_DELAYS) ||
 	(action_required & ACTION_ADD_DELAYS) ||
 	(action_required & ACTION_COMPUTE_PHASECORRECTIONS) ||
-	(action_required & ACTION_RESET_PHASECORRECTIONS)) {
+	(action_required & ACTION_RESET_PHASECORRECTIONS) ||
+	(action_required & ACTION_ENACT_ACAL)) {
       action_required |= ACTION_AMPPHASE_OPTIONS_CHANGED;
       nmesg = 0;
       for (j = 0; j < nvisbands; j++) {
@@ -1497,6 +1525,26 @@ int main(int argc, char *argv[]) {
 		       180 / M_PI);
 	    }
 	  }
+	  if (action_required & ACTION_ENACT_ACAL) {
+	    // We print out the computed noise diode amplitudes.
+	    if ((acal_modified_idx >= 0) && (acal_modified_idx < n_ampphase_options)) {
+	      modptr = NULL;
+	      for (l = 0;
+		   l < ampphase_options[acal_modified_idx]->num_modifiers[visband_idx[j]]; l++) {
+		if (ampphase_options[acal_modified_idx]->modifiers[visband_idx[j]][l]->set_noise_diode_amplitude == true) {
+		  modptr = ampphase_options[acal_modified_idx]->modifiers[visband_idx[j]][l];
+		}
+	      }
+	      if (modptr != NULL) {
+		for (l = 1; l < modptr->noise_diode_num_antennas; l++) {
+		  snprintf(mesgout[nmesg++], VISBUFLONG,
+			   "   ANT %d: X = %.2f Y = %.2f Jy\n", l,
+			   modptr->noise_diode_amplitude[l][POL_X],
+			   modptr->noise_diode_amplitude[l][POL_Y]);
+		}
+	      }
+	    }
+	  }
 	}
       }
       readline_print_messages(nmesg, mesgout);
@@ -1515,6 +1563,40 @@ int main(int argc, char *argv[]) {
       if (action_required & ACTION_RESET_PHASECORRECTIONS) {
 	action_required -= ACTION_RESET_PHASECORRECTIONS;
       }
+      if (action_required & ACTION_ENACT_ACAL) {
+	action_required -= ACTION_ENACT_ACAL;
+      }
+    }
+
+    if (action_required & ACTION_COMPUTE_ACAL) {
+      // The server is responsible for computing the acal parameters, so we
+      // just send the request.
+      action_required -= ACTION_COMPUTE_ACAL;
+
+      server_request.request_type = REQUEST_ACAL;
+      init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)SENDBUFSIZE);
+      pack_requests(&cmp, &server_request);
+      pack_write_sint(&cmp, n_ampphase_options);
+      for (i = 0; i < n_ampphase_options; i++) {
+	pack_ampphase_options(&cmp, ampphase_options[i]);
+      }
+      // We have to compute, sort and then send the MJDs of the cycles we want
+      // to use to compute the acal parameters.
+      pack_write_sint(&cmp, nncal);
+      CALLOC(amjds, nncal);
+      for (i = 0; i < nncal; i++) {
+	amjds[i] = date2mjd(vis_data.vis_quantities[nncal_indices[i]][0][0]->obsdate,
+			    vis_data.vis_quantities[nncal_indices[i]][0][0]->ut_seconds);
+      }
+      qsort(amjds, nncal, sizeof(double), cmpfunc_double);
+      pack_writearray_double(&cmp, nncal, amjds);
+      // Send along the supplied source amplitudes if we have any.
+      pack_write_sint(&cmp, n_acal_fluxdensities);
+      if (n_acal_fluxdensities > 0) {
+	pack_writearray_float(&cmp, n_acal_fluxdensities, acal_fluxdensities);
+      }
+      socket_send_buffer(socket_peer, send_buffer, cmp_mem_access_get_pos(&mem));
+      FREE(amjds);
     }
     
     if (action_required & ACTION_DESCRIBE_DATA) {
@@ -1526,7 +1608,7 @@ int main(int argc, char *argv[]) {
 	described_ptr = vis_data.vis_quantities[data_selected_index];
 	described_hdr = vis_data.header_data[data_selected_index];
 	found_options = find_ampphase_options(n_ampphase_options, ampphase_options,
-					      described_hdr);
+					      described_hdr, NULL);
 	seconds_to_hourlabel(described_ptr[0][0]->ut_seconds, htime);
 	snprintf(mesgout[nmesg++], VISBUFLONG, "DATA AT %s %s:\n",
 		 described_ptr[0][0]->obsdate, htime);
@@ -1876,6 +1958,26 @@ int main(int argc, char *argv[]) {
 	// The server is shutting down and wants us to die first so it can close
 	// its listening port cleanly.
 	action_required = ACTION_QUIT;
+      } else if (server_response.response_type == RESPONSE_ACAL_COMPUTED) {
+	// We get information back about our acal request.
+	// Receive the ampphase options first, and free old ones if we need to.
+	if (n_ampphase_options > 0) {
+	  for (i = 0; i < n_ampphase_options; i++) {
+	    free_ampphase_options(ampphase_options[i]);
+	    FREE(ampphase_options[i]);
+	  }
+	  FREE(ampphase_options);
+	}
+	pack_read_sint(&cmp, &n_ampphase_options);
+	MALLOC(ampphase_options, n_ampphase_options);
+	for (i = 0; i < n_ampphase_options; i++) {
+	  CALLOC(ampphase_options[i], 1);
+	  unpack_ampphase_options(&cmp, ampphase_options[i]);
+	}
+	// The server tells us which of the options was modified.
+	pack_read_sint(&cmp, &acal_modified_idx);
+	// Output and use these new modifiers.
+	action_required = ACTION_ENACT_ACAL;
       }
       FREE(recv_buffer);
     }

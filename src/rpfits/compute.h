@@ -1348,7 +1348,8 @@ void free_ampphase_modifiers(struct ampphase_modifiers *modifiers);
 void free_ampphase_options(struct ampphase_options *options);
 struct ampphase_options* find_ampphase_options(int num_options,
 					       struct ampphase_options **options,
-					       struct scan_header_data *scan_header_data);
+					       struct scan_header_data *scan_header_data,
+					       int *options_idx);
 void copy_metinfo(struct metinfo *dest,
                   struct metinfo *src);
 void copy_syscal_data(struct syscal_data *dest,
@@ -1366,6 +1367,7 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
                  struct ampphase **ampphase, int pol, int ifno, int *num_options,
                  struct ampphase_options ***options);
 int cmpfunc_real(const void *a, const void *b);
+int cmpfunc_double(const void *a, const void *b);
 int cmpfunc_complex(const void *a, const void *b);
 int cmpfunc_integer(const void *a, const void *b);
 int ampphase_average(struct scan_header_data *scan_header_data,

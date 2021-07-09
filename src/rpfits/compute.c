@@ -715,17 +715,24 @@ void free_ampphase_options(struct ampphase_options *options) {
  *  \param options an array of ampphase_options structures
  *  \param scan_header_data the scan header data describing the band configuration
  *                          you're seeeking
+ *  \param options_idx if set to not NULL, this pointer will be filled with the index
+ *                     of the found options in the \a options array, or -1 if not found
  *  \return a pointer to the ampphase_options structure, or NULL if no match
  *          was found
  */
 struct ampphase_options* find_ampphase_options(int num_options,
 					       struct ampphase_options **options,
-					       struct scan_header_data *scan_header_data) {
+					       struct scan_header_data *scan_header_data,
+					       int *options_idx) {
   int i, j;
   bool all_bands_match = false;
   struct ampphase_options *match = NULL;
 
   /* printf("[find_ampphase_options] searching set of %d options\n", num_options); */
+
+  if (options_idx != NULL) {
+    *options_idx = -1;
+  }
   
   for (i = 0; i < num_options; i++) {
     /* printf(" options %d has %d windows, scan header has %d windows\n", i, */
@@ -744,6 +751,9 @@ struct ampphase_options* find_ampphase_options(int num_options,
       }
       if (all_bands_match == true) {
 	match = options[i];
+	if (options_idx != NULL) {
+	  *options_idx = i;
+	}
 	break;
       }
     }
@@ -1085,7 +1095,7 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
 
   // Try to find the correct options for this band.
   band_options = find_ampphase_options(*num_options, *options,
-				       scan_header_data);
+				       scan_header_data, NULL);
   needs_new_options = (band_options == NULL);
 
   /* printf("[vis_ampphase] after finding options\n"); */
@@ -1609,6 +1619,20 @@ int cmpfunc_real(const void *a, const void *b) {
 }
 
 /*!
+ *  \brief A qsort comparator function for double real type numbers
+ *  \param a a pointer to a number
+ *  \param b a pointer to another number
+ *  \return - 0 if the two dereferenced numbers are equal
+ *          - -ive if the dereferenced \a b number is larger
+ *          - +ive if the dereferenced \a a number is larger
+ */
+int cmpfunc_double(const void *a, const void *b) {
+  const double va = *(double *)a;
+  const double vb = *(double *)b;
+  return ( (va > vb) - (va < vb) );
+}
+
+/*!
  *  \brief A qsort comparator function for float complex type numbers
  *  \param a a pointer to a number
  *  \param b a pointer to another number
@@ -1713,7 +1737,7 @@ int ampphase_average(struct scan_header_data *scan_header_data,
     band_options = ampphase->options;
   } else {
     band_options = find_ampphase_options(*num_options, *options,
-					 scan_header_data);
+					 scan_header_data, NULL);
   }
   needs_new_options = (band_options == NULL);
 
@@ -2140,7 +2164,7 @@ void calculate_system_temperatures_cycle_data(struct cycle_data *cycle_data,
   }
 
   // Try to find the correct options for this band.
-  band_options = find_ampphase_options(*num_options, *options, scan_header_data);
+  band_options = find_ampphase_options(*num_options, *options, scan_header_data, NULL);
   needs_new_options = (band_options == NULL);
 
   /* printf("[calculate_system_temperatures_cycle_data] after finding options\n"); */

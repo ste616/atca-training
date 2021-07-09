@@ -1173,7 +1173,7 @@ int main(int argc, char *argv[]) {
         unpack_spectrum_data(&cmp, &spectrum_data);
 	// Find the options relevant to the displayed data.
 	found_options = find_ampphase_options(n_ampphase_options, ampphase_options,
-					      spectrum_data.header_data);
+					      spectrum_data.header_data, NULL);
 	/* snprintf(mesgout[nmesg++], SPDBUFSIZE, "RELEVANT OPTIONS:\n"); */
 	/* print_options_set(1, &found_options, mesgout[nmesg++], SPDBUFSIZE); */
 	/* readline_print_messages(nmesg, mesgout); */
