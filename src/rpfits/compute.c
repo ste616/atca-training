@@ -3808,6 +3808,13 @@ void compute_noise_diode_amplitudes(struct fluxdensity_specification *fluxdensit
 		      }
 		      FREE(gains[ant_label - 1]);
 		    }
+		    FREE(rsum1);
+		    FREE(isum1);
+		    FREE(rsum2);
+		    FREE(isum2);
+		    FREE(rsum3);
+		    FREE(isum3);
+		    FREE(asuma);
 		  }
 		}
 	      }
@@ -3830,25 +3837,28 @@ void compute_noise_diode_amplitudes(struct fluxdensity_specification *fluxdensit
     
     FREE(gains);
     FREE(gains_nbins);
-  }
 
-  for (j = 0; j < num_cycles; j++) {
-    for (a = 0; a < cycle_spectra[0]->header_data->num_ants; a++) {
-      FREE(gainsum[j][a]);
-      FREE(gainsum_numtriplets[j][a]);
+    for (j = 0; j < num_cycles; j++) {
+      for (a = 0; a < cycle_spectra[0]->header_data->num_ants; a++) {
+	FREE(gainsum[j][a]);
+	FREE(gainsum_numtriplets[j][a]);
+      }
+      FREE(gainsum[j]);
+      FREE(gainsum_numtriplets[j]);
     }
-    FREE(gainsum[j]);
-    FREE(gainsum_numtriplets[j]);
+
   }
   FREE(gainsum);
   FREE(gainsum_numtriplets);
 
-  FREE(rsum1);
-  FREE(rsum2);
-  FREE(rsum3);
-  FREE(isum1);
-  FREE(isum2);
-  FREE(isum3);
+
+  /* FREE(rsum1); */
+  /* FREE(rsum2); */
+  /* FREE(rsum3); */
+  /* FREE(isum1); */
+  /* FREE(isum2); */
+  /* FREE(isum3); */
+  /* FREE(asuma); */
 }
 
 

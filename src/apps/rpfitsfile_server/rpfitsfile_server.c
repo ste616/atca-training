@@ -1385,6 +1385,10 @@ void data_reader(int read_type, int n_rpfits_files,
     
   }
 
+  if (read_type & GRAB_MJDS_SPECTRA) {
+    FREE(mjds_cache_hit);
+  }
+
   
 }
 
