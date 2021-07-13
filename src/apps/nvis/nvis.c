@@ -1525,23 +1525,25 @@ int main(int argc, char *argv[]) {
 		       180 / M_PI);
 	    }
 	  }
-	  if (action_required & ACTION_ENACT_ACAL) {
-	    // We print out the computed noise diode amplitudes.
-	    if ((acal_modified_idx >= 0) && (acal_modified_idx < n_ampphase_options)) {
-	      modptr = NULL;
-	      for (l = 0;
-		   l < ampphase_options[acal_modified_idx]->num_modifiers[visband_idx[j]]; l++) {
-		if (ampphase_options[acal_modified_idx]->modifiers[visband_idx[j]][l]->set_noise_diode_amplitude == true) {
-		  modptr = ampphase_options[acal_modified_idx]->modifiers[visband_idx[j]][l];
-		}
+	} else if (action_required & ACTION_ENACT_ACAL) {
+	  // We print out the computed noise diode amplitudes.
+	  if ((acal_modified_idx >= 0) && (acal_modified_idx < n_ampphase_options)) {
+	    modptr = NULL;
+	    for (l = 0;
+		 l < ampphase_options[acal_modified_idx]->num_modifiers[visband_idx[j]]; l++) {
+	      if (ampphase_options[acal_modified_idx]->modifiers[visband_idx[j]][l]->set_noise_diode_amplitude == true) {
+		modptr = ampphase_options[acal_modified_idx]->modifiers[visband_idx[j]][l];
 	      }
-	      if (modptr != NULL) {
-		for (l = 1; l < modptr->noise_diode_num_antennas; l++) {
-		  snprintf(mesgout[nmesg++], VISBUFLONG,
-			   "   ANT %d: X = %.2f Y = %.2f Jy\n", l,
-			   modptr->noise_diode_amplitude[l][POL_X],
-			   modptr->noise_diode_amplitude[l][POL_Y]);
-		}
+	    }
+	    if (modptr != NULL) {
+	      snprintf(mesgout[nmesg++], VISBUFLONG, " BAND %d, MJD %.6f - %.6f:\n",
+		       visband_idx[j], modptr->noise_diode_start_mjd,
+		       modptr->noise_diode_end_mjd);
+	      for (l = 1; l < modptr->noise_diode_num_antennas; l++) {
+		snprintf(mesgout[nmesg++], VISBUFLONG,
+			 "   ANT %d: X = %.2f Y = %.2f Jy\n", l,
+			 modptr->noise_diode_amplitude[l][POL_X],
+			 modptr->noise_diode_amplitude[l][POL_Y]);
 	      }
 	    }
 	  }

@@ -852,7 +852,7 @@ void data_reader(int read_type, int n_rpfits_files,
                  struct vis_data **vis_data,
 		 struct spectrum_data ***spectrum_mjds) {
   int i, j, res, n, calcres, curr_header, idx_if, idx_pol, local_num_options;
-  int pols[4] = { POL_XX, POL_YY, POL_XY, POL_YX }, idx_return;
+  int pols[4] = { POL_XX, POL_YY, POL_XY, POL_YX }, idx_return, num_mjds_grabbed = 0;
   bool open_file, keep_reading, header_free, read_cycles, keep_cycling;
   bool cycle_free, spectrum_return, vis_cycled, cache_hit_vis_data;
   bool cache_hit_spectrum_data, nocompute, *mjds_cache_hit = NULL;
@@ -933,6 +933,7 @@ void data_reader(int read_type, int n_rpfits_files,
   if (read_type & GRAB_MJDS_SPECTRA) {
     // Are we allocating memory?
     if (*spectrum_mjds == NULL) {
+      printf(" Allocating memory for %d MJD grabs\n", num_mjds);
       CALLOC(*spectrum_mjds, num_mjds);
     }
     CALLOC(mjds_cache_hit, num_mjds);
@@ -940,6 +941,8 @@ void data_reader(int read_type, int n_rpfits_files,
     for (i = 0; i < num_mjds; i++) {
       mjds_cache_hit[i] = get_cache_spd_data(*num_options, *ampphase_options, mjds[i],
 					     half_cycle, &((*spectrum_mjds)[i]));
+      printf("  %s cache hit for MJD %.6f\n", (mjds_cache_hit[i] ? "GOT" : "NO"),
+	     mjds[i]);
     }
   }
 
@@ -975,6 +978,9 @@ void data_reader(int read_type, int n_rpfits_files,
 			 + half_cycle))) {
 	  open_file = true;
 	}
+      }
+      if (open_file) {
+	printf(" opening file %d to grab MJDS\n", i);
       }
     }
     if (read_type & COMPUTE_VIS_PRODUCTS) {
@@ -1079,6 +1085,9 @@ void data_reader(int read_type, int n_rpfits_files,
 	      read_cycles = true;
 	    }
 	  }
+	  if (read_cycles) {
+	    printf("  reading from scan header %d to grab MJDS\n", curr_header);
+	  }
 	}
         if (read_cycles && (res & READER_DATA_AVAILABLE)) {
           /* printf("[data_reader] reading cycles from this scan...\n"); */
@@ -1155,6 +1164,9 @@ void data_reader(int read_type, int n_rpfits_files,
 		    spectrum_return = true;
 		    idx_return = j;
 		  }
+		}
+		if (spectrum_return) {
+		  printf("   will return spectrum to index %d\n", idx_return);
 		}
 	      }
               if ((read_type & COMPUTE_VIS_PRODUCTS) ||
@@ -1300,6 +1312,7 @@ void data_reader(int read_type, int n_rpfits_files,
 		  if ((read_type & GRAB_MJDS_SPECTRA) &&
 		      (idx_return >= 0)) {
 		    (*spectrum_mjds)[idx_return] = temp_spectrum;
+		    num_mjds_grabbed++;
 		  }
                 } else {
                   // Free the temporary spectrum memory.
@@ -1312,7 +1325,10 @@ void data_reader(int read_type, int n_rpfits_files,
                   FREE(temp_spectrum->spectrum);
                   FREE(temp_spectrum);
                 }
-                if (!(read_type & COMPUTE_VIS_PRODUCTS)) {
+                //if (!(read_type & COMPUTE_VIS_PRODUCTS)) {
+		if (((read_type & GRAB_SPECTRUM) && !(read_type & COMPUTE_VIS_PRODUCTS)) ||
+		    ((read_type & GRAB_MJDS_SPECTRA) &&
+		     (num_mjds_grabbed == num_mjds))) {
                   // We don't need to search any more.
                   fprintf(stderr, "  NO MORE SEARCHING!\n");
                   keep_cycling = false;
@@ -2768,11 +2784,16 @@ int main(int argc, char *argv[]) {
 		  CALLOC(copied_options[i], 1);
 		  copy_ampphase_options(copied_options[i], client_options[i]);
 		}
+		printf(" Getting %d cycles:\n", n_acal_cycles);
+		for (i = 0; i < n_acal_cycles; i++) {
+		  printf("   MJD %.6f\n", acal_cycle_mjds[i]);
+		}
 		// Get the cycles.
 		data_reader(GRAB_MJDS_SPECTRA, arguments.n_rpfits_files, -1, -1, -1,
 			    n_acal_cycles, acal_cycle_mjds, &n_client_options,
 			    &client_options, info_rpfits_files,
 			    NULL, NULL, &acal_spectra);
+		printf(" Data obtained, computing parameters...\n");
 		// And compute the amplitude calibration parameters.
 		if (n_acal_fluxdensities <= 0) {
 		  acal_source =
@@ -2785,6 +2806,7 @@ int main(int argc, char *argv[]) {
 		  // We use the numbers that came along with the request.
 		  fd_spec.num_models = n_acal_fluxdensities;
 		}
+		printf(" Working with %d flux density models\n", fd_spec.num_models);
 		CALLOC(fd_spec.model_frequency, fd_spec.num_models);
 		CALLOC(fd_spec.model_frequency_tolerance, fd_spec.num_models);
 		CALLOC(fd_spec.model_num_terms, fd_spec.num_models);
@@ -2989,13 +3011,18 @@ int main(int argc, char *argv[]) {
 		  strncpy(client_response.client_id, client_request.client_id,
 			  CLIENTIDLENGTH);
 		  MALLOC(send_buffer, RPSBUFSIZE);
+		  init_cmp_memory_buffer(&cmp, &mem, send_buffer, RPSBUFSIZE);
 		  pack_responses(&cmp, &client_response);
+		  fprintf(stderr, "  response header packed\n");
 		  // Send the new options with the modifiers.
 		  pack_write_sint(&cmp, n_client_options);
-		  for (i = 0; i < n_client_options; i++) {
-		    pack_ampphase_options(&cmp, client_options[i]);
+		  fprintf(stderr, "  client option number %d packed\n", n_client_options);
+		  for (j = 0; j < n_client_options; j++) {
+		    pack_ampphase_options(&cmp, client_options[j]);
 		  }
+		  fprintf(stderr, "  all options packed\n");
 		  // Tell them which index was modified.
+		  fprintf(stderr, "  packing options index %d\n", acal_options_idx);
 		  pack_write_sint(&cmp, acal_options_idx);
 		  printf(" %s to client %s.\n",
 			 get_type_string(TYPE_RESPONSE, client_response.response_type),

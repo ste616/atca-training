@@ -474,6 +474,12 @@ void set_default_ampphase_modifiers(struct ampphase_modifiers *modifiers) {
   modifiers->phase_start_mjd = -1;
   modifiers->phase_end_mjd = -1;
   modifiers->phase = NULL;
+  modifiers->set_noise_diode_amplitude = false;
+  modifiers->noise_diode_num_antennas = 0;
+  modifiers->noise_diode_num_pols = 0;
+  modifiers->noise_diode_start_mjd = -1;
+  modifiers->noise_diode_end_mjd = -1;
+  modifiers->noise_diode_amplitude = NULL;
 }
 
 /*! \brief Add a new modifier to the list of modifiers in an options structure
@@ -2041,7 +2047,12 @@ bool ampphase_modifiers_match(struct ampphase_modifiers *a,
       (a->phase_num_antennas == b->phase_num_antennas) &&
       (a->phase_num_pols == b->phase_num_pols) &&
       (a->phase_start_mjd == b->phase_start_mjd) &&
-      (a->phase_end_mjd == b->phase_end_mjd)) {
+      (a->phase_end_mjd == b->phase_end_mjd) &&
+      (a->set_noise_diode_amplitude == b->set_noise_diode_amplitude) &&
+      (a->noise_diode_num_antennas == b->noise_diode_num_antennas) &&
+      (a->noise_diode_num_pols == b->noise_diode_num_pols) &&
+      (a->noise_diode_start_mjd == b->noise_diode_start_mjd) &&
+      (a->noise_diode_end_mjd == b->noise_diode_end_mjd)) {
     // Looks good so far, now check the delay settings.
     match = true;
     for (i = 0; i < a->delay_num_antennas; i++) {
@@ -2059,6 +2070,18 @@ bool ampphase_modifiers_match(struct ampphase_modifiers *a,
     for (i = 0; i < a->phase_num_antennas; i++) {
       for (j = 0; j < b->phase_num_pols; j++) {
 	if (a->phase[i][j] != b->phase[i][j]) {
+	  match = false;
+	  break;
+	}
+      }
+      if (!match) {
+	break;
+      }
+    }
+    // And check the noise diode settings.
+    for (i = 0; i < a->noise_diode_num_antennas; i++) {
+      for (j = 0; j < b->noise_diode_num_pols; j++) {
+	if (a->noise_diode_amplitude[i][j] != b->noise_diode_amplitude[i][j]) {
 	  match = false;
 	  break;
 	}

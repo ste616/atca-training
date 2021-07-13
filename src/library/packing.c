@@ -447,6 +447,14 @@ void pack_ampphase_modifiers(cmp_ctx_t *cmp, struct ampphase_modifiers *a) {
   for (i = 0; i < a->phase_num_antennas; i++) {
     pack_writearray_float(cmp, a->phase_num_pols, a->phase[i]);
   }
+  pack_write_bool(cmp, a->set_noise_diode_amplitude);
+  pack_write_sint(cmp, a->noise_diode_num_antennas);
+  pack_write_sint(cmp, a->noise_diode_num_pols);
+  pack_write_double(cmp, a->noise_diode_start_mjd);
+  pack_write_double(cmp, a->noise_diode_end_mjd);
+  for (i = 0; i < a->noise_diode_num_antennas; i++) {
+    pack_writearray_float(cmp, a->noise_diode_num_pols, a->noise_diode_amplitude[i]);
+  }
 }
 
 /*!
@@ -490,6 +498,22 @@ void unpack_ampphase_modifiers(cmp_ctx_t *cmp, struct ampphase_modifiers *a) {
     }
   } else {
     a->phase = NULL;
+  }
+  pack_read_bool(cmp, &(a->set_noise_diode_amplitude));
+  pack_read_sint(cmp, &(a->noise_diode_num_antennas));
+  pack_read_sint(cmp, &(a->noise_diode_num_pols));
+  pack_read_double(cmp, &(a->noise_diode_start_mjd));
+  pack_read_double(cmp, &(a->noise_diode_end_mjd));
+  if (a->noise_diode_num_antennas > 0) {
+    CALLOC(a->noise_diode_amplitude, a->noise_diode_num_antennas);
+    if (a->noise_diode_num_pols > 0) {
+      for (i = 0; i < a->noise_diode_num_antennas; i++) {
+	CALLOC(a->noise_diode_amplitude[i], a->noise_diode_num_pols);
+	pack_readarray_float(cmp, a->noise_diode_num_pols, a->noise_diode_amplitude[i]);
+      }
+    }
+  } else {
+    a->noise_diode_amplitude = NULL;
   }
 }
 
