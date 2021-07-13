@@ -3010,14 +3010,15 @@ int main(int argc, char *argv[]) {
 		  client_response.response_type = RESPONSE_ACAL_COMPUTED;
 		  strncpy(client_response.client_id, client_request.client_id,
 			  CLIENTIDLENGTH);
-		  MALLOC(send_buffer, RPSBUFSIZE);
-		  init_cmp_memory_buffer(&cmp, &mem, send_buffer, RPSBUFSIZE);
+		  MALLOC(send_buffer, RPSENDBUFSIZE);
+		  init_cmp_memory_buffer(&cmp, &mem, send_buffer, RPSENDBUFSIZE);
 		  pack_responses(&cmp, &client_response);
 		  fprintf(stderr, "  response header packed\n");
 		  // Send the new options with the modifiers.
 		  pack_write_sint(&cmp, n_client_options);
 		  fprintf(stderr, "  client option number %d packed\n", n_client_options);
 		  for (j = 0; j < n_client_options; j++) {
+		    fprintf(stderr, "   ... %d\n", j);
 		    pack_ampphase_options(&cmp, client_options[j]);
 		  }
 		  fprintf(stderr, "  all options packed\n");

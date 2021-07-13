@@ -3584,7 +3584,7 @@ void compute_noise_diode_amplitudes(struct fluxdensity_specification *fluxdensit
   int i, j, k, a, b, c, ant_label, polidx[POL_YY + 1], winidx = -1;
   int bnt_label, cnt_label, x1, y1, x2, y2, x3, y3, a1, a2, nbins1, nbins2, nbins3;
   int *gains_nbins = NULL, nbinsa, nfreqmatch = 0, maxfreqmatch = 0, freqmatchidx;
-  int ***gainsum_numtriplets = NULL, nbins_gainsum = 0;
+  int ***gainsum_numtriplets = NULL, nbins_gainsum = 0, opol = -1;
   bool aons, bons, cons;
   float *rsum1, *rsum2, *rsum3, *isum1, *isum2, *isum3, **gains = NULL, *asuma;
   float nd_amp, src_fd, ***gainsum = NULL;
@@ -3634,6 +3634,7 @@ void compute_noise_diode_amplitudes(struct fluxdensity_specification *fluxdensit
     for (j = 0; j < cycle_spectra[0]->num_pols; j++) {
       if (cycle_spectra[0]->spectrum[winidx][j]->pol == i) {
 	polidx[i] = j;
+	break;
       }
     }
   }
@@ -3676,6 +3677,14 @@ void compute_noise_diode_amplitudes(struct fluxdensity_specification *fluxdensit
   CALLOC(gainsum, num_cycles);
   CALLOC(gainsum_numtriplets, num_cycles);
   for (i = POL_XX; i <= POL_YY; i++) {
+    switch (i) {
+    case POL_XX:
+      opol = POL_X;
+      break;
+    case POL_YY:
+      opol = POL_Y;
+      break;
+    }
     // We have to find the noise diode amplitude per antenna, so it is
     // most sensible to loop over the antennas here, and do the same
     // procedure for each.
@@ -3695,8 +3704,8 @@ void compute_noise_diode_amplitudes(struct fluxdensity_specification *fluxdensit
       }
       if (!aons) {
 	// Mark this antenna as off-source in the modifier.
-	(*noise_diode_modifier)->noise_diode_amplitude[ant_label][POL_X] =
-	  (*noise_diode_modifier)->noise_diode_amplitude[ant_label][POL_Y] = -1.0;
+	(*noise_diode_modifier)->noise_diode_amplitude[ant_label][opol] = -1.0;
+	//  (*noise_diode_modifier)->noise_diode_amplitude[ant_label][POL_Y] = -1.0;
 	continue;
       }
       // Now determine all the gain triplets that can be made with this
@@ -3813,7 +3822,7 @@ void compute_noise_diode_amplitudes(struct fluxdensity_specification *fluxdensit
     for (j = 0; j < num_cycles; j++) {
       for (a = 0; a < cycle_spectra[0]->header_data->num_ants; a++) {
 	for (k = 0; k < nbins_gainsum; k++) {
-	  (*noise_diode_modifier)->noise_diode_amplitude[a + 1][polidx[i]] +=
+	  (*noise_diode_modifier)->noise_diode_amplitude[a + 1][opol] +=
 	    gainsum[j][a][k] / (gainsum_numtriplets[j][a][k] * nbins_gainsum);
 	}
       }
