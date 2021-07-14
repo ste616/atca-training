@@ -1979,7 +1979,7 @@ int main(int argc, char *argv[]) {
 	// The server tells us which of the options was modified.
 	pack_read_sint(&cmp, &acal_modified_idx);
 	// Output and use these new modifiers.
-	action_required = ACTION_ENACT_ACAL;
+	action_required = ACTION_ENACT_ACAL | ACTION_NEW_DATA_RECEIVED;
       }
       FREE(recv_buffer);
     }
