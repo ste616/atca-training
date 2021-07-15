@@ -3069,7 +3069,7 @@ int determine_filetype(char *f) {
  *  \param a actual filename, which upon exit will contain the actual file that
  *           will be created; this differs from f only if f doesn't contain the
  *           appropriate extension
- *  \param al the maximum length that will fit in \a l
+ *  \param al the maximum length that will fit in \a a
  *  \return the file type that will be made from \a d
  */
 int filename_to_pgplot_device(char *f, char *d, size_t l, int type, char *a, size_t al) {

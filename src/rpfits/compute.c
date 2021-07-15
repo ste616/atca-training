@@ -2158,9 +2158,11 @@ void calculate_system_temperatures_cycle_data(struct cycle_data *cycle_data,
   int reqpol[2], polnum, vidx;
   float ****tp_on_array = NULL, ****tp_off_array = NULL;
   float nhalfchan, chanwidth, rcheck, med_tp_on, med_tp_off, tp_on, tp_off;
-  float fs, fd, dx;
-  bool computed_tsys_applied = false, needs_new_options = false;
+  float fs, fd, dx, caljy_x, caljy_y;
+  double cycle_mjd;
+  bool computed_tsys_applied = false, needs_new_options = false, acal_override = false;
   struct ampphase_options *band_options = NULL;
+  struct ampphase_modifiers *use_modifier = NULL;
   // Recalculate the system temperature from the data within the
   // specified tvchannel range, and with different options.
 
@@ -2303,12 +2305,40 @@ void calculate_system_temperatures_cycle_data(struct cycle_data *cycle_data,
     system_temperature_modifier(STM_REMOVE, cycle_data, scan_header_data);
   }
 
+  cycle_mjd = date2mjd(scan_header_data->obsdate, cycle_data->ut_seconds);
+
   // Now we're free to actually do the system temperature computations.
+  acal_override = false;
   for (i = 0; i < cycle_data->num_cal_ifs; i++) {
     ifno = cycle_data->cal_ifs[i];
     // The cal_ifs array is not necessarily in ascending IF order.
     ifsidx = ifno - 1;
+
+    // Go through the modifier list and see if we're supposed to be using a
+    // different noise diode amplitude than what was used online.
+    use_modifier = NULL;
+    for (j = 0; j < band_options->num_modifiers[ifno]; j++) {
+      if ((band_options->modifiers[ifno][j]->set_noise_diode_amplitude == true) &&
+	  (band_options->modifiers[ifno][j]->noise_diode_start_mjd <= cycle_mjd) &&
+	  (band_options->modifiers[ifno][j]->noise_diode_end_mjd >= cycle_mjd)) {
+	use_modifier = band_options->modifiers[ifno][j];
+	// We don't break, and we always use the latest modifier in the list that
+	// matches.
+      }
+    }
+    
     for (j = 0; j < cycle_data->num_cal_ants; j++) {
+      if (use_modifier == NULL) {
+	// We use the online value for the noise diode amplitude.
+	caljy_x = cycle_data->caljy_x[ifsidx][j];
+	caljy_y = cycle_data->caljy_y[ifsidx][j];
+      } else {
+	caljy_x = use_modifier->noise_diode_amplitude[ifno][POL_X];
+	caljy_y = use_modifier->noise_diode_amplitude[ifno][POL_Y];
+	// We also need to ensure we adjust the system temperature.
+	acal_override = true;
+      }
+      
       for (k = CAL_XX; k <= CAL_YY; k++) {
 	if (band_options->averaging_method[ifno] & AVERAGETYPE_MEDIAN) {
 	  qsort(tp_on_array[j][ifsidx][k], n_tp_on_array[j][ifsidx][k], sizeof(float),
@@ -2327,16 +2357,19 @@ void calculate_system_temperatures_cycle_data(struct cycle_data *cycle_data,
 	}
 	dx = 99.995 * 99.995;
 	if (fd > (0.01 * fs)) {
-	  if ((k == CAL_XX) && (cycle_data->caljy_x[ifsidx][j] > 0)) {
-	    dx = (fs / fd) * cycle_data->caljy_x[ifsidx][j];
-	  } else if ((k == CAL_YY) && (cycle_data->caljy_y[ifsidx][j] > 0)) {
-	    dx = (fs / fd) * cycle_data->caljy_y[ifsidx][j];
+	  if ((k == CAL_XX) && (caljy_x > 0)) {//(cycle_data->caljy_x[ifsidx][j] > 0)) {
+	    //dx = (fs / fd) * cycle_data->caljy_x[ifsidx][j];
+	    dx = (fs / fd) * caljy_x;
+	  } else if ((k == CAL_YY) && (caljy_y > 0)) {//(cycle_data->caljy_y[ifsidx][j] > 0)) {
+	    //dx = (fs / fd) * cycle_data->caljy_y[ifsidx][j];
+	    dx = (fs / fd) * caljy_y;
 	  }
 	}
 	// Fill in the Tsys.
 	cycle_data->computed_tsys[i][j][k] = sqrtf(dx);
       }
     }
+
   }
 
   // If upon entry the computed Tsys was applied to the data, we now reapply the newly
@@ -2346,8 +2379,8 @@ void calculate_system_temperatures_cycle_data(struct cycle_data *cycle_data,
   }
 
   // Work out from the options what to do about correcting the visibilities.
-  if (band_options->systemp_reverse_online) {
-    if (band_options->systemp_apply_computed) {
+  if (band_options->systemp_reverse_online || acal_override) {
+    if (band_options->systemp_apply_computed || acal_override) {
       // Apply the computed Tsys.
       system_temperature_modifier(STM_APPLY_COMPUTED, cycle_data, scan_header_data);
     } else {
@@ -3584,10 +3617,12 @@ void compute_noise_diode_amplitudes(struct fluxdensity_specification *fluxdensit
   int i, j, k, a, b, c, ant_label, polidx[POL_YY + 1], winidx = -1;
   int bnt_label, cnt_label, x1, y1, x2, y2, x3, y3, a1, a2, nbins1, nbins2, nbins3;
   int *gains_nbins = NULL, nbinsa, nfreqmatch = 0, maxfreqmatch = 0, freqmatchidx;
-  int ***gainsum_numtriplets = NULL, nbins_gainsum = 0, opol = -1;
+  int **gainsum_numtriplets = NULL, nbins_gainsum = 0, opol = -1, nbinst = 0, nbinsta = 0;
   bool aons, bons, cons;
   float *rsum1, *rsum2, *rsum3, *isum1, *isum2, *isum3, **gains = NULL, *asuma;
-  float nd_amp, src_fd, ***gainsum = NULL;
+  float nd_amp, src_fd, **gainsum = NULL;
+  float *trsum1 = NULL, *tisum1 = NULL, *trsum2 = NULL, *tisum2 = NULL;
+  float *trsum3 = NULL, *tisum3 = NULL, *tasuma = NULL;
   double cmjd;
 
   // Figure out the IF index.
@@ -3672,10 +3707,11 @@ void compute_noise_diode_amplitudes(struct fluxdensity_specification *fluxdensit
     (*noise_diode_modifier)->set_noise_diode_amplitude = false;
     return;
   }
+
+  fprintf(stderr, "  DEBUG: assuming source flux density of %.3f Jy in window %d\n",
+	  fluxdensity_models->model_terms[freqmatchidx][0], window);
   
   // Loop over the polarisations.
-  CALLOC(gainsum, num_cycles);
-  CALLOC(gainsum_numtriplets, num_cycles);
   for (i = POL_XX; i <= POL_YY; i++) {
     switch (i) {
     case POL_XX:
@@ -3689,10 +3725,8 @@ void compute_noise_diode_amplitudes(struct fluxdensity_specification *fluxdensit
     // most sensible to loop over the antennas here, and do the same
     // procedure for each.
     CALLOC(gains, cycle_spectra[0]->header_data->num_ants);
-    for (j = 0; j < num_cycles; j++) {
-      CALLOC(gainsum[j], cycle_spectra[0]->header_data->num_ants);
-      CALLOC(gainsum_numtriplets[j], cycle_spectra[0]->header_data->num_ants);
-    }
+    CALLOC(gainsum, cycle_spectra[0]->header_data->num_ants);
+    CALLOC(gainsum_numtriplets, cycle_spectra[0]->header_data->num_ants);
     CALLOC(gains_nbins, cycle_spectra[0]->header_data->num_ants);
     for (a = 0; a < cycle_spectra[0]->header_data->num_ants; a++) {
       ant_label = cycle_spectra[0]->header_data->ant_label[a];
@@ -3781,32 +3815,34 @@ void compute_noise_diode_amplitudes(struct fluxdensity_specification *fluxdensit
 		      }
 		    }
 		    if ((nbins1 == nbins2) && (nbins1 == nbins3)) {
-		      nbins_gainsum = nbins1;
-		      CALLOC(gains[ant_label - 1], nbins1);
-		      if (gainsum[j][ant_label - 1] == NULL) {
-			CALLOC(gainsum[j][ant_label - 1], nbins1);
-			CALLOC(gainsum_numtriplets[j][ant_label - 1], nbins1);
+		      if (nbinst == 0) {
+			nbinst = nbins1;
+			CALLOC(trsum1, nbinst);
+			CALLOC(tisum1, nbinst);
+			CALLOC(trsum2, nbinst);
+			CALLOC(tisum2, nbinst);
+			CALLOC(trsum3, nbinst);
+			CALLOC(tisum3, nbinst);
 		      }
-		      for (k = 0; k < nbins1; k++) {
-			gains[ant_label - 1][k] = sqrtf((rsum1[k] * rsum1[k] + isum1[k] * isum1[k]) *
-							(rsum2[k] * rsum2[k] + isum2[k] * isum2[k]) /
-							(rsum3[k] * rsum3[k] + isum3[k] * isum3[k]));
+		      if (nbinsta == 0) {
+			nbinsta = nbinsa;
+			CALLOC(tasuma, nbinsta);
 		      }
-		      if (nbinsa == 2) {
-			// We need the autos to have the niose diode on-off bins.
-			nd_amp = asuma[1] - asuma[0];
-		      } else {
-			nd_amp = 0;
+		      if (nbins1 == nbinst) {
+			for (k = 0; k < nbinst; k++) {
+			  trsum1[k] += rsum1[k];
+			  tisum1[k] += isum1[k];
+			  trsum2[k] += rsum2[k];
+			  tisum2[k] += isum2[k];
+			  trsum3[k] += rsum3[k];
+			  tisum3[k] += isum3[k];
+			}
 		      }
-		      // In the CABB method, the flux density of the source is just the
-		      // first term of the model.
-		      src_fd = fluxdensity_models->model_terms[freqmatchidx][0];
-		      // Now calculate the noise diode strength in Jy.
-		      for (k = 0; k < nbins1; k++) {
-			gainsum[j][ant_label - 1][k] += (src_fd * nd_amp) / gains[ant_label - 1][k];
-			gainsum_numtriplets[j][ant_label - 1][k] += 1;
+		      if (nbinsa == nbinsta) {
+			for (k = 0; k < nbinsta; k++) {
+			  tasuma[k] += asuma[k];
+			}
 		      }
-		      FREE(gains[ant_label - 1]);
 		    }
 		    FREE(rsum1);
 		    FREE(isum1);
@@ -3815,6 +3851,45 @@ void compute_noise_diode_amplitudes(struct fluxdensity_specification *fluxdensit
 		    FREE(rsum3);
 		    FREE(isum3);
 		    FREE(asuma);
+		  }
+		  //if ((nbins1 == nbins2) && (nbins1 == nbins3)) {
+		  if ((nbinst > 0) && (nbinsta > 1)) {
+		    nbins_gainsum = nbinst;
+		    CALLOC(gains[ant_label - 1], nbinst);
+		    if (gainsum[ant_label - 1] == NULL) {
+		      CALLOC(gainsum[ant_label - 1], nbinst);
+		      CALLOC(gainsum_numtriplets[ant_label - 1], nbinst);
+		    }
+		    for (k = 0; k < nbinst; k++) {
+		      gains[ant_label - 1][k] =
+			sqrtf((trsum1[k] * trsum1[k] + tisum1[k] * tisum1[k]) *
+			      (trsum2[k] * trsum2[k] + tisum2[k] * tisum2[k]) /
+			      (trsum3[k] * trsum3[k] + tisum3[k] * tisum3[k]));
+		      /* fprintf(stderr, "ACAL: for ant %d bin %d, triplet %d-%d * %d-%d / %d-%d = root(%.3f * %.3f / %.3f) = %.3f\n", */
+		      /* 	      ant_label, k, x1, y1, x2, y2, x3, y3, */
+		      /* 	      (trsum1[k] * trsum1[k] + tisum1[k] * tisum1[k]), */
+		      /* 	      (trsum2[k] * trsum2[k] + tisum2[k] * tisum2[k]), */
+		      /* 	      (trsum3[k] * trsum3[k] + tisum3[k] * tisum3[k]), */
+		      /* 	      gains[ant_label - 1][k]); */
+		    }
+		    if (nbinsta == 2) {
+		      // We need the autos to have the niose diode on-off bins.
+		      nd_amp = tasuma[1] - tasuma[0];
+		    } else {
+		      nd_amp = 0;
+		    }
+		    // In the CABB method, the flux density of the source is just the
+		    // first term of the model.
+		    src_fd = fluxdensity_models->model_terms[freqmatchidx][0];
+		    // Now calculate the noise diode strength in Jy.
+		    for (k = 0; k < nbinst; k++) {
+		      gainsum[ant_label - 1][k] += (src_fd * nd_amp) / gains[ant_label - 1][k];
+		      gainsum_numtriplets[ant_label - 1][k] += 1;
+		      /* fprintf(stderr, "ACAL: gain sum ant %d bin %d, now %.3f N = %d\n", */
+		      /* 	      ant_label, k, gainsum[ant_label - 1][k], */
+		      /* 	      gainsum_numtriplets[ant_label - 1][k]); */
+		    }
+		    FREE(gains[ant_label - 1]);
 		  }
 		}
 	      }
@@ -3826,30 +3901,24 @@ void compute_noise_diode_amplitudes(struct fluxdensity_specification *fluxdensit
     // At this point, we have an array with all the antennas and all the cycles
     // filled in with the noise diode strengths. Calculate the average noise
     // diode strength.
-    for (j = 0; j < num_cycles; j++) {
-      for (a = 0; a < cycle_spectra[0]->header_data->num_ants; a++) {
-	for (k = 0; k < nbins_gainsum; k++) {
-	  (*noise_diode_modifier)->noise_diode_amplitude[a + 1][opol] +=
-	    gainsum[j][a][k] / (gainsum_numtriplets[j][a][k] * nbins_gainsum);
-	}
+    for (a = 0; a < cycle_spectra[0]->header_data->num_ants; a++) {
+      for (k = 0; k < nbins_gainsum; k++) {
+	(*noise_diode_modifier)->noise_diode_amplitude[a + 1][opol] +=
+	  gainsum[a][k] / (float)(gainsum_numtriplets[a][k] * nbins_gainsum);
       }
     }
     
     FREE(gains);
     FREE(gains_nbins);
 
-    for (j = 0; j < num_cycles; j++) {
-      for (a = 0; a < cycle_spectra[0]->header_data->num_ants; a++) {
-	FREE(gainsum[j][a]);
-	FREE(gainsum_numtriplets[j][a]);
-      }
-      FREE(gainsum[j]);
-      FREE(gainsum_numtriplets[j]);
+    for (a = 0; a < cycle_spectra[0]->header_data->num_ants; a++) {
+      FREE(gainsum[a]);
+      FREE(gainsum_numtriplets[a]);
     }
+    FREE(gainsum);
+    FREE(gainsum_numtriplets);
 
   }
-  FREE(gainsum);
-  FREE(gainsum_numtriplets);
 
 
   /* FREE(rsum1); */
