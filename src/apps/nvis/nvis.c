@@ -273,6 +273,8 @@ int char_to_product(char pstring) {
     return VIS_PLOTPANEL_DELAY;
   case 'D':
     return VIS_PLOTPANEL_WINDDIR;
+  case 'g':
+    return VIS_PLOTPANEL_GTP_COMPUTED;
   case 'G':
     return VIS_PLOTPANEL_GTP;
   case 'h':
@@ -283,7 +285,9 @@ int char_to_product(char pstring) {
     return VIS_PLOTPANEL_SIDEREALTIME;
   case 'n':
     return VIS_PLOTPANEL_CALJY;
-  case 'N':
+  case 'o':
+    return VIS_PLOTPANEL_SDO_COMPUTED;
+  case 'O':
     return VIS_PLOTPANEL_SDO;
   case 'p':
     return VIS_PLOTPANEL_PHASE;
@@ -628,14 +632,20 @@ static void interpret_command(char *line) {
         } else if (minmatch("seemonrms", line_els[1], 7) ||
 		   (strcmp(line_els[1], "Y") == 0)) {
           change_panel = VIS_PLOTPANEL_SEEMONRMS;
-        } else if (minmatch("computed_systemp", line_els[1], 4) ||
+        } else if (minmatch("computed_systemp", line_els[1], 10) ||
 		   (strcmp(line_els[1], "C") == 0)) {
           change_panel = VIS_PLOTPANEL_SYSTEMP_COMPUTED;
+	} else if (minmatch("computed_gtp", line_els[1], 10) ||
+		   (strcmp(line_els[1], "g") == 0)) {
+	  change_panel = VIS_PLOTPANEL_GTP_COMPUTED;
         } else if (minmatch("gtp", line_els[1], 3) ||
 		   (strcmp(line_els[1], "G") == 0)) {
           change_panel = VIS_PLOTPANEL_GTP;
+	} else if (minmatch("computed_sdo", line_els[1], 10) ||
+		   (strcmp(line_els[1], "o") == 0)) {
+	  change_panel = VIS_PLOTPANEL_SDO_COMPUTED;
         } else if (minmatch("sdo", line_els[1], 3) ||
-		   (strcmp(line_els[1], "N") == 0)) {
+		   (strcmp(line_els[1], "O") == 0)) {
           change_panel = VIS_PLOTPANEL_SDO;
         } else if (minmatch("caljy", line_els[1], 3) ||
 		   (strcmp(line_els[1], "n") == 0)) {

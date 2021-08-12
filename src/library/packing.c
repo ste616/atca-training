@@ -1391,6 +1391,8 @@ void pack_syscal_data(cmp_ctx_t *cmp, struct syscal_data *a) {
       for (j = 0; j < a->num_ifs; j++) {
         pack_writearray_float(cmp, a->num_pols, a->gtp[i][j]);
         pack_writearray_float(cmp, a->num_pols, a->sdo[i][j]);
+        pack_writearray_float(cmp, a->num_pols, a->computed_gtp[i][j]);
+        pack_writearray_float(cmp, a->num_pols, a->computed_sdo[i][j]);
         pack_writearray_float(cmp, a->num_pols, a->caljy[i][j]);
       }
     }
@@ -1483,16 +1485,24 @@ void unpack_syscal_data(cmp_ctx_t *cmp, struct syscal_data *a) {
   if ((a->num_ifs > 0) && (a->num_pols > 0)) {
     MALLOC(a->gtp, a->num_ants);
     MALLOC(a->sdo, a->num_ants);
+    MALLOC(a->computed_gtp, a->num_ants);
+    MALLOC(a->computed_sdo, a->num_ants);
     MALLOC(a->caljy, a->num_ants);
     for (i = 0; i < a->num_ants; i++) {
       MALLOC(a->gtp[i], a->num_ifs);
       MALLOC(a->sdo[i], a->num_ifs);
+      MALLOC(a->computed_gtp[i], a->num_ifs);
+      MALLOC(a->computed_sdo[i], a->num_ifs);
       MALLOC(a->caljy[i], a->num_ifs);
       for (j = 0; j < a->num_ifs; j++) {
         MALLOC(a->gtp[i][j], a->num_pols);
         pack_readarray_float(cmp, a->num_pols, a->gtp[i][j]);
         MALLOC(a->sdo[i][j], a->num_pols);
         pack_readarray_float(cmp, a->num_pols, a->sdo[i][j]);
+        MALLOC(a->computed_gtp[i][j], a->num_pols);
+        pack_readarray_float(cmp, a->num_pols, a->computed_gtp[i][j]);
+        MALLOC(a->computed_sdo[i][j], a->num_pols);
+        pack_readarray_float(cmp, a->num_pols, a->computed_sdo[i][j]);
         MALLOC(a->caljy[i][j], a->num_pols);
         pack_readarray_float(cmp, a->num_pols, a->caljy[i][j]);
       }
@@ -1500,6 +1510,8 @@ void unpack_syscal_data(cmp_ctx_t *cmp, struct syscal_data *a) {
   } else {
     a->gtp = NULL;
     a->sdo = NULL;
+    a->computed_gtp = NULL;
+    a->computed_sdo = NULL;
     a->caljy = NULL;
   }
   

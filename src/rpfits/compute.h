@@ -608,6 +608,22 @@ struct syscal_data {
    * second index and `num_pols` for the third index. Each index starts at 0.
    */
   float ***sdo;
+  /*! \var computed_gtp
+   *  \brief The gated total power as computed by this software for each antenna,
+   *         window and polarisation, in Jy
+   *
+   * This 3-D array has length `num_ants` for the first index, `num_ifs` for the
+   * second index and `num_pols` for the third index. Each index starts at 0.
+   */
+  float ***computed_gtp;
+  /*! \var computed_sdo
+   *  \brief The synchronously demodulated output as computed by this software
+   *         for each antenna, window and polarisation, in Jy
+   *
+   * This 3-D array has length `num_ants` for the first index, `num_ifs` for the
+   * second index and `num_pols` for the third index. Each index starts at 0.
+   */
+  float ***computed_sdo;
   /*! \var caljy
    *  \brief The flux density of the switching noise source on each antenna, window
    *         and polarisation

@@ -673,6 +673,28 @@ struct cycle_data {
    * `cal_ants` respectively.
    */
   float **gtp_y;
+  /*! \var computed_gtp_x
+   *  \brief The gated total power (GTP) observed during this cycle for the X pol, for each IF 
+   *         and antenna combination, as computed by this software
+   *
+   * This array has length `num_cal_ifs` * `num_cal_ants`. The first index is over the IFs,
+   * and the second index is over the antennas. Each array index starts at 0.
+   *
+   * The order of the IF and antenna indices is the same as for the arrays `cal_ifs` and
+   * `cal_ants` respectively.
+   */
+  float **computed_gtp_x;
+  /*! \var computed_gtp_y
+   *  \brief The gated total power (GTP) observed during this cycle for the Y pol, for each IF 
+   *         and antenna combination, as computed by this software
+   *
+   * This array has length `num_cal_ifs` * `num_cal_ants`. The first index is over the IFs,
+   * and the second index is over the antennas. Each array index starts at 0.
+   *
+   * The order of the IF and antenna indices is the same as for the arrays `cal_ifs` and
+   * `cal_ants` respectively.
+   */
+  float **computed_gtp_y;
   /*! \var sdo_x
    *  \brief The synchronously-demodulated output (SDO) observed during this cycle for the
    *         X pol, for each IF and antenna combination
@@ -695,6 +717,28 @@ struct cycle_data {
    * `cal_ants` respectively.
    */
   float **sdo_y;
+  /*! \var computed_sdo_x
+   *  \brief The synchronously-demodulated output (SDO) observed during this cycle for the
+   *         X pol, for each IF and antenna combination, as computed by this software
+   *
+   * This array has length `num_cal_ifs` * `num_cal_ants`. The first index is over the IFs,
+   * and the second index is over the antennas. Each array index starts at 0.
+   *
+   * The order of the IF and antenna indices is the same as for the arrays `cal_ifs` and
+   * `cal_ants` respectively.
+   */
+  float **computed_sdo_x;
+  /*! \var computed_sdo_y
+   *  \brief The synchronously-demodulated output (SDO) observed during this cycle for the
+   *         Y pol, for each IF and antenna combination, as computed by this software
+   *
+   * This array has length `num_cal_ifs` * `num_cal_ants`. The first index is over the IFs,
+   * and the second index is over the antennas. Each array index starts at 0.
+   *
+   * The order of the IF and antenna indices is the same as for the arrays `cal_ifs` and
+   * `cal_ants` respectively.
+   */
+  float **computed_sdo_y;
   /*! \var caljy_x
    *  \brief The noise diode signal level assumed by the correlator during this cycle for the
    *         X pol, for each IF and antenna combination, in Jy
@@ -717,6 +761,28 @@ struct cycle_data {
    * `cal_ants` respectively.
    */
   float **caljy_y;
+  /*! \var used_caljy_x
+   *  \brief The noise diode signal level assumed by this software during this cycle for the
+   *         X pol, for each IF and antenna combination, in Jy
+   *
+   * This array has length `num_cal_ifs` * `num_cal_ants`. The first index is over the IFs,
+   * and the second index is over the antennas. Each array index starts at 0.
+   *
+   * The order of the IF and antenna indices is the same as for the arrays `cal_ifs` and
+   * `cal_ants` respectively.
+   */
+  float **used_caljy_x;
+  /*! \var used_caljy_y
+   *  \brief The noise diode signal level assumed by this software during this cycle for the
+   *         Y pol, for each IF and antenna combination, in Jy
+   *
+   * This array has length `num_cal_ifs` * `num_cal_ants`. The first index is over the IFs,
+   * and the second index is over the antennas. Each array index starts at 0.
+   *
+   * The order of the IF and antenna indices is the same as for the arrays `cal_ifs` and
+   * `cal_ants` respectively.
+   */
+  float **used_caljy_y;
   /*! \var flagging
    *  \brief An indication of whether this cycle was flagged as bad by the correlator,
    *         for each IF and antenna combination; the flagging indicators are explained

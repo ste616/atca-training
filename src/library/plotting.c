@@ -267,7 +267,7 @@ void change_vis_plotcontrols_limits(struct vis_plotcontrols *plotcontrols,
   }
 }
 
-#define NAVAILABLE_PANELS 21
+#define NAVAILABLE_PANELS 23
 const int available_panels[NAVAILABLE_PANELS] = { VIS_PLOTPANEL_AMPLITUDE,
                                                   VIS_PLOTPANEL_PHASE,
                                                   VIS_PLOTPANEL_DELAY,
@@ -288,7 +288,9 @@ const int available_panels[NAVAILABLE_PANELS] = { VIS_PLOTPANEL_AMPLITUDE,
 						  VIS_PLOTPANEL_HOURANGLE,
 						  VIS_PLOTPANEL_RIGHTASCENSION,
 						  VIS_PLOTPANEL_DECLINATION,
-						  VIS_PLOTPANEL_SIDEREALTIME };
+						  VIS_PLOTPANEL_SIDEREALTIME,
+						  VIS_PLOTPANEL_GTP_COMPUTED,
+						  VIS_PLOTPANEL_SDO_COMPUTED };
 
 bool product_can_be_x(int product) {
   switch (product) {
@@ -1581,6 +1583,8 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
                (plot_controls->panel_type[i] == VIS_PLOTPANEL_SYSTEMP_COMPUTED) ||
                (plot_controls->panel_type[i] == VIS_PLOTPANEL_GTP) ||
                (plot_controls->panel_type[i] == VIS_PLOTPANEL_SDO) ||
+	       (plot_controls->panel_type[i] == VIS_PLOTPANEL_GTP_COMPUTED) ||
+	       (plot_controls->panel_type[i] == VIS_PLOTPANEL_SDO_COMPUTED) ||
                (plot_controls->panel_type[i] == VIS_PLOTPANEL_CALJY)) {
       // Make a metadata plot that only has antenna-based lines.
       panel_n_vis_lines[i] = n_tsys_vis_lines;
@@ -1680,9 +1684,15 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
                 } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_GTP) {
                   plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
                     syscal_data[k]->gtp[sysantidx][sysifidx][syspolidx];
+		} else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_GTP_COMPUTED) {
+		  plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
+		    syscal_data[k]->computed_gtp[sysantidx][sysifidx][syspolidx];
                 } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_SDO) {
                   plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
                     syscal_data[k]->sdo[sysantidx][sysifidx][syspolidx];
+		} else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_SDO_COMPUTED) {
+		  plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
+		    syscal_data[k]->computed_sdo[sysantidx][sysifidx][syspolidx];
                 } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_CALJY) {
                   plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
                     syscal_data[k]->caljy[sysantidx][sysifidx][syspolidx];
@@ -2022,8 +2032,14 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
     } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_GTP) {
       (void)strcpy(panellabel, "GTP");
       (void)strcpy(panelunits, "");
+    } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_GTP_COMPUTED) {
+      (void)strcpy(panellabel, "Comp. GTP");
+      (void)strcpy(panelunits, "");
     } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_SDO) {
       (void)strcpy(panellabel, "SDO");
+      (void)strcpy(panelunits, "");
+    } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_SDO_COMPUTED) {
+      (void)strcpy(panellabel, "Comp. SDO");
       (void)strcpy(panelunits, "");
     } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_CALJY) {
       (void)strcpy(panellabel, "Noise Cal.");
