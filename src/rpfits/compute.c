@@ -2249,7 +2249,8 @@ void calculate_system_temperatures_cycle_data(struct cycle_data *cycle_data,
   float nhalfchan, chanwidth, rcheck, med_tp_on, med_tp_off, tp_on, tp_off;
   float fs, fd, dx, caljy_x, caljy_y;
   double cycle_mjd;
-  bool computed_tsys_applied = false, needs_new_options = false, acal_override = false;
+  //bool computed_tsys_applied = false;
+  bool needs_new_options = false, acal_override = false;
   struct ampphase_options *band_options = NULL;
   struct ampphase_modifiers *use_modifier = NULL;
   // Recalculate the system temperature from the data within the
@@ -2297,7 +2298,8 @@ void calculate_system_temperatures_cycle_data(struct cycle_data *cycle_data,
 
   /* printf("[calculate_system_temperatures_cycle_data] after creating new options\n"); */
   /* print_options_set(*num_options, *options); */
-
+  // The GTP and SDO can only be properly computed with the raw correlation
+  // coefficients.
   system_temperature_modifier(STM_REMOVE, cycle_data, scan_header_data);
   
   for (i = 0; i < cycle_data->num_points; i++) {
@@ -2390,11 +2392,11 @@ void calculate_system_temperatures_cycle_data(struct cycle_data *cycle_data,
   // overwriting the computed Tsys numbers, we have to first reverse the application
   // otherwise we'll have no way to reverse them later.
   // We make only a simple check for this.
-  if ((cycle_data->computed_tsys_applied != NULL) &&
-      (cycle_data->computed_tsys_applied[0][0][0] == SYSCAL_TSYS_APPLIED)) {
-    computed_tsys_applied = true;
-    system_temperature_modifier(STM_REMOVE, cycle_data, scan_header_data);
-  }
+  /* if ((cycle_data->computed_tsys_applied != NULL) && */
+  /*     (cycle_data->computed_tsys_applied[0][0][0] == SYSCAL_TSYS_APPLIED)) { */
+  /*   computed_tsys_applied = true; */
+  /*   system_temperature_modifier(STM_REMOVE, cycle_data, scan_header_data); */
+  /* } */
   
   cycle_mjd = date2mjd(scan_header_data->obsdate, cycle_data->ut_seconds);
 
@@ -2472,20 +2474,20 @@ void calculate_system_temperatures_cycle_data(struct cycle_data *cycle_data,
 
   }
 
-  // If upon entry the computed Tsys was applied to the data, we now reapply the newly
-  // computed Tsys.
-  if (computed_tsys_applied == true) {
-    system_temperature_modifier(STM_APPLY_COMPUTED, cycle_data, scan_header_data);
-  }
+  /* // If upon entry the computed Tsys was applied to the data, we now reapply the newly */
+  /* // computed Tsys. */
+  /* if (computed_tsys_applied == true) { */
+  /*   system_temperature_modifier(STM_APPLY_COMPUTED, cycle_data, scan_header_data); */
+  /* } */
 
   // Work out from the options what to do about correcting the visibilities.
   if (band_options->systemp_reverse_online || acal_override) {
     if (band_options->systemp_apply_computed || acal_override) {
       // Apply the computed Tsys.
       system_temperature_modifier(STM_APPLY_COMPUTED, cycle_data, scan_header_data);
-    } else {
-      // We are being asked to remove all calibration.
-      system_temperature_modifier(STM_REMOVE, cycle_data, scan_header_data);
+    /* } else { */
+    /*   // We are being asked to remove all calibration. */
+    /*   system_temperature_modifier(STM_REMOVE, cycle_data, scan_header_data); */
     }
   } else {
     // The user wants to apply the online Tsys.
@@ -4131,7 +4133,7 @@ void compute_noise_diode_amplitudes(struct fluxdensity_specification *fluxdensit
  */
 void sum_vis(struct ampphase *ampphase, int baseline_idx, struct ampphase_options *options,
 	     int *nbins, float **rsum, float **isum, float **asum) {
-  int oidx, i, j;
+  int oidx, i, j, n;
   
   // Allocate the memory.
   *nbins = ampphase->nbins[baseline_idx];
@@ -4164,9 +4166,10 @@ void sum_vis(struct ampphase *ampphase, int baseline_idx, struct ampphase_option
   }
 
   for (i = 0; i < *nbins; i++) {
-    for (j = 0; j < ampphase->f_nchannels[baseline_idx][i]; j++) {
+    for (j = 0, n = 0; j < ampphase->f_nchannels[baseline_idx][i]; j++) {
       if ((ampphase->f_channel[baseline_idx][i][j] >= options->min_tvchannel[oidx]) &&
 	  (ampphase->f_channel[baseline_idx][i][j] <= options->max_tvchannel[oidx])) {
+	n++;
 	if (rsum != NULL) {
 	  (*rsum)[i] += crealf(ampphase->f_raw[baseline_idx][i][j]);
 	}
@@ -4177,6 +4180,15 @@ void sum_vis(struct ampphase *ampphase, int baseline_idx, struct ampphase_option
 	  (*asum)[i] += ampphase->f_amplitude[baseline_idx][i][j];
 	}
       }
+    }
+    if ((rsum != NULL) && (n > 0)) {
+      (*rsum)[i] /= (float)n;
+    }
+    if ((isum != NULL) && (n > 0)) {
+      (*isum)[i] /= (float)n;
+    }
+    if ((asum != NULL) && (n > 0)) {
+      (*asum)[i] /= (float)n;
     }
   }
 
