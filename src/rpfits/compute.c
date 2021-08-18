@@ -1946,7 +1946,8 @@ int ampphase_average(struct scan_header_data *scan_header_data,
 	n_delavg_median[j] = 0;
       }
       // Prepare our amplitude scaler.
-      amp_scaler = sqrtf(on_off_diff[a1] * on_off_diff[a2]);
+      //amp_scaler = sqrtf(on_off_diff[a1] * on_off_diff[a2]);
+      amp_scaler = 1.0;
       for (j = 0; j < ampphase->f_nchannels[i][k]; j++) {
         // Check for in range.
         if ((ampphase->f_channel[i][k][j] >= min_tvchannel) &&
@@ -4083,7 +4084,7 @@ void compute_noise_diode_amplitudes(struct fluxdensity_specification *fluxdensit
 		      }
 		      if (nbinsa == nbinsta) {
 			for (k = 0; k < nbinsta; k++) {
-			  tasuma[k] += asuma[k];
+			  tasuma[k] += asuma[k] / div1;
 			}
 		      }
 		    }
