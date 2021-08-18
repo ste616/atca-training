@@ -3802,11 +3802,12 @@ void compute_noise_diode_amplitudes(struct fluxdensity_specification *fluxdensit
   int bnt_label, cnt_label, x1, y1, x2, y2, x3, y3, a1, a2, nbins1, nbins2, nbins3;
   int *gains_nbins = NULL, nbinsa, nfreqmatch = 0, maxfreqmatch = 0, freqmatchidx;
   int **gainsum_numtriplets = NULL, nbins_gainsum = 0, opol = -1, nbinst = 0, nbinsta = 0;
+  int nbinsb, nbinsc, syswinidx = -1, syspolidx;
   bool aons, bons, cons;
   float *rsum1, *rsum2, *rsum3, *isum1, *isum2, *isum3, **gains = NULL, *asuma;
-  float nd_amp, src_fd, **gainsum = NULL;
+  float nd_amp, src_fd, **gainsum = NULL, *asumb, *asumc;
   float *trsum1 = NULL, *tisum1 = NULL, *trsum2 = NULL, *tisum2 = NULL;
-  float *trsum3 = NULL, *tisum3 = NULL, *tasuma = NULL;
+  float *trsum3 = NULL, *tisum3 = NULL, *tasuma = NULL, div1, div2, div3, caljya, caljyb, caljyc;
   double cmjd;
 
   // Figure out the IF index.
@@ -3818,6 +3819,17 @@ void compute_noise_diode_amplitudes(struct fluxdensity_specification *fluxdensit
   }
   if (winidx == -1) {
     // We don't know about this window.
+    return;
+  }
+  // For the syscal as well.
+  for (i = 0; i < cycle_spectra[0]->spectrum[winidx][0]->syscal_data->num_ifs; i++) {
+    if (cycle_spectra[0]->spectrum[winidx][0]->syscal_data->if_num[i] == window) {
+      syswinidx = i;
+      break;
+    }
+  }
+  if (syswinidx == -1) {
+    // We don't know about this window's calibration.
     return;
   }
   
@@ -3905,6 +3917,18 @@ void compute_noise_diode_amplitudes(struct fluxdensity_specification *fluxdensit
       opol = POL_Y;
       break;
     }
+    for (j = 0, syspolidx = -1; j < cycle_spectra[0]->spectrum[winidx][polidx[i]]->syscal_data->num_pols; j++) {
+      if (cycle_spectra[0]->spectrum[winidx][polidx[i]]->syscal_data->pol[j] == i) {
+	syspolidx = j;
+	break;
+      }
+    }
+    if (syspolidx == -1) {
+      fprintf(stderr, "DEBUG ACAL: can't find pol %d in the syscal!\n", i);
+      syspolidx = CAL_XX;
+    }
+    nbinst = 0;
+    nbinsta = 0;
     // We have to find the noise diode amplitude per antenna, so it is
     // most sensible to loop over the antennas here, and do the same
     // procedure for each.
@@ -3994,8 +4018,24 @@ void compute_noise_diode_amplitudes(struct fluxdensity_specification *fluxdensit
 			// get the noise diode amplitude.
 			asuma = NULL;
 			nbinsa = 0;
+			caljya =
+			  cycle_spectra[j]->spectrum[winidx][polidx[i]]->syscal_data->caljy[ant_label - 1][syswinidx][syspolidx];
 			sum_vis(cycle_spectra[j]->spectrum[winidx][polidx[i]], k, options,
 				&nbinsa, &asuma, NULL, NULL);
+		      } else if ((a1 == bnt_label) && (a2 == bnt_label)) {
+			asumb = NULL;
+			nbinsb = 0;
+			caljyb =
+			  cycle_spectra[j]->spectrum[winidx][polidx[i]]->syscal_data->caljy[bnt_label - 1][syswinidx][syspolidx];
+			sum_vis(cycle_spectra[j]->spectrum[winidx][polidx[i]], k, options,
+				&nbinsb, &asumb, NULL, NULL);
+		      } else if ((a1 == cnt_label) && (a2 == cnt_label)) {
+			asumc = NULL;
+			nbinsc = 0;
+			caljyc =
+			  cycle_spectra[j]->spectrum[winidx][polidx[i]]->syscal_data->caljy[cnt_label - 1][syswinidx][syspolidx];
+			sum_vis(cycle_spectra[j]->spectrum[winidx][polidx[i]], k, options,
+				&nbinsc, &asumc, NULL, NULL);
 		      }
 		    }
 		    if ((nbins1 == nbins2) && (nbins1 == nbins3)) {
@@ -4013,13 +4053,32 @@ void compute_noise_diode_amplitudes(struct fluxdensity_specification *fluxdensit
 			CALLOC(tasuma, nbinsta);
 		      }
 		      if (nbins1 == nbinst) {
+			// Calculate the normalising factors first.
+			if ((nbinsa == nbinsb) &&
+			    (nbinsa == nbinsc) &&
+			    (nbinsa > 1)) {
+			  fprintf(stderr, "DEBUG ACAL: for antenna %d pol %d, ON = %.4f OFF = %.4f CALJY = %.4f\n",
+				  ant_label, i, asuma[1], asuma[0], caljya);
+			  fprintf(stderr, "DEBUG ACAL: for antenna %d pol %d, ON = %.4f OFF = %.4f CALJY = %.4f\n",
+				  bnt_label, i, asumb[1], asumb[0], caljyb);
+			  fprintf(stderr, "DEBUG ACAL: for antenna %d pol %d, ON = %.4f OFF = %.4f CALJY = %.4f\n",
+				  cnt_label, i, asumc[1], asumc[0], caljyc);
+			  div1 = sqrtf(((asuma[1] - asuma[0]) / caljya) *
+				       ((asumb[1] - asumb[0]) / caljyb));
+			  div2 = sqrtf(((asuma[1] - asuma[0]) / caljya) *
+				       ((asumc[1] - asumc[0]) / caljyc));
+			  div3 = sqrtf(((asumb[1] - asumb[0]) / caljyb) * \
+				       ((asumc[1] - asumc[0]) / caljyc));
+			} else {
+			  div1 = div2 = div3 = 1.0;
+			}
 			for (k = 0; k < nbinst; k++) {
-			  trsum1[k] += rsum1[k];
-			  tisum1[k] += isum1[k];
-			  trsum2[k] += rsum2[k];
-			  tisum2[k] += isum2[k];
-			  trsum3[k] += rsum3[k];
-			  tisum3[k] += isum3[k];
+			  trsum1[k] += rsum1[k] / div1;
+			  tisum1[k] += isum1[k] / div1;
+			  trsum2[k] += rsum2[k] / div2;
+			  tisum2[k] += isum2[k] / div2;
+			  trsum3[k] += rsum3[k] / div3;
+			  tisum3[k] += isum3[k] / div3;
 			}
 		      }
 		      if (nbinsa == nbinsta) {
@@ -4035,6 +4094,8 @@ void compute_noise_diode_amplitudes(struct fluxdensity_specification *fluxdensit
 		    FREE(rsum3);
 		    FREE(isum3);
 		    FREE(asuma);
+		    FREE(asumb);
+		    FREE(asumc);
 		  }
 		  //if ((nbins1 == nbins2) && (nbins1 == nbins3)) {
 		  if ((nbinst > 0) && (nbinsta > 1)) {
@@ -4075,6 +4136,15 @@ void compute_noise_diode_amplitudes(struct fluxdensity_specification *fluxdensit
 		    }
 		    FREE(gains[ant_label - 1]);
 		  }
+		  FREE(trsum1);
+		  FREE(tisum1);
+		  FREE(trsum2);
+		  FREE(tisum2);
+		  FREE(trsum3);
+		  FREE(tisum3);
+		  nbinst = 0;
+		  FREE(tasuma);
+		  nbinsta = 0;
 		}
 	      }
 	    }
