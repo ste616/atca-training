@@ -206,6 +206,7 @@ static void sighandler(int sig) {
 #define ACTION_ARRAY_CONFIGURATION_PRINT 1<<22
 #define ACTION_COMPUTE_ACAL              1<<23
 #define ACTION_ENACT_ACAL                1<<24
+#define ACTION_RESET_ACAL                1<<25
 
 // The action modifier magic numbers.
 #define ACTIONMOD_NOMOD                  0
@@ -925,6 +926,8 @@ static void interpret_command(char *line) {
 		n_acal_fluxdensities = 0;
 		acal_idx_offset = 0;
 	      }
+	    } else {
+	      acal_idx_offset = 0;
 	    }
 	  }
 	  // Check if we have any modifiers.
@@ -994,9 +997,13 @@ static void interpret_command(char *line) {
 	// Remove any phase correction modifiers from our list, and then tell the server
 	// to do its thing.
 	action_required = ACTION_RESET_PHASECORRECTIONS;
+      } else if (minmatch("acal", line_els[1], 3)) {
+	// Remove any noise diode amplitude correction modifiers from our list, and then
+	// the the server to do its thing.
+	action_required = ACTION_RESET_ACAL;
       } else if (minmatch("all", line_els[1], 3)) {
 	// Remove all modifiers.
-	action_required = ACTION_RESET_DELAYS | ACTION_RESET_PHASECORRECTIONS;
+	action_required = ACTION_RESET_DELAYS | ACTION_RESET_PHASECORRECTIONS | ACTION_RESET_ACAL;
       }
     } else if (minmatch("time", line_els[0], 3)) {
       // Change which type of time we display on the bottom.
@@ -1083,7 +1090,7 @@ int main(int argc, char *argv[]) {
   int i, j, k, l, m, r, bytes_received, nmesg = 0, bidx = -1, num_timelines = 0, pnum;
   int dump_type = FILETYPE_UNKNOWN, dump_device_number = -1, vis_device_number = -1;
   int *timeline_types = NULL, cycidx, visidx, a1, a2, *mod_remove = NULL, n_mod_remove = 0;
-  int alabel, acal_modified_idx;
+  int alabel, acal_modified_idx, acal_modify_range;
   cmp_ctx_t cmp;
   cmp_mem_access_t mem;
   struct requests server_request;
@@ -1274,13 +1281,15 @@ int main(int argc, char *argv[]) {
 	(action_required & ACTION_ADD_DELAYS) ||
 	(action_required & ACTION_COMPUTE_PHASECORRECTIONS) ||
 	(action_required & ACTION_RESET_PHASECORRECTIONS) ||
-	(action_required & ACTION_ENACT_ACAL)) {
+	(action_required & ACTION_ENACT_ACAL) ||
+	(action_required & ACTION_RESET_ACAL)) {
       action_required |= ACTION_AMPPHASE_OPTIONS_CHANGED;
       nmesg = 0;
       for (j = 0; j < nvisbands; j++) {
 	visidx = visband_idx[j] - 1;
 	if ((action_required & ACTION_RESET_DELAYS) ||
-	    (action_required & ACTION_RESET_PHASECORRECTIONS)) {
+	    (action_required & ACTION_RESET_PHASECORRECTIONS) ||
+	    (action_required & ACTION_RESET_ACAL)) {
 	  // Remove all modifiers that have delay corrections in the options.
 	  n_mod_remove = 0;
 	  mod_remove = NULL;
@@ -1288,7 +1297,9 @@ int main(int argc, char *argv[]) {
 	    if (((action_required & ACTION_RESET_DELAYS) &&
 		 (found_options->modifiers[visband_idx[j]][i]->add_delay)) ||
 		((action_required & ACTION_RESET_PHASECORRECTIONS) &&
-		 (found_options->modifiers[visband_idx[j]][i]->add_phase))) {
+		 (found_options->modifiers[visband_idx[j]][i]->add_phase)) ||
+		((action_required & ACTION_RESET_ACAL) &&
+		 (found_options->modifiers[visband_idx[j]][i]->set_noise_diode_amplitude))) {
 	      n_mod_remove += 1;
 	      REALLOC(mod_remove, n_mod_remove);
 	      mod_remove[n_mod_remove - 1] = i;
@@ -1546,6 +1557,14 @@ int main(int argc, char *argv[]) {
 	      }
 	    }
 	    if (modptr != NULL) {
+	      if ((acal_modify_range == ACTIONMOD_CORRECT_ALL) ||
+		  (acal_modify_range == ACTIONMOD_CORRECT_BEFORE)) {
+		modptr->noise_diode_start_mjd = 0;
+	      }
+	      if ((acal_modify_range == ACTIONMOD_CORRECT_ALL) ||
+		  (acal_modify_range == ACTIONMOD_CORRECT_AFTER)) {
+		modptr->noise_diode_end_mjd = 100000; // This is 2132-SEP-01.
+	      }
 	      snprintf(mesgout[nmesg++], VISBUFLONG, " BAND %d, MJD %.6f - %.6f:\n",
 		       visband_idx[j], modptr->noise_diode_start_mjd,
 		       modptr->noise_diode_end_mjd);
@@ -1577,6 +1596,10 @@ int main(int argc, char *argv[]) {
       }
       if (action_required & ACTION_ENACT_ACAL) {
 	action_required -= ACTION_ENACT_ACAL;
+	acal_modify_range = ACTIONMOD_NOMOD;
+      }
+      if (action_required & ACTION_RESET_ACAL) {
+	action_required -= ACTION_RESET_ACAL;
       }
     }
 
@@ -1584,6 +1607,8 @@ int main(int argc, char *argv[]) {
       // The server is responsible for computing the acal parameters, so we
       // just send the request.
       action_required -= ACTION_COMPUTE_ACAL;
+      acal_modify_range = action_modifier;
+      action_modifier = ACTIONMOD_NOMOD;
 
       server_request.request_type = REQUEST_ACAL;
       init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)SENDBUFSIZE);

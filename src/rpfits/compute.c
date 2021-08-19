@@ -4058,12 +4058,12 @@ void compute_noise_diode_amplitudes(struct fluxdensity_specification *fluxdensit
 			if ((nbinsa == nbinsb) &&
 			    (nbinsa == nbinsc) &&
 			    (nbinsa > 1)) {
-			  fprintf(stderr, "DEBUG ACAL: for antenna %d pol %d, ON = %.4f OFF = %.4f CALJY = %.4f\n",
-				  ant_label, i, asuma[1], asuma[0], caljya);
-			  fprintf(stderr, "DEBUG ACAL: for antenna %d pol %d, ON = %.4f OFF = %.4f CALJY = %.4f\n",
-				  bnt_label, i, asumb[1], asumb[0], caljyb);
-			  fprintf(stderr, "DEBUG ACAL: for antenna %d pol %d, ON = %.4f OFF = %.4f CALJY = %.4f\n",
-				  cnt_label, i, asumc[1], asumc[0], caljyc);
+			  /* fprintf(stderr, "DEBUG ACAL: for antenna %d pol %d, ON = %.4f OFF = %.4f CALJY = %.4f\n", */
+			  /* 	  ant_label, i, asuma[1], asuma[0], caljya); */
+			  /* fprintf(stderr, "DEBUG ACAL: for antenna %d pol %d, ON = %.4f OFF = %.4f CALJY = %.4f\n", */
+			  /* 	  bnt_label, i, asumb[1], asumb[0], caljyb); */
+			  /* fprintf(stderr, "DEBUG ACAL: for antenna %d pol %d, ON = %.4f OFF = %.4f CALJY = %.4f\n", */
+			  /* 	  cnt_label, i, asumc[1], asumc[0], caljyc); */
 			  div1 = sqrtf(((asuma[1] - asuma[0]) / caljya) *
 				       ((asumb[1] - asumb[0]) / caljyb));
 			  div2 = sqrtf(((asuma[1] - asuma[0]) / caljya) *
