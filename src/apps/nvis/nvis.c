@@ -1110,6 +1110,7 @@ int main(int argc, char *argv[]) {
   struct scan_header_data *described_hdr = NULL;
   struct panelspec dump_panelspec;
   struct ampphase_modifiers *modptr = NULL;
+  struct fluxdensity_specification acal_fd_spec;
 
   // Allocate and initialise some memory.
   MALLOC(mesgout, MAX_N_MESSAGES);
@@ -1565,8 +1566,21 @@ int main(int argc, char *argv[]) {
 		  (acal_modify_range == ACTIONMOD_CORRECT_AFTER)) {
 		modptr->noise_diode_end_mjd = 100000; // This is 2132-SEP-01.
 	      }
-	      snprintf(mesgout[nmesg++], VISBUFLONG, " BAND %d, MJD %.6f - %.6f:\n",
-		       visband_idx[j], modptr->noise_diode_start_mjd,
+	      // Find the flux density specification for this band.
+	      for (l = 0; l < acal_fd_spec.num_models; l++) {
+		if (((acal_fd_spec.model_frequency[l] -
+		      acal_fd_spec.model_frequency_tolerance[l]) <
+		     described_hdr->if_centre_freq[visidx]) &&
+		    ((acal_fd_spec.model_frequency[l] +
+		      acal_fd_spec.model_frequency_tolerance[l]) >
+		     described_hdr->if_centre_freq[visidx])) {
+		  break;
+		}
+	      }
+	      snprintf(mesgout[nmesg++], VISBUFLONG,
+		       " BAND %d FLUX = %.3f Jy, MJD %.6f - %.6f:\n",
+		       visband_idx[j], acal_fd_spec.model_terms[l][0],
+		       modptr->noise_diode_start_mjd,
 		       modptr->noise_diode_end_mjd);
 	      for (l = 1; l < modptr->noise_diode_num_antennas; l++) {
 		snprintf(mesgout[nmesg++], VISBUFLONG,
@@ -1597,6 +1611,7 @@ int main(int argc, char *argv[]) {
       if (action_required & ACTION_ENACT_ACAL) {
 	action_required -= ACTION_ENACT_ACAL;
 	acal_modify_range = ACTIONMOD_NOMOD;
+	free_fluxdensity_specification(&acal_fd_spec);
       }
       if (action_required & ACTION_RESET_ACAL) {
 	action_required -= ACTION_RESET_ACAL;
@@ -2013,6 +2028,8 @@ int main(int argc, char *argv[]) {
 	}
 	// The server tells us which of the options was modified.
 	pack_read_sint(&cmp, &acal_modified_idx);
+	// We also receive the flux densities assumed during calibration.
+	unpack_fluxdensity_specification(&cmp, &acal_fd_spec);
 	// Output and use these new modifiers.
 	action_required = ACTION_ENACT_ACAL | ACTION_NEW_DATA_RECEIVED;
       }

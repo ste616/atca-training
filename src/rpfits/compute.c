@@ -4175,14 +4175,6 @@ void compute_noise_diode_amplitudes(struct fluxdensity_specification *fluxdensit
 
   }
 
-
-  /* FREE(rsum1); */
-  /* FREE(rsum2); */
-  /* FREE(rsum3); */
-  /* FREE(isum1); */
-  /* FREE(isum2); */
-  /* FREE(isum3); */
-  /* FREE(asuma); */
 }
 
 
@@ -4327,7 +4319,6 @@ bool source_model(char *source_name, float eval_freq, int *num_terms, bool *log_
   strip_end_spaces(source_name, tsrc, SOURCE_LENGTH);
   
   // Branch based on source name (a primitive way to do this I know, I'm sorry).
-  fprintf(stderr, "DEBUG searching for model for source [%s]\n", tsrc);
   if (strcmp(tsrc, "1934-638") == 0) {
     // Our best flux density calibrator, has a frequency-dependent model.
     *log_terms = true;
@@ -4340,7 +4331,6 @@ bool source_model(char *source_name, float eval_freq, int *num_terms, bool *log_
     }
   } else if (strcmp(tsrc, "0823-500") == 0) {
     // This is not a very good model, since 0823-500 varies over time.
-    fprintf(stderr, "DEBUG found 0823-500\n");
     *log_terms = true;
     *num_terms = 4;
     model_ptr = model_0823;

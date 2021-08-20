@@ -2805,12 +2805,12 @@ int main(int argc, char *argv[]) {
 		  // We make a very simplistic flux density specifier here, but this will
 		  // need to be changed when we want to move to a better method of acal.
 		  // We do this now to match how CABB acal works.
-		  fd_spec.num_models = 1;
+		  fd_spec.num_models = acal_spectra[0]->num_ifs;
 		} else {
 		  // We use the numbers that came along with the request.
 		  fd_spec.num_models = n_acal_fluxdensities;
 		}
-		printf(" Working with %d flux density models\n", fd_spec.num_models);
+		/* printf(" Working with %d flux density models\n", fd_spec.num_models); */
 		CALLOC(fd_spec.model_frequency, fd_spec.num_models);
 		CALLOC(fd_spec.model_frequency_tolerance, fd_spec.num_models);
 		CALLOC(fd_spec.model_num_terms, fd_spec.num_models);
@@ -2849,19 +2849,19 @@ int main(int argc, char *argv[]) {
 				   acal_spectra[0]->header_data->if_centre_freq[i],
 				   &acal_model_num_terms, &acal_model_log,
 				   &acal_model_terms);
-		    fd_spec.model_frequency[0] = acal_spectra[0]->header_data->if_centre_freq[i];
-		    fd_spec.model_frequency_tolerance[0] =
+		    fd_spec.model_frequency[i] = acal_spectra[0]->header_data->if_centre_freq[i];
+		    fd_spec.model_frequency_tolerance[i] =
 		      acal_spectra[0]->header_data->if_bandwidth[i] / 2;
-		    fd_spec.model_num_terms[0] = 1;
-		    REALLOC(fd_spec.model_terms[0], fd_spec.model_num_terms[0]);
+		    fd_spec.model_num_terms[i] = 1;
+		    REALLOC(fd_spec.model_terms[i], fd_spec.model_num_terms[i]);
 		    if (acal_source_recognised) {
 		      acal_fd =
 			fluxdensity_model_evaluate(acal_model_num_terms, acal_model_log,
 						   acal_model_terms,
 						   acal_spectra[0]->header_data->if_centre_freq[i]);
-		      fd_spec.model_terms[0][0] = acal_fd;
+		      fd_spec.model_terms[i][0] = acal_fd;
 		    } else {
-		      fd_spec.model_terms[0][0] = 1;
+		      fd_spec.model_terms[i][0] = 1;
 		    }
 		  }
 		  compute_noise_diode_amplitudes(&fd_spec, n_acal_cycles, acal_window,
@@ -2898,6 +2898,8 @@ int main(int argc, char *argv[]) {
 		  }
 		  // Specify the index of the options we modified.
 		  pack_write_sint(&child_cmp, acal_options_idx);
+		  // Send back the flux density specification for the user.
+		  pack_fluxdensity_specification(&child_cmp, &fd_spec);
 		  // Pack the MJDs of each of the data grabs. We send the grabs back so
 		  // they can be cached.
 		  pack_write_sint(&child_cmp, n_acal_cycles);
@@ -2924,6 +2926,7 @@ int main(int argc, char *argv[]) {
 		  free_ampphase_options(copied_options[i]);
 		  FREE(copied_options[i]);
 		}
+		free_fluxdensity_specification(&fd_spec);
 		// Die.
 		printf("CHILD IS FINISHED!\n");
 		exit(0);
@@ -2988,6 +2991,8 @@ int main(int argc, char *argv[]) {
 	      }
 	      // Read the index of the modified options.
 	      pack_read_sint(&cmp, &acal_options_idx);
+	      // Get the flux density specification.
+	      unpack_fluxdensity_specification(&cmp, &fd_spec);
 	      // Unpack the MJDs of each of the cycles that were requested, as
 	      // we will cache them for later use.
 	      pack_read_sint(&cmp, &n_acal_cycles);
@@ -3017,18 +3022,20 @@ int main(int argc, char *argv[]) {
 		  MALLOC(send_buffer, RPSENDBUFSIZE);
 		  init_cmp_memory_buffer(&cmp, &mem, send_buffer, RPSENDBUFSIZE);
 		  pack_responses(&cmp, &client_response);
-		  fprintf(stderr, "  response header packed\n");
+		  /* fprintf(stderr, "  response header packed\n"); */
 		  // Send the new options with the modifiers.
 		  pack_write_sint(&cmp, n_client_options);
-		  fprintf(stderr, "  client option number %d packed\n", n_client_options);
+		  /* fprintf(stderr, "  client option number %d packed\n", n_client_options); */
 		  for (j = 0; j < n_client_options; j++) {
 		    fprintf(stderr, "   ... %d\n", j);
 		    pack_ampphase_options(&cmp, client_options[j]);
 		  }
-		  fprintf(stderr, "  all options packed\n");
+		  /* fprintf(stderr, "  all options packed\n"); */
 		  // Tell them which index was modified.
-		  fprintf(stderr, "  packing options index %d\n", acal_options_idx);
+		  /* fprintf(stderr, "  packing options index %d\n", acal_options_idx); */
 		  pack_write_sint(&cmp, acal_options_idx);
+		  // And send the flux density models.
+		  pack_fluxdensity_specification(&cmp, &fd_spec);
 		  printf(" %s to client %s.\n",
 			 get_type_string(TYPE_RESPONSE, client_response.response_type),
 			 client_request.client_id);
@@ -3055,7 +3062,7 @@ int main(int argc, char *argv[]) {
 	      // And free the other received memory.
 	      FREE(acal_cycle_mjds);
 	      n_acal_cycles = 0;
-	      
+	      free_fluxdensity_specification(&fd_spec);
 	    }
             printf(" Sent %ld bytes\n", bytes_sent);
 
