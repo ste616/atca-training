@@ -3778,6 +3778,7 @@ void free_fluxdensity_specification(struct fluxdensity_specification *a) {
     FREE(a->model_terms[i]);
   }
   FREE(a->model_terms);
+  FREE(a->model_num_terms);
   FREE(a->model_frequency);
   FREE(a->model_frequency_tolerance);
 
