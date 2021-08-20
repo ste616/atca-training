@@ -2427,8 +2427,8 @@ void calculate_system_temperatures_cycle_data(struct cycle_data *cycle_data,
 	caljy_x = cycle_data->caljy_x[ifsidx][j];
 	caljy_y = cycle_data->caljy_y[ifsidx][j];
       } else {
-	caljy_x = use_modifier->noise_diode_amplitude[ifno][POL_X];
-	caljy_y = use_modifier->noise_diode_amplitude[ifno][POL_Y];
+	caljy_x = use_modifier->noise_diode_amplitude[j + 1][POL_X];
+	caljy_y = use_modifier->noise_diode_amplitude[j + 1][POL_Y];
 	// We also need to ensure we adjust the system temperature.
 	acal_override = true;
       }
@@ -4320,9 +4320,15 @@ bool source_model(char *source_name, float eval_freq, int *num_terms, bool *log_
   float model_1934_high[2] = { 5.887, -1.3763 };
   float model_0823[4] = { -51.0361, 41.4101, -10.7771, 0.90468 };
   float *model_ptr = NULL;
+  char tsrc[SOURCE_LENGTH];
+
+  // The source name from the RPFITS header will probably have loads of whitespace
+  // at the end of the string, so we strip that first.
+  strip_end_spaces(source_name, tsrc, SOURCE_LENGTH);
   
   // Branch based on source name (a primitive way to do this I know, I'm sorry).
-  if (strcmp(source_name, "1934-638") == 0) {
+  fprintf(stderr, "DEBUG searching for model for source [%s]\n", tsrc);
+  if (strcmp(tsrc, "1934-638") == 0) {
     // Our best flux density calibrator, has a frequency-dependent model.
     *log_terms = true;
     if (eval_freq < 11150) {
@@ -4332,8 +4338,9 @@ bool source_model(char *source_name, float eval_freq, int *num_terms, bool *log_
       *num_terms = 2;
       model_ptr = model_1934_high;
     }
-  } else if (strcmp(source_name, "0823-500") == 0) {
+  } else if (strcmp(tsrc, "0823-500") == 0) {
     // This is not a very good model, since 0823-500 varies over time.
+    fprintf(stderr, "DEBUG found 0823-500\n");
     *log_terms = true;
     *num_terms = 4;
     model_ptr = model_0823;
