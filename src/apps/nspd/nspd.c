@@ -550,6 +550,10 @@ static void interpret_command(char *line) {
 	  // Show the averaged channels.
 	  plot_decorations |= PLOT_AVERAGED_DATA;
 	  decorations_changed = true;
+	} else if (minmatch("computed_tsys", line_els[1], 4)) {
+	  // Show the computed Tsys numbers in the label.
+	  plot_decorations |= PLOT_COMPUTED_TSYS;
+	  decorations_changed = true;
 	}
 
 	if (decorations_changed) {
@@ -571,6 +575,12 @@ static void interpret_command(char *line) {
 	  // Hide the averaged channels.
 	  if (plot_decorations & PLOT_AVERAGED_DATA) {
 	    plot_decorations -= PLOT_AVERAGED_DATA;
+	    decorations_changed = true;
+	  }
+	} else if (minmatch("computed_tsys", line_els[1], 4)) {
+	  // Show the online Tsys numbers in the label.
+	  if (plot_decorations & PLOT_COMPUTED_TSYS) {
+	    plot_decorations -= PLOT_COMPUTED_TSYS;
 	    decorations_changed = true;
 	  }
 	}

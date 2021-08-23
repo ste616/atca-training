@@ -140,6 +140,9 @@ void change_spd_plotcontrols(struct spd_plotcontrols *plotcontrols,
     if (plotcontrols->plot_options & PLOT_AVERAGED_DATA) {
       plotcontrols->plot_options -= PLOT_AVERAGED_DATA;
     }
+    if (plotcontrols->plot_options & PLOT_COMPUTED_TSYS) {
+      plotcontrols->plot_options -= PLOT_COMPUTED_TSYS;
+    }
     plotcontrols->plot_options |= *decorations;
   }
   
@@ -2531,9 +2534,15 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
               CALLOC(systemp_strings[j], tsys_num_ifs);
               for (k = 0; k < tsys_num_ifs; k++) {
                 CALLOC(systemp_strings[j][k], BUFSIZE);
-                snprintf(systemp_strings[j][k], BUFSIZE, "%.1f / %.1f",
-                         compiled_tsys_data->online_tsys[j][k][CAL_XX],
-                         compiled_tsys_data->online_tsys[j][k][CAL_YY]);
+		if (plot_controls->plot_options & PLOT_COMPUTED_TSYS) {
+		  snprintf(systemp_strings[j][k], BUFSIZE, "%.1f / %.1f",
+			   compiled_tsys_data->computed_tsys[j][k][CAL_XX],
+			   compiled_tsys_data->computed_tsys[j][k][CAL_YY]);
+		} else {
+		  snprintf(systemp_strings[j][k], BUFSIZE, "%.1f / %.1f",
+			   compiled_tsys_data->online_tsys[j][k][CAL_XX],
+			   compiled_tsys_data->online_tsys[j][k][CAL_YY]);
+		}
                 cpglen(4, systemp_strings[j][k], &information_text_width,
                        &information_text_height);
                 MAXASSIGN(maxlen_tsys, information_text_width);
@@ -2552,7 +2561,11 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
                            compiled_tsys_data->if_num[j - 1]);
                   cpgptxt(information_x_pos, YPOS_LINE(j), 0, 0, information_text);
                 } else if ((j == 0) && (k == 0)) {
-                  cpgptxt(information_x_pos, YPOS_LINE(0), 0, 0, "TSYS");
+		  if (plot_controls->plot_options & PLOT_COMPUTED_TSYS) {
+		    cpgptxt(information_x_pos, YPOS_LINE(0), 0, 0, "CTSYS");
+		  } else {
+		    cpgptxt(information_x_pos, YPOS_LINE(0), 0, 0, "TSYS");
+		  }
                 } else {
                   cpgptxt((information_x_pos + (maxlen_tsys / 2.0) +
                            ((float)(k - 1) * (maxlen_tsys + 0.02))),

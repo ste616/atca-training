@@ -33,6 +33,7 @@
 #define PLOT_IMAG                 1<<14
 #define PLOT_TVCHANNELS           1<<15
 #define PLOT_AVERAGED_DATA        1<<16
+#define PLOT_COMPUTED_TSYS        1<<17
 
 #define PLOTTIME_UTC              1
 #define PLOTTIME_AEST             2
