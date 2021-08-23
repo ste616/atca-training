@@ -1134,7 +1134,15 @@ int main(int argc, char *argv[]) {
   reference_antenna_index = 0;
   n_acal_fluxdensities = 0;
   acal_fluxdensities = NULL;
-
+  // This next initialisation is to stop some valgrind warnings...
+  for (i = 0; i <= POL_XY; i++) {
+    for (j = 0; j < MAX_ANTENNANUM; j++) {
+      for (k = 0; k < MAXNNCAL; k++) {
+	phase_cals[i][j][k] = 0;
+      }
+    }
+  }
+  
   // Set the default for the arguments.
   arguments.use_file = false;
   arguments.input_file[0] = 0;
