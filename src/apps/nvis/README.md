@@ -241,6 +241,8 @@ the uncorrected cycles will be shown as determined by **tsys**.
 
 While the server computes the data, `nvis` will continue to show the current data.
 
+---
+
 #### array
 
 Format: **arr**ay *antennas*
