@@ -920,7 +920,7 @@ static void interpret_command(char *line) {
 	      succ = string_to_float(line_els[1], &(acal_fluxdensities[0])) &
 		string_to_float(line_els[2], &(acal_fluxdensities[1]));
 	      if (!succ) {
-		printf(" Unabel to acal: supplied flux densities not valid\n");
+		printf(" Unable to acal: supplied flux densities not valid\n");
 		action_required -= ACTION_COMPUTE_ACAL;
 		FREE(acal_fluxdensities);
 		n_acal_fluxdensities = 0;
