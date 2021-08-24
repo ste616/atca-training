@@ -70,3 +70,19 @@ decorrelation due to the way vector averaging works with data that is not
 delay calibrated. So you should start by delay calibrating all the data, and
 then you should see that NVIS looks something like the following:
 
+![NVIS after a dcal](nvis_t3_after_dcal.png)
+
+You should notice a few things about the amplitudes at this point.
+First, they're clearly much higher than we think they should be. Second,
+the amplitudes on each baseline don't agree with each other very well.
+Third, it looks like the amplitude for 0945-321 increases at about 04:47:45.
+
+We know that both sources are point-like, so the amplitudes should be
+consistent across all the baselines. We also know that they are unlikely
+to change their flux densities suddenly. So why does NVIS appear the way it
+does? Figuring that out will reveal more details about how CABB works, and
+why. Having this knowledge should help you when you are observing or doing
+data reduction.
+
+## CABB's amplitude correction model
+
