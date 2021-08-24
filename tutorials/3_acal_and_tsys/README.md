@@ -61,3 +61,12 @@ at 5.5 GHz, and from about 04:49:30 until 04:52:10 we observed 0823-500,
 which has a flux density of about 2.879 Jy at 5.5 GHz (a ~9 times higher
 flux density than 0945-321).
 
+## Initial look at the data
+
+Immediately we can see that the flux densities of the two sources, as
+they appear in NVIS, do not match those just quoted. After the previous
+two tutorials, you should understand that at this point there is a lot of
+decorrelation due to the way vector averaging works with data that is not
+delay calibrated. So you should start by delay calibrating all the data, and
+then you should see that NVIS looks something like the following:
+
