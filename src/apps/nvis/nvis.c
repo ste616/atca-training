@@ -633,7 +633,7 @@ static void interpret_command(char *line) {
         } else if (minmatch("seemonrms", line_els[1], 7) ||
 		   (strcmp(line_els[1], "Y") == 0)) {
           change_panel = VIS_PLOTPANEL_SEEMONRMS;
-        } else if (minmatch("computed_systemp", line_els[1], 10) ||
+        } else if (minmatch("computed_systemp", line_els[1], 11) ||
 		   (strcmp(line_els[1], "C") == 0)) {
           change_panel = VIS_PLOTPANEL_SYSTEMP_COMPUTED;
 	} else if (minmatch("computed_gtp", line_els[1], 10) ||
@@ -642,7 +642,7 @@ static void interpret_command(char *line) {
         } else if (minmatch("gtp", line_els[1], 3) ||
 		   (strcmp(line_els[1], "G") == 0)) {
           change_panel = VIS_PLOTPANEL_GTP;
-	} else if (minmatch("computed_sdo", line_els[1], 10) ||
+	} else if (minmatch("computed_sdo", line_els[1], 11) ||
 		   (strcmp(line_els[1], "o") == 0)) {
 	  change_panel = VIS_PLOTPANEL_SDO_COMPUTED;
         } else if (minmatch("sdo", line_els[1], 3) ||

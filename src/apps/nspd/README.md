@@ -325,6 +325,14 @@ Format: **hid**e **av**eraged
 
 Stop showing the data which has been binned by the **delavg** value.
 
+##### computed_tsys
+
+Format: **hid**e **comp**uted_tsys
+
+Show the system temperatures that were determined at the time of observation in the
+upper `nspd` panel. When the observed system temperatures are shown, the
+label at the top left of the system temperatures table will read "TSYS".
+
 ---
 
 #### imaginary
@@ -536,6 +544,14 @@ the smoothed line will be labelled as "AAv", and shown in a different colour.
 When **delavg** is 1, the two lines will be plot exactly over each other,
 and since the "v" line is drawn later than the normal product, the line visible
 on the panel will be in the "v" colour.
+
+##### computed_tsys
+
+Format: **sho**w **comp**uted_tsys
+
+Show the system temperatures computed with the current settings in the
+upper `nspd` panel. When the computed system temperatures are shown, the
+label at the top left of the system temperatures table will read "CTSYS".
 
 ---
 
