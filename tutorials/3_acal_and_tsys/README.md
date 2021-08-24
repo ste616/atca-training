@@ -86,3 +86,70 @@ data reduction.
 
 ## CABB's amplitude correction model
 
+Let's begin by describing what's going on in the correlator, in a
+less-technical way than we will later.
+
+The data coming from each antenna into the correlator is simply a stream
+of voltages over time. When each antenna is pointing at the same patch
+of sky, one might expect that this stream would look very similar on each
+antenna, with random noise variations being the main difference, but this
+is not necessarily the case. Even in a homogenous array like ATCA, the
+equipment on each antenna is not really identical, and that's before we
+start to consider controllable attenuators and differences in age and
+the time since different parts were tuned or replaced.
+
+When the time comes for the correlator to multiply the data from one
+antenna with another, it cannot be assumed that the individual antennas
+share the same voltage scaling. So what comes out of the multiplication?
+
+Let's think about what we want the result to be. Imagine an empty patch
+of sky, except for a point source with some known flux density at a
+well-defined position. We've told our correlator to correct for delays
+and phases towards that point source. In this case, we want each channel
+of our cross-correlation to represent the flux density of the point
+source in that frequency channel, with a phase of 0 because it's positioned
+at the phase centre. But for that to be true, both antennas have to agree
+on the flux density that they are looking at, and this is the aim of
+amplitude calibration.
+
+So how do we ensure this to be the case? Like a lot of things in radio astronomy,
+it comes down to comparisons with known standards. We begin by pointing
+at a source with some known flux density, and calibrate our antennas
+against this. Then, when we observe some other source with an unknown
+flux density, we simply assume that the system has a linear response to
+flux density such that if a source had twice the amount of flux density,
+the system would produce twice the response compared to the standard.
+
+Sounds easy, and it is, so long as the system stays perfectly linear between your
+observation of the flux density standard, and your observation of the
+target. However, that is rarely the case, because the response of the
+system depends on so many things: the atmosphere between the telescope
+and the source, effects of pointing elevation on the reflector shape,
+shifts in antenna focus, etc.
+
+We can group most of these types of changes into a single parameter though:
+system temperature. The basic idea is that an instrument with a lower
+system temperature is more sensitive, and thus will produce a larger response
+to the same input. If we keep track of the system temperature of the
+instrument, we can compensate for the non-linearity caused by changes in
+sensitivity, and recover the linear response we require for precision
+measurements.
+
+This is best expressed as the "system equivalent flux density", which is
+the flux density of a source which would double the response of a system.
+Imagine that when you look at a completely empty patch of sky, your
+instrument produces an output of *A*, but when you observe a source with a
+flux density of *S* Jy, your instrument produces an output of *2A*; in
+this case, your system equivalent flux density (SEFD) is *S* Jy. You can
+see then, that if for some reason your SEFD increased to *2S* Jy, that same
+source would only increase the output by 50%, instead of the 100% increase
+it generated while your SEFD was *S* Jy.
+
+Ideally then, we want to continually assess what our SEFD is during
+our observations. We could repeatedly go back and observe the same
+standard flux density calibration source, but that adds a great deal of
+overhead. What would be better is if we could carry around a source with
+known flux density, and continually observe how much the system responds
+to that source, even while we're looking at other sources. And, for the
+ATCA, we do have such a system: the noise diode.
+
