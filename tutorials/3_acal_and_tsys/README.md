@@ -220,10 +220,43 @@ the average power is just the mean of these two powers, and we call this the
 
 So, the full equation for how the amplitude is determined is:
 
-![A_{ij}=\frac{|C_{ij}|\sqrt{T^{sys}_{i}\times T^{sys}_{j}}}{\sqrt{G_{i}\times G_{j}}}](https://latex.codecogs.com/svg.latex?A_%7Bij%7D%3D%5Cfrac%7B%7CC_%7Bij%7D%7C%5Csqrt%7BT%5E%7Bsys%7D_%7Bi%7D%5Ctimes%20T%5E%7Bsys%7D_%7Bj%7D%7D%7D%7B%5Csqrt%7BG_%7Bi%7D%5Ctimes%20G_%7Bj%7D%7D%7D)
+![A_{ij}=\frac{|C_{ij}|\sqrt{T^{sys}_{i}\times T^{sys}_{j}}}{\sqrt{GTP_{i}\times GTP_{j}}}](https://latex.codecogs.com/svg.latex?A_%7Bij%7D%3D%5Cfrac%7B%7CC_%7Bij%7D%7C%5Csqrt%7BT%5E%7Bsys%7D_%7Bi%7D%5Ctimes%20T%5E%7Bsys%7D_%7Bj%7D%7D%7D%7B%5Csqrt%7BGTP_%7Bi%7D%5Ctimes%20GTP_%7Bj%7D%7D%7D)
 
 where A<sub>ij</sub> is the amplitude, T<sup>sys</sup><sub>i</sub> is
-the system temperature of antenna i, and G<sub>i</sub> is the GTP
+the system temperature of antenna i, and GTP<sub>i</sub> is the GTP
 of antenna i. A<sub>ij</sub> will have the same units as T<sup>sys</sup><sub>i</sub>
-so long as C<sub>ij</sub> has the same units as G<sub>i</sub>.
+so long as C<sub>ij</sub> has the same units as GTP<sub>i</sub>.
+
+We measure GTP<sub>i</sub> directly from the data, but we need some way
+to determine T<sup>sys</sup><sub>i</sub>. If we know the amplitude of
+the noise diode, and the noise diode is switching on and off, there
+is a pretty straightforward relationship: the system temperature will
+be the amplitude of the noise diode multiplied by the fractional change
+in the output power caused by the noise diode. The absolute change in the
+output power is called the "synchronously-demodulated output" (SDO), and
+is simply defined by the difference in the power between the on and off
+states. The fractional change is just this SDO divided by the average power,
+which is the GTP. In other words:
+
+![T^{sys}_{i} = N_{i}\frac{SDO_{i}}{GTP_{i}}](https://latex.codecogs.com/svg.latex?T%5E%7Bsys%7D_%7Bi%7D%20%3D%20N_%7Bi%7D%5Cfrac%7BSDO_%7Bi%7D%7D%7BGTP_%7Bi%7D%7D)
+
+where N<sub>i</sub> is the amplitude of the noise diode on antenna i,
+and SDO<sub>i</sub> is the SDO of antenna i.
+
+You might notice that we can combine these two equations for simplicity,
+since:
+
+![\frac{T^{sys}_{i}}{GTP_{i}} = \frac{N_{i}}{SDO_{i}}](https://latex.codecogs.com/svg.latex?%5Cfrac%7BT%5E%7Bsys%7D_%7Bi%7D%7D%7BGTP_%7Bi%7D%7D%20%3D%20%5Cfrac%7BN_%7Bi%7D%7D%7BSDO_%7Bi%7D%7D)
+
+we can change the amplitude equation to one which only requires a constant
+and a single measure:
+
+![A_{ij}=\frac{|C_{ij}|\sqrt{N_{i}\times N_{j}}}{\sqrt{SDO_{i}\times SDO_{j}}}](https://latex.codecogs.com/svg.latex?A_%7Bij%7D%3D%5Cfrac%7B%7CC_%7Bij%7D%7C%5Csqrt%7BN_%7Bi%7D%5Ctimes%20N_%7Bj%7D%7D%7D%7B%5Csqrt%7BSDO_%7Bi%7D%5Ctimes%20SDO_%7Bj%7D%7D%7D)
+
+This is what the correlator does every cycle; it measures the SDO from the
+autocorrelation data, and takes the known amplitude of the noise diode,
+and modifies its output appropriately. Do you remember back in tutorial 1,
+we saw that an acal command took immediate effect? This is why: the modification
+here occurs after the data has been correlated and the SDO is measured, whereas delay
+and phase shifts are accounted for during the correlation process.
 
