@@ -221,3 +221,9 @@ the average power is just the mean of these two powers, and we call this the
 So, the full equation for how the amplitude is determined is:
 
 ![A_{ij}=\frac{|C_{ij}|\sqrt{T^{sys}_{i}\times T^{sys}_{j}}}{\sqrt{G_{i}\times G_{j}}}](https://latex.codecogs.com/svg.latex?A_%7Bij%7D%3D%5Cfrac%7B%7CC_%7Bij%7D%7C%5Csqrt%7BT%5E%7Bsys%7D_%7Bi%7D%5Ctimes%20T%5E%7Bsys%7D_%7Bj%7D%7D%7D%7B%5Csqrt%7BG_%7Bi%7D%5Ctimes%20G_%7Bj%7D%7D%7D)
+
+where A<sub>ij</sub> is the amplitude, T<sup>sys</sup><sub>i</sub> is
+the system temperature of antenna i, and G<sub>i</sub> is the GTP
+of antenna i. A<sub>ij</sub> will have the same units as T<sup>sys</sup><sub>i</sub>
+so long as C<sub>ij</sub> has the same units as G<sub>i</sub>.
+
