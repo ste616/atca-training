@@ -231,14 +231,18 @@ We measure GTP<sub>i</sub> directly from the data, but we need some way
 to determine T<sup>sys</sup><sub>i</sub>. If we know the amplitude of
 the noise diode, and the noise diode is switching on and off, there
 is a pretty straightforward relationship: the system temperature will
-be the amplitude of the noise diode multiplied by the fractional change
-in the output power caused by the noise diode. The absolute change in the
-output power is called the "synchronously-demodulated output" (SDO), and
+be the amplitude of the noise diode multiplied by the inverse of the effect it has
+to the output power caused by the noise diode. We have to use the inverse
+here because a system with a higher system temperature will respond less to
+the same input than a system with a lower system temperature.
+
+The absolute change in the output power due to the noise diode is called the
+"synchronously-demodulated output" (SDO), and
 is simply defined by the difference in the power between the on and off
 states. The fractional change is just this SDO divided by the average power,
-which is the GTP. In other words:
+which is the GTP. In other words, taking into account the inverse relationship:
 
-![T^{sys}_{i} = N_{i}\frac{SDO_{i}}{GTP_{i}}](https://latex.codecogs.com/svg.latex?T%5E%7Bsys%7D_%7Bi%7D%20%3D%20N_%7Bi%7D%5Cfrac%7BSDO_%7Bi%7D%7D%7BGTP_%7Bi%7D%7D)
+![T^{sys}_{i} = N_{i}\frac{GTP_{i}}{SDO_{i}}](https://latex.codecogs.com/svg.latex?T%5E%7Bsys%7D_%7Bi%7D%20%3D%20N_%7Bi%7D%5Cfrac%7BGTP_%7Bi%7D%7D%7BSDO_%7Bi%7D%7D)
 
 where N<sub>i</sub> is the amplitude of the noise diode on antenna i,
 and SDO<sub>i</sub> is the SDO of antenna i.
