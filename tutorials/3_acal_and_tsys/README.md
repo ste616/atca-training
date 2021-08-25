@@ -195,5 +195,30 @@ is, the noise diode on CA04 is pumping up the amplitude when it is on
 by about the same ratio as for CA03; this can be made clearer by giving
 NSPD the command `a` to let each panel use its own y-axis range.
 
+You can see the effect of this different scaling clearly on NVIS, with
+the baselines with the highest amplitudes on 0823-500 all containing
+CA04. It might be useful now to discuss how amplitudes are determined
+from the data.
 
+We label the output from the correlation process the complex number
+C<sub>ij</sub>, for antennas i and j. This is a power
+(because it is a multiplication
+of two numbers), and thus has units of something like Volts^2 (if the raw
+input numbers to the correlator were in Volts). The amplitude is just the
+magnitude of this complex number, but it is presented in NVIS as (pseudo-)Jy.
+How do we do this translation? By multiplying by the square root of the
+product of the system temperatures of the two antennas, where the
+system temperature is expressed in the desired units (in this case Jy).
+But we also need to take away the units of Cij, and we do this by
+dividing it by the square root of the product of the average power
+levels on each antenna. We get these values from the auto-correlation power
+spectra. From NSPD you can see we have two power spectra per polarisation,
+IF and antenna: one from when the noise diode is on, and the other when it
+is off. Because the noise diode has a duty cycle of 50% (half on, half off),
+the average power is just the mean of these two powers, and we call this the
+"gated total power" (GTP).
+
+So, the full equation for how the amplitude is determined is:
+
+![equation](https://latex.codecogs.com/svg.latex?A_{ij}=\frac{|C_{ij}|\sqrt{T^{sys}_{i}\times T^{sys}_{j}}}{\sqrt{G_{i}\times G_{j}}})
 
