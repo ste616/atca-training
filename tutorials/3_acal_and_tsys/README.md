@@ -209,7 +209,7 @@ magnitude of this complex number, but it is presented in NVIS as (pseudo-)Jy.
 How do we do this translation? By multiplying by the square root of the
 product of the system temperatures of the two antennas, where the
 system temperature is expressed in the desired units (in this case Jy).
-But we also need to take away the units of Cij, and we do this by
+But we also need to take away the units of C<sub>ij</sub>, and we do this by
 dividing it by the square root of the product of the average power
 levels on each antenna. We get these values from the auto-correlation power
 spectra. From NSPD you can see we have two power spectra per polarisation,
@@ -263,4 +263,14 @@ and modifies its output appropriately. Do you remember back in tutorial 1,
 we saw that an acal command took immediate effect? This is why: the modification
 here occurs after the data has been correlated and the SDO is measured, whereas delay
 and phase shifts are accounted for during the correlation process.
+
+And because the amplitude scaling is done in this way, it is completely
+reversable, if we know the SDO and the amplitude of the noise diode that
+was used by the correlator for each cycle. This data is indeed stored in
+the data file, and we can view this, and system temperature and GTP, in NVIS
+with the panels `O` (SDO), `n` (noise diode amplitude), `S` (system temperature)
+and `G` (GTP). If you tell NVIS to view this panels along with the amplitude,
+you will see seomthing like the image below.
+
+![NVIS showing amplitude calibration-related parameters](nvis_t3_aOnSG-t.png)
 
