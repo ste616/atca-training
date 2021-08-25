@@ -153,3 +153,47 @@ known flux density, and continually observe how much the system responds
 to that source, even while we're looking at other sources. And, for the
 ATCA, we do have such a system: the noise diode.
 
+On each antenna, for all bands except for 3mm, we have installed a
+broadband noise source which is engineered to be very stable over the
+typical timescales for observing. This noise source is switched on and
+off 8 times per second, and the correlator monitors the data to continually
+assess the effect the noise diode has, and compute the current system
+temperature for each cycle. The correlator then scales the data
+by the computed system temperature, to keep the system linear.
+Thus it is important to calibrate the
+amplitude of the noise diodes, so that the monitoring is as accurate as
+possible; this is what the amplitude calibration process does.
+
+## A look at the data
+
+Let's take a closer look at the data in NSPD. Configure it to view only
+the auto-correlations for both IFs, view 0823-500, and set an amplitude
+scale which keeps all the data in view. The following commands will do
+that, but feel free to go with your own solution.
+
+```
+NSPD> off ccs
+NSPD> get time 04:51
+NSPD> nxy 3 4
+NSPD> a 100 6500
+```
+
+You will see something that looks like the following image.
+
+![NSPD view of 0823-500 auto-correlations](nspd_autos_0823-500.png)
+
+This illustrates quite well the idea that each antenna is on a
+different scale. Consider CA04, which has a much higher amplitude
+than all the other antennas in both IFs. You might think this is
+because the antenna is generating more noise than the other antennas, but
+look more carefully at the red and white lines. The red line is the
+power in the X polarisation while the noise diode is on, while the white
+line is the power in that same polarisation while the noise diode is off.
+Compare the size of the gap between these two lines for each antenna, and
+you'll see that it is fractionally very similar on all the antennas. That
+is, the noise diode on CA04 is pumping up the amplitude when it is on
+by about the same ratio as for CA03; this can be made clearer by giving
+NSPD the command `a` to let each panel use its own y-axis range.
+
+
+
