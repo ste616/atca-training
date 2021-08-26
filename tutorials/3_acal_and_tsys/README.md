@@ -304,3 +304,14 @@ of the more interesting points.
 
 ## Computing SDO and GTP
 
+You may have noticed also that the plot above shows very large numbers for
+GTP and SDO, and may then be wondering about exactly how the correlator
+determines these values. As we said before, these numbers come from the
+raw data, before the scaling process occurs. So let's take a look at those
+raw data, by giving NVIS the command `tsys off`. This causes the server
+to reverse all the amplitude scaling, and display the raw data in both
+NVIS and NSPD. Below is an image showing the raw data for the
+auto-correlations in NSPD.
+
+![Raw data auto-correlations in NSPD](nspd_t3_raw_data.png)
+
