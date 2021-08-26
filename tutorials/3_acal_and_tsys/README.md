@@ -270,7 +270,37 @@ was used by the correlator for each cycle. This data is indeed stored in
 the data file, and we can view this, and system temperature and GTP, in NVIS
 with the panels `O` (SDO), `n` (noise diode amplitude), `S` (system temperature)
 and `G` (GTP). If you tell NVIS to view this panels along with the amplitude,
-you will see seomthing like the image below.
+you will see something like the image below.
 
 ![NVIS showing amplitude calibration-related parameters](nvis_t3_aOnSG-t.png)
+
+There is quite a lot of information in these plots, so let's touch on a few
+of the more interesting points.
+* The amplitude of the noise diode on CA04 is much higher than on the other
+  antennas, and the system temperature is much higher as well, but the SDO
+  and GTP of the antenna is pretty much in line with the others; yet another
+  clue that the problem with this antenna is that the noise diode amplitude
+  is incorrect.
+* System temperature is given in Kelvin here, not Jy. There is a conversion
+  between these two units, which we will go into later. System temperature
+  is stored in the file as Kelvin, and this doesn't matter because only SDO
+  and the noise diode amplitude are required for amplitude manipulation.
+* When the amplitude of 0945-321 changes (at around 04:47:45), the SDO, GTP
+  and system temperature all change in a step fashion, but the noise diode
+  amplitude is not affected. In particular, the SDO decreases, so the
+  computed source flux density must increase since it looks to the correlator
+  like the source is now having a bigger effect on a less sensitive
+  instrument. Why this occurred will be described later, because this is
+  exactly what we would prefer didn't happen, and pretty much why this
+  tutorial exists!
+* There is data while the antennas are slewing between 0945-321 and 0823-500,
+  and we see during this period that the system temperature and GTP are
+  decreasing, while SDO stays constant. This is due to elevation effects:
+  0823-500 was at a higher elevation (about 49 degrees) than 0945-321
+  (about 32 degrees), we can see the transition is pretty smooth as the
+  elevation increases. We can also see from the data that the antennas
+  must have reached their target elevation before they had finished slewing
+  in azimuth.
+
+## Computing SDO and GTP
 
