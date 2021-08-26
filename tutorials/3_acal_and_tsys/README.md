@@ -315,3 +315,22 @@ auto-correlations in NSPD.
 
 ![Raw data auto-correlations in NSPD](nspd_t3_raw_data.png)
 
+Now the amplitudes of the data match the GTP and SDO, and we can see where
+these numbers come from; each of them is the average value within the
+tvchannel range (and this average can be the mean or median, depending
+on the **tvmedian** setting).
+
+The NVIS display looks like this:
+
+![Raw data in NVIS](nvis_t3_raw_data.png)
+
+And here you can notice that the step change in GTP, SDO and system
+temperature that was seen while observing 0945-321 did not come because the
+raw amplitudes changed. The change therefore must have been because the
+correlator was instructed to calculate GTP and SDO differently. Can you
+work out what the change might have been? If you said "the observer changed
+the tvchannels", then you're correct! This is one of the crucial takeaways
+from this tutorial, and one which will be expanded upon later: **the calibration
+of the telescope includes the tvchannel setting, and if you change this
+during your observation, the calibration will no longer be the same**.
+
