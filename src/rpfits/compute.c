@@ -3809,7 +3809,7 @@ void compute_noise_diode_amplitudes(struct fluxdensity_specification *fluxdensit
   float *rsum1, *rsum2, *rsum3, *isum1, *isum2, *isum3, **gains = NULL, *asuma;
   float nd_amp, src_fd, **gainsum = NULL, *asumb, *asumc;
   float *trsum1 = NULL, *tisum1 = NULL, *trsum2 = NULL, *tisum2 = NULL;
-  float *trsum3 = NULL, *tisum3 = NULL, *tasuma = NULL, div1, div2, div3, caljya, caljyb, caljyc;
+  float *trsum3 = NULL, *tisum3 = NULL, *tasuma = NULL;
   double cmjd;
 
   // Figure out the IF index.
@@ -3931,6 +3931,7 @@ void compute_noise_diode_amplitudes(struct fluxdensity_specification *fluxdensit
     }
     nbinst = 0;
     nbinsta = 0;
+
     // We have to find the noise diode amplitude per antenna, so it is
     // most sensible to loop over the antennas here, and do the same
     // procedure for each.
@@ -4020,22 +4021,16 @@ void compute_noise_diode_amplitudes(struct fluxdensity_specification *fluxdensit
 			// get the noise diode amplitude.
 			asuma = NULL;
 			nbinsa = 0;
-			caljya =
-			  cycle_spectra[j]->spectrum[winidx][polidx[i]]->syscal_data->caljy[ant_label - 1][syswinidx][syspolidx];
 			sum_vis(cycle_spectra[j]->spectrum[winidx][polidx[i]], k, options,
 				&nbinsa, &asuma, NULL, NULL);
 		      } else if ((a1 == bnt_label) && (a2 == bnt_label)) {
 			asumb = NULL;
 			nbinsb = 0;
-			caljyb =
-			  cycle_spectra[j]->spectrum[winidx][polidx[i]]->syscal_data->caljy[bnt_label - 1][syswinidx][syspolidx];
 			sum_vis(cycle_spectra[j]->spectrum[winidx][polidx[i]], k, options,
 				&nbinsb, &asumb, NULL, NULL);
 		      } else if ((a1 == cnt_label) && (a2 == cnt_label)) {
 			asumc = NULL;
 			nbinsc = 0;
-			caljyc =
-			  cycle_spectra[j]->spectrum[winidx][polidx[i]]->syscal_data->caljy[cnt_label - 1][syswinidx][syspolidx];
 			sum_vis(cycle_spectra[j]->spectrum[winidx][polidx[i]], k, options,
 				&nbinsc, &asumc, NULL, NULL);
 		      }
@@ -4055,37 +4050,18 @@ void compute_noise_diode_amplitudes(struct fluxdensity_specification *fluxdensit
 			CALLOC(tasuma, nbinsta);
 		      }
 		      if (nbins1 == nbinst) {
-			// Calculate the normalising factors first.
-			if ((nbinsa == nbinsb) &&
-			    (nbinsa == nbinsc) &&
-			    (nbinsa > 1)) {
-			  /* fprintf(stderr, "DEBUG ACAL: for antenna %d pol %d, ON = %.4f OFF = %.4f CALJY = %.4f\n", */
-			  /* 	  ant_label, i, asuma[1], asuma[0], caljya); */
-			  /* fprintf(stderr, "DEBUG ACAL: for antenna %d pol %d, ON = %.4f OFF = %.4f CALJY = %.4f\n", */
-			  /* 	  bnt_label, i, asumb[1], asumb[0], caljyb); */
-			  /* fprintf(stderr, "DEBUG ACAL: for antenna %d pol %d, ON = %.4f OFF = %.4f CALJY = %.4f\n", */
-			  /* 	  cnt_label, i, asumc[1], asumc[0], caljyc); */
-			  div1 = sqrtf(((asuma[1] - asuma[0]) / caljya) *
-				       ((asumb[1] - asumb[0]) / caljyb));
-			  div2 = sqrtf(((asuma[1] - asuma[0]) / caljya) *
-				       ((asumc[1] - asumc[0]) / caljyc));
-			  div3 = sqrtf(((asumb[1] - asumb[0]) / caljyb) * \
-				       ((asumc[1] - asumc[0]) / caljyc));
-			} else {
-			  div1 = div2 = div3 = 1.0;
-			}
 			for (k = 0; k < nbinst; k++) {
-			  trsum1[k] += rsum1[k] / div1;
-			  tisum1[k] += isum1[k] / div1;
-			  trsum2[k] += rsum2[k] / div2;
-			  tisum2[k] += isum2[k] / div2;
-			  trsum3[k] += rsum3[k] / div3;
-			  tisum3[k] += isum3[k] / div3;
+			  trsum1[k] += rsum1[k];
+			  tisum1[k] += isum1[k];
+			  trsum2[k] += rsum2[k];
+			  tisum2[k] += isum2[k];
+			  trsum3[k] += rsum3[k];
+			  tisum3[k] += isum3[k];
 			}
 		      }
 		      if (nbinsa == nbinsta) {
 			for (k = 0; k < nbinsta; k++) {
-			  tasuma[k] += asuma[k] / div1;
+			  tasuma[k] += asuma[k];
 			}
 		      }
 		    }
@@ -4159,7 +4135,9 @@ void compute_noise_diode_amplitudes(struct fluxdensity_specification *fluxdensit
     // diode strength.
     for (a = 0; a < cycle_spectra[0]->header_data->num_ants; a++) {
       for (k = 0; k < nbins_gainsum; k++) {
-	(*noise_diode_modifier)->noise_diode_amplitude[a + 1][opol] +=
+	// The 2x is because the noise diode amplitude is halved due to the
+	// 50% duty cycle, and we correct that here.
+	(*noise_diode_modifier)->noise_diode_amplitude[a + 1][opol] += 2 *
 	  gainsum[a][k] / (float)(gainsum_numtriplets[a][k] * nbins_gainsum);
       }
     }

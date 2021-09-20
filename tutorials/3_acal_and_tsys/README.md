@@ -269,7 +269,7 @@ reversable, if we know the SDO and the amplitude of the noise diode that
 was used by the correlator for each cycle. This data is indeed stored in
 the data file, and we can view this, and system temperature and GTP, in NVIS
 with the panels `O` (SDO), `n` (noise diode amplitude), `S` (system temperature)
-and `G` (GTP). If you tell NVIS to view this panels along with the amplitude,
+and `G` (GTP). If you tell NVIS to view these panels along with the amplitude,
 you will see something like the image below.
 
 ![NVIS showing amplitude calibration-related parameters](nvis_t3_aOnSG-t.png)
@@ -297,7 +297,7 @@ of the more interesting points.
   and we see during this period that the system temperature and GTP are
   decreasing, while SDO stays constant. This is due to elevation effects:
   0823-500 was at a higher elevation (about 49 degrees) than 0945-321
-  (about 32 degrees), we can see the transition is pretty smooth as the
+  (about 32 degrees), and we can see the transition is pretty smooth as the
   elevation increases. We can also see from the data that the antennas
   must have reached their target elevation before they had finished slewing
   in azimuth.
@@ -332,5 +332,9 @@ work out what the change might have been? If you said "the observer changed
 the tvchannels", then you're correct! This is one of the crucial takeaways
 from this tutorial, and one which will be expanded upon later: **the calibration
 of the telescope includes the tvchannel setting, and if you change this
-during your observation, the calibration will no longer be the same**.
+during your observation, the calibration will no longer be the same**. This is
+why the correlator remembers the tvchannel range associated with each
+different frequency configuration.
+
+
 

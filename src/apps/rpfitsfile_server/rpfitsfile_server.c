@@ -2787,6 +2787,8 @@ int main(int argc, char *argv[]) {
 		for (i = 0; i < n_copied_options; i++) {
 		  CALLOC(copied_options[i], 1);
 		  copy_ampphase_options(copied_options[i], client_options[i]);
+		  // Set the options to have no Tsys calibration applied.
+		  client_options[i]->systemp_reverse_online = true;
 		}
 		printf(" Getting %d cycles:\n", n_acal_cycles);
 		for (i = 0; i < n_acal_cycles; i++) {
