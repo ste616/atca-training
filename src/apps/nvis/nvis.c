@@ -1090,7 +1090,7 @@ int main(int argc, char *argv[]) {
   int i, j, k, l, m, r, bytes_received, nmesg = 0, bidx = -1, num_timelines = 0, pnum;
   int dump_type = FILETYPE_UNKNOWN, dump_device_number = -1, vis_device_number = -1;
   int *timeline_types = NULL, cycidx, visidx, a1, a2, *mod_remove = NULL, n_mod_remove = 0;
-  int alabel, acal_modified_idx, acal_modify_range;
+  int alabel, acal_modified_idx, acal_modify_range, n_acal_options = 0;
   cmp_ctx_t cmp;
   cmp_mem_access_t mem;
   struct requests server_request;
@@ -1111,6 +1111,7 @@ int main(int argc, char *argv[]) {
   struct panelspec dump_panelspec;
   struct ampphase_modifiers *modptr = NULL;
   struct fluxdensity_specification acal_fd_spec;
+  struct ampphase_options **acal_options = NULL;
 
   // Allocate and initialise some memory.
   MALLOC(mesgout, MAX_N_MESSAGES);
@@ -1637,8 +1638,14 @@ int main(int argc, char *argv[]) {
       init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)SENDBUFSIZE);
       pack_requests(&cmp, &server_request);
       pack_write_sint(&cmp, n_ampphase_options);
+      // We keep a copy of these options for when we have to enact them,
+      // because these will come back with the Tsys correction parameter set to NONE.
+      n_acal_options = n_ampphase_options;
+      CALLOC(acal_options, n_acal_options);
       for (i = 0; i < n_ampphase_options; i++) {
 	pack_ampphase_options(&cmp, ampphase_options[i]);
+	CALLOC(acal_options[i], 1);
+	copy_ampphase_options(acal_options[i], ampphase_options[i]);
       }
       // We have to compute, sort and then send the MJDs of the cycles we want
       // to use to compute the acal parameters.
@@ -2038,6 +2045,22 @@ int main(int argc, char *argv[]) {
 	pack_read_sint(&cmp, &acal_modified_idx);
 	// We also receive the flux densities assumed during calibration.
 	unpack_fluxdensity_specification(&cmp, &acal_fd_spec);
+	// Now we change back to use the Tsys correction that was in effect
+	// when we requested the acal to be computed.
+	for (i = 0; i < n_ampphase_options; i++) {
+	  if (i < n_acal_options) {
+	    ampphase_options[i]->systemp_reverse_online =
+	      acal_options[i]->systemp_reverse_online;
+	    ampphase_options[i]->systemp_apply_computed =
+	      acal_options[i]->systemp_apply_computed;
+	  }
+	}
+	// Free the copied options now we don't need them any more.
+	for (i = 0; i < n_acal_options; i++) {
+	  free_ampphase_options(acal_options[i]);
+	  FREE(acal_options[i]);
+	}
+	FREE(acal_options);
 	// Output and use these new modifiers.
 	action_required = ACTION_ENACT_ACAL | ACTION_NEW_DATA_RECEIVED;
       }

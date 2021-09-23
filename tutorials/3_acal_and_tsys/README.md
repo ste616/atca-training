@@ -354,3 +354,24 @@ and SDO, and thus allow us to determine it. For example, if we call our antennas
 
 ![\frac{A_{13}A_{23}}{A_{12}}=\frac{N_{3}}{SDO_{3}}\frac{|C_{13}| |C_{23}|}{|C_{12}|}](https://latex.codecogs.com/svg.latex?%5Cfrac%7BA_%7B13%7DA_%7B23%7D%7D%7BA_%7B12%7D%7D%3D%5Cfrac%7BN_%7B3%7D%7D%7BSDO_%7B3%7D%7D%5Cfrac%7B%7CC_%7B13%7D%7C%20%7CC_%7B23%7D%7C%7D%7B%7CC_%7B12%7D%7C%7D)
 
+That is, if you take the product of the two baselines that involve the antenna
+you want to isolate, and divide that by the baseline that doesn't, you cancel out
+the effects of the other two antennas; this is called a "gain triplet".
+
+If you know the amplitude of the source you're observing, and it's a point source,
+then the left-hand-side of these equations simplifies to give just the amplitude
+of the source. And if there are more than three antennas, you can isolate a single antenna
+in multiple ways (with six antennas, you can find ten different ways) and thus
+get a more accurate estimate of the noise diode amplitudes.
+
+This is what the correlator does when you do an acal, so let's run through
+that command. The acal command is a CACOR command, and it requires that you supply
+the flux density of the source in each of the IFs. Since most observers use 1934-638 or
+0823-500 to do their amplitude calibration, they also usually choose to use CAOBS
+to perform the acal because it will automatically supply the appropriate flux densities
+of these sources, at the centre frequency of each IF. For example, with centre frequencies
+of 5500 MHz and 7500 MHz, CAOBS's flux density model for 0823-500 will automatically
+supply the flux densities of 2.622 Jy and 1.747 Jy respectively. That is, you could
+type `corr acal` in CAOBS to get the same effect as `acal 2.622 1.747` in CACOR.
+
+The acal command in NVIS has the same functionality, so let's try it.
