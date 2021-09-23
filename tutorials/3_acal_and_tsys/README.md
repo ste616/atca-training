@@ -336,5 +336,21 @@ during your observation, the calibration will no longer be the same**. This is
 why the correlator remembers the tvchannel range associated with each
 different frequency configuration.
 
+## Setting the noise diode amplitude
 
+The last thing we need to do is determine the noise diode amplitude accurately.
+To do this we go back to the equation which transforms the correlated output into
+the amplitude.
+
+![A_{ij}=\frac{|C_{ij}|\sqrt{N_{i}\times N_{j}}}{\sqrt{SDO_{i}\times SDO_{j}}}](https://latex.codecogs.com/svg.latex?A_%7Bij%7D%3D%5Cfrac%7B%7CC_%7Bij%7D%7C%5Csqrt%7BN_%7Bi%7D%5Ctimes%20N_%7Bj%7D%7D%7D%7B%5Csqrt%7BSDO_%7Bi%7D%5Ctimes%20SDO_%7Bj%7D%7D%7D)
+
+If we have three antennas, we can isolate each antenna's noise diode amplitude
+and SDO, and thus allow us to determine it. For example, if we call our antennas
+1, 2 and 3, we can get the equations:
+
+![\frac{A_{12}A_{13}}{A_{23}}=\frac{N_{1}}{SDO_{1}}\frac{|C_{12}| |C_{13}|}{|C_{23}|}](https://latex.codecogs.com/svg.latex?%5Cfrac%7BA_%7B12%7DA_%7B13%7D%7D%7BA_%7B23%7D%7D%3D%5Cfrac%7BN_%7B1%7D%7D%7BSDO_%7B1%7D%7D%5Cfrac%7B%7CC_%7B12%7D%7C%20%7CC_%7B13%7D%7C%7D%7B%7CC_%7B23%7D%7C%7D)
+
+![\frac{A_{12}A_{23}}{A_{13}}=\frac{N_{2}}{SDO_{2}}\frac{|C_{12}| |C_{23}|}{|C_{13}|}](https://latex.codecogs.com/svg.latex?%5Cfrac%7BA_%7B12%7DA_%7B23%7D%7D%7BA_%7B13%7D%7D%3D%5Cfrac%7BN_%7B2%7D%7D%7BSDO_%7B2%7D%7D%5Cfrac%7B%7CC_%7B12%7D%7C%20%7CC_%7B23%7D%7C%7D%7B%7CC_%7B13%7D%7C%7D)
+
+![\frac{A_{13}A_{23}}{A_{12}}=\frac{N_{3}}{SDO_{3}}\frac{|C_{13}| |C_{23}|}{|C_{12}|}](https://latex.codecogs.com/svg.latex?%5Cfrac%7BA_%7B13%7DA_%7B23%7D%7D%7BA_%7B12%7D%7D%3D%5Cfrac%7BN_%7B3%7D%7D%7BSDO_%7B3%7D%7D%5Cfrac%7B%7CC_%7B13%7D%7C%20%7CC_%7B23%7D%7C%7D%7B%7CC_%7B12%7D%7C%7D)
 
