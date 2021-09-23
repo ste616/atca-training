@@ -431,6 +431,6 @@ time and compare the correlator-computed values with the values computed by the
 simulator. For example, here is the comparison between the correlator-computed and
 simulator-computed system temperatures.
 
-![NVIS display comparing the system temperatures after the acal](nvis_t3_after_acal_sSC.png)
+![NVIS display comparing the system temperatures after the acal](nvis_t3_after_acal_aSC.png)
 
 
