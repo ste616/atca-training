@@ -374,4 +374,49 @@ of 5500 MHz and 7500 MHz, CAOBS's flux density model for 0823-500 will automatic
 supply the flux densities of 2.622 Jy and 1.747 Jy respectively. That is, you could
 type `corr acal` in CAOBS to get the same effect as `acal 2.622 1.747` in CACOR.
 
-The acal command in NVIS has the same functionality, so let's try it.
+The acal command in NVIS has the same functionality, so let's try it. Make sure the
+time range you've selected with the `data` command is during the 0823-500 observation,
+and then give NVIS the command:
+
+```
+NVIS> acal all
+```
+
+If you watch the terminal that `rpfitsfile_server` is running in, you'll see a bunch
+of output, including the lines:
+
+```
+ Data obtained, computing parameters...
+  DEBUG: assuming source flux density of 2.622 Jy in window 1
+  DEBUG: assuming source flux density of 1.747 Jy in window 2
+```
+
+From this you can see it is using the same flux density model as CAOBS does for
+0823-500. After a bit of computation on the server, you will see some output in
+NVIS similar to:
+
+```
+NVIS> acal all
+ BAND 1 FLUX = 2.622 Jy, MJD 0.000000 - 100000.000000:
+   ANT 1: X = 22.28 Y = 22.51 Jy
+   ANT 2: X = 18.73 Y = 19.75 Jy
+   ANT 3: X = 18.53 Y = 18.22 Jy
+   ANT 4: X = 18.76 Y = 18.76 Jy
+   ANT 5: X = 17.21 Y = 15.47 Jy
+   ANT 6: X = 21.11 Y = 20.56 Jy
+ BAND 2 FLUX = 1.747 Jy, MJD 0.000000 - 100000.000000:
+   ANT 1: X = 33.90 Y = 33.50 Jy
+   ANT 2: X = 26.86 Y = 27.16 Jy
+   ANT 3: X = 28.90 Y = 30.81 Jy
+   ANT 4: X = 29.28 Y = 29.46 Jy
+   ANT 5: X = 22.70 Y = 20.43 Jy
+   ANT 6: X = 29.93 Y = 30.49 Jy
+```
+
+These numbers are the computed noise diode amplitudes for each polarisation on
+each antenna, for each of the IFs. Once these have been computed, NVIS asks
+the server to recompute the amplitudes for all the data. After that has been completed,
+the NVIS display should look something like the following picture:
+
+![NVIS display after the acal](nvis_t3_after_acal_aOnSG.png)
+
