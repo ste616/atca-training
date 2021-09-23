@@ -420,3 +420,17 @@ the NVIS display should look something like the following picture:
 
 ![NVIS display after the acal](nvis_t3_after_acal_aOnSG.png)
 
+The amplitudes on all the baselines are now consistent with each other, and match
+the flux density of 0823-500. The "Noise Cal." panel also shows that the amplitude
+of each noise diode matches the number in the above NVIS output. However, it doesn't
+look like any of the other panels have changed, and they haven't. The simulation
+software makes available both the correlator-computed GTP, SDO and system temperature
+with the `G`, `O` and `S` panels respectively, and the same quantities computed with
+whatever settings you want, with the `g`, `o`, and `C` panels respectively. Take some
+time and compare the correlator-computed values with the values computed by the
+simulator. For example, here is the comparison between the correlator-computed and
+simulator-computed system temperatures.
+
+![NVIS display comparing the system temperatures after the acal](nvis_t3_after_acal_sSC.png)
+
+
