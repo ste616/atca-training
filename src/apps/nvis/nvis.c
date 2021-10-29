@@ -592,7 +592,7 @@ static void interpret_command(char *line) {
       if (nels == 1) {
         // Reset the all the panels back to defaults.
         change_vis_plotcontrols_limits(&vis_plotcontrols, PLOT_ALL_PANELS,
-                                       false, 0, 0);
+                                       false, false, 0, 0);
         action_required = ACTION_REFRESH_PLOT;
       } else if (nels > 1) {
         // Get the panel type from the second argument.
@@ -659,15 +659,28 @@ static void interpret_command(char *line) {
           if (nels == 2) {
             // Reset just the named panel.
             change_vis_plotcontrols_limits(&vis_plotcontrols, change_panel,
-                                           false, 0, 0);
+                                           false, false, 0, 0);
             action_required = ACTION_REFRESH_PLOT;
-          } else if (nels == 4) {
+	  } else if (nels == 3) {
+	    if (minmatch("fraction", line_els[2], 4)) {
+	      // Reset the named panel, but also change it to display fractional
+	      // values.
+	      change_vis_plotcontrols_limits(&vis_plotcontrols, change_panel,
+					     false, true, 0, 0);
+	      action_required = ACTION_REFRESH_PLOT;
+	    }
+          } else if ((nels == 4) || (nels == 5)) {
             // We've been given limits.
             if ((string_to_float(line_els[2], &limit_min)) &&
                 (string_to_float(line_els[3], &limit_max))) {
               // The limits were successfully read.
-              change_vis_plotcontrols_limits(&vis_plotcontrols, change_panel,
-                                             true, limit_min, limit_max);
+	      if ((nels == 5) && minmatch("fraction", line_els[4], 4)) {
+		change_vis_plotcontrols_limits(&vis_plotcontrols, change_panel,
+					       true, true, limit_min, limit_max);
+	      } else {
+		change_vis_plotcontrols_limits(&vis_plotcontrols, change_panel,
+					       true, false, limit_min, limit_max);
+	      }
               action_required = ACTION_REFRESH_PLOT;
             }
           }

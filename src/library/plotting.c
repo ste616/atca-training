@@ -252,7 +252,7 @@ void change_vis_plotcontrols_visbands(struct vis_plotcontrols *plotcontrols,
 }
 
 void change_vis_plotcontrols_limits(struct vis_plotcontrols *plotcontrols,
-                                    int paneltype, bool use_limit,
+                                    int paneltype, bool use_limit, bool show_fraction,
                                     float limit_min, float limit_max) {
   int i;
   // First, find the panel matching paneltype. If paneltype is -1, change
@@ -261,6 +261,7 @@ void change_vis_plotcontrols_limits(struct vis_plotcontrols *plotcontrols,
     if ((paneltype == VIS_PLOTPANEL_ALL) ||
         (plotcontrols->panel_type[i] == paneltype)) {
       plotcontrols->use_panel_limits[i] = use_limit;
+      plotcontrols->show_panel_fraction[i] = show_fraction;
       if (use_limit) {
         // Change the limit settings.
         plotcontrols->panel_limits_min[i] = limit_min;
@@ -308,7 +309,7 @@ void change_vis_plotcontrols_panels(struct vis_plotcontrols *plotcontrols,
                                     int xaxis_type, int num_panels,
                                     int *paneltypes, struct panelspec *panelspec) {
   int cnpanels = 0, i, j;
-  bool *climits = NULL;
+  bool *climits = NULL, *cfractions = NULL;
   float *climits_min = NULL, *climits_max = NULL;
   
   // We change which panels are displayed, and the axis types.
@@ -331,12 +332,14 @@ void change_vis_plotcontrols_panels(struct vis_plotcontrols *plotcontrols,
     CALLOC(climits, num_panels);
     CALLOC(climits_min, num_panels);
     CALLOC(climits_max, num_panels);
+    CALLOC(cfractions, num_panels);
     for (i = 0; i < num_panels; i++) {
       for (j = 0; j < plotcontrols->num_panels; j++) {
         if (paneltypes[i] == plotcontrols->panel_type[j]) {
           climits[i] = plotcontrols->use_panel_limits[j];
           climits_min[i] = plotcontrols->panel_limits_min[j];
           climits_max[i] = plotcontrols->panel_limits_max[j];
+	  cfractions[i] = plotcontrols->show_panel_fraction[j];
           break;
         }
       }
@@ -352,16 +355,19 @@ void change_vis_plotcontrols_panels(struct vis_plotcontrols *plotcontrols,
     REALLOC(plotcontrols->use_panel_limits, plotcontrols->num_panels);
     REALLOC(plotcontrols->panel_limits_min, plotcontrols->num_panels);
     REALLOC(plotcontrols->panel_limits_max, plotcontrols->num_panels);
+    REALLOC(plotcontrols->show_panel_fraction, plotcontrols->num_panels);
     for (i = 0; i < num_panels; i++) {
       plotcontrols->panel_type[i] = paneltypes[i];
       plotcontrols->use_panel_limits[i] = climits[i];
       plotcontrols->panel_limits_min[i] = climits_min[i];
       plotcontrols->panel_limits_max[i] = climits_max[i];
+      plotcontrols->show_panel_fraction[i] = cfractions[i];
     }
     // Free our memory.
     FREE(climits);
     FREE(climits_min);
     FREE(climits_max);
+    FREE(cfractions);
   }
   
 }
@@ -404,8 +410,10 @@ void init_vis_plotcontrols(struct vis_plotcontrols *plotcontrols,
   MALLOC(plotcontrols->use_panel_limits, plotcontrols->num_panels);
   MALLOC(plotcontrols->panel_limits_min, plotcontrols->num_panels);
   MALLOC(plotcontrols->panel_limits_max, plotcontrols->num_panels);
+  MALLOC(plotcontrols->show_panel_fraction, plotcontrols->num_panels);
   for (i = 0; i < plotcontrols->num_panels; i++) {
     plotcontrols->use_panel_limits[i] = false;
+    plotcontrols->show_panel_fraction[i] = false;
   }
 
   // Keep the PGPLOT device.
@@ -446,6 +454,7 @@ void free_vis_plotcontrols(struct vis_plotcontrols *plotcontrols) {
   FREE(plotcontrols->use_panel_limits);
   FREE(plotcontrols->panel_limits_min);
   FREE(plotcontrols->panel_limits_max);
+  FREE(plotcontrols->show_panel_fraction);
 }
 
 void free_panelspec(struct panelspec *panelspec) {
@@ -1138,13 +1147,14 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
   int **n_plot_lines = NULL, ipos = -1, *panel_n_vis_lines = NULL, n_active_ants = 0;
   int n_tsys_vis_lines = 0, n_meta_vis_lines = 0, dbrk, *antprod = NULL, nls = 1;
   int n_closure_vis_lines = 0;
-  float ****plot_lines = NULL, min_x, max_x, min_y, max_y;
+  float ****plot_lines = NULL, min_x, max_x, min_y, max_y, avg_plotline_value;
   float cxpos, dxpos, labtotalwidth, labspacing, dy, maxwidth, twidth;
   float padlabel = 0.01, cch, timeline_x[2], timeline_y[2];
   float ***antlines = NULL, maxch = 1.1, num_panels;
   double basemjd, basest, chkmjd, chktime, min_time, max_time, lst;
-  char xopts[BUFSIZE], yopts[BUFSIZE], panellabel[BUFSIZE], panelunits[BUFSIZE];
+  char xopts[BUFSIZE], yopts[BUFSIZE], panellabel[BUFSIZE], panelunits[BUFSIZE-2];
   char antstring[BUFSIZE], bandstring[BUFSIZE], panelerror[BUFSIZE], timetypestring[BUFSIZE];
+  char tpanelunits[BUFSIZE];
   struct vis_line **vis_lines = NULL, **tsys_vis_lines = NULL, **meta_vis_line = NULL;
   struct vis_line ***plot_vis_lines = NULL, **closure_vis_lines = NULL;
   struct scan_header_data *vlh = NULL;
@@ -1940,6 +1950,27 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
       }
     }
 
+    // If we've been asked to show fractional values, we compute those here.
+    if (plot_controls->show_panel_fraction[i]) {
+      // We also have to reset the plot range.
+      min_y = INFINITY;
+      max_y = -INFINITY;
+      for (j = 0; j < panel_n_vis_lines[i]; j++) {
+	// Calculate the average value.
+	avg_plotline_value = 0;
+	for (k = 0; k < n_plot_lines[i][j]; k++) {
+	  avg_plotline_value += plot_lines[i][j][1][k];
+	}
+	avg_plotline_value /= (float)n_plot_lines[i][j];
+	// And now recompute each value compared to this average.
+	for (k = 0; k < n_plot_lines[i][j]; k++) {
+	  plot_lines[i][j][1][k] /= avg_plotline_value;
+	  MINASSIGN(min_y, plot_lines[i][j][1][k]);
+	  MAXASSIGN(max_y, plot_lines[i][j][1][k]);
+	}
+      }
+    }
+    
     // Make the panel.
     changepanel(0, i, panelspec);
     
@@ -2062,6 +2093,11 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
     } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_SIDEREALTIME) {
       (void)strcpy(panellabel, "Sidereal Time");
       (void)strcpy(panelunits, "(hours)");
+    }
+    // Add an indicator of whether we're plotting fractional values.
+    if (plot_controls->show_panel_fraction[i]) {
+      snprintf(tpanelunits, BUFSIZE, "*%s*", panelunits);
+      strcpy(panelunits, tpanelunits);
     }
     cpgmtxt("L", 2.2, 0.5, 0.5, panellabel);
     cpgmtxt("R", 2.2, 0.5, 0.5, panelunits);

@@ -433,4 +433,71 @@ simulator-computed system temperatures.
 
 ![NVIS display comparing the system temperatures after the acal](nvis_t3_after_acal_aSC.png)
 
+The system temperatures on each antenna are now computed to be very similar to each other,
+which is what we expect at these frequencies. Success!
+
+## The problems with acal
+
+As we saw before, tracking system temperature allows us to keep the system linear
+while conditions change. System temperature comes in handy during imaging and analysis,
+so you can downweight less sensitive data compared to the more sensitive data. For
+these purposes, it doesn't really matter if the system temperature is accurate, so long
+as all the data is on the same system temperature scale. In the above plot, we can see
+that the flux density of 0823-500 is 2.622 Jy, and that of 0945-321 is about 0.28 Jy.
+What happens if we tell the acal that the flux density of 0823-500 is actually 5 Jy at 5.5 GHz?
+
+To do this, first reset the amplitude calibration with `reset acal` in NVIS, and then
+`acal 5 3.331 all` (which scales IF2 by the same amount as IF1). You might get something
+like the following image.
+
+![NVIS display comparing the system temperatures after the acal with higher amplitude](nvis_t3_bigger_acal_aSC.png)
+
+The computed system temperature is higher than it was before, but so is the flux density
+of 0945-321; it's now about 0.55 Jy. So when we told the system to increase the flux
+density of 0823-500 by a factor of about 1.9, the flux density of 0945-321 also increased
+by that same factor.
+
+This is entirely fixable in data reduction, because of the linearity. If during data
+reduction, we decide the flux density scale is incorrect, we simply scale everything the
+correct way (this is what gpboot does in Miriad). But Miriad at least does this in a very
+simple way, by scaling the gains without adjusting the underlying system temperatures. This
+will be no problem if we make an image using data from a single epoch, all obtained after
+a single acal. There, if we weight inversely proportionally to system temperature, all
+the data will be weighted correctly relative to each other.
+
+Imagine though that you're trying to make an image from several epochs of data, spread
+over several weeks or months of time. At each epoch another acal is performed, so each
+epoch's system temperature scaling is different. Now, it might be that the same system
+temperature from two different epochs could actually represent two different actual
+sensitivities.
+
+How different could they be? Let's investigate.
+
+We already saw earlier that a system temperature change could be caused by changing the
+tvchannels, so let's start with that. In NSPD, we can clearly see that there's some
+pretty strong RFI at about 5580 MHz, especially on the shortest baseline 1-2. If during
+the calibration process the observer wanted to avoid this RFI, they may have changed
+the tvchannels before the acal. The RFI sits at about channel 1100, so maybe they wanted
+to keep as many channels as they could, and chose a range of 200 - 1050.
+
+In this case, the acal will produce system temperatures on average 1.9% lower than
+before. If we examine how stable the system temperature is though, we can see that
+in the last 2 minutes of 0823-500 data, the system temperature doesn't vary by more
+than 0.8% (except on CA01, where it varies by 2%). So the settings used for the acal
+produce a significant, measurable effect on the system temperature. And if you're
+relying on the system temperature during your data reduction, there will be a
+systematic error if it isn't calibrated exactly the same way each time. It may not
+be an important or significant error, but it is at least something to keep in
+mind when executing your observations.
+
+It can be a challenge to ensure the exact same calibration each time as well. If the
+flux density of the source you're using to calibrate changes with time, then using
+the same flux density parameters with acal at each epoch is not correct. Only 1934-638
+has a stable flux density, while all other calibrators vary, albeit some of them
+(like 0823-500) slowly and relatively predictably. The C007 project monitors the
+ATCA calibrator list and makes available historical flux densities in the
+[ATCA calibrator database](https://www.narrabri.atnf.csiro.au/calibrators/). This
+same database also makes it possible to query the most recent flux densities of
+any calibrator at any particular set of frequencies (most conveniently through the
+CABB scheduler interface).
 

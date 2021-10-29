@@ -310,6 +310,13 @@ struct vis_plotcontrols {
    * This 1-D array has length `num_panels` and is indexed starting at 0.
    */
   float *panel_limits_max;
+  /*! \var show_panel_fraction
+   *  \brief Display the values on this panel as a fraction of the average
+   *         value.
+   *
+   * This 1-D array has length `num_panels` and is indexed starting at 0.
+   */
+  bool *show_panel_fraction;
   /*! \var x_axis_type
    *  \brief The variable to use on the x-axis, as one of the eligible
    *         PLOT_* magic numbers defined in this header
@@ -414,7 +421,7 @@ void init_spd_plotcontrols(struct spd_plotcontrols *plotcontrols,
 void change_vis_plotcontrols_visbands(struct vis_plotcontrols *plotcontrols,
                                       int nvisbands, char **visbands);
 void change_vis_plotcontrols_limits(struct vis_plotcontrols *plotcontrols,
-                                    int paneltype, bool use_limits,
+                                    int paneltype, bool use_limits, bool show_fraction,
                                     float limit_min, float limit_max);
 bool product_can_be_x(int product);
 void change_vis_plotcontrols_panels(struct vis_plotcontrols *plotcontrols,
