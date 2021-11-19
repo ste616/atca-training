@@ -501,3 +501,10 @@ same database also makes it possible to query the most recent flux densities of
 any calibrator at any particular set of frequencies (most conveniently through the
 CABB scheduler interface).
 
+The data we've been looking at was obtained on 2021-April-28, and we can use the
+[flux density request function on the 0823-500 page](https://www.narrabri.atnf.csiro.au/calibrators/calibrator_database_viewcal?source=0823-500#fluxRequest)
+to find out that 0823-500 had flux densities of 2.835 Jy and 1.993 Jy at 5.5 and
+7.5 GHz respectively, as measured on 2021-May-01. This is 8.1% and 14.1% higher
+than the model flux densities at those two frequencies respectively. Putting the
+measured values in makes the system temperatures 4% and 6.8% higher
+respectively.

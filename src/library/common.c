@@ -987,3 +987,95 @@ void info_print(char *o, int olen, char *fmt, ...) {
   }
   
 }
+
+/*!
+ *  \brief Convert supplied degrees into radians
+ *  \param deg the angle in degrees to convert
+ *  \return the angle in radians
+ */
+float deg2rad(float deg) {
+  return (deg * M_PI / 180);
+}
+
+/*!
+ *  \brief Convert supplied radians into degrees
+ *  \param rad the angle in radians to convert
+ *  \return the angle in degrees, between 0 and 360 deg
+ */
+float rad2deg(float rad) {
+  return (rad * 180 / M_PI);
+}
+
+/*!
+ *  \brief Convert supplied hours into degrees
+ *  \param hour the angle in hours to convert
+ *  \return the angle in degrees
+ */
+float hour2deg(float hour) {
+  return (hour * 15);
+}
+
+/*! 
+ *  \brief Convert supplied hours into radians
+ *  \param hour the angle in hours to convert
+ *  \return the angle in radians
+ */
+float hour2rad(float hour) {
+  return (deg2rad(hour2deg(hour)));
+}
+
+/*!
+ *  \brief Convert supplied degrees into hours
+ *  \param deg the angle in degrees to convert
+ *  \return the angle in hours
+ */
+float deg2hour(float deg) {
+  return (deg / 15);
+}
+
+/*!
+ *  \brief Convert supplied radians into hours
+ *  \param rad the angle in radians to convert
+ *  \return the angle in hours
+ */
+float rad2hour(float rad) {
+  return (deg2hour(rad2deg(rad)));
+}
+
+/*!
+ *  \brief Calculate the elevation of a source given hour angle, the
+ *         source declination, and the location of the observation
+ *  \param hour_angle the hour angle of the observation, in hours
+ *  \param declination the declination of the source, in degrees
+ *  \param latitude the latitude of the observatory, in degrees
+ *  \param azimuth a pointer to a variable which upon exit will be set
+ *                 to the local azimuth of the source, in degrees,
+ *                 or NULL if you don't care about azimuth
+ *  \param elevation a pointer to a variable which upon exit will be set
+ *                   to the local elevation of the source, in degrees,
+ *                   or NULL if you don't care about elevation
+ */
+void eq_az_el(float hour_angle, float declination, float latitude,
+	      float *azimuth, float *elevation) {
+  float sphi, cphi, sleft, cleft, sright, cright, left_out, right_out;
+  
+  // Just a bunch of conversions.
+  sphi = sinf(deg2rad(latitude));
+  cphi = cosf(deg2rad(latitude));
+  sleft = sinf(hour2rad(hour_angle));
+  cleft = cosf(hour2rad(hour_angle));
+  sright = sinf(deg2rad(declination));
+  cright = cosf(deg2rad(declination));
+  left_out = atan2f(-sleft, -cleft * sphi + (sright * cphi) / cright);
+  // Keep the azimuth as a positive number.
+  while (left_out < 0) {
+    left_out += 2 * M_PI;
+  }
+  right_out = asinf(cleft * cright * cphi + sright * sphi);
+  if (azimuth != NULL) {
+    *azimuth = rad2deg(left_out);
+  }
+  if (elevation != NULL) {
+    *elevation = rad2deg(right_out);
+  }
+}

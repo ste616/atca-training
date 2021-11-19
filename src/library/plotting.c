@@ -271,7 +271,7 @@ void change_vis_plotcontrols_limits(struct vis_plotcontrols *plotcontrols,
   }
 }
 
-#define NAVAILABLE_PANELS 23
+#define NAVAILABLE_PANELS 25
 const int available_panels[NAVAILABLE_PANELS] = { VIS_PLOTPANEL_AMPLITUDE,
                                                   VIS_PLOTPANEL_PHASE,
                                                   VIS_PLOTPANEL_DELAY,
@@ -294,7 +294,9 @@ const int available_panels[NAVAILABLE_PANELS] = { VIS_PLOTPANEL_AMPLITUDE,
 						  VIS_PLOTPANEL_DECLINATION,
 						  VIS_PLOTPANEL_SIDEREALTIME,
 						  VIS_PLOTPANEL_GTP_COMPUTED,
-						  VIS_PLOTPANEL_SDO_COMPUTED };
+						  VIS_PLOTPANEL_SDO_COMPUTED,
+						  VIS_PLOTPANEL_AZIMUTH,
+						  VIS_PLOTPANEL_ELEVATION };
 
 bool product_can_be_x(int product) {
   switch (product) {
@@ -1150,7 +1152,7 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
   float ****plot_lines = NULL, min_x, max_x, min_y, max_y, avg_plotline_value;
   float cxpos, dxpos, labtotalwidth, labspacing, dy, maxwidth, twidth;
   float padlabel = 0.01, cch, timeline_x[2], timeline_y[2];
-  float ***antlines = NULL, maxch = 1.1, num_panels;
+  float ***antlines = NULL, maxch = 1.1, num_panels, hour_angle, azimuth, elevation;
   double basemjd, basest, chkmjd, chktime, min_time, max_time, lst;
   char xopts[BUFSIZE], yopts[BUFSIZE], panellabel[BUFSIZE], panelunits[BUFSIZE-2];
   char antstring[BUFSIZE], bandstring[BUFSIZE], panelerror[BUFSIZE], timetypestring[BUFSIZE];
@@ -1729,7 +1731,9 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
 	       (plot_controls->panel_type[i] == VIS_PLOTPANEL_RIGHTASCENSION) ||
 	       (plot_controls->panel_type[i] == VIS_PLOTPANEL_DECLINATION) ||
 	       (plot_controls->panel_type[i] == VIS_PLOTPANEL_HOURANGLE) ||
-	       (plot_controls->panel_type[i] == VIS_PLOTPANEL_SIDEREALTIME)) {
+	       (plot_controls->panel_type[i] == VIS_PLOTPANEL_SIDEREALTIME) ||
+	       (plot_controls->panel_type[i] == VIS_PLOTPANEL_AZIMUTH) ||
+	       (plot_controls->panel_type[i] == VIS_PLOTPANEL_ELEVATION)) {
       // Make a metadata plot that only has a single site-based line.
       panel_n_vis_lines[i] = 1;
       MALLOC(plot_lines[i], 1);
@@ -1832,6 +1836,23 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
 		mjd2lst(date2mjd(cycle_vis_quantities[k][l][m]->obsdate,
 				 cycle_vis_quantities[k][l][m]->ut_seconds),
 			ATCA_LONGITUDE_TURNS, 37);
+	    } else if ((plot_controls->panel_type[i] == VIS_PLOTPANEL_AZIMUTH) ||
+		       (plot_controls->panel_type[i] == VIS_PLOTPANEL_ELEVATION)) {
+	      // Compute the azimuth and elevation from the hour angle, declination
+	      // and latitude.
+	      lst = mjd2lst(date2mjd(cycle_vis_quantities[k][l][m]->obsdate,
+				     cycle_vis_quantities[k][l][m]->ut_seconds),
+			    ATCA_LONGITUDE_TURNS, 37);
+	      hour_angle = lst -
+		header_data[k]->rightascension_hours[cycle_vis_quantities[k][l][m]->source_no];
+	      eq_az_el(hour_angle,
+		       header_data[k]->declination_degrees[cycle_vis_quantities[k][l][m]->source_no],
+		       ATCA_LATITUDE, &azimuth, &elevation);
+	      if (plot_controls->panel_type[i] == VIS_PLOTPANEL_AZIMUTH) {
+		plot_lines[i][j][1][n_plot_lines[i][j] - 1] = azimuth;
+	      } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_ELEVATION) {
+		plot_lines[i][j][1][n_plot_lines[i][j] - 1] = elevation;
+	      }
 	    }
             MINASSIGN(min_y, plot_lines[i][j][1][n_plot_lines[i][j] - 1]);
             MAXASSIGN(max_y, plot_lines[i][j][1][n_plot_lines[i][j] - 1]);
@@ -2093,6 +2114,12 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
     } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_SIDEREALTIME) {
       (void)strcpy(panellabel, "Sidereal Time");
       (void)strcpy(panelunits, "(hours)");
+    } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_AZIMUTH) {
+      (void)strcpy(panellabel, "Azimuth");
+      (void)strcpy(panelunits, "(degrees)");
+    } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_ELEVATION) {
+      (void)strcpy(panellabel, "Elevation");
+      (void)strcpy(panelunits, "(degrees)");
     }
     // Add an indicator of whether we're plotting fractional values.
     if (plot_controls->show_panel_fraction[i]) {

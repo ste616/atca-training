@@ -266,6 +266,8 @@ int char_to_product(char pstring) {
   switch (pstring) {
   case 'a':
     return VIS_PLOTPANEL_AMPLITUDE;
+  case 'A':
+    return VIS_PLOTPANEL_AZIMUTH;
   case 'c':
     return VIS_PLOTPANEL_CLOSUREPHASE;
   case 'C':
@@ -274,6 +276,8 @@ int char_to_product(char pstring) {
     return VIS_PLOTPANEL_DELAY;
   case 'D':
     return VIS_PLOTPANEL_WINDDIR;
+  case 'E':
+    return VIS_PLOTPANEL_ELEVATION;
   case 'g':
     return VIS_PLOTPANEL_GTP_COMPUTED;
   case 'G':

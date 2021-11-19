@@ -157,8 +157,18 @@
  */
 #define FINDARRAYCONFIG_NOT_FOUND 3
 
+/*! \def ATCA_LONGITUDE
+ *  \brief The longitude of the midpoint of the ATCA, in degrees
+ */
 #define ATCA_LONGITUDE (double)149.5501388
+/*! \def ATCA_LONGITUDE_TURNS
+ *  \brief The longitude of the midpoint of the ATCA, in turns
+ */
 #define ATCA_LONGITUDE_TURNS (ATCA_LONGITUDE / 360.0)
+/*! \def ATCA_LATITUDE
+ *  \brief The latitude of the midpoint of the ATCA, in degrees
+ */
+#define ATCA_LATITUDE (float)-30.3128846
 
 /*! \struct array_information
  *  \brief Information about each antenna position, station and the array
@@ -234,3 +244,11 @@ void current_time_string(char *s, size_t l);
 double number_bounds(double n, double b);
 double turn_fraction(double f);
 void info_print(char *o, int olen, char *fmt, ...);
+float deg2rad(float deg);
+float rad2deg(float rad);
+float hour2deg(float hour);
+float hour2rad(float hour);
+float deg2hour(float deg);
+float rad2hour(float rad);
+void eq_az_el(float hour_angle, float declination, float latitude,
+	      float *azimuth, float *elevation);
