@@ -508,3 +508,53 @@ to find out that 0823-500 had flux densities of 2.835 Jy and 1.993 Jy at 5.5 and
 than the model flux densities at those two frequencies respectively. Putting the
 measured values in makes the system temperatures 4% and 6.8% higher
 respectively.
+
+To put this in perspective, the system temperature at these frequencies at
+32 degrees elevation is about 12% higher than at 50 degrees. In effect, weighting
+different epochs with inconsistent system temperature scaling would mean
+assigning equal weight to observations with quite different elevations.
+
+## Summary
+
+At this point you should understand how calibrating the amplitude can affect
+a lot more than just what is displayed in NVIS. Although we got into a lot of
+detail about the mathematics used to convert correlation coefficients into
+flux densities, the main points to take away from this tutorial are:
+
+1. Apart from the true flux density of the source, the flux densities
+produced by the correlator depend on:
+   * the numbers used when the acal command was given,
+   * the tvchannel settings,
+   * the actual sensitivity of each antenna.
+2. The system temperature scaling of the flux densities is crucial to
+keeping the system linear, which itself is crucial to ensuring that
+accurate measurements can be made with the telescope.
+3. The primary assumption made with this flux density calibration is that
+the noise diode on each antenna has a stable amplitude over the timescale
+of a typical observation.
+4. Using system temperatures to weight data during data reduction can lead
+to undesirable results if using multiple epochs that do not have
+consistent system temperature scaling.
+
+With these first three tutorials done you should know how to do the two
+most important calibration commands, why we do them, and how to tell if
+they've worked. In the next tutorial we'll see if you can put this
+knowledge to use and calibrate a difficult dataset. But for now, here's
+a few questions and challenges related to the material in this tutorial.
+
+* In the last plot of this tutorial, you can see that the system temperature
+of CA02 was quite a lot higher on 0945-321 than the other antennas, despite it
+being pretty much the same as the others while on 0823-500. Explain this behaviour.
+Hint: this is directly related to another question in the previous tutorial.
+(MODERATE)
+* If the amplitude is calculated as a function of the correlation coefficient,
+the amplitudes of the noise diodes and the SDO levels on the antennas, then why
+does the amplitude shown on NVIS depend on whether the delay is calibrated?
+(EASY)
+* Try to calibrate the amplitudes before delay calibration, and explain what
+happens. (MODERATE)
+* Do the tutorial again, but switch on tvmedian at the start. Explain the
+differences you notice. (MODERATE)
+
+
+
