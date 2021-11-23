@@ -262,60 +262,111 @@ static void interpret_username(char *line) {
   FREE(line);
 }
 
-int char_to_product(char pstring) {
-  switch (pstring) {
-  case 'a':
-    return VIS_PLOTPANEL_AMPLITUDE;
-  case 'A':
+int char_to_product(char *pstring) {
+  // Have to check for "az" first before looking for "a" (amplitude).
+  if (minmatch("azimuth", pstring, 2) ||
+      (strcmp(pstring, "A") == 0)) {
     return VIS_PLOTPANEL_AZIMUTH;
-  case 'c':
+  }
+  if (minmatch("amplitude", pstring, 1) ||
+      (strcmp(pstring, "a") == 0)) {
+    return VIS_PLOTPANEL_AMPLITUDE;
+  }
+  if (minmatch("closurephase", pstring, 4) ||
+      (strcmp(pstring, "c") == 0)) {
     return VIS_PLOTPANEL_CLOSUREPHASE;
-  case 'C':
+  }
+  if (minmatch("computed_systemp", pstring, 11) ||
+      (strcmp(pstring, "C") == 0)) {
     return VIS_PLOTPANEL_SYSTEMP_COMPUTED;
-  case 'd':
+  }
+  if (minmatch("delay", pstring, 1) ||
+      (strcmp(pstring, "d") == 0)) {
     return VIS_PLOTPANEL_DELAY;
-  case 'D':
+  }
+  if (minmatch("winddirection", pstring, 5) ||
+      (strcmp(pstring, "D") == 0)) {
     return VIS_PLOTPANEL_WINDDIR;
-  case 'E':
+  }
+  if (minmatch("elevation", pstring, 2) ||
+      (strcmp(pstring, "E") == 0)) {
     return VIS_PLOTPANEL_ELEVATION;
-  case 'g':
+  }
+  if (minmatch("computed_gtp", pstring, 10) ||
+      (strcmp(pstring, "g") == 0)) {
     return VIS_PLOTPANEL_GTP_COMPUTED;
-  case 'G':
+  }
+  if (minmatch("gtp", pstring, 3) ||
+      (strcmp(pstring, "G") == 0)) {
     return VIS_PLOTPANEL_GTP;
-  case 'h':
+  }
+  if (minmatch("hourangle", pstring, 4) ||
+      (strcmp(pstring, "h") == 0)) {
     return VIS_PLOTPANEL_HOURANGLE;
-  case 'H':
+  }
+  if (minmatch("humidity", pstring, 4) ||
+      (strcmp(pstring, "H") == 0)) {
     return VIS_PLOTPANEL_HUMIDITY;
-  case 'L':
+  }
+  if (minmatch("sidereal", pstring, 3) ||
+      (strcmp(pstring, "L") == 0)) {
     return VIS_PLOTPANEL_SIDEREALTIME;
-  case 'n':
+  }
+  if (minmatch("caljy", pstring, 3) ||
+      (strcmp(pstring, "n") == 0)) {
     return VIS_PLOTPANEL_CALJY;
-  case 'o':
+  }
+  if (minmatch("computed_sdo", pstring, 11) ||
+      (strcmp(pstring, "o") == 0)) {
     return VIS_PLOTPANEL_SDO_COMPUTED;
-  case 'O':
+  }
+  if (minmatch("sdo", pstring, 3) ||
+      (strcmp(pstring, "O") == 0)) {
     return VIS_PLOTPANEL_SDO;
-  case 'p':
-    return VIS_PLOTPANEL_PHASE;
-  case 'P':
+  }
+  if (minmatch("pressure", pstring, 4) ||
+      (strcmp(pstring, "P") == 0)) {
     return VIS_PLOTPANEL_PRESSURE;
-  case 'R':
+  }  
+  if (minmatch("phase", pstring, 1) ||
+      (strcmp(pstring, "p") == 0)) {
+    return VIS_PLOTPANEL_PHASE;
+  }
+  if (minmatch("rain", pstring, 3) ||
+      (strcmp(pstring, "R") == 0)) {
     return VIS_PLOTPANEL_RAINGAUGE;
-  case 'S':
+  }
+  if (minmatch("systemp", pstring, 4) ||
+      (strcmp(pstring, "S") == 0)) {
     return VIS_PLOTPANEL_SYSTEMP;
-  case 't':
+  }
+  if (minmatch("temperature", pstring, 4) ||
+      (strcmp(pstring, "T") == 0)) {
+    return VIS_PLOTPANEL_TEMPERATURE;
+  }
+  if (minmatch("time", pstring, 1) ||
+      (strcmp(pstring, "t") == 0)) {
     // This is time, which is a valid x-axis.
     return PLOT_TIME;
-  case 'T':
-    return VIS_PLOTPANEL_TEMPERATURE;
-  case 'V':
+  }
+  if (minmatch("windspeed", pstring, 5) ||
+      (strcmp(pstring, "V") == 0)) {
     return VIS_PLOTPANEL_WINDSPEED;
-  case 'x':
+  }
+  if (minmatch("rightascension", pstring, 5) ||
+      (strcmp(pstring, "x") == 0)) {
     return VIS_PLOTPANEL_RIGHTASCENSION;
-  case 'X':
+  }
+  if (minmatch("seemonphase", pstring, 7) ||
+      (strcmp(pstring, "X") == 0)) {
     return VIS_PLOTPANEL_SEEMONPHASE;
-  case 'y':
+  }
+  if (minmatch("declination", pstring, 3) ||
+      (strcmp(pstring, "y") == 0)) {
     return VIS_PLOTPANEL_DECLINATION;
-  case 'Y':
+  }
+  if (minmatch("seemonrms", pstring, 7) ||
+      (strcmp(pstring, "Y") == 0)) {
     return VIS_PLOTPANEL_SEEMONRMS;
   }
   return -1;
@@ -401,7 +452,7 @@ int time_index() {
 // Callback function called for each line when accept-line
 // executed, EOF seen, or EOF character read.
 static void interpret_command(char *line) {
-  char **line_els = NULL, *cycomma = NULL, delim[] = " ";
+  char **line_els = NULL, *cycomma = NULL, delim[] = " ", tprod[2];
   char duration[VISBUFSIZE], historystart[VISBUFSIZE], ttime[TIMEFILE_LENGTH];
   int nels, i, j, k, array_change_spec, nproducts, pr;
   int change_panel = PLOT_ALL_PANELS, iarg, plen = 0, temp_xaxis_type;
@@ -600,64 +651,9 @@ static void interpret_command(char *line) {
         action_required = ACTION_REFRESH_PLOT;
       } else if (nels > 1) {
         // Get the panel type from the second argument.
-        change_panel = VIS_PLOTPANEL_ALL;
-        if (minmatch("amplitude", line_els[1], 1) ||
-	    (strcmp(line_els[1], "a") == 0)) {
-          change_panel = VIS_PLOTPANEL_AMPLITUDE;
-        } else if (minmatch("phase", line_els[1], 1) ||
-		   (strcmp(line_els[1], "p") == 0)) {
-          change_panel = VIS_PLOTPANEL_PHASE;
-        } else if (minmatch("delay", line_els[1], 1) ||
-		   (strcmp(line_els[1], "d") == 0)) {
-          change_panel = VIS_PLOTPANEL_DELAY;
-        } else if (minmatch("temperature", line_els[1], 4) ||
-		   (strcmp(line_els[1], "T") == 0)) {
-          change_panel = VIS_PLOTPANEL_TEMPERATURE;
-        } else if (minmatch("pressure", line_els[1], 4) ||
-		   (strcmp(line_els[1], "P") == 0)) {
-          change_panel = VIS_PLOTPANEL_PRESSURE;
-        } else if (minmatch("humidity", line_els[1], 4) ||
-		   (strcmp(line_els[1], "H") == 0)) {
-          change_panel = VIS_PLOTPANEL_HUMIDITY;
-        } else if (minmatch("systemp", line_els[1], 4) ||
-		   (strcmp(line_els[1], "S") == 0)) {
-          change_panel = VIS_PLOTPANEL_SYSTEMP;
-        } else if (minmatch("windspeed", line_els[1], 5) ||
-		   (strcmp(line_els[1], "V") == 0)) {
-          change_panel = VIS_PLOTPANEL_WINDSPEED;
-        } else if (minmatch("winddirection", line_els[1], 5) ||
-		   (strcmp(line_els[1], "D") == 0)) {
-          change_panel = VIS_PLOTPANEL_WINDDIR;
-        } else if (minmatch("rain", line_els[1], 3) ||
-		   (strcmp(line_els[1], "R") == 0)) {
-          change_panel = VIS_PLOTPANEL_RAINGAUGE;
-        } else if (minmatch("seemonphase", line_els[1], 7) ||
-		   (strcmp(line_els[1], "X") == 0)) {
-          change_panel = VIS_PLOTPANEL_SEEMONPHASE;
-        } else if (minmatch("seemonrms", line_els[1], 7) ||
-		   (strcmp(line_els[1], "Y") == 0)) {
-          change_panel = VIS_PLOTPANEL_SEEMONRMS;
-        } else if (minmatch("computed_systemp", line_els[1], 11) ||
-		   (strcmp(line_els[1], "C") == 0)) {
-          change_panel = VIS_PLOTPANEL_SYSTEMP_COMPUTED;
-	} else if (minmatch("computed_gtp", line_els[1], 10) ||
-		   (strcmp(line_els[1], "g") == 0)) {
-	  change_panel = VIS_PLOTPANEL_GTP_COMPUTED;
-        } else if (minmatch("gtp", line_els[1], 3) ||
-		   (strcmp(line_els[1], "G") == 0)) {
-          change_panel = VIS_PLOTPANEL_GTP;
-	} else if (minmatch("computed_sdo", line_els[1], 11) ||
-		   (strcmp(line_els[1], "o") == 0)) {
-	  change_panel = VIS_PLOTPANEL_SDO_COMPUTED;
-        } else if (minmatch("sdo", line_els[1], 3) ||
-		   (strcmp(line_els[1], "O") == 0)) {
-          change_panel = VIS_PLOTPANEL_SDO;
-        } else if (minmatch("caljy", line_els[1], 3) ||
-		   (strcmp(line_els[1], "n") == 0)) {
-          change_panel = VIS_PLOTPANEL_CALJY;
-        } else if (minmatch("closurephase", line_els[1], 4) ||
-		   (strcmp(line_els[1], "c") == 0)) {
-	  change_panel = VIS_PLOTPANEL_CLOSUREPHASE;
+	change_panel = char_to_product(line_els[1]);
+	if (change_panel == -1) {
+	  change_panel = VIS_PLOTPANEL_ALL;
 	}
         if (change_panel != VIS_PLOTPANEL_ALL) {
           if (nels == 2) {
@@ -1054,12 +1050,15 @@ static void interpret_command(char *line) {
         // the end.
         plen = strlen(line_els[0]);
         product_backwards = false;
+	tprod[1] = 0;
         if (line_els[0][plen - 2] == '-') {
           product_backwards = true;
-          temp_xaxis_type = char_to_product(line_els[0][plen - 1]);
+	  tprod[0] = line_els[0][plen - 1];
+          temp_xaxis_type = char_to_product(tprod);
         } else {
           // Otherwise the x-axis is specified as the first char.
-          temp_xaxis_type = char_to_product(line_els[0][0]);
+	  tprod[0] = line_els[0][0];
+          temp_xaxis_type = char_to_product(tprod);
         }
         // Now go through all the other characters.
         if (product_backwards) {
@@ -1070,7 +1069,8 @@ static void interpret_command(char *line) {
           idx_high = plen;
         }
         for (i = idx_low, temp_nypanels = 0; i < idx_high; i++) {
-          ty = char_to_product(line_els[0][i]);
+	  tprod[0] = line_els[0][i];
+          ty = char_to_product(tprod);
           if (ty >= 0) {
             temp_nypanels += 1;
             REALLOC(temp_yaxis_type, temp_nypanels);

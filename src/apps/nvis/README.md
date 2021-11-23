@@ -687,7 +687,7 @@ the current data until the server responds.
 
 #### scale
 
-Format: **sca**le [*panel name* [*min value* *max value*]]
+Format: **sca**le [*panel name* [*min value* *max value*] [*__frac__tion*]]
 
 This command sets the y-axis scaling for a panel. If no arguments are given,
 then all panel y-axis ranges are reset to contain all the data (the default).
@@ -706,6 +706,10 @@ the default, but no other panel is affected.
 
 Otherwise, you may set manually the minimum and maximum values to use for
 that particular panel. You must supply both the minimum and maximum values.
+
+If the **frac**tion argument is supplied, either with or without *min value*
+and *max value*, then the named panel will be displayed as a fractional
+change against the average value of the line in the plotted time range.
 
 ---
 
