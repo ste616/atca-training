@@ -116,10 +116,12 @@ alphabetical order, and each character specification is case-sensitive.
 Character | Panel Displayed
 --------- | ---------------
 a         | Amplitude: the average amplitude on each baseline per cycle
+A         | Azimuth: the azimuth of the source in that cycle; not the actual antenna azimuth
 c         | Closure phase: the closure phase quantity calculated for some baselines with the reference antenna per cycle
 C         | Computed System Temperature: the system temperature of each antenna, as computed using the options currently supplied by this client
 d         | Delay: the delay error as determined by examining the phases as a function of frequency
 D         | Wind Direction: the direction the wind is coming from
+E         | Elevation: the elevation of the source in that cycle; not the actual antenna elevation
 g         | Computed GTP: the gated total power, as computed using the options currently supplied by this client
 G         | GTP: the gated total power measured online
 h         | Hour angle, which is LST - source RA
@@ -694,12 +696,15 @@ then all panel y-axis ranges are reset to contain all the data (the default).
 
 The *panel name* is one of the following (the minimum match is shown in bold
 for each name, and the short letter name of the panel, as used for select is
-given in parentheses; either is usable): **a**mplitude (a), **p**hase (p),
-**d**elay (d), **temp**erature (T), **pres**sure (P), **humi**dity (H),
-**winds**peed (V), **windd**irection (D), **rai**n (R), **seemonp**hase (X),
-**seemonr**ms (Y), **computed_sy**stemp (C), **computed_g**tp (g),
-**gtp** (G), **computed_sd**o (o), **sdo** (O), **cal**jy (n),
-**clos**urephase (c).
+given in parentheses; either is usable): **a**mplitude (a), **az**imuth (A),
+**clos**urephase (c), **computed_sy**stemp (C), **d**elay (d),
+**windd**irection (D), **el**evation (E), **computed_g**tp (g), **gtp** (G),
+**hour**angle (h), **humi**dity (H), **sid**ereal (L), **cal**jy (n),
+**computed_sd**o (o), **sdo** (O), **p**hase (p), **pres**sure (P),
+**rai**n (R), **syst**emp (S), **temp**erature (T), **winds**peed (V),
+**right**ascension (x), **seemonp**hase (X), **dec**lination (y),
+**seemonr**ms (Y), .
+
 
 If only the *panel name* is supplied, that panel's y-axis range is reset to
 the default, but no other panel is affected.
