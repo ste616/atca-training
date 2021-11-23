@@ -199,11 +199,51 @@ struct ampphase_modifiers {
    *         polarisation
    *
    * This is a 2-D array of floats. The first index has size `phase_num_antennas` and
-   * is indexed starting at 1, which the second index has size `phase_num_pols` and is
+   * is indexed starting at 1, while the second index has size `phase_num_pols` and is
    * indexed starting at `POL_X` and ending at `POL_Y`.
    */
   float **phase;
-  
+
+  /*! \var set_noise_diode_amplitude
+   *  \brief flag to indicate whether the amplitude parameters in this structure hold
+   *         values that should be used to determine the system temperatures (if set
+   *         to true) or ignored (if set to false)
+   */
+  bool set_noise_diode_amplitude;
+
+  /*! \var noise_diode_num_antennas
+   *  \brief The number of antennas with noise diode amplitude values (should
+   *         always be 7)
+   */
+  int noise_diode_num_antennas;
+
+  /*! \var noise_diode_num_pols
+   *  \brief The number of polarisations with noise diode amplitude values
+   *         (should always be 6)
+   */
+  int noise_diode_num_pols;
+
+  /*! \var noise_diode_start_mjd
+   *  \brief The earliest MJD for which to correct the system temperature in
+   *         the data
+   */
+  double noise_diode_start_mjd;
+
+  /*! \var noise_diode_end_mjd
+   *  \brief The latest MJD for which to correct the system temperature in the
+   *         data
+   */
+  double noise_diode_end_mjd;
+
+  /*! \var noise_diode_amplitude
+   *  \brief The amplitude of each noise diode (in Jy)
+   *
+   * This is a 2-D array of floats. The first index has size
+   * `noise_diode_num_antennas` and is indexed starting at 1, while the second index
+   * has size `noise_diode_num_pols` and is indexed starting at `POL_X` and ending
+   * at `POL_Y`.
+   */
+  float **noise_diode_amplitude;
 };
 
 /*! \struct ampphase_options
@@ -568,6 +608,22 @@ struct syscal_data {
    * second index and `num_pols` for the third index. Each index starts at 0.
    */
   float ***sdo;
+  /*! \var computed_gtp
+   *  \brief The gated total power as computed by this software for each antenna,
+   *         window and polarisation, in Jy
+   *
+   * This 3-D array has length `num_ants` for the first index, `num_ifs` for the
+   * second index and `num_pols` for the third index. Each index starts at 0.
+   */
+  float ***computed_gtp;
+  /*! \var computed_sdo
+   *  \brief The synchronously demodulated output as computed by this software
+   *         for each antenna, window and polarisation, in Jy
+   *
+   * This 3-D array has length `num_ants` for the first index, `num_ifs` for the
+   * second index and `num_pols` for the third index. Each index starts at 0.
+   */
+  float ***computed_sdo;
   /*! \var caljy
    *  \brief The flux density of the switching noise source on each antenna, window
    *         and polarisation
@@ -1236,6 +1292,50 @@ struct vis_data {
   struct ampphase_options **options;
 };
 
+/*! \struct fluxdensity_specification
+ *  \brief A way to specify flux densities required for amplitude calibration
+ */
+struct fluxdensity_specification {
+  /*! \var num_models
+   *  \brief The number of models described in this structure
+   */
+  int num_models;
+
+  /*! \var model_frequency
+   *  \brief The frequency (in MHz) at which each model is valid
+   *
+   * This array has length `num_models` and is indexed starting at 0.
+   */
+  float *model_frequency;
+
+  /*! \var model_frequency_tolerance
+   *  \brief The frequency range (in MHz) over which each model is valid
+   *
+   * This array has length `num_models` and is indexed starting at 0.
+   *
+   * The valid frequency range for each model goes from
+   * `model_frequency - model_frequency_tolerance` to 
+   * `model_frequency + model_frequency_tolerance`.
+   */
+  float *model_frequency_tolerance;
+
+  /*! \var model_num_terms
+   *  \brief The number of terms in each model
+   *
+   * This array has length `num_models` as is indexed starting at 0.
+   */
+  int *model_num_terms;
+
+  /*! \var model_terms
+   *  \brief The model coefficients
+   *
+   * This 2-D array has length `num_models` in the first index, and
+   * `model_num_terms[i]` in the second index, where `i` is the position
+   * along the first index. Both indexes start at 0.
+   */
+  float **model_terms;
+};
+
 float fmedianf(float *a, int n);
 float complex fcmedianfc(float complex *a, int n);
 float fsumf(float *a, int n);
@@ -1252,7 +1352,8 @@ int polarisation_number(char *polstring);
 struct ampphase_options ampphase_options_default(void);
 void set_default_ampphase_options(struct ampphase_options *options);
 void set_default_ampphase_modifiers(struct ampphase_modifiers *modifiers);
-struct ampphase_modifiers* add_modifier(struct ampphase_options *options, int idx);
+struct ampphase_modifiers* add_modifier(struct ampphase_options *options, int idx,
+					struct ampphase_modifiers *modifier_to_add);
 void remove_modifiers(struct ampphase_options *options, int idx, int n_modifiers,
 		      int *modidx);
 void copy_ampphase_modifiers(struct ampphase_modifiers *dest,
@@ -1263,7 +1364,8 @@ void free_ampphase_modifiers(struct ampphase_modifiers *modifiers);
 void free_ampphase_options(struct ampphase_options *options);
 struct ampphase_options* find_ampphase_options(int num_options,
 					       struct ampphase_options **options,
-					       struct scan_header_data *scan_header_data);
+					       struct scan_header_data *scan_header_data,
+					       int *options_idx);
 void copy_metinfo(struct metinfo *dest,
                   struct metinfo *src);
 void copy_syscal_data(struct syscal_data *dest,
@@ -1281,6 +1383,7 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
                  struct ampphase **ampphase, int pol, int ifno, int *num_options,
                  struct ampphase_options ***options);
 int cmpfunc_real(const void *a, const void *b);
+int cmpfunc_double(const void *a, const void *b);
 int cmpfunc_complex(const void *a, const void *b);
 int cmpfunc_integer(const void *a, const void *b);
 int ampphase_average(struct scan_header_data *scan_header_data,
@@ -1318,3 +1421,14 @@ void compute_closure_phase(struct scan_header_data *scan_header_data,
 void compute_delays(struct ampphase *ampphase, bool phase_in_degrees, int min_chan, int max_chan,
 		    float ****delays, int *n_baselines, int **n_bins, int ***n_delays,
 		    float ***mean_delay, float ***median_delay);
+void free_fluxdensity_specification(struct fluxdensity_specification *a);
+void compute_noise_diode_amplitudes(struct fluxdensity_specification *fluxdensity_models,
+				    int num_cycles, int window, struct ampphase_options *options,
+				    struct spectrum_data **cycle_spectra,
+				    struct ampphase_modifiers **noise_diode_modifier);
+void sum_vis(struct ampphase *ampphase, int baseline_idx, struct ampphase_options *options,
+	     int *nbins, float **rsum, float **isum, float **asum);
+float fluxdensity_model_evaluate(int num_terms, bool log_terms, float *terms,
+				 float eval_freq);
+bool source_model(char *source_name, float eval_freq, int *num_terms, bool *log_terms,
+		  float **terms);

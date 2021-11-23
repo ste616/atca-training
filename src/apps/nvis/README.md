@@ -116,16 +116,20 @@ alphabetical order, and each character specification is case-sensitive.
 Character | Panel Displayed
 --------- | ---------------
 a         | Amplitude: the average amplitude on each baseline per cycle
+A         | Azimuth: the azimuth of the source in that cycle; not the actual antenna azimuth
 c         | Closure phase: the closure phase quantity calculated for some baselines with the reference antenna per cycle
 C         | Computed System Temperature: the system temperature of each antenna, as computed using the options currently supplied by this client
 d         | Delay: the delay error as determined by examining the phases as a function of frequency
 D         | Wind Direction: the direction the wind is coming from
+E         | Elevation: the elevation of the source in that cycle; not the actual antenna elevation
+g         | Computed GTP: the gated total power, as computed using the options currently supplied by this client
 G         | GTP: the gated total power measured online
 h         | Hour angle, which is LST - source RA
 H         | Humidity: as reported by the site weather station
 L         | Local Sidereal Time, in hours
 n         | The amplitude of the noise diode in Jy: this is measured per antenna
-N         | SDO: the synchronously-demodulated output measured online
+o         | Computed SDO: the synchronously-demodulated output, as computed using the options currently supplied by this client
+O         | SDO: the synchronously-demodulated output measured online
 p         | Phase: the average phase on each baseline per cycle
 P         | Pressure: as reported by the site weather station
 R         | Rain Gauge: as reported by the site weather station
@@ -173,6 +177,71 @@ Like `vis`, what `nvis` displays is controlled by commands given at the
 Each command can be given with minimum match; the minimum string is given
 for each command below in **bold**. For example, you may give the **sel**ect command
 as `sel` or `select`, or even `sele`, but not `se`.
+
+---
+
+#### acal
+
+Format: **acal** [*fd1* *fd2*] [*before*/*after*/*all*]
+
+This command tells the server to compute the amplitude of the noise diode
+for each antenna, polarisation and IF, given the flux density of the source,
+and then to recompute the data amplitudes given these noise diode amplitudes.
+
+Unlike the **dcal** and **pcal** commands, the computations required to
+calibrate the noise diode amplitudes can only be done with access to the
+raw data, so all computations are done on the server. Therefore, after giving
+this command there will be a delay before some output like the following
+will appear in the controlling terminal:
+
+```
+NVIS> acal
+ BAND 1 FLUX = 2.622 Jy, MJD 59332.201996 - 59332.202111:
+   ANT 1: X = 20.94 Y = 24.43 Jy
+   ANT 2: X = 20.83 Y = 18.84 Jy
+   ANT 3: X = 19.13 Y = 18.08 Jy
+   ANT 4: X = 17.69 Y = 17.93 Jy
+   ANT 5: X = 16.27 Y = 15.11 Jy
+   ANT 6: X = 19.73 Y = 19.48 Jy
+ BAND 2 FLUX = 1.747 Jy, MJD 59332.201996 - 59332.202111:
+   ANT 1: X = 33.07 Y = 34.26 Jy
+   ANT 2: X = 25.84 Y = 25.09 Jy
+   ANT 3: X = 28.86 Y = 28.66 Jy
+   ANT 4: X = 31.79 Y = 33.78 Jy
+   ANT 5: X = 23.92 Y = 23.41 Jy
+   ANT 6: X = 31.68 Y = 34.94 Jy
+```
+
+For each of the calbands, the MJD range for the corrections is specified, along
+with the flux density of the source assumed by the calibration process. For some
+sources (1934-638 and 0823-500) this flux density can be estimated by the
+software, given each band's central frequency. However, if the source's flux
+density is not known, and not supplied by the user, it will be assumed to be
+1 Jy.
+
+If you want to specify the flux density of the source, you must do so for each
+of the calbands with the two optional arguments *fd1* and *fd2*, which are both
+given in Jy.
+
+The noise diode amplitudes returned by this command are also all given in Jy for
+each polarisation and antenna. The setting of **refant** has no effect on this
+computation, and neither does **delavg**, but **tvchannels** and
+**tvmedian** settings will have significant effects. The **nncal** setting will
+still control how many cycles the server uses to compute these parameters.
+
+If used without an optional argument specifying the time range to correct,
+the amplitudes will be corrected only for the **nncal** cycles selected.
+If used with the *before* argument, all cycles up to and including the first cycle
+in the **nncal** selection will be corrected. If used with the *after* argument,
+all cycles beginning with the last cycle in the **nncal** selection and
+afterwards will be corrected. If used with the *all* argument, all data will be
+corrected.
+
+For those cycles that are corrected, the data will be shown with the computed
+system temperatures applied, regardless of the setting of **tsys**, while all
+the uncorrected cycles will be shown as determined by **tsys**.
+
+While the server computes the data, `nvis` will continue to show the current data.
 
 ---
 
@@ -578,22 +647,30 @@ argument.
 
 #### reset
 
-Format: **reset** *parameter*
+Format: **res**et *parameter*
 
 This command sets the *parameter* back to its default value or state. This
 command accepts only a single argument, which must be one of the following.
 
+##### acal
+
+Format: **res**et **acal**
+
+Remove all amplitude corrections from the currently selected calbands. `nvis`
+will then ask the server to recompute the data, and will continue to show
+the current data until the server responds.
+
 ##### all
 
-Format: **reset** **all**
+Format: **res**et **all**
 
-Remove all phase and delay corrections from the currently selected
+Remove all phase, delay and amplitude corrections from the currently selected
 calbands. `nvis` will then ask the server to recompute the data, and will
 continue to show the current data until the server responds.
 
 ##### delays
 
-Format: **reset** **del**ays
+Format: **res**et **del**ays
 
 Remove all delay corrections from the currently selected calbands. `nvis`
 will then ask the server to recompute the data, and will continue to show
@@ -601,7 +678,7 @@ the current data until the server responds.
 
 ##### phases
 
-Format: **reset** **pha**ses
+Format: **res**et **pha**ses
 
 Remove all phase corrections from the currently selected calbands. `nvis`
 will then ask the server to recompute the data, and will continue to show
@@ -612,24 +689,32 @@ the current data until the server responds.
 
 #### scale
 
-Format: **sca**le [*panel name* [*min value* *max value*]]
+Format: **sca**le [*panel name* [*min value* *max value*] [*__frac__tion*]]
 
 This command sets the y-axis scaling for a panel. If no arguments are given,
 then all panel y-axis ranges are reset to contain all the data (the default).
 
 The *panel name* is one of the following (the minimum match is shown in bold
 for each name, and the short letter name of the panel, as used for select is
-given in parentheses; either is usable): **a**mplitude (a), **p**hase (p),
-**d**elay (d), **temp**erature (T), **pres**sure (P), **humi**dity (H),
-**winds**peed (V), **windd**irection (D), **rai**n (R), **seemonp**hase (X),
-**seemonr**ms (Y), **comp**uted_systemp (C), **gtp** (G), **sdo** (N),
-**cal**jy (n).
+given in parentheses; either is usable): **a**mplitude (a), **az**imuth (A),
+**clos**urephase (c), **computed_sy**stemp (C), **d**elay (d),
+**windd**irection (D), **el**evation (E), **computed_g**tp (g), **gtp** (G),
+**hour**angle (h), **humi**dity (H), **sid**ereal (L), **cal**jy (n),
+**computed_sd**o (o), **sdo** (O), **p**hase (p), **pres**sure (P),
+**rai**n (R), **syst**emp (S), **temp**erature (T), **winds**peed (V),
+**right**ascension (x), **seemonp**hase (X), **dec**lination (y),
+**seemonr**ms (Y), .
+
 
 If only the *panel name* is supplied, that panel's y-axis range is reset to
 the default, but no other panel is affected.
 
 Otherwise, you may set manually the minimum and maximum values to use for
 that particular panel. You must supply both the minimum and maximum values.
+
+If the **frac**tion argument is supplied, either with or without *min value*
+and *max value*, then the named panel will be displayed as a fractional
+change against the average value of the line in the plotted time range.
 
 ---
 

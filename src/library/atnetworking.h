@@ -126,6 +126,8 @@
 #define REQUEST_TIMERANGE              10
 #define REQUEST_CYCLE_TIMES            11
 #define REQUEST_SUPPLY_USERNAME        12
+#define REQUEST_ACAL                   13
+#define CHILDREQUEST_MJDS_SPECTRA      14
 
 /*! \struct requests
  *  \brief Structure to use when communicating from a client to a central server
@@ -174,6 +176,10 @@ struct requests {
 #define RESPONSE_USERREQUEST_SPECTRUM   15
 #define RESPONSE_USERNAME_EXISTS        16
 #define RESPONSE_SHUTDOWN               17
+#define RESPONSE_COMPUTED_ACAL          18
+#define RESPONSE_ACAL_COMPUTING         19
+#define RESPONSE_ACAL_REQUEST_INVALID   20
+#define RESPONSE_ACAL_COMPUTED          21
 
 /*! \struct responses
  *  \brief Structure to use when responding to a request

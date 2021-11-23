@@ -447,6 +447,14 @@ void pack_ampphase_modifiers(cmp_ctx_t *cmp, struct ampphase_modifiers *a) {
   for (i = 0; i < a->phase_num_antennas; i++) {
     pack_writearray_float(cmp, a->phase_num_pols, a->phase[i]);
   }
+  pack_write_bool(cmp, a->set_noise_diode_amplitude);
+  pack_write_sint(cmp, a->noise_diode_num_antennas);
+  pack_write_sint(cmp, a->noise_diode_num_pols);
+  pack_write_double(cmp, a->noise_diode_start_mjd);
+  pack_write_double(cmp, a->noise_diode_end_mjd);
+  for (i = 0; i < a->noise_diode_num_antennas; i++) {
+    pack_writearray_float(cmp, a->noise_diode_num_pols, a->noise_diode_amplitude[i]);
+  }
 }
 
 /*!
@@ -490,6 +498,22 @@ void unpack_ampphase_modifiers(cmp_ctx_t *cmp, struct ampphase_modifiers *a) {
     }
   } else {
     a->phase = NULL;
+  }
+  pack_read_bool(cmp, &(a->set_noise_diode_amplitude));
+  pack_read_sint(cmp, &(a->noise_diode_num_antennas));
+  pack_read_sint(cmp, &(a->noise_diode_num_pols));
+  pack_read_double(cmp, &(a->noise_diode_start_mjd));
+  pack_read_double(cmp, &(a->noise_diode_end_mjd));
+  if (a->noise_diode_num_antennas > 0) {
+    CALLOC(a->noise_diode_amplitude, a->noise_diode_num_antennas);
+    if (a->noise_diode_num_pols > 0) {
+      for (i = 0; i < a->noise_diode_num_antennas; i++) {
+	CALLOC(a->noise_diode_amplitude[i], a->noise_diode_num_pols);
+	pack_readarray_float(cmp, a->noise_diode_num_pols, a->noise_diode_amplitude[i]);
+      }
+    }
+  } else {
+    a->noise_diode_amplitude = NULL;
   }
 }
 
@@ -1367,6 +1391,8 @@ void pack_syscal_data(cmp_ctx_t *cmp, struct syscal_data *a) {
       for (j = 0; j < a->num_ifs; j++) {
         pack_writearray_float(cmp, a->num_pols, a->gtp[i][j]);
         pack_writearray_float(cmp, a->num_pols, a->sdo[i][j]);
+        pack_writearray_float(cmp, a->num_pols, a->computed_gtp[i][j]);
+        pack_writearray_float(cmp, a->num_pols, a->computed_sdo[i][j]);
         pack_writearray_float(cmp, a->num_pols, a->caljy[i][j]);
       }
     }
@@ -1459,16 +1485,24 @@ void unpack_syscal_data(cmp_ctx_t *cmp, struct syscal_data *a) {
   if ((a->num_ifs > 0) && (a->num_pols > 0)) {
     MALLOC(a->gtp, a->num_ants);
     MALLOC(a->sdo, a->num_ants);
+    MALLOC(a->computed_gtp, a->num_ants);
+    MALLOC(a->computed_sdo, a->num_ants);
     MALLOC(a->caljy, a->num_ants);
     for (i = 0; i < a->num_ants; i++) {
       MALLOC(a->gtp[i], a->num_ifs);
       MALLOC(a->sdo[i], a->num_ifs);
+      MALLOC(a->computed_gtp[i], a->num_ifs);
+      MALLOC(a->computed_sdo[i], a->num_ifs);
       MALLOC(a->caljy[i], a->num_ifs);
       for (j = 0; j < a->num_ifs; j++) {
         MALLOC(a->gtp[i][j], a->num_pols);
         pack_readarray_float(cmp, a->num_pols, a->gtp[i][j]);
         MALLOC(a->sdo[i][j], a->num_pols);
         pack_readarray_float(cmp, a->num_pols, a->sdo[i][j]);
+        MALLOC(a->computed_gtp[i][j], a->num_pols);
+        pack_readarray_float(cmp, a->num_pols, a->computed_gtp[i][j]);
+        MALLOC(a->computed_sdo[i][j], a->num_pols);
+        pack_readarray_float(cmp, a->num_pols, a->computed_sdo[i][j]);
         MALLOC(a->caljy[i][j], a->num_pols);
         pack_readarray_float(cmp, a->num_pols, a->caljy[i][j]);
       }
@@ -1476,9 +1510,69 @@ void unpack_syscal_data(cmp_ctx_t *cmp, struct syscal_data *a) {
   } else {
     a->gtp = NULL;
     a->sdo = NULL;
+    a->computed_gtp = NULL;
+    a->computed_sdo = NULL;
     a->caljy = NULL;
   }
   
+}
+
+/*!
+ *  \brief Pack a fluxdensity_specification structure into the data stream
+ *  \param cmp the CMP buffer object
+ *  \param a the fluxdensity_specification structure
+ */
+void pack_fluxdensity_specification(cmp_ctx_t *cmp, struct fluxdensity_specification *a) {
+  int i;
+  
+  // The number of models.
+  pack_write_sint(cmp, a->num_models);
+
+  // The frequency and tolerance arrays.
+  pack_writearray_float(cmp, a->num_models, a->model_frequency);
+  pack_writearray_float(cmp, a->num_models, a->model_frequency_tolerance);
+
+  // The number of terms in each model.
+  pack_writearray_sint(cmp, a->num_models, a->model_num_terms);
+
+  // The models.
+  for (i = 0; i < a->num_models; i++) {
+    pack_writearray_float(cmp, a->model_num_terms[i], a->model_terms[i]);
+  }
+}
+
+/*! 
+ *  \brief Unpack a fluxdensity_specification structure from the data stream
+ *  \param cmp the CMP buffer object
+ *  \param a the fluxdensity_specification structure
+ */
+void unpack_fluxdensity_specification(cmp_ctx_t *cmp, struct fluxdensity_specification *a) {
+  int i;
+
+  // The number of models.
+  pack_read_sint(cmp, &(a->num_models));
+
+  if (a->num_models <= 0) {
+    return;
+  }
+  
+  CALLOC(a->model_frequency, a->num_models);
+  CALLOC(a->model_frequency_tolerance, a->num_models);
+  CALLOC(a->model_num_terms, a->num_models);
+  CALLOC(a->model_terms, a->num_models);
+
+  // The frequency and tolerance arrays.
+  pack_readarray_float(cmp, a->num_models, a->model_frequency);
+  pack_readarray_float(cmp, a->num_models, a->model_frequency_tolerance);
+
+  // The number of terms in each model.
+  pack_readarray_sint(cmp, a->num_models, a->model_num_terms);
+
+  // The models.
+  for (i = 0; i < a->num_models; i++) {
+    CALLOC(a->model_terms[i], a->model_num_terms[i]);
+    pack_readarray_float(cmp, a->model_num_terms[i], a->model_terms[i]);
+  }
 }
 
 void init_cmp_memory_buffer(cmp_ctx_t *cmp, cmp_mem_access_t *mem, void *buffer,

@@ -84,6 +84,14 @@ increase signal-to-noise ratio to successfully calibrate the telescope delays.
 
 [Start tutorial 2](tutorials/2_dcal_and_delavg/)
 
+### Tutorial 3
+
+This tutorial will cover the process of amplitude calibration, and all the
+effects that come along with it (especially how system temperature measurements
+are affected), and how to use it properly.
+
+[Start tutorial 3](tutorials/3_acal_and_tsys/)
+
 
 ## About this package
 This software was written and tested by Jamie Stevens (ste616@gmail.com, or

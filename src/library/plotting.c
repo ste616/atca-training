@@ -140,6 +140,9 @@ void change_spd_plotcontrols(struct spd_plotcontrols *plotcontrols,
     if (plotcontrols->plot_options & PLOT_AVERAGED_DATA) {
       plotcontrols->plot_options -= PLOT_AVERAGED_DATA;
     }
+    if (plotcontrols->plot_options & PLOT_COMPUTED_TSYS) {
+      plotcontrols->plot_options -= PLOT_COMPUTED_TSYS;
+    }
     plotcontrols->plot_options |= *decorations;
   }
   
@@ -249,7 +252,7 @@ void change_vis_plotcontrols_visbands(struct vis_plotcontrols *plotcontrols,
 }
 
 void change_vis_plotcontrols_limits(struct vis_plotcontrols *plotcontrols,
-                                    int paneltype, bool use_limit,
+                                    int paneltype, bool use_limit, bool show_fraction,
                                     float limit_min, float limit_max) {
   int i;
   // First, find the panel matching paneltype. If paneltype is -1, change
@@ -258,6 +261,7 @@ void change_vis_plotcontrols_limits(struct vis_plotcontrols *plotcontrols,
     if ((paneltype == VIS_PLOTPANEL_ALL) ||
         (plotcontrols->panel_type[i] == paneltype)) {
       plotcontrols->use_panel_limits[i] = use_limit;
+      plotcontrols->show_panel_fraction[i] = show_fraction;
       if (use_limit) {
         // Change the limit settings.
         plotcontrols->panel_limits_min[i] = limit_min;
@@ -267,7 +271,7 @@ void change_vis_plotcontrols_limits(struct vis_plotcontrols *plotcontrols,
   }
 }
 
-#define NAVAILABLE_PANELS 21
+#define NAVAILABLE_PANELS 25
 const int available_panels[NAVAILABLE_PANELS] = { VIS_PLOTPANEL_AMPLITUDE,
                                                   VIS_PLOTPANEL_PHASE,
                                                   VIS_PLOTPANEL_DELAY,
@@ -288,7 +292,11 @@ const int available_panels[NAVAILABLE_PANELS] = { VIS_PLOTPANEL_AMPLITUDE,
 						  VIS_PLOTPANEL_HOURANGLE,
 						  VIS_PLOTPANEL_RIGHTASCENSION,
 						  VIS_PLOTPANEL_DECLINATION,
-						  VIS_PLOTPANEL_SIDEREALTIME };
+						  VIS_PLOTPANEL_SIDEREALTIME,
+						  VIS_PLOTPANEL_GTP_COMPUTED,
+						  VIS_PLOTPANEL_SDO_COMPUTED,
+						  VIS_PLOTPANEL_AZIMUTH,
+						  VIS_PLOTPANEL_ELEVATION };
 
 bool product_can_be_x(int product) {
   switch (product) {
@@ -303,7 +311,7 @@ void change_vis_plotcontrols_panels(struct vis_plotcontrols *plotcontrols,
                                     int xaxis_type, int num_panels,
                                     int *paneltypes, struct panelspec *panelspec) {
   int cnpanels = 0, i, j;
-  bool *climits = NULL;
+  bool *climits = NULL, *cfractions = NULL;
   float *climits_min = NULL, *climits_max = NULL;
   
   // We change which panels are displayed, and the axis types.
@@ -326,12 +334,14 @@ void change_vis_plotcontrols_panels(struct vis_plotcontrols *plotcontrols,
     CALLOC(climits, num_panels);
     CALLOC(climits_min, num_panels);
     CALLOC(climits_max, num_panels);
+    CALLOC(cfractions, num_panels);
     for (i = 0; i < num_panels; i++) {
       for (j = 0; j < plotcontrols->num_panels; j++) {
         if (paneltypes[i] == plotcontrols->panel_type[j]) {
           climits[i] = plotcontrols->use_panel_limits[j];
           climits_min[i] = plotcontrols->panel_limits_min[j];
           climits_max[i] = plotcontrols->panel_limits_max[j];
+	  cfractions[i] = plotcontrols->show_panel_fraction[j];
           break;
         }
       }
@@ -347,16 +357,19 @@ void change_vis_plotcontrols_panels(struct vis_plotcontrols *plotcontrols,
     REALLOC(plotcontrols->use_panel_limits, plotcontrols->num_panels);
     REALLOC(plotcontrols->panel_limits_min, plotcontrols->num_panels);
     REALLOC(plotcontrols->panel_limits_max, plotcontrols->num_panels);
+    REALLOC(plotcontrols->show_panel_fraction, plotcontrols->num_panels);
     for (i = 0; i < num_panels; i++) {
       plotcontrols->panel_type[i] = paneltypes[i];
       plotcontrols->use_panel_limits[i] = climits[i];
       plotcontrols->panel_limits_min[i] = climits_min[i];
       plotcontrols->panel_limits_max[i] = climits_max[i];
+      plotcontrols->show_panel_fraction[i] = cfractions[i];
     }
     // Free our memory.
     FREE(climits);
     FREE(climits_min);
     FREE(climits_max);
+    FREE(cfractions);
   }
   
 }
@@ -399,8 +412,10 @@ void init_vis_plotcontrols(struct vis_plotcontrols *plotcontrols,
   MALLOC(plotcontrols->use_panel_limits, plotcontrols->num_panels);
   MALLOC(plotcontrols->panel_limits_min, plotcontrols->num_panels);
   MALLOC(plotcontrols->panel_limits_max, plotcontrols->num_panels);
+  MALLOC(plotcontrols->show_panel_fraction, plotcontrols->num_panels);
   for (i = 0; i < plotcontrols->num_panels; i++) {
     plotcontrols->use_panel_limits[i] = false;
+    plotcontrols->show_panel_fraction[i] = false;
   }
 
   // Keep the PGPLOT device.
@@ -441,6 +456,7 @@ void free_vis_plotcontrols(struct vis_plotcontrols *plotcontrols) {
   FREE(plotcontrols->use_panel_limits);
   FREE(plotcontrols->panel_limits_min);
   FREE(plotcontrols->panel_limits_max);
+  FREE(plotcontrols->show_panel_fraction);
 }
 
 void free_panelspec(struct panelspec *panelspec) {
@@ -1133,13 +1149,14 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
   int **n_plot_lines = NULL, ipos = -1, *panel_n_vis_lines = NULL, n_active_ants = 0;
   int n_tsys_vis_lines = 0, n_meta_vis_lines = 0, dbrk, *antprod = NULL, nls = 1;
   int n_closure_vis_lines = 0;
-  float ****plot_lines = NULL, min_x, max_x, min_y, max_y;
+  float ****plot_lines = NULL, min_x, max_x, min_y, max_y, avg_plotline_value;
   float cxpos, dxpos, labtotalwidth, labspacing, dy, maxwidth, twidth;
   float padlabel = 0.01, cch, timeline_x[2], timeline_y[2];
-  float ***antlines = NULL, maxch = 1.1, num_panels;
+  float ***antlines = NULL, maxch = 1.1, num_panels, hour_angle, azimuth, elevation;
   double basemjd, basest, chkmjd, chktime, min_time, max_time, lst;
-  char xopts[BUFSIZE], yopts[BUFSIZE], panellabel[BUFSIZE], panelunits[BUFSIZE];
+  char xopts[BUFSIZE], yopts[BUFSIZE], panellabel[BUFSIZE], panelunits[BUFSIZE-2];
   char antstring[BUFSIZE], bandstring[BUFSIZE], panelerror[BUFSIZE], timetypestring[BUFSIZE];
+  char tpanelunits[BUFSIZE];
   struct vis_line **vis_lines = NULL, **tsys_vis_lines = NULL, **meta_vis_line = NULL;
   struct vis_line ***plot_vis_lines = NULL, **closure_vis_lines = NULL;
   struct scan_header_data *vlh = NULL;
@@ -1581,6 +1598,8 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
                (plot_controls->panel_type[i] == VIS_PLOTPANEL_SYSTEMP_COMPUTED) ||
                (plot_controls->panel_type[i] == VIS_PLOTPANEL_GTP) ||
                (plot_controls->panel_type[i] == VIS_PLOTPANEL_SDO) ||
+	       (plot_controls->panel_type[i] == VIS_PLOTPANEL_GTP_COMPUTED) ||
+	       (plot_controls->panel_type[i] == VIS_PLOTPANEL_SDO_COMPUTED) ||
                (plot_controls->panel_type[i] == VIS_PLOTPANEL_CALJY)) {
       // Make a metadata plot that only has antenna-based lines.
       panel_n_vis_lines[i] = n_tsys_vis_lines;
@@ -1680,9 +1699,15 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
                 } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_GTP) {
                   plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
                     syscal_data[k]->gtp[sysantidx][sysifidx][syspolidx];
+		} else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_GTP_COMPUTED) {
+		  plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
+		    syscal_data[k]->computed_gtp[sysantidx][sysifidx][syspolidx];
                 } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_SDO) {
                   plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
                     syscal_data[k]->sdo[sysantidx][sysifidx][syspolidx];
+		} else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_SDO_COMPUTED) {
+		  plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
+		    syscal_data[k]->computed_sdo[sysantidx][sysifidx][syspolidx];
                 } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_CALJY) {
                   plot_lines[i][j][1][n_plot_lines[i][j] - 1] =
                     syscal_data[k]->caljy[sysantidx][sysifidx][syspolidx];
@@ -1706,7 +1731,9 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
 	       (plot_controls->panel_type[i] == VIS_PLOTPANEL_RIGHTASCENSION) ||
 	       (plot_controls->panel_type[i] == VIS_PLOTPANEL_DECLINATION) ||
 	       (plot_controls->panel_type[i] == VIS_PLOTPANEL_HOURANGLE) ||
-	       (plot_controls->panel_type[i] == VIS_PLOTPANEL_SIDEREALTIME)) {
+	       (plot_controls->panel_type[i] == VIS_PLOTPANEL_SIDEREALTIME) ||
+	       (plot_controls->panel_type[i] == VIS_PLOTPANEL_AZIMUTH) ||
+	       (plot_controls->panel_type[i] == VIS_PLOTPANEL_ELEVATION)) {
       // Make a metadata plot that only has a single site-based line.
       panel_n_vis_lines[i] = 1;
       MALLOC(plot_lines[i], 1);
@@ -1809,6 +1836,23 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
 		mjd2lst(date2mjd(cycle_vis_quantities[k][l][m]->obsdate,
 				 cycle_vis_quantities[k][l][m]->ut_seconds),
 			ATCA_LONGITUDE_TURNS, 37);
+	    } else if ((plot_controls->panel_type[i] == VIS_PLOTPANEL_AZIMUTH) ||
+		       (plot_controls->panel_type[i] == VIS_PLOTPANEL_ELEVATION)) {
+	      // Compute the azimuth and elevation from the hour angle, declination
+	      // and latitude.
+	      lst = mjd2lst(date2mjd(cycle_vis_quantities[k][l][m]->obsdate,
+				     cycle_vis_quantities[k][l][m]->ut_seconds),
+			    ATCA_LONGITUDE_TURNS, 37);
+	      hour_angle = lst -
+		header_data[k]->rightascension_hours[cycle_vis_quantities[k][l][m]->source_no];
+	      eq_az_el(hour_angle,
+		       header_data[k]->declination_degrees[cycle_vis_quantities[k][l][m]->source_no],
+		       ATCA_LATITUDE, &azimuth, &elevation);
+	      if (plot_controls->panel_type[i] == VIS_PLOTPANEL_AZIMUTH) {
+		plot_lines[i][j][1][n_plot_lines[i][j] - 1] = azimuth;
+	      } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_ELEVATION) {
+		plot_lines[i][j][1][n_plot_lines[i][j] - 1] = elevation;
+	      }
 	    }
             MINASSIGN(min_y, plot_lines[i][j][1][n_plot_lines[i][j] - 1]);
             MAXASSIGN(max_y, plot_lines[i][j][1][n_plot_lines[i][j] - 1]);
@@ -1927,6 +1971,27 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
       }
     }
 
+    // If we've been asked to show fractional values, we compute those here.
+    if (plot_controls->show_panel_fraction[i]) {
+      // We also have to reset the plot range.
+      min_y = INFINITY;
+      max_y = -INFINITY;
+      for (j = 0; j < panel_n_vis_lines[i]; j++) {
+	// Calculate the average value.
+	avg_plotline_value = 0;
+	for (k = 0; k < n_plot_lines[i][j]; k++) {
+	  avg_plotline_value += plot_lines[i][j][1][k];
+	}
+	avg_plotline_value /= (float)n_plot_lines[i][j];
+	// And now recompute each value compared to this average.
+	for (k = 0; k < n_plot_lines[i][j]; k++) {
+	  plot_lines[i][j][1][k] /= avg_plotline_value;
+	  MINASSIGN(min_y, plot_lines[i][j][1][k]);
+	  MAXASSIGN(max_y, plot_lines[i][j][1][k]);
+	}
+      }
+    }
+    
     // Make the panel.
     changepanel(0, i, panelspec);
     
@@ -2022,8 +2087,14 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
     } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_GTP) {
       (void)strcpy(panellabel, "GTP");
       (void)strcpy(panelunits, "");
+    } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_GTP_COMPUTED) {
+      (void)strcpy(panellabel, "Comp. GTP");
+      (void)strcpy(panelunits, "");
     } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_SDO) {
       (void)strcpy(panellabel, "SDO");
+      (void)strcpy(panelunits, "");
+    } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_SDO_COMPUTED) {
+      (void)strcpy(panellabel, "Comp. SDO");
       (void)strcpy(panelunits, "");
     } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_CALJY) {
       (void)strcpy(panellabel, "Noise Cal.");
@@ -2043,6 +2114,17 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
     } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_SIDEREALTIME) {
       (void)strcpy(panellabel, "Sidereal Time");
       (void)strcpy(panelunits, "(hours)");
+    } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_AZIMUTH) {
+      (void)strcpy(panellabel, "Azimuth");
+      (void)strcpy(panelunits, "(degrees)");
+    } else if (plot_controls->panel_type[i] == VIS_PLOTPANEL_ELEVATION) {
+      (void)strcpy(panellabel, "Elevation");
+      (void)strcpy(panelunits, "(degrees)");
+    }
+    // Add an indicator of whether we're plotting fractional values.
+    if (plot_controls->show_panel_fraction[i]) {
+      snprintf(tpanelunits, BUFSIZE, "*%s*", panelunits);
+      strcpy(panelunits, tpanelunits);
     }
     cpgmtxt("L", 2.2, 0.5, 0.5, panellabel);
     cpgmtxt("R", 2.2, 0.5, 0.5, panelunits);
@@ -2515,9 +2597,15 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
               CALLOC(systemp_strings[j], tsys_num_ifs);
               for (k = 0; k < tsys_num_ifs; k++) {
                 CALLOC(systemp_strings[j][k], BUFSIZE);
-                snprintf(systemp_strings[j][k], BUFSIZE, "%.1f / %.1f",
-                         compiled_tsys_data->online_tsys[j][k][CAL_XX],
-                         compiled_tsys_data->online_tsys[j][k][CAL_YY]);
+		if (plot_controls->plot_options & PLOT_COMPUTED_TSYS) {
+		  snprintf(systemp_strings[j][k], BUFSIZE, "%.1f / %.1f",
+			   compiled_tsys_data->computed_tsys[j][k][CAL_XX],
+			   compiled_tsys_data->computed_tsys[j][k][CAL_YY]);
+		} else {
+		  snprintf(systemp_strings[j][k], BUFSIZE, "%.1f / %.1f",
+			   compiled_tsys_data->online_tsys[j][k][CAL_XX],
+			   compiled_tsys_data->online_tsys[j][k][CAL_YY]);
+		}
                 cpglen(4, systemp_strings[j][k], &information_text_width,
                        &information_text_height);
                 MAXASSIGN(maxlen_tsys, information_text_width);
@@ -2536,7 +2624,11 @@ void make_spd_plot(struct ampphase ***cycle_ampphase, struct panelspec *panelspe
                            compiled_tsys_data->if_num[j - 1]);
                   cpgptxt(information_x_pos, YPOS_LINE(j), 0, 0, information_text);
                 } else if ((j == 0) && (k == 0)) {
-                  cpgptxt(information_x_pos, YPOS_LINE(0), 0, 0, "TSYS");
+		  if (plot_controls->plot_options & PLOT_COMPUTED_TSYS) {
+		    cpgptxt(information_x_pos, YPOS_LINE(0), 0, 0, "CTSYS");
+		  } else {
+		    cpgptxt(information_x_pos, YPOS_LINE(0), 0, 0, "TSYS");
+		  }
                 } else {
                   cpgptxt((information_x_pos + (maxlen_tsys / 2.0) +
                            ((float)(k - 1) * (maxlen_tsys + 0.02))),
@@ -3069,7 +3161,7 @@ int determine_filetype(char *f) {
  *  \param a actual filename, which upon exit will contain the actual file that
  *           will be created; this differs from f only if f doesn't contain the
  *           appropriate extension
- *  \param al the maximum length that will fit in \a l
+ *  \param al the maximum length that will fit in \a a
  *  \return the file type that will be made from \a d
  */
 int filename_to_pgplot_device(char *f, char *d, size_t l, int type, char *a, size_t al) {

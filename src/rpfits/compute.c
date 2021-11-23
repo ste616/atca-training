@@ -474,20 +474,33 @@ void set_default_ampphase_modifiers(struct ampphase_modifiers *modifiers) {
   modifiers->phase_start_mjd = -1;
   modifiers->phase_end_mjd = -1;
   modifiers->phase = NULL;
+  modifiers->set_noise_diode_amplitude = false;
+  modifiers->noise_diode_num_antennas = 0;
+  modifiers->noise_diode_num_pols = 0;
+  modifiers->noise_diode_start_mjd = -1;
+  modifiers->noise_diode_end_mjd = -1;
+  modifiers->noise_diode_amplitude = NULL;
 }
 
 /*! \brief Add a new modifier to the list of modifiers in an options structure
  *  \param options the ampphase_options structure to add the modifier to
  *  \param idx the index in modifiers to add to, which is the IF index
+ *  \param modifier_to_add an already created modifier that you may wish to add to the
+ *                         list; specify this as NULL to make this routine add a default
+ *                         modifier instead
  *  \returns a pointer to the modifier structure added
  */
 struct ampphase_modifiers* add_modifier(struct ampphase_options *options,
-					int idx) {
+					int idx, struct ampphase_modifiers *modifier_to_add) {
   struct ampphase_modifiers *new_modifier = NULL;
   options->num_modifiers[idx] += 1;
   REALLOC(options->modifiers[idx], options->num_modifiers[idx]);
   CALLOC(new_modifier, 1);
-  set_default_ampphase_modifiers(new_modifier);
+  if (modifier_to_add == NULL) {
+    set_default_ampphase_modifiers(new_modifier);
+  } else {
+    copy_ampphase_modifiers(new_modifier, modifier_to_add);
+  }
   options->modifiers[idx][options->num_modifiers[idx] - 1] = new_modifier;
   return(new_modifier);
 }
@@ -563,6 +576,11 @@ void copy_ampphase_modifiers(struct ampphase_modifiers *dest,
   STRUCTCOPY(src, dest, phase_num_pols);
   STRUCTCOPY(src, dest, phase_start_mjd);
   STRUCTCOPY(src, dest, phase_end_mjd);
+  STRUCTCOPY(src, dest, set_noise_diode_amplitude);
+  STRUCTCOPY(src, dest, noise_diode_num_antennas);
+  STRUCTCOPY(src, dest, noise_diode_num_pols);
+  STRUCTCOPY(src, dest, noise_diode_start_mjd);
+  STRUCTCOPY(src, dest, noise_diode_end_mjd);
   if (dest->delay_num_antennas > 0) {
     CALLOC(dest->delay, dest->delay_num_antennas);
     for (i = 0; i < dest->delay_num_antennas; i++) {
@@ -588,6 +606,19 @@ void copy_ampphase_modifiers(struct ampphase_modifiers *dest,
     }
   } else {
     dest->phase = NULL;
+  }
+  if (dest->noise_diode_num_antennas > 0) {
+    CALLOC(dest->noise_diode_amplitude, dest->noise_diode_num_antennas);
+    for (i = 0; i < dest->noise_diode_num_antennas; i++) {
+      if (dest->noise_diode_num_pols > 0) {
+	CALLOC(dest->noise_diode_amplitude[i], dest->noise_diode_num_pols);
+	for (j = 0; j < dest->noise_diode_num_pols; j++) {
+	  STRUCTCOPY(src, dest, noise_diode_amplitude[i][j]);
+	}
+      }
+    }
+  } else {
+    dest->noise_diode_amplitude = NULL;
   }
 }
 
@@ -649,6 +680,10 @@ void free_ampphase_modifiers(struct ampphase_modifiers *modifiers) {
     FREE(modifiers->phase[i]);
   }
   FREE(modifiers->phase);
+  for (i = 0; i < modifiers->noise_diode_num_antennas; i++) {
+    FREE(modifiers->noise_diode_amplitude[i]);
+  }
+  FREE(modifiers->noise_diode_amplitude);
 }
 
 /*!
@@ -686,17 +721,24 @@ void free_ampphase_options(struct ampphase_options *options) {
  *  \param options an array of ampphase_options structures
  *  \param scan_header_data the scan header data describing the band configuration
  *                          you're seeeking
+ *  \param options_idx if set to not NULL, this pointer will be filled with the index
+ *                     of the found options in the \a options array, or -1 if not found
  *  \return a pointer to the ampphase_options structure, or NULL if no match
  *          was found
  */
 struct ampphase_options* find_ampphase_options(int num_options,
 					       struct ampphase_options **options,
-					       struct scan_header_data *scan_header_data) {
+					       struct scan_header_data *scan_header_data,
+					       int *options_idx) {
   int i, j;
   bool all_bands_match = false;
   struct ampphase_options *match = NULL;
 
   /* printf("[find_ampphase_options] searching set of %d options\n", num_options); */
+
+  if (options_idx != NULL) {
+    *options_idx = -1;
+  }
   
   for (i = 0; i < num_options; i++) {
     /* printf(" options %d has %d windows, scan header has %d windows\n", i, */
@@ -715,6 +757,9 @@ struct ampphase_options* find_ampphase_options(int num_options,
       }
       if (all_bands_match == true) {
 	match = options[i];
+	if (options_idx != NULL) {
+	  *options_idx = i;
+	}
 	break;
       }
     }
@@ -785,6 +830,8 @@ void copy_syscal_data(struct syscal_data *dest,
   REALLOC(dest->computed_tsys_applied, dest->num_ants);
   REALLOC(dest->gtp, dest->num_ants);
   REALLOC(dest->sdo, dest->num_ants);
+  REALLOC(dest->computed_gtp, dest->num_ants);
+  REALLOC(dest->computed_sdo, dest->num_ants);
   REALLOC(dest->caljy, dest->num_ants);
   for (i = 0; i < dest->num_ants; i++) {
     STRUCTCOPY(src, dest, parangle[i]);
@@ -799,6 +846,8 @@ void copy_syscal_data(struct syscal_data *dest,
     MALLOC(dest->computed_tsys_applied[i], dest->num_ifs);
     MALLOC(dest->gtp[i], dest->num_ifs);
     MALLOC(dest->sdo[i], dest->num_ifs);
+    MALLOC(dest->computed_gtp[i], dest->num_ifs);
+    MALLOC(dest->computed_sdo[i], dest->num_ifs);
     MALLOC(dest->caljy[i], dest->num_ifs);
     for (j = 0; j < dest->num_ifs; j++) {
       STRUCTCOPY(src, dest, xyphase[i][j]);
@@ -809,6 +858,8 @@ void copy_syscal_data(struct syscal_data *dest,
       MALLOC(dest->computed_tsys_applied[i][j], dest->num_pols);
       MALLOC(dest->gtp[i][j], dest->num_pols);
       MALLOC(dest->sdo[i][j], dest->num_pols);
+      MALLOC(dest->computed_gtp[i][j], dest->num_pols);
+      MALLOC(dest->computed_sdo[i][j], dest->num_pols);
       MALLOC(dest->caljy[i][j], dest->num_pols);
       for (k = 0; k < dest->num_pols; k++) {
         STRUCTCOPY(src, dest, online_tsys[i][j][k]);
@@ -817,6 +868,8 @@ void copy_syscal_data(struct syscal_data *dest,
         STRUCTCOPY(src, dest, computed_tsys_applied[i][j][k]);
         STRUCTCOPY(src, dest, gtp[i][j][k]);
         STRUCTCOPY(src, dest, sdo[i][j][k]);
+        STRUCTCOPY(src, dest, computed_gtp[i][j][k]);
+        STRUCTCOPY(src, dest, computed_sdo[i][j][k]);
         STRUCTCOPY(src, dest, caljy[i][j][k]);
       }
     }
@@ -856,6 +909,8 @@ void free_syscal_data(struct syscal_data *syscal_data) {
         FREE(syscal_data->computed_tsys_applied[i][j]);
         FREE(syscal_data->gtp[i][j]);
         FREE(syscal_data->sdo[i][j]);
+        FREE(syscal_data->computed_gtp[i][j]);
+        FREE(syscal_data->computed_sdo[i][j]);
         FREE(syscal_data->caljy[i][j]);
       }
       FREE(syscal_data->online_tsys[i]);
@@ -864,6 +919,8 @@ void free_syscal_data(struct syscal_data *syscal_data) {
       FREE(syscal_data->computed_tsys_applied[i]);
       FREE(syscal_data->gtp[i]);
       FREE(syscal_data->sdo[i]);
+      FREE(syscal_data->computed_gtp[i]);
+      FREE(syscal_data->computed_sdo[i]);
       FREE(syscal_data->caljy[i]);
     }
     FREE(syscal_data->online_tsys);
@@ -872,6 +929,8 @@ void free_syscal_data(struct syscal_data *syscal_data) {
     FREE(syscal_data->computed_tsys_applied);
     FREE(syscal_data->gtp);
     FREE(syscal_data->sdo);
+    FREE(syscal_data->computed_gtp);
+    FREE(syscal_data->computed_sdo);
     FREE(syscal_data->caljy);
   }
 }
@@ -1056,7 +1115,7 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
 
   // Try to find the correct options for this band.
   band_options = find_ampphase_options(*num_options, *options,
-				       scan_header_data);
+				       scan_header_data, NULL);
   needs_new_options = (band_options == NULL);
 
   /* printf("[vis_ampphase] after finding options\n"); */
@@ -1210,6 +1269,10 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
 	     (*ampphase)->syscal_data->num_ants);
       CALLOC((*ampphase)->syscal_data->sdo,
 	     (*ampphase)->syscal_data->num_ants);
+      CALLOC((*ampphase)->syscal_data->computed_gtp,
+	     (*ampphase)->syscal_data->num_ants);
+      CALLOC((*ampphase)->syscal_data->computed_sdo,
+	     (*ampphase)->syscal_data->num_ants);
       CALLOC((*ampphase)->syscal_data->caljy,
 	     (*ampphase)->syscal_data->num_ants);
       for (i = 0; i < (*ampphase)->syscal_data->num_ants; i++) {
@@ -1238,23 +1301,41 @@ int vis_ampphase(struct scan_header_data *scan_header_data,
           (*ampphase)->syscal_data->gtp[i][0][0] =
             cycle_data->gtp_y[syscal_if_idx][i];
         }
+        CALLOC((*ampphase)->syscal_data->computed_gtp[i], 1);
+        CALLOC((*ampphase)->syscal_data->computed_gtp[i][0], 1);
+        if (syscal_pol_idx == CAL_XX) {
+          (*ampphase)->syscal_data->computed_gtp[i][0][0] =
+            cycle_data->computed_gtp_x[syscal_if_idx][i];
+        } else if (syscal_pol_idx == CAL_YY) {
+          (*ampphase)->syscal_data->computed_gtp[i][0][0] =
+            cycle_data->computed_gtp_y[syscal_if_idx][i];
+        }
         CALLOC((*ampphase)->syscal_data->sdo[i], 1);
         CALLOC((*ampphase)->syscal_data->sdo[i][0], 1);
         if (syscal_pol_idx == CAL_XX) {
           (*ampphase)->syscal_data->sdo[i][0][0] =
-            cycle_data->gtp_x[syscal_if_idx][i];
+            cycle_data->sdo_x[syscal_if_idx][i];
         } else if (syscal_pol_idx == CAL_YY) {
           (*ampphase)->syscal_data->sdo[i][0][0] =
-            cycle_data->gtp_y[syscal_if_idx][i];
+            cycle_data->sdo_y[syscal_if_idx][i];
+        }
+        CALLOC((*ampphase)->syscal_data->computed_sdo[i], 1);
+        CALLOC((*ampphase)->syscal_data->computed_sdo[i][0], 1);
+        if (syscal_pol_idx == CAL_XX) {
+          (*ampphase)->syscal_data->computed_sdo[i][0][0] =
+            cycle_data->computed_sdo_x[syscal_if_idx][i];
+        } else if (syscal_pol_idx == CAL_YY) {
+          (*ampphase)->syscal_data->computed_sdo[i][0][0] =
+            cycle_data->computed_sdo_y[syscal_if_idx][i];
         }
         CALLOC((*ampphase)->syscal_data->caljy[i], 1);
         CALLOC((*ampphase)->syscal_data->caljy[i][0], 1);
         if (syscal_pol_idx == CAL_XX) {
           (*ampphase)->syscal_data->caljy[i][0][0] =
-            cycle_data->caljy_x[syscal_if_idx][i];
+            cycle_data->used_caljy_x[syscal_if_idx][i];
         } else if (syscal_pol_idx == CAL_YY) {
           (*ampphase)->syscal_data->caljy[i][0][0] =
-            cycle_data->caljy_y[syscal_if_idx][i];
+            cycle_data->used_caljy_y[syscal_if_idx][i];
         }
       }
     } else {
@@ -1580,6 +1661,20 @@ int cmpfunc_real(const void *a, const void *b) {
 }
 
 /*!
+ *  \brief A qsort comparator function for double real type numbers
+ *  \param a a pointer to a number
+ *  \param b a pointer to another number
+ *  \return - 0 if the two dereferenced numbers are equal
+ *          - -ive if the dereferenced \a b number is larger
+ *          - +ive if the dereferenced \a a number is larger
+ */
+int cmpfunc_double(const void *a, const void *b) {
+  const double va = *(double *)a;
+  const double vb = *(double *)b;
+  return ( (va > vb) - (va < vb) );
+}
+
+/*!
  *  \brief A qsort comparator function for float complex type numbers
  *  \param a a pointer to a number
  *  \param b a pointer to another number
@@ -1646,13 +1741,14 @@ int ampphase_average(struct scan_header_data *scan_header_data,
   int n_points = 0, i, j, k, n_expected = 0, n_delavg_expected = 0;
   int *delavg_n = NULL, delavg_idx = 0, n_delay_points = 0;
   int min_tvchannel, max_tvchannel, a1, a2, *n_delavg_median = NULL;
+  int syscal_ant_idx = -1, syscal_window_idx = -1, syscal_pol_idx = -1;
   float total_amplitude = 0, total_phase = 0, total_delay = 0;
   float delta_phase, delta_frequency, dp, p1, p2, p3;
   float *median_array_amplitude = NULL, *median_array_phase = NULL;
   float *median_array_delay = NULL;
-  float *array_frequency = NULL, *delavg_frequency = NULL;
+  float *array_frequency = NULL, *delavg_frequency = NULL, amp_scaler;
   float *delavg_phase = NULL, **median_delavg_frequency = NULL;
-  float **median_delavg_phase = NULL;
+  float **median_delavg_phase = NULL, on_off_diff[MAX_ANTENNANUM];
   float complex total_complex, *median_complex = NULL, average_complex;
   float complex *delavg_raw = NULL, **median_delavg_raw = NULL;
   bool needs_new_options = false;
@@ -1684,7 +1780,7 @@ int ampphase_average(struct scan_header_data *scan_header_data,
     band_options = ampphase->options;
   } else {
     band_options = find_ampphase_options(*num_options, *options,
-					 scan_header_data);
+					 scan_header_data, NULL);
   }
   needs_new_options = (band_options == NULL);
 
@@ -1773,6 +1869,56 @@ int ampphase_average(struct scan_header_data *scan_header_data,
     CALLOC(median_delavg_raw[i], band_options->delay_averaging[ampphase->window]);
     CALLOC(median_delavg_frequency[i], band_options->delay_averaging[ampphase->window]);
   }
+
+  // Find the appropriate window and polarisation index in the syscal data.
+  for (i = 0, syscal_window_idx = -1; i < ampphase->syscal_data->num_ifs; i++) {
+    if (ampphase->syscal_data->if_num[i] == ampphase->window) {
+      syscal_window_idx = i;
+      break;
+    }
+  }
+  for (i = 0, syscal_pol_idx = -1; i < ampphase->syscal_data->num_pols; i++) {
+    if (ampphase->syscal_data->pol[i] == ampphase->pol) {
+      syscal_pol_idx = i;
+      break;
+    }
+  }
+  
+  // Do a pass through the baselines to get autocorrelation data so we can do
+  // some amplitude scaling later.
+  if ((syscal_window_idx >= 0) && (syscal_pol_idx >= 0)) {
+    for (i = 0; i < (*vis_quantities)->nbaselines; i++) {
+      base_to_ants((*vis_quantities)->baseline[i], &a1, &a2);
+      if (a1 == a2) {
+	on_off_diff[a1] = 0;
+	for (j = 0, syscal_ant_idx = -1; j < ampphase->syscal_data->num_ants; j++) {
+	  if (ampphase->syscal_data->ant_num[j] == a1) {
+	    syscal_ant_idx = j;
+	    break;
+	  }
+	}
+	if (syscal_ant_idx >= 0) {
+	  for (j = 0; j < ampphase->f_nchannels[i][0]; j++) {
+	    if ((ampphase->f_channel[i][0][j] >= min_tvchannel) &&
+		(ampphase->f_channel[i][0][j] < max_tvchannel)) {
+	      on_off_diff[a1] += crealf(ampphase->f_raw[i][1][j]) -
+		crealf(ampphase->f_raw[i][0][j]);
+	    }
+	  }
+	  on_off_diff[a1] /=
+	    (ampphase->f_nchannels[i][0] *
+	     ampphase->syscal_data->caljy[syscal_ant_idx][syscal_window_idx][syscal_pol_idx]);
+	} else {
+	  on_off_diff[a1] = 1;
+	}
+      }
+    }
+  } else {
+    for (i = 0; i < MAX_ANTENNANUM; i++) {
+      on_off_diff[i] = 1;
+    }
+  }
+  
   // Do the averaging loop.
   /* fprintf(stderr, "[ampphase_averaging] starting averaging loop\n"); */
   /* debug = fopen(debug_fname, "w"); */
@@ -1799,16 +1945,19 @@ int ampphase_average(struct scan_header_data *scan_header_data,
 	delavg_n[j] = 0;
 	n_delavg_median[j] = 0;
       }
+      // Prepare our amplitude scaler.
+      //amp_scaler = sqrtf(on_off_diff[a1] * on_off_diff[a2]);
+      amp_scaler = 1.0;
       for (j = 0; j < ampphase->f_nchannels[i][k]; j++) {
         // Check for in range.
         if ((ampphase->f_channel[i][k][j] >= min_tvchannel) &&
             (ampphase->f_channel[i][k][j] < max_tvchannel)) {
-          total_amplitude += ampphase->f_amplitude[i][k][j];
+          total_amplitude += ampphase->f_amplitude[i][k][j] * amp_scaler;
           total_phase += ampphase->f_phase[i][k][j];
-          total_complex += ampphase->f_raw[i][k][j];
-          median_array_amplitude[n_points] = ampphase->f_amplitude[i][k][j];
+          total_complex += ampphase->f_raw[i][k][j] * amp_scaler;
+          median_array_amplitude[n_points] = ampphase->f_amplitude[i][k][j] * amp_scaler;
           median_array_phase[n_points] = ampphase->f_phase[i][k][j];
-          median_complex[n_points] = ampphase->f_raw[i][k][j];
+          median_complex[n_points] = ampphase->f_raw[i][k][j] * amp_scaler;
           array_frequency[n_points] = ampphase->f_frequency[i][k][j];
           n_points++;
           delavg_idx =
@@ -1988,7 +2137,12 @@ bool ampphase_modifiers_match(struct ampphase_modifiers *a,
       (a->phase_num_antennas == b->phase_num_antennas) &&
       (a->phase_num_pols == b->phase_num_pols) &&
       (a->phase_start_mjd == b->phase_start_mjd) &&
-      (a->phase_end_mjd == b->phase_end_mjd)) {
+      (a->phase_end_mjd == b->phase_end_mjd) &&
+      (a->set_noise_diode_amplitude == b->set_noise_diode_amplitude) &&
+      (a->noise_diode_num_antennas == b->noise_diode_num_antennas) &&
+      (a->noise_diode_num_pols == b->noise_diode_num_pols) &&
+      (a->noise_diode_start_mjd == b->noise_diode_start_mjd) &&
+      (a->noise_diode_end_mjd == b->noise_diode_end_mjd)) {
     // Looks good so far, now check the delay settings.
     match = true;
     for (i = 0; i < a->delay_num_antennas; i++) {
@@ -2006,6 +2160,18 @@ bool ampphase_modifiers_match(struct ampphase_modifiers *a,
     for (i = 0; i < a->phase_num_antennas; i++) {
       for (j = 0; j < b->phase_num_pols; j++) {
 	if (a->phase[i][j] != b->phase[i][j]) {
+	  match = false;
+	  break;
+	}
+      }
+      if (!match) {
+	break;
+      }
+    }
+    // And check the noise diode settings.
+    for (i = 0; i < a->noise_diode_num_antennas; i++) {
+      for (j = 0; j < b->noise_diode_num_pols; j++) {
+	if (a->noise_diode_amplitude[i][j] != b->noise_diode_amplitude[i][j]) {
 	  match = false;
 	  break;
 	}
@@ -2082,9 +2248,12 @@ void calculate_system_temperatures_cycle_data(struct cycle_data *cycle_data,
   int reqpol[2], polnum, vidx;
   float ****tp_on_array = NULL, ****tp_off_array = NULL;
   float nhalfchan, chanwidth, rcheck, med_tp_on, med_tp_off, tp_on, tp_off;
-  float fs, fd, dx;
-  bool computed_tsys_applied = false, needs_new_options = false;
+  float fs, fd, dx, caljy_x, caljy_y;
+  double cycle_mjd;
+  //bool computed_tsys_applied = false;
+  bool needs_new_options = false, acal_override = false;
   struct ampphase_options *band_options = NULL;
+  struct ampphase_modifiers *use_modifier = NULL;
   // Recalculate the system temperature from the data within the
   // specified tvchannel range, and with different options.
 
@@ -2111,7 +2280,7 @@ void calculate_system_temperatures_cycle_data(struct cycle_data *cycle_data,
   }
 
   // Try to find the correct options for this band.
-  band_options = find_ampphase_options(*num_options, *options, scan_header_data);
+  band_options = find_ampphase_options(*num_options, *options, scan_header_data, NULL);
   needs_new_options = (band_options == NULL);
 
   /* printf("[calculate_system_temperatures_cycle_data] after finding options\n"); */
@@ -2130,6 +2299,9 @@ void calculate_system_temperatures_cycle_data(struct cycle_data *cycle_data,
 
   /* printf("[calculate_system_temperatures_cycle_data] after creating new options\n"); */
   /* print_options_set(*num_options, *options); */
+  // The GTP and SDO can only be properly computed with the raw correlation
+  // coefficients.
+  system_temperature_modifier(STM_REMOVE, cycle_data, scan_header_data);
   
   for (i = 0; i < cycle_data->num_points; i++) {
     bl = ants_to_base(cycle_data->ant1[i], cycle_data->ant2[i]);
@@ -2221,18 +2393,48 @@ void calculate_system_temperatures_cycle_data(struct cycle_data *cycle_data,
   // overwriting the computed Tsys numbers, we have to first reverse the application
   // otherwise we'll have no way to reverse them later.
   // We make only a simple check for this.
-  if ((cycle_data->computed_tsys_applied != NULL) &&
-      (cycle_data->computed_tsys_applied[0][0][0] == SYSCAL_TSYS_APPLIED)) {
-    computed_tsys_applied = true;
-    system_temperature_modifier(STM_REMOVE, cycle_data, scan_header_data);
-  }
+  /* if ((cycle_data->computed_tsys_applied != NULL) && */
+  /*     (cycle_data->computed_tsys_applied[0][0][0] == SYSCAL_TSYS_APPLIED)) { */
+  /*   computed_tsys_applied = true; */
+  /*   system_temperature_modifier(STM_REMOVE, cycle_data, scan_header_data); */
+  /* } */
+  
+  cycle_mjd = date2mjd(scan_header_data->obsdate, cycle_data->ut_seconds);
 
   // Now we're free to actually do the system temperature computations.
+  acal_override = false;
   for (i = 0; i < cycle_data->num_cal_ifs; i++) {
     ifno = cycle_data->cal_ifs[i];
     // The cal_ifs array is not necessarily in ascending IF order.
     ifsidx = ifno - 1;
+
+    // Go through the modifier list and see if we're supposed to be using a
+    // different noise diode amplitude than what was used online.
+    use_modifier = NULL;
+    for (j = 0; j < band_options->num_modifiers[ifno]; j++) {
+      if ((band_options->modifiers[ifno][j]->set_noise_diode_amplitude == true) &&
+	  (band_options->modifiers[ifno][j]->noise_diode_start_mjd <= cycle_mjd) &&
+	  (band_options->modifiers[ifno][j]->noise_diode_end_mjd >= cycle_mjd)) {
+	use_modifier = band_options->modifiers[ifno][j];
+	// We don't break, and we always use the latest modifier in the list that
+	// matches.
+      }
+    }
+    
     for (j = 0; j < cycle_data->num_cal_ants; j++) {
+      if (use_modifier == NULL) {
+	// We use the online value for the noise diode amplitude.
+	caljy_x = cycle_data->caljy_x[ifsidx][j];
+	caljy_y = cycle_data->caljy_y[ifsidx][j];
+      } else {
+	caljy_x = use_modifier->noise_diode_amplitude[j + 1][POL_X];
+	caljy_y = use_modifier->noise_diode_amplitude[j + 1][POL_Y];
+	// We also need to ensure we adjust the system temperature.
+	acal_override = true;
+      }
+      cycle_data->used_caljy_x[ifsidx][j] = caljy_x;
+      cycle_data->used_caljy_y[ifsidx][j] = caljy_y;
+      
       for (k = CAL_XX; k <= CAL_YY; k++) {
 	if (band_options->averaging_method[ifno] & AVERAGETYPE_MEDIAN) {
 	  qsort(tp_on_array[j][ifsidx][k], n_tp_on_array[j][ifsidx][k], sizeof(float),
@@ -2244,39 +2446,49 @@ void calculate_system_temperatures_cycle_data(struct cycle_data *cycle_data,
 	  fs = 0.5 * (med_tp_on + med_tp_off);
 	  fd = med_tp_on - med_tp_off;
 	} else if (band_options->averaging_method[ifno] & AVERAGETYPE_MEAN) {
-	  tp_on = fsumf(tp_on_array[j][ifsidx][k], n_tp_on_array[j][ifsidx][k]);
-	  tp_off = fsumf(tp_off_array[j][ifsidx][k], n_tp_off_array[j][ifsidx][k]);
+	  tp_on = fmeanf(tp_on_array[j][ifsidx][k], n_tp_on_array[j][ifsidx][k]);
+	  tp_off = fmeanf(tp_off_array[j][ifsidx][k], n_tp_off_array[j][ifsidx][k]);
 	  fs = 0.5 * (tp_on + tp_off);
 	  fd = tp_on - tp_off;
 	}
 	dx = 99.995 * 99.995;
 	if (fd > (0.01 * fs)) {
-	  if ((k == CAL_XX) && (cycle_data->caljy_x[ifsidx][j] > 0)) {
-	    dx = (fs / fd) * cycle_data->caljy_x[ifsidx][j];
-	  } else if ((k == CAL_YY) && (cycle_data->caljy_y[ifsidx][j] > 0)) {
-	    dx = (fs / fd) * cycle_data->caljy_y[ifsidx][j];
+	  if ((k == CAL_XX) && (caljy_x > 0)) {//(cycle_data->caljy_x[ifsidx][j] > 0)) {
+	    //dx = (fs / fd) * cycle_data->caljy_x[ifsidx][j];
+	    dx = (fs / fd) * caljy_x;
+	  } else if ((k == CAL_YY) && (caljy_y > 0)) {//(cycle_data->caljy_y[ifsidx][j] > 0)) {
+	    //dx = (fs / fd) * cycle_data->caljy_y[ifsidx][j];
+	    dx = (fs / fd) * caljy_y;
 	  }
 	}
 	// Fill in the Tsys.
 	cycle_data->computed_tsys[i][j][k] = sqrtf(dx);
+	if (k == CAL_XX) {
+	  cycle_data->computed_gtp_x[i][j] = fs;
+	  cycle_data->computed_sdo_x[i][j] = fd;
+	} else if (k == CAL_YY) {
+	  cycle_data->computed_gtp_y[i][j] = fs;
+	  cycle_data->computed_sdo_y[i][j] = fd;
+	}
       }
     }
+
   }
 
-  // If upon entry the computed Tsys was applied to the data, we now reapply the newly
-  // computed Tsys.
-  if (computed_tsys_applied == true) {
-    system_temperature_modifier(STM_APPLY_COMPUTED, cycle_data, scan_header_data);
-  }
+  /* // If upon entry the computed Tsys was applied to the data, we now reapply the newly */
+  /* // computed Tsys. */
+  /* if (computed_tsys_applied == true) { */
+  /*   system_temperature_modifier(STM_APPLY_COMPUTED, cycle_data, scan_header_data); */
+  /* } */
 
   // Work out from the options what to do about correcting the visibilities.
-  if (band_options->systemp_reverse_online) {
-    if (band_options->systemp_apply_computed) {
+  if (band_options->systemp_reverse_online || acal_override) {
+    if (band_options->systemp_apply_computed || acal_override) {
       // Apply the computed Tsys.
       system_temperature_modifier(STM_APPLY_COMPUTED, cycle_data, scan_header_data);
-    } else {
-      // We are being asked to remove all calibration.
-      system_temperature_modifier(STM_REMOVE, cycle_data, scan_header_data);
+    /* } else { */
+    /*   // We are being asked to remove all calibration. */
+    /*   system_temperature_modifier(STM_REMOVE, cycle_data, scan_header_data); */
     }
   } else {
     // The user wants to apply the online Tsys.
@@ -2397,7 +2609,7 @@ void calculate_system_temperatures(struct ampphase *ampphase,
         } else {
           dx = 99.995 * 99.995;
         }
-        // The memory for the computed_tsys is alloacted at the same
+        // The memory for the computed_tsys is allocated at the same
         // time as for the online_tsys.
         ampphase->syscal_data->computed_tsys[i][window_idx][pol_idx] =
           sqrtf(dx);
@@ -2449,6 +2661,8 @@ void spectrum_data_compile_system_temperatures(struct spectrum_data *spectrum_da
   CALLOC((*syscal_data)->computed_tsys_applied, (*syscal_data)->num_ants);
   CALLOC((*syscal_data)->gtp, (*syscal_data)->num_ants);
   CALLOC((*syscal_data)->sdo, (*syscal_data)->num_ants);
+  CALLOC((*syscal_data)->computed_gtp, (*syscal_data)->num_ants);
+  CALLOC((*syscal_data)->computed_sdo, (*syscal_data)->num_ants);
   CALLOC((*syscal_data)->caljy, (*syscal_data)->num_ants);
   // Do the same for the non-Tsys parameters.
   CALLOC((*syscal_data)->xyphase, (*syscal_data)->num_ants);
@@ -2465,6 +2679,8 @@ void spectrum_data_compile_system_temperatures(struct spectrum_data *spectrum_da
     CALLOC((*syscal_data)->computed_tsys_applied[i], (*syscal_data)->num_ifs);
     CALLOC((*syscal_data)->gtp[i], (*syscal_data)->num_ifs);
     CALLOC((*syscal_data)->sdo[i], (*syscal_data)->num_ifs);
+    CALLOC((*syscal_data)->computed_gtp[i], (*syscal_data)->num_ifs);
+    CALLOC((*syscal_data)->computed_sdo[i], (*syscal_data)->num_ifs);
     CALLOC((*syscal_data)->caljy[i], (*syscal_data)->num_ifs);
     CALLOC((*syscal_data)->xyphase[i], (*syscal_data)->num_ifs);
     CALLOC((*syscal_data)->xyamp[i], (*syscal_data)->num_ifs);
@@ -2475,6 +2691,8 @@ void spectrum_data_compile_system_temperatures(struct spectrum_data *spectrum_da
       CALLOC((*syscal_data)->computed_tsys_applied[i][j], (*syscal_data)->num_pols);
       CALLOC((*syscal_data)->gtp[i][j], (*syscal_data)->num_pols);
       CALLOC((*syscal_data)->sdo[i][j], (*syscal_data)->num_pols);
+      CALLOC((*syscal_data)->computed_gtp[i][j], (*syscal_data)->num_pols);
+      CALLOC((*syscal_data)->computed_sdo[i][j], (*syscal_data)->num_pols);
       CALLOC((*syscal_data)->caljy[i][j], (*syscal_data)->num_pols);
       for (k = 0; k < (*syscal_data)->num_pols; k++) {
         (*syscal_data)->online_tsys[i][j][k] = -1;
@@ -2483,6 +2701,8 @@ void spectrum_data_compile_system_temperatures(struct spectrum_data *spectrum_da
         (*syscal_data)->computed_tsys_applied[i][j][k] = -1;
         (*syscal_data)->gtp[i][j][k] = -1;
         (*syscal_data)->sdo[i][j][k] = -1;
+        (*syscal_data)->computed_gtp[i][j][k] = -1;
+        (*syscal_data)->computed_sdo[i][j][k] = -1;
         (*syscal_data)->caljy[i][j][k] = -1;
       }
       (*syscal_data)->xyphase[i][j] = -1; // Makes no sense...
@@ -2545,6 +2765,10 @@ void spectrum_data_compile_system_temperatures(struct spectrum_data *spectrum_da
                   tsys_data->gtp[k][l][m];
                 (*syscal_data)->sdo[kk][ll][mm] =
                   tsys_data->sdo[k][l][m];
+                (*syscal_data)->computed_gtp[kk][ll][mm] =
+                  tsys_data->computed_gtp[k][l][m];
+                (*syscal_data)->computed_sdo[kk][ll][mm] =
+                  tsys_data->computed_sdo[k][l][m];
                 (*syscal_data)->caljy[kk][ll][mm] =
                   tsys_data->caljy[k][l][m];
               }
@@ -2576,6 +2800,8 @@ void spectrum_data_compile_system_temperatures(struct spectrum_data *spectrum_da
       FREE((*syscal_data)->computed_tsys_applied[i][j]);
       FREE((*syscal_data)->gtp[i][j]);
       FREE((*syscal_data)->sdo[i][j]);
+      FREE((*syscal_data)->computed_gtp[i][j]);
+      FREE((*syscal_data)->computed_sdo[i][j]);
       FREE((*syscal_data)->caljy[i][j]);
     }
     REALLOC((*syscal_data)->online_tsys[i], (high_if + 1));
@@ -2584,6 +2810,8 @@ void spectrum_data_compile_system_temperatures(struct spectrum_data *spectrum_da
     REALLOC((*syscal_data)->computed_tsys_applied[i], (high_if + 1));
     REALLOC((*syscal_data)->gtp[i], (high_if + 1));
     REALLOC((*syscal_data)->sdo[i], (high_if + 1));
+    REALLOC((*syscal_data)->computed_gtp[i], (high_if + 1));
+    REALLOC((*syscal_data)->computed_sdo[i], (high_if + 1));
     REALLOC((*syscal_data)->caljy[i], (high_if + 1));
     REALLOC((*syscal_data)->xyphase[i], (high_if + 1));
     REALLOC((*syscal_data)->xyamp[i], (high_if + 1));
@@ -2608,7 +2836,9 @@ void system_temperature_modifier(int action,
 				 struct scan_header_data *scan_header_data) {
   int i, j, k, bl, ant1_idx, ant2_idx, iidx, ifno, *ant1_polidx = NULL, *ant2_polidx = NULL;
   int vidx, ***applied_target = NULL, applied_value = -1, polnum;
-  float rcheck, mfac = 1.0, ***tsys_target = NULL;
+  float rcheck, mfac = 1.0, mval; //***tsys_target = NULL;
+  float **sdo_target1 = NULL, **sdo_target2 = NULL;
+  float **caljy_target1 = NULL, **caljy_target2 = NULL;
   bool already_applied = false, needs_removal = false, modified = false;
   
   if ((action == STM_APPLY_CORRELATOR) || (action == STM_APPLY_COMPUTED)) {
@@ -2691,29 +2921,93 @@ void system_temperature_modifier(int action,
 	// Don't modify.
 	continue;
       }
+      if (ant1_idx == ant2_idx) {
+	mval = 1.0;
+      } else {
+	mval = 0.5;
+      }
+
+      if (ant1_polidx[j] == CAL_XX) {
+	caljy_target1 = cycle_data->used_caljy_x;
+      } else if (ant1_polidx[j] == CAL_YY) {
+	caljy_target1 = cycle_data->used_caljy_y;
+      }
+      if (ant2_polidx[j] == CAL_XX) {
+	caljy_target2 = cycle_data->used_caljy_x;
+      } else if (ant2_polidx[j] == CAL_YY) {
+	caljy_target2 = cycle_data->used_caljy_y;
+      }
       
-      if (action == STM_APPLY_CORRELATOR) {
-	mfac = sqrtf(cycle_data->tsys[iidx][ant1_idx][ant1_polidx[j]] *
-		     cycle_data->tsys[iidx][ant2_idx][ant2_polidx[j]]);
-      } else if (action == STM_APPLY_COMPUTED) {
-	mfac = sqrtf(cycle_data->computed_tsys[iidx][ant1_idx][ant1_polidx[j]] *
-		     cycle_data->computed_tsys[iidx][ant2_idx][ant2_polidx[j]]);
-      } else if (action == STM_REMOVE) {
-	// Work out which one has been applied.
-	if ((cycle_data->tsys_applied[iidx][ant1_idx][ant1_polidx[j]] == SYSCAL_TSYS_APPLIED) &&
-	    (cycle_data->tsys_applied[iidx][ant2_idx][ant2_polidx[j]] == SYSCAL_TSYS_APPLIED)) {
-	  tsys_target = cycle_data->tsys;
+      if ((action == STM_APPLY_CORRELATOR) ||
+	  ((action == STM_REMOVE) &&
+	   (cycle_data->tsys_applied[iidx][ant1_idx][ant1_polidx[j]] ==
+	    SYSCAL_TSYS_APPLIED) &&
+	   (cycle_data->tsys_applied[iidx][ant2_idx][ant2_polidx[j]] ==
+	    SYSCAL_TSYS_APPLIED))) {
+	if (ant1_polidx[j] == CAL_XX) {
+	  sdo_target1 = cycle_data->sdo_x;
+	} else if (ant1_polidx[j] == CAL_YY) {
+	  sdo_target1 = cycle_data->sdo_y;
+	}
+	if (ant2_polidx[j] == CAL_XX) {
+	  sdo_target2 = cycle_data->sdo_x;
+	} else if (ant2_polidx[j] == CAL_YY) {
+	  sdo_target2 = cycle_data->sdo_y;
+	}
+	if (action == STM_REMOVE) {
 	  applied_target = cycle_data->tsys_applied;
-	} else if ((cycle_data->computed_tsys_applied[iidx][ant1_idx][ant1_polidx[j]] ==
-		    SYSCAL_TSYS_APPLIED) &&
-		   (cycle_data->computed_tsys_applied[iidx][ant2_idx][ant2_polidx[j]] ==
-		    SYSCAL_TSYS_APPLIED)) {
-	  tsys_target = cycle_data->computed_tsys;
+	}
+      } else if ((action == STM_APPLY_COMPUTED) ||
+		 ((action == STM_REMOVE) &&
+		  (cycle_data->computed_tsys_applied[iidx][ant1_idx][ant1_polidx[j]] ==
+		   SYSCAL_TSYS_APPLIED) &&
+		  (cycle_data->computed_tsys_applied[iidx][ant2_idx][ant2_polidx[j]] ==
+		   SYSCAL_TSYS_APPLIED))) {
+	if (ant1_polidx[j] == CAL_XX) {
+	  sdo_target1 = cycle_data->computed_sdo_x;
+	} else if (ant1_polidx[j] == CAL_YY) {
+	  sdo_target1 = cycle_data->computed_sdo_y;
+	}
+	if (ant2_polidx[j] == CAL_XX) {
+	  sdo_target2 = cycle_data->computed_sdo_x;
+	} else if (ant2_polidx[j] == CAL_YY) {
+	  sdo_target2 = cycle_data->computed_sdo_y;
+	}
+	if (action == STM_REMOVE) {
 	  applied_target = cycle_data->computed_tsys_applied;
 	}
-	mfac = 1.0 / sqrtf(tsys_target[iidx][ant1_idx][ant1_polidx[j]] *
-			   tsys_target[iidx][ant1_idx][ant1_polidx[j]]);
       }
+
+      mfac = mval * sqrtf((caljy_target1[iidx][ant1_idx] / sdo_target1[iidx][ant1_idx]) *
+			  (caljy_target2[iidx][ant2_idx] / sdo_target2[iidx][ant2_idx]));
+      if (action == STM_REMOVE) {
+	mfac = 1.0 / mfac;
+      }
+      
+      /* if (action == STM_APPLY_CORRELATOR) { */
+      /* 	/\* mfac = mval * sqrtf(cycle_data->tsys[iidx][ant1_idx][ant1_polidx[j]] * *\/ */
+      /* 	/\* 		    cycle_data->tsys[iidx][ant2_idx][ant2_polidx[j]]); *\/ */
+      /* 	mfac = mval * sqrtf((caljy_target1[iidx][ant1_idx] / sdo_target1[iidx][ant1_idx]) * */
+      /* 			    (caljy_target2[iidx][ant2_idx] / sdo_target2[iidx][ant1_idx])); */
+      /* } else if (action == STM_APPLY_COMPUTED) { */
+      /* 	mfac = sqrtf(cycle_data->computed_tsys[iidx][ant1_idx][ant1_polidx[j]] * */
+      /* 		     cycle_data->computed_tsys[iidx][ant2_idx][ant2_polidx[j]]); */
+      /* } else if (action == STM_REMOVE) { */
+      /* 	// Work out which one has been applied. */
+      /* 	if ((cycle_data->tsys_applied[iidx][ant1_idx][ant1_polidx[j]] == SYSCAL_TSYS_APPLIED) && */
+      /* 	    (cycle_data->tsys_applied[iidx][ant2_idx][ant2_polidx[j]] == SYSCAL_TSYS_APPLIED)) { */
+      /* 	  tsys_target = cycle_data->tsys; */
+      /* 	  applied_target = cycle_data->tsys_applied; */
+      /* 	} else if ((cycle_data->computed_tsys_applied[iidx][ant1_idx][ant1_polidx[j]] == */
+      /* 		    SYSCAL_TSYS_APPLIED) && */
+      /* 		   (cycle_data->computed_tsys_applied[iidx][ant2_idx][ant2_polidx[j]] == */
+      /* 		    SYSCAL_TSYS_APPLIED)) { */
+      /* 	  tsys_target = cycle_data->computed_tsys; */
+      /* 	  applied_target = cycle_data->computed_tsys_applied; */
+      /* 	} */
+      /* 	mfac = 1.0 / sqrtf(tsys_target[iidx][ant1_idx][ant1_polidx[j]] * */
+      /* 			   tsys_target[iidx][ant2_idx][ant2_polidx[j]]); */
+      /* } */
       if ((mfac != mfac) || (mfac < 0)) {
 	continue;
       }
@@ -3470,4 +3764,566 @@ void compute_delays(struct ampphase *ampphase, bool phase_in_degrees, int min_ch
       
     }
   }
+}
+
+/*!
+ *  \brief Free memory in a fluxdensity_specification structure, but don't
+ *         free the pointer memory itself
+ *  \param a the pointer to the structure to free
+ */
+void free_fluxdensity_specification(struct fluxdensity_specification *a) {
+  int i;
+
+  for (i = 0; i < a->num_models; i++) {
+    FREE(a->model_terms[i]);
+  }
+  FREE(a->model_terms);
+  FREE(a->model_num_terms);
+  FREE(a->model_frequency);
+  FREE(a->model_frequency_tolerance);
+
+  a->num_models = 0;
+}
+
+/*!
+ *  \brief Take some ampphase cycle data and calculate the noise diode amplitudes
+ *         given a supplied flux density
+ *  \param fluxdensity_models the flux density models for the source
+ *  \param num_cycles the number of cycles in the \a cycle_ampphase array
+ *  \param window the IF to look at
+ *  \param options the options structure to direct which channels to use
+ *  \param cycle_spectra the array of cycle data, with length \a num_cycles
+ *  \param noise_diode_modifier a pointer to a variable which upon exit will be
+ *         a modifier structure filled with the derived noise diode amplitudes
+ */
+void compute_noise_diode_amplitudes(struct fluxdensity_specification *fluxdensity_models,
+				    int num_cycles, int window, struct ampphase_options *options,
+				    struct spectrum_data **cycle_spectra,
+				    struct ampphase_modifiers **noise_diode_modifier) {
+  int i, j, k, a, b, c, ant_label, polidx[POL_YY + 1], winidx = -1;
+  int bnt_label, cnt_label, x1, y1, x2, y2, x3, y3, a1, a2, nbins1, nbins2, nbins3;
+  int *gains_nbins = NULL, nbinsa, nfreqmatch = 0, maxfreqmatch = 0, freqmatchidx;
+  int **gainsum_numtriplets = NULL, nbins_gainsum = 0, opol = -1, nbinst = 0, nbinsta = 0;
+  int nbinsb, nbinsc, syswinidx = -1, syspolidx;
+  bool aons, bons, cons;
+  float *rsum1, *rsum2, *rsum3, *isum1, *isum2, *isum3, **gains = NULL, *asuma;
+  float nd_amp, src_fd, **gainsum = NULL, *asumb, *asumc;
+  float *trsum1 = NULL, *tisum1 = NULL, *trsum2 = NULL, *tisum2 = NULL;
+  float *trsum3 = NULL, *tisum3 = NULL, *tasuma = NULL;
+  double cmjd;
+
+  // Figure out the IF index.
+  for (i = 0; i < cycle_spectra[0]->num_ifs; i++) {
+    if (cycle_spectra[0]->spectrum[i][0]->window == window) {
+      winidx = i;
+      break;
+    }
+  }
+  if (winidx == -1) {
+    // We don't know about this window.
+    return;
+  }
+  // For the syscal as well.
+  for (i = 0; i < cycle_spectra[0]->spectrum[winidx][0]->syscal_data->num_ifs; i++) {
+    if (cycle_spectra[0]->spectrum[winidx][0]->syscal_data->if_num[i] == window) {
+      syswinidx = i;
+      break;
+    }
+  }
+  if (syswinidx == -1) {
+    // We don't know about this window's calibration.
+    return;
+  }
+  
+  // Check if we're supposed to create a modifier structure.
+  if (*noise_diode_modifier == NULL) {
+    CALLOC(*noise_diode_modifier, 1);
+    (*noise_diode_modifier)->set_noise_diode_amplitude = true;
+    (*noise_diode_modifier)->noise_diode_num_antennas = 7;
+    (*noise_diode_modifier)->noise_diode_num_pols = POL_Y + 1;
+    CALLOC((*noise_diode_modifier)->noise_diode_amplitude,
+	   (*noise_diode_modifier)->noise_diode_num_antennas);
+    for (i = 0; i < (*noise_diode_modifier)->noise_diode_num_antennas; i++) {
+      CALLOC((*noise_diode_modifier)->noise_diode_amplitude[i],
+	     (*noise_diode_modifier)->noise_diode_num_pols);
+    }
+    // Take the dates from the cycles.
+    (*noise_diode_modifier)->noise_diode_start_mjd =
+      date2mjd(cycle_spectra[0]->spectrum[winidx][0]->obsdate,
+	       cycle_spectra[0]->spectrum[winidx][0]->ut_seconds);
+    (*noise_diode_modifier)->noise_diode_end_mjd =
+      (*noise_diode_modifier)->noise_diode_start_mjd;
+    for (i = 1; i < num_cycles; i++) {
+      cmjd = date2mjd(cycle_spectra[i]->spectrum[winidx][0]->obsdate,
+		      cycle_spectra[i]->spectrum[winidx][0]->ut_seconds);
+      MINASSIGN((*noise_diode_modifier)->noise_diode_start_mjd, cmjd);
+      MAXASSIGN((*noise_diode_modifier)->noise_diode_end_mjd, cmjd);
+    }
+  }
+
+  // Find the polarisations.
+  for (i = POL_XX; i <= POL_YY; i++) {
+    polidx[i] = -1;
+    for (j = 0; j < cycle_spectra[0]->num_pols; j++) {
+      if (cycle_spectra[0]->spectrum[winidx][j]->pol == i) {
+	polidx[i] = j;
+	break;
+      }
+    }
+  }
+
+  if ((polidx[POL_XX] < 0) || (polidx[POL_YY] < 0)) {
+    // Weren't able to find this pol, we're in trouble!
+    (*noise_diode_modifier)->set_noise_diode_amplitude = false;
+    return;
+  }
+  
+  // Work out which flux density model we use.
+  maxfreqmatch = 0;
+  freqmatchidx = -1;
+  for (i = 0; i < fluxdensity_models->num_models; i++) {
+    nfreqmatch = 0;
+    for (j = 0; j < cycle_spectra[0]->spectrum[winidx][polidx[POL_XX]]->nchannels; j++) {
+      if ((cycle_spectra[0]->spectrum[winidx][polidx[POL_XX]]->frequency[j] >=
+	   fluxdensity_models->model_frequency[i] -
+	   fluxdensity_models->model_frequency_tolerance[i]) &&
+	  (cycle_spectra[0]->spectrum[winidx][polidx[POL_XX]]->frequency[j] <=
+	   fluxdensity_models->model_frequency[i] +
+	   fluxdensity_models->model_frequency_tolerance[i])) {
+	nfreqmatch++;
+      }
+    }
+    if (nfreqmatch > maxfreqmatch) {
+      maxfreqmatch = nfreqmatch;
+      freqmatchidx = i;
+    }
+  }
+
+  if ((freqmatchidx < 0) ||
+      (fluxdensity_models->model_num_terms[freqmatchidx] <= 0)) {
+    // No usable frequency model.
+    (*noise_diode_modifier)->set_noise_diode_amplitude = false;
+    return;
+  }
+
+  fprintf(stderr, "  DEBUG: assuming source flux density of %.3f Jy in window %d\n",
+	  fluxdensity_models->model_terms[freqmatchidx][0], window);
+  
+  // Loop over the polarisations.
+  for (i = POL_XX; i <= POL_YY; i++) {
+    switch (i) {
+    case POL_XX:
+      opol = POL_X;
+      break;
+    case POL_YY:
+      opol = POL_Y;
+      break;
+    }
+    for (j = 0, syspolidx = -1; j < cycle_spectra[0]->spectrum[winidx][polidx[i]]->syscal_data->num_pols; j++) {
+      if (cycle_spectra[0]->spectrum[winidx][polidx[i]]->syscal_data->pol[j] == i) {
+	syspolidx = j;
+	break;
+      }
+    }
+    if (syspolidx == -1) {
+      fprintf(stderr, "DEBUG ACAL: can't find pol %d in the syscal!\n", i);
+      syspolidx = CAL_XX;
+    }
+    nbinst = 0;
+    nbinsta = 0;
+
+    // We have to find the noise diode amplitude per antenna, so it is
+    // most sensible to loop over the antennas here, and do the same
+    // procedure for each.
+    CALLOC(gains, cycle_spectra[0]->header_data->num_ants);
+    CALLOC(gainsum, cycle_spectra[0]->header_data->num_ants);
+    CALLOC(gainsum_numtriplets, cycle_spectra[0]->header_data->num_ants);
+    CALLOC(gains_nbins, cycle_spectra[0]->header_data->num_ants);
+    for (a = 0; a < cycle_spectra[0]->header_data->num_ants; a++) {
+      ant_label = cycle_spectra[0]->header_data->ant_label[a];
+      // This antenna has to be on source for all the cycles to count.
+      aons = true;
+      for (j = 0; j < num_cycles; j++) {
+	aons &=
+	  (!(cycle_spectra[j]->spectrum[winidx][polidx[i]]->syscal_data->flagging[ant_label - 1] & 1));
+      }
+      if (!aons) {
+	// Mark this antenna as off-source in the modifier.
+	(*noise_diode_modifier)->noise_diode_amplitude[ant_label][opol] = -1.0;
+	//  (*noise_diode_modifier)->noise_diode_amplitude[ant_label][POL_Y] = -1.0;
+	continue;
+      }
+      // Now determine all the gain triplets that can be made with this
+      // antenna.
+      for (b = 0; b < cycle_spectra[0]->header_data->num_ants; b++) {
+	bnt_label = cycle_spectra[0]->header_data->ant_label[b];
+	if (bnt_label != ant_label) {
+	  bons = true;
+	  for (j = 0; j < num_cycles; j++) {
+	    bons &=
+	      (!(cycle_spectra[j]->spectrum[winidx][polidx[i]]->syscal_data->flagging[bnt_label - 1] & 1));
+	  }
+	  if (bons) {
+	    for (c = b + 1; c < cycle_spectra[0]->header_data->num_ants; c++) {
+	      cnt_label = cycle_spectra[0]->header_data->ant_label[c];
+	      if ((cnt_label != bnt_label) && (cnt_label != ant_label)) {
+		cons = true;
+		for (j = 0; j < num_cycles; j++) {
+		  cons &=
+		    (!(cycle_spectra[j]->spectrum[winidx][polidx[i]]->syscal_data->flagging[cnt_label - 1] & 1));
+		}
+		if (cons) {
+		  // All three antennas are unique and on-source.
+		  if (ant_label < bnt_label) {
+		    x1 = ant_label;
+		    y1 = bnt_label;
+		  } else {
+		    x1 = bnt_label;
+		    y1 = ant_label;
+		  }
+		  if (ant_label < cnt_label) {
+		    x2 = ant_label;
+		    y2 = cnt_label;
+		  } else {
+		    x2 = cnt_label;
+		    y2 = ant_label;
+		  }
+		  if (bnt_label < cnt_label) {
+		    x3 = bnt_label;
+		    y3 = cnt_label;
+		  } else {
+		    x3 = cnt_label;
+		    y3 = bnt_label;
+		  }
+		  // Now we collect data over the baselines and cycles and put them in memory
+		  // to do calculations later.
+		  for (j = 0; j < num_cycles; j++) {
+		    for (k = 0; k < cycle_spectra[j]->spectrum[winidx][polidx[i]]->nbaselines; k++) {
+		      base_to_ants(cycle_spectra[j]->spectrum[winidx][polidx[i]]->baseline[k],
+				   &a1, &a2);
+		      if ((a1 == x1) && (a2 == y1)) {
+			rsum1 = isum1 = NULL;
+			nbins1 = 0;
+			sum_vis(cycle_spectra[j]->spectrum[winidx][polidx[i]], k, options,
+				&nbins1, &rsum1, &isum1, NULL);
+		      } else if ((a1 == x2) && (a2 == y2)) {
+			rsum2 = isum2 = NULL;
+			nbins2 = 0;
+			sum_vis(cycle_spectra[j]->spectrum[winidx][polidx[i]], k, options,
+				&nbins2, &rsum2, &isum2, NULL);
+		      } else if ((a1 == x3) && (a2 == y3)) {
+			rsum3 = isum3 = NULL;
+			nbins3 = 0;
+			sum_vis(cycle_spectra[j]->spectrum[winidx][polidx[i]], k, options,
+				&nbins3, &rsum3, &isum3, NULL);
+		      } else if ((a1 == ant_label) && (a2 == ant_label)) {
+			// This is the autocorrelation, and we want to use this to
+			// get the noise diode amplitude.
+			asuma = NULL;
+			nbinsa = 0;
+			sum_vis(cycle_spectra[j]->spectrum[winidx][polidx[i]], k, options,
+				&nbinsa, &asuma, NULL, NULL);
+		      } else if ((a1 == bnt_label) && (a2 == bnt_label)) {
+			asumb = NULL;
+			nbinsb = 0;
+			sum_vis(cycle_spectra[j]->spectrum[winidx][polidx[i]], k, options,
+				&nbinsb, &asumb, NULL, NULL);
+		      } else if ((a1 == cnt_label) && (a2 == cnt_label)) {
+			asumc = NULL;
+			nbinsc = 0;
+			sum_vis(cycle_spectra[j]->spectrum[winidx][polidx[i]], k, options,
+				&nbinsc, &asumc, NULL, NULL);
+		      }
+		    }
+		    if ((nbins1 == nbins2) && (nbins1 == nbins3)) {
+		      if (nbinst == 0) {
+			nbinst = nbins1;
+			CALLOC(trsum1, nbinst);
+			CALLOC(tisum1, nbinst);
+			CALLOC(trsum2, nbinst);
+			CALLOC(tisum2, nbinst);
+			CALLOC(trsum3, nbinst);
+			CALLOC(tisum3, nbinst);
+		      }
+		      if (nbinsta == 0) {
+			nbinsta = nbinsa;
+			CALLOC(tasuma, nbinsta);
+		      }
+		      if (nbins1 == nbinst) {
+			for (k = 0; k < nbinst; k++) {
+			  trsum1[k] += rsum1[k];
+			  tisum1[k] += isum1[k];
+			  trsum2[k] += rsum2[k];
+			  tisum2[k] += isum2[k];
+			  trsum3[k] += rsum3[k];
+			  tisum3[k] += isum3[k];
+			}
+		      }
+		      if (nbinsa == nbinsta) {
+			for (k = 0; k < nbinsta; k++) {
+			  tasuma[k] += asuma[k];
+			}
+		      }
+		    }
+		    FREE(rsum1);
+		    FREE(isum1);
+		    FREE(rsum2);
+		    FREE(isum2);
+		    FREE(rsum3);
+		    FREE(isum3);
+		    FREE(asuma);
+		    FREE(asumb);
+		    FREE(asumc);
+		  }
+		  //if ((nbins1 == nbins2) && (nbins1 == nbins3)) {
+		  if ((nbinst > 0) && (nbinsta > 1)) {
+		    nbins_gainsum = nbinst;
+		    CALLOC(gains[ant_label - 1], nbinst);
+		    if (gainsum[ant_label - 1] == NULL) {
+		      CALLOC(gainsum[ant_label - 1], nbinst);
+		      CALLOC(gainsum_numtriplets[ant_label - 1], nbinst);
+		    }
+		    for (k = 0; k < nbinst; k++) {
+		      gains[ant_label - 1][k] =
+			sqrtf((trsum1[k] * trsum1[k] + tisum1[k] * tisum1[k]) *
+			      (trsum2[k] * trsum2[k] + tisum2[k] * tisum2[k]) /
+			      (trsum3[k] * trsum3[k] + tisum3[k] * tisum3[k]));
+		      /* fprintf(stderr, "ACAL: for ant %d bin %d, triplet %d-%d * %d-%d / %d-%d = root(%.3f * %.3f / %.3f) = %.3f\n", */
+		      /* 	      ant_label, k, x1, y1, x2, y2, x3, y3, */
+		      /* 	      (trsum1[k] * trsum1[k] + tisum1[k] * tisum1[k]), */
+		      /* 	      (trsum2[k] * trsum2[k] + tisum2[k] * tisum2[k]), */
+		      /* 	      (trsum3[k] * trsum3[k] + tisum3[k] * tisum3[k]), */
+		      /* 	      gains[ant_label - 1][k]); */
+		    }
+		    if (nbinsta == 2) {
+		      // We need the autos to have the niose diode on-off bins.
+		      nd_amp = tasuma[1] - tasuma[0];
+		    } else {
+		      nd_amp = 0;
+		    }
+		    // In the CABB method, the flux density of the source is just the
+		    // first term of the model.
+		    src_fd = fluxdensity_models->model_terms[freqmatchidx][0];
+		    // Now calculate the noise diode strength in Jy.
+		    for (k = 0; k < nbinst; k++) {
+		      gainsum[ant_label - 1][k] += (src_fd * nd_amp) / gains[ant_label - 1][k];
+		      gainsum_numtriplets[ant_label - 1][k] += 1;
+		      /* fprintf(stderr, "ACAL: gain sum ant %d bin %d, now %.3f N = %d\n", */
+		      /* 	      ant_label, k, gainsum[ant_label - 1][k], */
+		      /* 	      gainsum_numtriplets[ant_label - 1][k]); */
+		    }
+		    FREE(gains[ant_label - 1]);
+		  }
+		  FREE(trsum1);
+		  FREE(tisum1);
+		  FREE(trsum2);
+		  FREE(tisum2);
+		  FREE(trsum3);
+		  FREE(tisum3);
+		  nbinst = 0;
+		  FREE(tasuma);
+		  nbinsta = 0;
+		}
+	      }
+	    }
+	  }
+	}
+      }
+    }
+    // At this point, we have an array with all the antennas and all the cycles
+    // filled in with the noise diode strengths. Calculate the average noise
+    // diode strength.
+    for (a = 0; a < cycle_spectra[0]->header_data->num_ants; a++) {
+      for (k = 0; k < nbins_gainsum; k++) {
+	// The 2x is because the noise diode amplitude is halved due to the
+	// 50% duty cycle, and we correct that here.
+	(*noise_diode_modifier)->noise_diode_amplitude[a + 1][opol] += 2 *
+	  gainsum[a][k] / (float)(gainsum_numtriplets[a][k] * nbins_gainsum);
+      }
+    }
+    
+    FREE(gains);
+    FREE(gains_nbins);
+
+    for (a = 0; a < cycle_spectra[0]->header_data->num_ants; a++) {
+      FREE(gainsum[a]);
+      FREE(gainsum_numtriplets[a]);
+    }
+    FREE(gainsum);
+    FREE(gainsum_numtriplets);
+
+  }
+
+}
+
+
+/*!
+ *  \brief Create sums of imaginary and real variables over tvchannels
+ *  \param ampphase the ampphase structure with the data to sum
+ *  \param baseline_idx the index of the baseline to sum
+ *  \param options the specification of the tvchannels
+ *  \param nbins a pointer which will be filled with the length of \a rsum and \a isum
+ *  \param rsum a pointer that will be filled with an array of length \a nbins, with each
+ *              element being the sum of the real components of all the tvchannels in each bin
+ *  \param isum a pointer that will be filled with an array of length \a nbins, with each
+ *              element being the sum of the imaginary components of all the tvchannels in each bin
+ *  \param asum a pointer that will be filled with an array of length \a nbins, with each
+ *              element being the sum of the amplitude of all the tvchannels in each bin
+ *
+ * Each of \a rsum, \a isum and \a asum can be sent as NULL to tell this routine not to
+ * return that parameter.
+ */
+void sum_vis(struct ampphase *ampphase, int baseline_idx, struct ampphase_options *options,
+	     int *nbins, float **rsum, float **isum, float **asum) {
+  int oidx, i, j, n;
+  
+  // Allocate the memory.
+  *nbins = ampphase->nbins[baseline_idx];
+  if (rsum != NULL) {
+    REALLOC(*rsum, *nbins);
+  }
+  if (isum != NULL) {
+    REALLOC(*isum, *nbins);
+  }
+  if (asum != NULL) {
+    REALLOC(*asum, *nbins);
+  }
+  for (i = 0; i < *nbins; i++) {
+    if (rsum != NULL) {
+      (*rsum)[i] = 0;
+    }
+    if (isum != NULL) {
+      (*isum)[i] = 0;
+    }
+    if (asum != NULL) {
+      (*asum)[i] = 0;
+    }
+  }
+  
+  // For now we assume the window index works for the options.
+  oidx = ampphase->window;
+  if (oidx > options->num_ifs) {
+    // Bad.
+    return;
+  }
+
+  for (i = 0; i < *nbins; i++) {
+    for (j = 0, n = 0; j < ampphase->f_nchannels[baseline_idx][i]; j++) {
+      if ((ampphase->f_channel[baseline_idx][i][j] >= options->min_tvchannel[oidx]) &&
+	  (ampphase->f_channel[baseline_idx][i][j] <= options->max_tvchannel[oidx])) {
+	n++;
+	if (rsum != NULL) {
+	  (*rsum)[i] += crealf(ampphase->f_raw[baseline_idx][i][j]);
+	}
+	if (isum != NULL) {
+	  (*isum)[i] += cimagf(ampphase->f_raw[baseline_idx][i][j]);
+	}
+	if (asum != NULL) {
+	  (*asum)[i] += ampphase->f_amplitude[baseline_idx][i][j];
+	}
+      }
+    }
+    if ((rsum != NULL) && (n > 0)) {
+      (*rsum)[i] /= (float)n;
+    }
+    if ((isum != NULL) && (n > 0)) {
+      (*isum)[i] /= (float)n;
+    }
+    if ((asum != NULL) && (n > 0)) {
+      (*asum)[i] /= (float)n;
+    }
+  }
+
+}
+
+/*!
+ *  \brief Take a flux density model, evaluate it at a particular frequency, and
+ *         return the flux density
+ *  \param num_terms the number of terms in the model, and length of \a terms array
+ *  \param log_terms flag to indicate if the model is in log S log nu space (true), or
+ *                   in linear S nu (false)
+ *  \param terms an array of the model terms
+ *  \param eval_freq the frequency (in MHz) at which to evaluate the model
+ *  \returns the flux density (in Jy) the model specifies at the \a eval_freq
+ */
+float fluxdensity_model_evaluate(int num_terms, bool log_terms, float *terms,
+				 float eval_freq) {
+  int i;
+  float fd = 0, freq;
+
+  if (log_terms) {
+    freq = log10f(eval_freq);
+  } else {
+    freq = eval_freq;
+  }
+  if (num_terms > 0) {
+    fd = terms[0];
+    for (i = 1; i < num_terms; i++) {
+      fd += terms[i] * powf(freq, i);
+    }
+  }
+
+  if (log_terms) {
+    fd = powf(10, fd);
+  }
+  
+  return (fd);
+}
+
+/*!
+ *  \brief Return a flux density model for a source
+ *  \param source_name the name of the source
+ *  \param eval_freq the frequency (in MHz) at which the model must be valid for (which
+ *                   is required for several models which are frequency-dependent)
+ *  \param num_terms a pointer to a variable which will be filled with the number of
+ *                   terms in the returned model
+ *  \param log_terms a pointer to a variable which will be filled with a flag that indicates
+ *                   if the model is in log S log nu space (true), or in linear S nu (false)
+ *  \param terms a pointer to a variable which will be allocated into an array of length
+ *               \a num_terms with the model terms
+ *  \returns a flag indicating if a model is returned for the specified source (true),
+ *           or if no model matched (false)
+ */
+bool source_model(char *source_name, float eval_freq, int *num_terms, bool *log_terms,
+		  float **terms) {
+  int i;
+  float model_1934_low[4] = { -30.7667, 26.4908, -7.0977, 0.605334 };
+  float model_1934_high[2] = { 5.887, -1.3763 };
+  float model_0823[4] = { -51.0361, 41.4101, -10.7771, 0.90468 };
+  float *model_ptr = NULL;
+  char tsrc[SOURCE_LENGTH];
+
+  // The source name from the RPFITS header will probably have loads of whitespace
+  // at the end of the string, so we strip that first.
+  strip_end_spaces(source_name, tsrc, SOURCE_LENGTH);
+  
+  // Branch based on source name (a primitive way to do this I know, I'm sorry).
+  if (strcmp(tsrc, "1934-638") == 0) {
+    // Our best flux density calibrator, has a frequency-dependent model.
+    *log_terms = true;
+    if (eval_freq < 11150) {
+      *num_terms = 4;
+      model_ptr = model_1934_low;
+    } else {
+      *num_terms = 2;
+      model_ptr = model_1934_high;
+    }
+  } else if (strcmp(tsrc, "0823-500") == 0) {
+    // This is not a very good model, since 0823-500 varies over time.
+    *log_terms = true;
+    *num_terms = 4;
+    model_ptr = model_0823;
+  }
+
+  if (model_ptr == NULL) {
+    // No match.
+    return (false);
+  }
+
+  // Copy the model over.
+  CALLOC(*terms, *num_terms);
+  for (i = 0; i < *num_terms; i++) {
+    (*terms)[i] = model_ptr[i];
+  }
+  return (true);
 }

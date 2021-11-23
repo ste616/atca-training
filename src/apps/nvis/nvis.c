@@ -81,11 +81,11 @@ int data_selected_index, tsys_apply;
 int xaxis_type, *yaxis_type, nxpanels, nypanels, nvisbands;
 int *visband_idx, tvchan_change_min, tvchan_change_max;
 int reference_antenna_index, nncal, deladd_antnum, deladd_polnum, deladd_ifnum;
-int *nncal_indices, nncal_cycletime, new_timetype;
+int *nncal_indices, nncal_cycletime, new_timetype, n_acal_fluxdensities;
 char **visband, tvchan_visband[10], hardcopy_filename[VISBUFSHORT];
 // Whether to order the baselines in length order (true/false).
 bool sort_baselines;
-float data_seconds, *nncal_seconds, deladd_value;
+float data_seconds, *nncal_seconds, deladd_value, *acal_fluxdensities;
 struct vis_plotcontrols vis_plotcontrols;
 struct panelspec vis_panelspec;
 struct vis_data vis_data;
@@ -204,6 +204,9 @@ static void sighandler(int sig) {
 #define ACTION_ADD_DELAYS                1<<20
 #define ACTION_CHANGE_TIMETYPE           1<<21
 #define ACTION_ARRAY_CONFIGURATION_PRINT 1<<22
+#define ACTION_COMPUTE_ACAL              1<<23
+#define ACTION_ENACT_ACAL                1<<24
+#define ACTION_RESET_ACAL                1<<25
 
 // The action modifier magic numbers.
 #define ACTIONMOD_NOMOD                  0
@@ -259,52 +262,111 @@ static void interpret_username(char *line) {
   FREE(line);
 }
 
-int char_to_product(char pstring) {
-  switch (pstring) {
-  case 'a':
+int char_to_product(char *pstring) {
+  // Have to check for "az" first before looking for "a" (amplitude).
+  if (minmatch("azimuth", pstring, 2) ||
+      (strcmp(pstring, "A") == 0)) {
+    return VIS_PLOTPANEL_AZIMUTH;
+  }
+  if (minmatch("amplitude", pstring, 1) ||
+      (strcmp(pstring, "a") == 0)) {
     return VIS_PLOTPANEL_AMPLITUDE;
-  case 'c':
+  }
+  if (minmatch("closurephase", pstring, 4) ||
+      (strcmp(pstring, "c") == 0)) {
     return VIS_PLOTPANEL_CLOSUREPHASE;
-  case 'C':
+  }
+  if (minmatch("computed_systemp", pstring, 11) ||
+      (strcmp(pstring, "C") == 0)) {
     return VIS_PLOTPANEL_SYSTEMP_COMPUTED;
-  case 'd':
+  }
+  if (minmatch("delay", pstring, 1) ||
+      (strcmp(pstring, "d") == 0)) {
     return VIS_PLOTPANEL_DELAY;
-  case 'D':
+  }
+  if (minmatch("winddirection", pstring, 5) ||
+      (strcmp(pstring, "D") == 0)) {
     return VIS_PLOTPANEL_WINDDIR;
-  case 'G':
+  }
+  if (minmatch("elevation", pstring, 2) ||
+      (strcmp(pstring, "E") == 0)) {
+    return VIS_PLOTPANEL_ELEVATION;
+  }
+  if (minmatch("computed_gtp", pstring, 10) ||
+      (strcmp(pstring, "g") == 0)) {
+    return VIS_PLOTPANEL_GTP_COMPUTED;
+  }
+  if (minmatch("gtp", pstring, 3) ||
+      (strcmp(pstring, "G") == 0)) {
     return VIS_PLOTPANEL_GTP;
-  case 'h':
+  }
+  if (minmatch("hourangle", pstring, 4) ||
+      (strcmp(pstring, "h") == 0)) {
     return VIS_PLOTPANEL_HOURANGLE;
-  case 'H':
+  }
+  if (minmatch("humidity", pstring, 4) ||
+      (strcmp(pstring, "H") == 0)) {
     return VIS_PLOTPANEL_HUMIDITY;
-  case 'L':
+  }
+  if (minmatch("sidereal", pstring, 3) ||
+      (strcmp(pstring, "L") == 0)) {
     return VIS_PLOTPANEL_SIDEREALTIME;
-  case 'n':
+  }
+  if (minmatch("caljy", pstring, 3) ||
+      (strcmp(pstring, "n") == 0)) {
     return VIS_PLOTPANEL_CALJY;
-  case 'N':
+  }
+  if (minmatch("computed_sdo", pstring, 11) ||
+      (strcmp(pstring, "o") == 0)) {
+    return VIS_PLOTPANEL_SDO_COMPUTED;
+  }
+  if (minmatch("sdo", pstring, 3) ||
+      (strcmp(pstring, "O") == 0)) {
     return VIS_PLOTPANEL_SDO;
-  case 'p':
-    return VIS_PLOTPANEL_PHASE;
-  case 'P':
+  }
+  if (minmatch("pressure", pstring, 4) ||
+      (strcmp(pstring, "P") == 0)) {
     return VIS_PLOTPANEL_PRESSURE;
-  case 'R':
+  }  
+  if (minmatch("phase", pstring, 1) ||
+      (strcmp(pstring, "p") == 0)) {
+    return VIS_PLOTPANEL_PHASE;
+  }
+  if (minmatch("rain", pstring, 3) ||
+      (strcmp(pstring, "R") == 0)) {
     return VIS_PLOTPANEL_RAINGAUGE;
-  case 'S':
+  }
+  if (minmatch("systemp", pstring, 4) ||
+      (strcmp(pstring, "S") == 0)) {
     return VIS_PLOTPANEL_SYSTEMP;
-  case 't':
+  }
+  if (minmatch("temperature", pstring, 4) ||
+      (strcmp(pstring, "T") == 0)) {
+    return VIS_PLOTPANEL_TEMPERATURE;
+  }
+  if (minmatch("time", pstring, 1) ||
+      (strcmp(pstring, "t") == 0)) {
     // This is time, which is a valid x-axis.
     return PLOT_TIME;
-  case 'T':
-    return VIS_PLOTPANEL_TEMPERATURE;
-  case 'V':
+  }
+  if (minmatch("windspeed", pstring, 5) ||
+      (strcmp(pstring, "V") == 0)) {
     return VIS_PLOTPANEL_WINDSPEED;
-  case 'x':
+  }
+  if (minmatch("rightascension", pstring, 5) ||
+      (strcmp(pstring, "x") == 0)) {
     return VIS_PLOTPANEL_RIGHTASCENSION;
-  case 'X':
+  }
+  if (minmatch("seemonphase", pstring, 7) ||
+      (strcmp(pstring, "X") == 0)) {
     return VIS_PLOTPANEL_SEEMONPHASE;
-  case 'y':
+  }
+  if (minmatch("declination", pstring, 3) ||
+      (strcmp(pstring, "y") == 0)) {
     return VIS_PLOTPANEL_DECLINATION;
-  case 'Y':
+  }
+  if (minmatch("seemonrms", pstring, 7) ||
+      (strcmp(pstring, "Y") == 0)) {
     return VIS_PLOTPANEL_SEEMONRMS;
   }
   return -1;
@@ -390,12 +452,12 @@ int time_index() {
 // Callback function called for each line when accept-line
 // executed, EOF seen, or EOF character read.
 static void interpret_command(char *line) {
-  char **line_els = NULL, *cycomma = NULL, delim[] = " ";
+  char **line_els = NULL, *cycomma = NULL, delim[] = " ", tprod[2];
   char duration[VISBUFSIZE], historystart[VISBUFSIZE], ttime[TIMEFILE_LENGTH];
   int nels, i, j, k, array_change_spec, nproducts, pr;
   int change_panel = PLOT_ALL_PANELS, iarg, plen = 0, temp_xaxis_type;
   int *temp_yaxis_type = NULL, temp_nypanels, idx_low, idx_high, ty;
-  int temp_refant, temp_nncal;
+  int temp_refant, temp_nncal, acal_idx_offset = 0;
   float histlength;
   float limit_min, limit_max;
   struct vis_product **vis_products = NULL, *tproduct = NULL;
@@ -585,76 +647,40 @@ static void interpret_command(char *line) {
       if (nels == 1) {
         // Reset the all the panels back to defaults.
         change_vis_plotcontrols_limits(&vis_plotcontrols, PLOT_ALL_PANELS,
-                                       false, 0, 0);
+                                       false, false, 0, 0);
         action_required = ACTION_REFRESH_PLOT;
       } else if (nels > 1) {
         // Get the panel type from the second argument.
-        change_panel = VIS_PLOTPANEL_ALL;
-        if (minmatch("amplitude", line_els[1], 1) ||
-	    (strcmp(line_els[1], "a") == 0)) {
-          change_panel = VIS_PLOTPANEL_AMPLITUDE;
-        } else if (minmatch("phase", line_els[1], 1) ||
-		   (strcmp(line_els[1], "p") == 0)) {
-          change_panel = VIS_PLOTPANEL_PHASE;
-        } else if (minmatch("delay", line_els[1], 1) ||
-		   (strcmp(line_els[1], "d") == 0)) {
-          change_panel = VIS_PLOTPANEL_DELAY;
-        } else if (minmatch("temperature", line_els[1], 4) ||
-		   (strcmp(line_els[1], "T") == 0)) {
-          change_panel = VIS_PLOTPANEL_TEMPERATURE;
-        } else if (minmatch("pressure", line_els[1], 4) ||
-		   (strcmp(line_els[1], "P") == 0)) {
-          change_panel = VIS_PLOTPANEL_PRESSURE;
-        } else if (minmatch("humidity", line_els[1], 4) ||
-		   (strcmp(line_els[1], "H") == 0)) {
-          change_panel = VIS_PLOTPANEL_HUMIDITY;
-        } else if (minmatch("systemp", line_els[1], 4) ||
-		   (strcmp(line_els[1], "S") == 0)) {
-          change_panel = VIS_PLOTPANEL_SYSTEMP;
-        } else if (minmatch("windspeed", line_els[1], 5) ||
-		   (strcmp(line_els[1], "V") == 0)) {
-          change_panel = VIS_PLOTPANEL_WINDSPEED;
-        } else if (minmatch("winddirection", line_els[1], 5) ||
-		   (strcmp(line_els[1], "D") == 0)) {
-          change_panel = VIS_PLOTPANEL_WINDDIR;
-        } else if (minmatch("rain", line_els[1], 3) ||
-		   (strcmp(line_els[1], "R") == 0)) {
-          change_panel = VIS_PLOTPANEL_RAINGAUGE;
-        } else if (minmatch("seemonphase", line_els[1], 7) ||
-		   (strcmp(line_els[1], "X") == 0)) {
-          change_panel = VIS_PLOTPANEL_SEEMONPHASE;
-        } else if (minmatch("seemonrms", line_els[1], 7) ||
-		   (strcmp(line_els[1], "Y") == 0)) {
-          change_panel = VIS_PLOTPANEL_SEEMONRMS;
-        } else if (minmatch("computed_systemp", line_els[1], 4) ||
-		   (strcmp(line_els[1], "C") == 0)) {
-          change_panel = VIS_PLOTPANEL_SYSTEMP_COMPUTED;
-        } else if (minmatch("gtp", line_els[1], 3) ||
-		   (strcmp(line_els[1], "G") == 0)) {
-          change_panel = VIS_PLOTPANEL_GTP;
-        } else if (minmatch("sdo", line_els[1], 3) ||
-		   (strcmp(line_els[1], "N") == 0)) {
-          change_panel = VIS_PLOTPANEL_SDO;
-        } else if (minmatch("caljy", line_els[1], 3) ||
-		   (strcmp(line_els[1], "n") == 0)) {
-          change_panel = VIS_PLOTPANEL_CALJY;
-        } else if (minmatch("closurephase", line_els[1], 4) ||
-		   (strcmp(line_els[1], "c") == 0)) {
-	  change_panel = VIS_PLOTPANEL_CLOSUREPHASE;
+	change_panel = char_to_product(line_els[1]);
+	if (change_panel == -1) {
+	  change_panel = VIS_PLOTPANEL_ALL;
 	}
         if (change_panel != VIS_PLOTPANEL_ALL) {
           if (nels == 2) {
             // Reset just the named panel.
             change_vis_plotcontrols_limits(&vis_plotcontrols, change_panel,
-                                           false, 0, 0);
+                                           false, false, 0, 0);
             action_required = ACTION_REFRESH_PLOT;
-          } else if (nels == 4) {
+	  } else if (nels == 3) {
+	    if (minmatch("fraction", line_els[2], 4)) {
+	      // Reset the named panel, but also change it to display fractional
+	      // values.
+	      change_vis_plotcontrols_limits(&vis_plotcontrols, change_panel,
+					     false, true, 0, 0);
+	      action_required = ACTION_REFRESH_PLOT;
+	    }
+          } else if ((nels == 4) || (nels == 5)) {
             // We've been given limits.
             if ((string_to_float(line_els[2], &limit_min)) &&
                 (string_to_float(line_els[3], &limit_max))) {
               // The limits were successfully read.
-              change_vis_plotcontrols_limits(&vis_plotcontrols, change_panel,
-                                             true, limit_min, limit_max);
+	      if ((nels == 5) && minmatch("fraction", line_els[4], 4)) {
+		change_vis_plotcontrols_limits(&vis_plotcontrols, change_panel,
+					       true, true, limit_min, limit_max);
+	      } else {
+		change_vis_plotcontrols_limits(&vis_plotcontrols, change_panel,
+					       true, false, limit_min, limit_max);
+	      }
               action_required = ACTION_REFRESH_PLOT;
             }
           }
@@ -859,16 +885,19 @@ static void interpret_command(char *line) {
 	}
       }
     } else if ((minmatch("dcal", line_els[0], 4)) ||
-	       (minmatch("pcal", line_els[0], 4))) {
+	       (minmatch("pcal", line_els[0], 4)) ||
+	       (minmatch("acal", line_els[0], 4))) {
       CHECKSIMULATOR;
-      // Compute the delays or phases required to correct the data and then tell the server
-      // to incorporate them.
+      // Compute the delays, phases or amplitudes required to correct the data and then
+      // tell the server to incorporate them.
       // Check if a time range has been specified.
       if (data_seconds < 0) {
 	if (minmatch("dcal", line_els[0], 4)) {
 	  printf(" Unable to dcal: please select a time range with data and nncal\n");
 	} else if (minmatch("pcal", line_els[0], 4)) {
 	  printf(" Unable to pcal: please select a time range with data and nncal\n");
+	} else if (minmatch("acal", line_els[0], 4)) {
+	  printf(" Unable to acal: please select a time range with data and nncal\n");
 	}
       } else {
 	// Check that we have enough cycles of data.
@@ -883,6 +912,8 @@ static void interpret_command(char *line) {
 	    printf(" Unable to dcal: ");
 	  } else if (minmatch("pcal", line_els[0], 4)) {
 	    printf(" Unable to pcal: ");
+	  } else if (minmatch("acal", line_els[0], 4)) {
+	    printf(" Unable to acal: ");
 	  }
 	  printf("need %d consecutive cycles of data, please change data and/or nncal\n",
 		 nncal);
@@ -891,15 +922,35 @@ static void interpret_command(char *line) {
 	    action_required = ACTION_COMPUTE_DELAYS;
 	  } else if (minmatch("pcal", line_els[0], 4)) {
 	    action_required = ACTION_COMPUTE_PHASECORRECTIONS;
+	  } else if (minmatch("acal", line_els[0], 4)) {
+	    action_required = ACTION_COMPUTE_ACAL;
+	    if ((nels == 3) || (nels == 4)) {
+	      // We've been given some flux densities to use.
+	      n_acal_fluxdensities = 2;
+	      CALLOC(acal_fluxdensities, n_acal_fluxdensities);
+	      acal_idx_offset = 2;
+	      // Parse the arguments and see if they look correct.
+	      succ = string_to_float(line_els[1], &(acal_fluxdensities[0])) &
+		string_to_float(line_els[2], &(acal_fluxdensities[1]));
+	      if (!succ) {
+		printf(" Unable to acal: supplied flux densities not valid\n");
+		action_required -= ACTION_COMPUTE_ACAL;
+		FREE(acal_fluxdensities);
+		n_acal_fluxdensities = 0;
+		acal_idx_offset = 0;
+	      }
+	    } else {
+	      acal_idx_offset = 0;
+	    }
 	  }
 	  // Check if we have any modifiers.
-	  if (nels == 2) {
-	    if (minmatch("all", line_els[1], 3)) {
+	  if (nels == (2 + acal_idx_offset)) {
+	    if (minmatch("all", line_els[1 + acal_idx_offset], 3)) {
 	      // We make the correction for the entire dataset.
 	      action_modifier = ACTIONMOD_CORRECT_ALL;
-	    } else if (minmatch("after", line_els[1], 3)) {
+	    } else if (minmatch("after", line_els[1 + acal_idx_offset], 3)) {
 	      action_modifier = ACTIONMOD_CORRECT_AFTER;
-	    } else if (minmatch("before", line_els[1], 3)) {
+	    } else if (minmatch("before", line_els[1 + acal_idx_offset], 3)) {
 	      action_modifier = ACTIONMOD_CORRECT_BEFORE;
 	    }
 	  }
@@ -959,9 +1010,13 @@ static void interpret_command(char *line) {
 	// Remove any phase correction modifiers from our list, and then tell the server
 	// to do its thing.
 	action_required = ACTION_RESET_PHASECORRECTIONS;
+      } else if (minmatch("acal", line_els[1], 3)) {
+	// Remove any noise diode amplitude correction modifiers from our list, and then
+	// the the server to do its thing.
+	action_required = ACTION_RESET_ACAL;
       } else if (minmatch("all", line_els[1], 3)) {
 	// Remove all modifiers.
-	action_required = ACTION_RESET_DELAYS | ACTION_RESET_PHASECORRECTIONS;
+	action_required = ACTION_RESET_DELAYS | ACTION_RESET_PHASECORRECTIONS | ACTION_RESET_ACAL;
       }
     } else if (minmatch("time", line_els[0], 3)) {
       // Change which type of time we display on the bottom.
@@ -995,12 +1050,15 @@ static void interpret_command(char *line) {
         // the end.
         plen = strlen(line_els[0]);
         product_backwards = false;
+	tprod[1] = 0;
         if (line_els[0][plen - 2] == '-') {
           product_backwards = true;
-          temp_xaxis_type = char_to_product(line_els[0][plen - 1]);
+	  tprod[0] = line_els[0][plen - 1];
+          temp_xaxis_type = char_to_product(tprod);
         } else {
           // Otherwise the x-axis is specified as the first char.
-          temp_xaxis_type = char_to_product(line_els[0][0]);
+	  tprod[0] = line_els[0][0];
+          temp_xaxis_type = char_to_product(tprod);
         }
         // Now go through all the other characters.
         if (product_backwards) {
@@ -1011,7 +1069,8 @@ static void interpret_command(char *line) {
           idx_high = plen;
         }
         for (i = idx_low, temp_nypanels = 0; i < idx_high; i++) {
-          ty = char_to_product(line_els[0][i]);
+	  tprod[0] = line_els[0][i];
+          ty = char_to_product(tprod);
           if (ty >= 0) {
             temp_nypanels += 1;
             REALLOC(temp_yaxis_type, temp_nypanels);
@@ -1048,7 +1107,7 @@ int main(int argc, char *argv[]) {
   int i, j, k, l, m, r, bytes_received, nmesg = 0, bidx = -1, num_timelines = 0, pnum;
   int dump_type = FILETYPE_UNKNOWN, dump_device_number = -1, vis_device_number = -1;
   int *timeline_types = NULL, cycidx, visidx, a1, a2, *mod_remove = NULL, n_mod_remove = 0;
-  int alabel;
+  int alabel, acal_modified_idx, acal_modify_range, n_acal_options = 0;
   cmp_ctx_t cmp;
   cmp_mem_access_t mem;
   struct requests server_request;
@@ -1063,11 +1122,13 @@ int main(int argc, char *argv[]) {
   float *timelines = NULL, *timeline_deltas = NULL, dsign = 1;
   float p1 = 0, p2 = 0, p3 = 0, pd1 = 0, pd2 = 0, pd3 = 0;
   float phase_cals[POL_XY + 1][MAX_ANTENNANUM][MAXNNCAL];
-  double tmjd;
+  double tmjd, *amjds = NULL;
   struct vis_quantities ***described_ptr = NULL;
   struct scan_header_data *described_hdr = NULL;
   struct panelspec dump_panelspec;
   struct ampphase_modifiers *modptr = NULL;
+  struct fluxdensity_specification acal_fd_spec;
+  struct ampphase_options **acal_options = NULL;
 
   // Allocate and initialise some memory.
   MALLOC(mesgout, MAX_N_MESSAGES);
@@ -1089,7 +1150,17 @@ int main(int argc, char *argv[]) {
   ampphase_options = NULL;
   found_options = NULL;
   reference_antenna_index = 0;
-
+  n_acal_fluxdensities = 0;
+  acal_fluxdensities = NULL;
+  // This next initialisation is to stop some valgrind warnings...
+  for (i = 0; i <= POL_XY; i++) {
+    for (j = 0; j < MAX_ANTENNANUM; j++) {
+      for (k = 0; k < MAXNNCAL; k++) {
+	phase_cals[i][j][k] = 0;
+      }
+    }
+  }
+  
   // Set the default for the arguments.
   arguments.use_file = false;
   arguments.input_file[0] = 0;
@@ -1209,7 +1280,7 @@ int main(int argc, char *argv[]) {
       print_information_scan_header(described_hdr, header_string, VISBUFSIZE);
       /* snprintf(mesgout[nmesg++], VISBUFSIZE, " header at index:\n%s\n", header_string); */
       found_options = find_ampphase_options(n_ampphase_options, ampphase_options,
-					    described_hdr);
+					    described_hdr, NULL);
       /* print_options_set(1, &found_options, header_string, VISBUFSIZE); */
       /* snprintf(mesgout[nmesg++], VISBUFSIZE, "%s", header_string); */
       readline_print_messages(nmesg, mesgout);
@@ -1236,13 +1307,16 @@ int main(int argc, char *argv[]) {
 	(action_required & ACTION_RESET_DELAYS) ||
 	(action_required & ACTION_ADD_DELAYS) ||
 	(action_required & ACTION_COMPUTE_PHASECORRECTIONS) ||
-	(action_required & ACTION_RESET_PHASECORRECTIONS)) {
+	(action_required & ACTION_RESET_PHASECORRECTIONS) ||
+	(action_required & ACTION_ENACT_ACAL) ||
+	(action_required & ACTION_RESET_ACAL)) {
       action_required |= ACTION_AMPPHASE_OPTIONS_CHANGED;
       nmesg = 0;
       for (j = 0; j < nvisbands; j++) {
 	visidx = visband_idx[j] - 1;
 	if ((action_required & ACTION_RESET_DELAYS) ||
-	    (action_required & ACTION_RESET_PHASECORRECTIONS)) {
+	    (action_required & ACTION_RESET_PHASECORRECTIONS) ||
+	    (action_required & ACTION_RESET_ACAL)) {
 	  // Remove all modifiers that have delay corrections in the options.
 	  n_mod_remove = 0;
 	  mod_remove = NULL;
@@ -1250,7 +1324,9 @@ int main(int argc, char *argv[]) {
 	    if (((action_required & ACTION_RESET_DELAYS) &&
 		 (found_options->modifiers[visband_idx[j]][i]->add_delay)) ||
 		((action_required & ACTION_RESET_PHASECORRECTIONS) &&
-		 (found_options->modifiers[visband_idx[j]][i]->add_phase))) {
+		 (found_options->modifiers[visband_idx[j]][i]->add_phase)) ||
+		((action_required & ACTION_RESET_ACAL) &&
+		 (found_options->modifiers[visband_idx[j]][i]->set_noise_diode_amplitude))) {
 	      n_mod_remove += 1;
 	      REALLOC(mod_remove, n_mod_remove);
 	      mod_remove[n_mod_remove - 1] = i;
@@ -1266,7 +1342,7 @@ int main(int argc, char *argv[]) {
 		   (action_required & ACTION_ADD_DELAYS) ||
 		   (action_required & ACTION_COMPUTE_PHASECORRECTIONS)) {
 	  // Create a new modifier in the options.
-	  modptr = add_modifier(found_options, visband_idx[j]);
+	  modptr = add_modifier(found_options, visband_idx[j], NULL);
 	  /* found_options->num_modifiers[visband_idx[j]] += 1; */
 	  /* REALLOC(found_options->modifiers[visband_idx[j]], */
 	  /* 	  found_options->num_modifiers[visband_idx[j]]); */
@@ -1497,6 +1573,49 @@ int main(int argc, char *argv[]) {
 		       180 / M_PI);
 	    }
 	  }
+	} else if (action_required & ACTION_ENACT_ACAL) {
+	  // We print out the computed noise diode amplitudes.
+	  if ((acal_modified_idx >= 0) && (acal_modified_idx < n_ampphase_options)) {
+	    modptr = NULL;
+	    for (l = 0;
+		 l < ampphase_options[acal_modified_idx]->num_modifiers[visband_idx[j]]; l++) {
+	      if (ampphase_options[acal_modified_idx]->modifiers[visband_idx[j]][l]->set_noise_diode_amplitude == true) {
+		modptr = ampphase_options[acal_modified_idx]->modifiers[visband_idx[j]][l];
+	      }
+	    }
+	    if (modptr != NULL) {
+	      if ((acal_modify_range == ACTIONMOD_CORRECT_ALL) ||
+		  (acal_modify_range == ACTIONMOD_CORRECT_BEFORE)) {
+		modptr->noise_diode_start_mjd = 0;
+	      }
+	      if ((acal_modify_range == ACTIONMOD_CORRECT_ALL) ||
+		  (acal_modify_range == ACTIONMOD_CORRECT_AFTER)) {
+		modptr->noise_diode_end_mjd = 100000; // This is 2132-SEP-01.
+	      }
+	      // Find the flux density specification for this band.
+	      for (l = 0; l < acal_fd_spec.num_models; l++) {
+		if (((acal_fd_spec.model_frequency[l] -
+		      acal_fd_spec.model_frequency_tolerance[l]) <
+		     described_hdr->if_centre_freq[visidx]) &&
+		    ((acal_fd_spec.model_frequency[l] +
+		      acal_fd_spec.model_frequency_tolerance[l]) >
+		     described_hdr->if_centre_freq[visidx])) {
+		  break;
+		}
+	      }
+	      snprintf(mesgout[nmesg++], VISBUFLONG,
+		       " BAND %d FLUX = %.3f Jy, MJD %.6f - %.6f:\n",
+		       visband_idx[j], acal_fd_spec.model_terms[l][0],
+		       modptr->noise_diode_start_mjd,
+		       modptr->noise_diode_end_mjd);
+	      for (l = 1; l < modptr->noise_diode_num_antennas; l++) {
+		snprintf(mesgout[nmesg++], VISBUFLONG,
+			 "   ANT %d: X = %.2f Y = %.2f Jy\n", l,
+			 modptr->noise_diode_amplitude[l][POL_X],
+			 modptr->noise_diode_amplitude[l][POL_Y]);
+	      }
+	    }
+	  }
 	}
       }
       readline_print_messages(nmesg, mesgout);
@@ -1515,6 +1634,53 @@ int main(int argc, char *argv[]) {
       if (action_required & ACTION_RESET_PHASECORRECTIONS) {
 	action_required -= ACTION_RESET_PHASECORRECTIONS;
       }
+      if (action_required & ACTION_ENACT_ACAL) {
+	action_required -= ACTION_ENACT_ACAL;
+	acal_modify_range = ACTIONMOD_NOMOD;
+	free_fluxdensity_specification(&acal_fd_spec);
+      }
+      if (action_required & ACTION_RESET_ACAL) {
+	action_required -= ACTION_RESET_ACAL;
+      }
+    }
+
+    if (action_required & ACTION_COMPUTE_ACAL) {
+      // The server is responsible for computing the acal parameters, so we
+      // just send the request.
+      action_required -= ACTION_COMPUTE_ACAL;
+      acal_modify_range = action_modifier;
+      action_modifier = ACTIONMOD_NOMOD;
+
+      server_request.request_type = REQUEST_ACAL;
+      init_cmp_memory_buffer(&cmp, &mem, send_buffer, (size_t)SENDBUFSIZE);
+      pack_requests(&cmp, &server_request);
+      pack_write_sint(&cmp, n_ampphase_options);
+      // We keep a copy of these options for when we have to enact them,
+      // because these will come back with the Tsys correction parameter set to NONE.
+      n_acal_options = n_ampphase_options;
+      CALLOC(acal_options, n_acal_options);
+      for (i = 0; i < n_ampphase_options; i++) {
+	pack_ampphase_options(&cmp, ampphase_options[i]);
+	CALLOC(acal_options[i], 1);
+	copy_ampphase_options(acal_options[i], ampphase_options[i]);
+      }
+      // We have to compute, sort and then send the MJDs of the cycles we want
+      // to use to compute the acal parameters.
+      pack_write_sint(&cmp, nncal);
+      CALLOC(amjds, nncal);
+      for (i = 0; i < nncal; i++) {
+	amjds[i] = date2mjd(vis_data.vis_quantities[nncal_indices[i]][0][0]->obsdate,
+			    vis_data.vis_quantities[nncal_indices[i]][0][0]->ut_seconds);
+      }
+      qsort(amjds, nncal, sizeof(double), cmpfunc_double);
+      pack_writearray_double(&cmp, nncal, amjds);
+      // Send along the supplied source amplitudes if we have any.
+      pack_write_sint(&cmp, n_acal_fluxdensities);
+      if (n_acal_fluxdensities > 0) {
+	pack_writearray_float(&cmp, n_acal_fluxdensities, acal_fluxdensities);
+      }
+      socket_send_buffer(socket_peer, send_buffer, cmp_mem_access_get_pos(&mem));
+      FREE(amjds);
     }
     
     if (action_required & ACTION_DESCRIBE_DATA) {
@@ -1526,7 +1692,7 @@ int main(int argc, char *argv[]) {
 	described_ptr = vis_data.vis_quantities[data_selected_index];
 	described_hdr = vis_data.header_data[data_selected_index];
 	found_options = find_ampphase_options(n_ampphase_options, ampphase_options,
-					      described_hdr);
+					      described_hdr, NULL);
 	seconds_to_hourlabel(described_ptr[0][0]->ut_seconds, htime);
 	snprintf(mesgout[nmesg++], VISBUFLONG, "DATA AT %s %s:\n",
 		 described_ptr[0][0]->obsdate, htime);
@@ -1876,6 +2042,44 @@ int main(int argc, char *argv[]) {
 	// The server is shutting down and wants us to die first so it can close
 	// its listening port cleanly.
 	action_required = ACTION_QUIT;
+      } else if (server_response.response_type == RESPONSE_ACAL_COMPUTED) {
+	// We get information back about our acal request.
+	// Receive the ampphase options first, and free old ones if we need to.
+	if (n_ampphase_options > 0) {
+	  for (i = 0; i < n_ampphase_options; i++) {
+	    free_ampphase_options(ampphase_options[i]);
+	    FREE(ampphase_options[i]);
+	  }
+	  FREE(ampphase_options);
+	}
+	pack_read_sint(&cmp, &n_ampphase_options);
+	MALLOC(ampphase_options, n_ampphase_options);
+	for (i = 0; i < n_ampphase_options; i++) {
+	  CALLOC(ampphase_options[i], 1);
+	  unpack_ampphase_options(&cmp, ampphase_options[i]);
+	}
+	// The server tells us which of the options was modified.
+	pack_read_sint(&cmp, &acal_modified_idx);
+	// We also receive the flux densities assumed during calibration.
+	unpack_fluxdensity_specification(&cmp, &acal_fd_spec);
+	// Now we change back to use the Tsys correction that was in effect
+	// when we requested the acal to be computed.
+	for (i = 0; i < n_ampphase_options; i++) {
+	  if (i < n_acal_options) {
+	    ampphase_options[i]->systemp_reverse_online =
+	      acal_options[i]->systemp_reverse_online;
+	    ampphase_options[i]->systemp_apply_computed =
+	      acal_options[i]->systemp_apply_computed;
+	  }
+	}
+	// Free the copied options now we don't need them any more.
+	for (i = 0; i < n_acal_options; i++) {
+	  free_ampphase_options(acal_options[i]);
+	  FREE(acal_options[i]);
+	}
+	FREE(acal_options);
+	// Output and use these new modifiers.
+	action_required = ACTION_ENACT_ACAL | ACTION_NEW_DATA_RECEIVED;
       }
       FREE(recv_buffer);
     }

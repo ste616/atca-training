@@ -153,7 +153,7 @@ while(0)
  *
  * This convenience macro is designed to be used like the following block:
  *
- *     float *array = NULL; int n_array = 0;
+ *     float *array = NULL; int n = 0;
  *     ARRAY_APPEND(array, ++n, 2); // array will be [ 2 ], n = 1
  *     ARRAY_APPEND(array, ++n, 16); // array will be [ 2, 16 ], n = 2
  */
