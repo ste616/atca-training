@@ -285,6 +285,33 @@ bool string_to_float(char *s, float *v) {
 }
 
 /*!
+ *  \brief Try to convert a string to a double precision number using strtod,
+ *         and indicate if this works or not
+ *  \param s the string to convert to a double
+ *  \param v a pointer to the variable to hold the parsed double
+ *  \returns a boolean indicator of whether the conversion was made (true)
+ *           or failed (false)
+ */
+bool string_to_double(char *s, double *v) {
+  // This routine wraps around strtof to indicate if the parsing is
+  // successful.
+  bool succ;
+  char *eptr = NULL;
+  double tv;
+
+  tv = strtod(s, &eptr);
+  if (eptr == s) {
+    // Failure.
+    succ = false;
+  } else {
+    // Success.
+    succ = true;
+    *v = tv;
+  }
+  return succ;
+}
+
+/*!
  *  \brief A wrapper around strtol that indicates if the parsing has
  *         been successful
  *  \param s the string which should represent an integer

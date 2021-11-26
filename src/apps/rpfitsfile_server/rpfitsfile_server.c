@@ -62,6 +62,10 @@ static char rpfitsfile_server_args_doc[] = "[options] RPFITS_FILES...";
  *         it to properly parse command line arguments
  */
 static struct argp_option rpfitsfile_server_options[] = {
+  { "minimum_mjd", 'j', "MJD", 0,
+    "MJD before which no data will be read" },
+  { "maximum_mjd", 'J', "MJD", 0,
+    "MJD after which no data will be read" },
   { "networked", 'n', 0, 0,
     "Switch to operate as a network data server " },
   { "port", 'p', "PORTNUM", 0,
@@ -114,6 +118,14 @@ struct rpfitsfile_server_arguments {
    * starting at 0. Each string has length RPSBUFSIZE.
    */
   char **testing_instruction_files;
+  /*! \var minimum_read_mjd
+   *  \brief MJD before which no data will be read from file
+   */
+  double minimum_read_mjd;
+  /*! \var maximum_read_mjd
+   *  \brief MJD after which no data will be read from file
+   */
+  double maximum_read_mjd;
 };
 
 /*!
@@ -131,6 +143,16 @@ static error_t rpfitsfile_server_parse_opt(int key, char *arg, struct argp_state
   struct rpfitsfile_server_arguments *arguments = state->input;
   
   switch (key) {
+  case 'j':
+    if (!string_to_double(arg, &(arguments->minimum_read_mjd))) {
+      arguments->minimum_read_mjd = -INFINITY;
+    }
+    break;
+  case 'J':
+    if (!string_to_double(arg, &(arguments->maximum_read_mjd))) {
+      arguments->maximum_read_mjd = INFINITY;
+    }
+    break;
   case 'n':
     arguments->network_operation = true;
     break;
@@ -1144,8 +1166,8 @@ void data_reader(int read_type, int n_rpfits_files,
               // Check if we're out of bounds here.
               if ((read_type & COMPUTE_VIS_PRODUCTS) &&
                   ((mjd_low > cycle_end) || ((mjd_high > 0) && (mjd_high < cycle_start)))) {
-                fprintf(stderr, "[data_reader] cycle skipped for COMPUTE_VIS_PRODUCTS %f\n",
-                        cycle_start);
+                /* fprintf(stderr, "[data_reader] cycle skipped for COMPUTE_VIS_PRODUCTS %f\n", */
+                /*         cycle_start); */
                 nocompute = true;
               } 
               /* printf("%.6f / %.6f / %.6f  (%.6f)\n", cycle_start, cycle_mjd, cycle_end, */
@@ -1807,7 +1829,9 @@ int main(int argc, char *argv[]) {
   arguments.testing_operation = false;
   arguments.num_instruction_files = 0;
   arguments.testing_instruction_files = NULL;
-
+  arguments.minimum_read_mjd = -INFINITY;
+  arguments.maximum_read_mjd = INFINITY;
+  
   // And the default for the calculator options.
   /* MALLOC(ampphase_options, 1); */
   /* set_default_ampphase_options(ampphase_options); */
@@ -1820,6 +1844,11 @@ int main(int argc, char *argv[]) {
   // Stop here if we don't have any RPFITS files.
   if (arguments.n_rpfits_files == 0) {
     fprintf(stderr, "NO RPFITS FILES SPECIFIED, EXITING\n");
+    return(-1);
+  }
+  // Check if our data limits make sense.
+  if (arguments.minimum_read_mjd >= arguments.maximum_read_mjd) {
+    fprintf(stderr, "SPECIFIED MJD RANGE IS INVALID, EXITING\n");
     return(-1);
   }
 
@@ -1884,7 +1913,8 @@ int main(int argc, char *argv[]) {
     info_rpfits_files[i] = new_rpfits_file();
     strncpy(info_rpfits_files[i]->filename, arguments.rpfits_files[i], RPSBUFSIZE);
   }
-  data_reader(READ_SCAN_METADATA, arguments.n_rpfits_files, 0.0, -1, -1, 0, NULL,
+  data_reader(READ_SCAN_METADATA, arguments.n_rpfits_files, 0.0,
+	      arguments.minimum_read_mjd, arguments.maximum_read_mjd, 0, NULL,
 	      &n_ampphase_options, &ampphase_options,
               info_rpfits_files, &spectrum_data, &vis_data, NULL);
   // We can now work out which time range we cover and the cycle time.
@@ -1945,7 +1975,13 @@ int main(int argc, char *argv[]) {
     ri = rand() % arguments.n_rpfits_files;
     rj = rand() % info_rpfits_files[ri]->n_scans;
     if (info_rpfits_files[ri]->n_cycles[rj] > 0) {
-      mjd_grab = info_rpfits_files[ri]->scan_start_mjd[rj] + 10.0 / 86400.0;
+      if ((info_rpfits_files[ri]->scan_start_mjd[rj] >= arguments.minimum_read_mjd) &&
+	  (info_rpfits_files[ri]->scan_end_mjd[rj] <= arguments.maximum_read_mjd)) {
+	mjd_grab = info_rpfits_files[ri]->scan_start_mjd[rj] + 10.0 / 86400.0;
+      } else if ((info_rpfits_files[ri]->scan_start_mjd[rj] < arguments.minimum_read_mjd) &&
+		 (info_rpfits_files[ri]->scan_end_mjd[rj] > arguments.minimum_read_mjd)) {
+	mjd_grab = arguments.minimum_read_mjd;
+      }
     }
     loop_limit++;
   }
@@ -1954,7 +1990,8 @@ int main(int argc, char *argv[]) {
     exit(1);
   }
   printf(" grabbing from random scan %d from file %d, MJD %.6f\n", rj, ri, mjd_grab);
-  data_reader(GRAB_SPECTRUM | COMPUTE_VIS_PRODUCTS, arguments.n_rpfits_files, mjd_grab, -1, -1,
+  data_reader(GRAB_SPECTRUM | COMPUTE_VIS_PRODUCTS, arguments.n_rpfits_files, mjd_grab,
+	      arguments.minimum_read_mjd, arguments.maximum_read_mjd,
 	      0, NULL, &n_ampphase_options, &ampphase_options, info_rpfits_files, &spectrum_data,
 	      &vis_data, NULL);
   // This first grab of the vis_data goes into the default client slot.
@@ -2254,7 +2291,8 @@ int main(int argc, char *argv[]) {
                 // Now do the computation.
                 printf("CHILD STARTED! Computing data...\n");
                 
-                data_reader(COMPUTE_VIS_PRODUCTS, arguments.n_rpfits_files, mjd_grab, -1, -1,
+                data_reader(COMPUTE_VIS_PRODUCTS, arguments.n_rpfits_files, mjd_grab,
+			    arguments.minimum_read_mjd, arguments.maximum_read_mjd,
 			    0, NULL, &n_client_options, &client_options, info_rpfits_files,
 			    &spectrum_data, &child_vis_data, NULL);
                 // We send the data back to our parent over the network.
@@ -2512,7 +2550,8 @@ int main(int argc, char *argv[]) {
                 // Now grab the spectrum.
                 printf("CHILD STARTED! Grabbing spectrum...\n");
                 
-                data_reader(GRAB_SPECTRUM, arguments.n_rpfits_files, mjd_grab, -1, -1, 0, NULL,
+                data_reader(GRAB_SPECTRUM, arguments.n_rpfits_files, mjd_grab,
+			    arguments.minimum_read_mjd, arguments.maximum_read_mjd, 0, NULL,
 			    &n_client_options, &client_options, info_rpfits_files,
 			    &child_spectrum_data, NULL, NULL);
                 // We send the data back to our parent over the network.
@@ -2796,7 +2835,8 @@ int main(int argc, char *argv[]) {
 		  printf("   MJD %.6f\n", acal_cycle_mjds[i]);
 		}
 		// Get the cycles.
-		data_reader(GRAB_MJDS_SPECTRA, arguments.n_rpfits_files, -1, -1, -1,
+		data_reader(GRAB_MJDS_SPECTRA, arguments.n_rpfits_files, -1,
+			    arguments.minimum_read_mjd, arguments.maximum_read_mjd,
 			    n_acal_cycles, acal_cycle_mjds, &n_client_options,
 			    &client_options, info_rpfits_files,
 			    NULL, NULL, &acal_spectra);
