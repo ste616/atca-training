@@ -41,6 +41,7 @@
 #define PLOTTIME_AWST             4
 #define PLOTTIME_GMST             5
 #define PLOTTIME_LST              6
+#define PLOTTIME_MJD              7
 
 #define PLOT_FLAG_POL_XX             1<<1
 #define PLOT_FLAG_POL_YY             1<<2

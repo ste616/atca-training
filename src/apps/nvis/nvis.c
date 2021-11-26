@@ -1021,7 +1021,7 @@ static void interpret_command(char *line) {
     } else if (minmatch("time", line_els[0], 3)) {
       // Change which type of time we display on the bottom.
       if (nels != 2) {
-	printf(" please supply an argument [UT/AEST/AEDT/AWST/GMST/LST]\n");
+	printf(" please supply an argument [UT/AEST/AEDT/AWST/GMST/LST/MJD]\n");
       } else {
 	action_required = ACTION_CHANGE_TIMETYPE;
 	if (strncasecmp(line_els[1], "gmst", 4) == 0) {
@@ -1037,8 +1037,10 @@ static void interpret_command(char *line) {
 	  new_timetype = PLOTTIME_AEDT;
 	} else if (strcasecmp(line_els[1], "awst") == 0) {
 	  new_timetype = PLOTTIME_AWST;
+	} else if (strcasecmp(line_els[1], "mjd") == 0) {
+	  new_timetype = PLOTTIME_MJD;
 	} else {
-	  printf(" please supply an argument [UT/AEST/AEDT/AWST/GMST/LST]\n");
+	  printf(" please supply an argument [UT/AEST/AEDT/AWST/GMST/LST/MJD]\n");
 	  action_required -= ACTION_CHANGE_TIMETYPE;
 	}
       }

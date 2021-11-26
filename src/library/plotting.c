@@ -1435,7 +1435,8 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
   if ((plot_controls->time_type == PLOTTIME_UTC) ||
       (plot_controls->time_type == PLOTTIME_AEST) ||
       (plot_controls->time_type == PLOTTIME_AEDT) ||
-      (plot_controls->time_type == PLOTTIME_AWST)) {
+      (plot_controls->time_type == PLOTTIME_AWST) ||
+      (plot_controls->time_type == PLOTTIME_MJD)) {
     min_x = (float)((min_time - basemjd) * 86400.0);
     max_x = (float)((max_time - basemjd) * 86400.0);
     if (plot_controls->time_type == PLOTTIME_AEST) {
@@ -1508,7 +1509,8 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
 	      if ((plot_controls->time_type == PLOTTIME_UTC) ||
 		  (plot_controls->time_type == PLOTTIME_AEST) ||
 		  (plot_controls->time_type == PLOTTIME_AEDT) ||
-		  (plot_controls->time_type == PLOTTIME_AWST)) {
+		  (plot_controls->time_type == PLOTTIME_AWST) ||
+		  (plot_controls->time_type == PLOTTIME_MJD)) {
 		chktime = (date2mjd(cycle_vis_quantities[k][l][m]->obsdate,
 				    cycle_vis_quantities[k][l][m]->ut_seconds) -
 			   basemjd) * 86400.0;
@@ -1617,7 +1619,8 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
 	      if ((plot_controls->time_type == PLOTTIME_UTC) ||
 		  (plot_controls->time_type == PLOTTIME_AEST) ||
 		  (plot_controls->time_type == PLOTTIME_AEDT) ||
-		  (plot_controls->time_type == PLOTTIME_AWST)) {
+		  (plot_controls->time_type == PLOTTIME_AWST) ||
+		  (plot_controls->time_type == PLOTTIME_MJD)) {
 		chktime = (date2mjd(cycle_vis_quantities[k][l][m]->obsdate,
 				    cycle_vis_quantities[k][l][m]->ut_seconds) -
 			   basemjd) * 86400.0;
@@ -1751,7 +1754,8 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
 	    if ((plot_controls->time_type == PLOTTIME_UTC) ||
 		(plot_controls->time_type == PLOTTIME_AEST) ||
 		(plot_controls->time_type == PLOTTIME_AEDT) ||
-		(plot_controls->time_type == PLOTTIME_AWST)) {
+		(plot_controls->time_type == PLOTTIME_AWST) ||
+		(plot_controls->time_type == PLOTTIME_MJD)) {
 	      chktime = (date2mjd(cycle_vis_quantities[k][l][m]->obsdate,
 				  cycle_vis_quantities[k][l][m]->ut_seconds) -
 			 basemjd) * 86400.0;
@@ -1886,7 +1890,8 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
 	      if ((plot_controls->time_type == PLOTTIME_UTC) ||
 		  (plot_controls->time_type == PLOTTIME_AEST) ||
 		  (plot_controls->time_type == PLOTTIME_AEDT) ||
-		  (plot_controls->time_type == PLOTTIME_AWST)) {
+		  (plot_controls->time_type == PLOTTIME_AWST) ||
+		  (plot_controls->time_type == PLOTTIME_MJD)) {
 		chktime = (date2mjd(cycle_vis_quantities[k][l][m]->obsdate,
 				    cycle_vis_quantities[k][l][m]->ut_seconds) -
 			   basemjd) * 86400.0;
@@ -2039,12 +2044,24 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
       (void)strcpy(yopts, "BCMTS");
     }
     if (i == (plot_controls->num_panels - 1)) {
-      (void)strcpy(xopts, "BCNTSZH");
+      /* if (plot_controls->time_type == PLOTTIME_MJD) { */
+      /* 	(void)strcpy(xopts, "BCNTS"); */
+      /* } else { */
+	(void)strcpy(xopts, "BCNTSZH");
+      /* } */
     } else {
-      (void)strcpy(xopts, "BCTSZ");
+      /* if (plot_controls->time_type == PLOTTIME_MJD) { */
+      /* 	(void)strcpy(xopts, "BCTS"); */
+      /* } else { */
+	(void)strcpy(xopts, "BCTSZ");
+      /* } */
     }
     cpgsls(1);
-    cpgtbox(xopts, 0, 0, yopts, 0, 0);
+    /* if (plot_controls->time_type == PLOTTIME_MJD) { */
+    /*   cpgbox(xopts, 0, 0, yopts, 0, 0); */
+    /* } else { */
+      cpgtbox(xopts, 0, 0, yopts, 0, 0);
+    /* } */
     if (plot_controls->panel_type[i] == VIS_PLOTPANEL_AMPLITUDE) {
       (void)strcpy(panellabel, "Amplitude");
       (void)strcpy(panelunits, "(Pseudo-Jy)");
@@ -2145,6 +2162,9 @@ void make_vis_plot(struct vis_quantities ****cycle_vis_quantities,
 	strcpy(timetypestring, "GMST");
       } else if (plot_controls->time_type == PLOTTIME_LST) {
 	strcpy(timetypestring, "LST");
+      } else if (plot_controls->time_type == PLOTTIME_MJD) {
+	/* strcpy(timetypestring, "MJD"); */
+	snprintf(timetypestring, BUFSIZE, "MJD + %.1f", basemjd);
       }
       cpgmtxt("B", 3, 0.5, 0.5, timetypestring);
       // Print the baselines on the bottom.
