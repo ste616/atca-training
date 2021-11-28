@@ -1141,15 +1141,17 @@ void data_reader(int read_type, int n_rpfits_files,
             // SOMETHING WITH THIS CYCLE
             cycle_mjd = date2mjd(sh->obsdate, cycle_data->ut_seconds);
             if (read_type & READ_SCAN_METADATA) {
-	      // The early time of the scan is also now set.
-	      if (info_rpfits_files[i]->scan_start_mjd[n] == 0) {
-		info_rpfits_files[i]->scan_start_mjd[n] = cycle_mjd;
+	      if ((cycle_mjd >= mjd_low) && (cycle_mjd <= mjd_high)) {
+		// The early time of the scan is also now set.
+		if (info_rpfits_files[i]->scan_start_mjd[n] == 0) {
+		  info_rpfits_files[i]->scan_start_mjd[n] = cycle_mjd;
+		}
+		info_rpfits_files[i]->scan_end_mjd[n] = cycle_mjd;
+		info_rpfits_files[i]->n_cycles[n] += 1;
+		REALLOC(info_rpfits_files[i]->cycle_mjd[n], info_rpfits_files[i]->n_cycles[n]);
+		info_rpfits_files[i]->cycle_mjd[n][info_rpfits_files[i]->n_cycles[n] - 1] =
+		  cycle_mjd;
 	      }
-              info_rpfits_files[i]->scan_end_mjd[n] = cycle_mjd;
-              info_rpfits_files[i]->n_cycles[n] += 1;
-              REALLOC(info_rpfits_files[i]->cycle_mjd[n], info_rpfits_files[i]->n_cycles[n]);
-              info_rpfits_files[i]->cycle_mjd[n][info_rpfits_files[i]->n_cycles[n] - 1] =
-                cycle_mjd;
             }
             if ((read_type & GRAB_SPECTRUM) ||
 		(read_type & GRAB_MJDS_SPECTRA) ||
