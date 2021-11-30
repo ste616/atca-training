@@ -22,6 +22,10 @@ our website:
 
 Put it into the `atca-training/tutorials/4_challenging_calibration` directory.
 
+## The challenges
+
+### Challenge 1
+
 From that same directory, start the `rpfitsfile_server` with the command:
 ```bash
 ../../build/rpfitsfile_server -n 2021-10-09_0514.C999 -j 59496.22465278 -J 59496.22581019
@@ -57,4 +61,22 @@ images.
 ![NSPD upon startup](nspd_t4_startup.png)
 
 ![NVIS upon startup](nvis_t4_startup.png)
+
+#### Goal
+
+In this dataset, we are observing 1934-638 with the 16cm receiver, for just a couple
+of minutes. You should be able to use the tools to work out everything else about the
+observation and the data.
+
+Doing the initial delay, amplitude and phase calibrations can be tricky at 16cm, since
+RFI can get in the way. Using any time range for NVIS calibration, and any reference
+antenna, get the data to look very similar to the following images.
+
+![NVIS AA at successful completion](nvis_t4_goal1_aa.png)
+
+![NVIS CC at successful completion](nvis_t4_goal1_cc.png)
+
+![NSPD IF1 at successful completion](nspd_t4_goal1_if1.png)
+
+![NSPD IF2 at successful completion](nspd_t4_goal1_if2.png)
 
