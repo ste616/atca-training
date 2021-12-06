@@ -1021,7 +1021,7 @@ static void interpret_command(char *line) {
     } else if (minmatch("time", line_els[0], 3)) {
       // Change which type of time we display on the bottom.
       if (nels != 2) {
-	printf(" please supply an argument [UT/AEST/AEDT/AWST/GMST/LST]\n");
+	printf(" please supply an argument [UT/AEST/AEDT/AWST/GMST/LST/MJD]\n");
       } else {
 	action_required = ACTION_CHANGE_TIMETYPE;
 	if (strncasecmp(line_els[1], "gmst", 4) == 0) {
@@ -1037,8 +1037,10 @@ static void interpret_command(char *line) {
 	  new_timetype = PLOTTIME_AEDT;
 	} else if (strcasecmp(line_els[1], "awst") == 0) {
 	  new_timetype = PLOTTIME_AWST;
+	} else if (strcasecmp(line_els[1], "mjd") == 0) {
+	  new_timetype = PLOTTIME_MJD;
 	} else {
-	  printf(" please supply an argument [UT/AEST/AEDT/AWST/GMST/LST]\n");
+	  printf(" please supply an argument [UT/AEST/AEDT/AWST/GMST/LST/MJD]\n");
 	  action_required -= ACTION_CHANGE_TIMETYPE;
 	}
       }
@@ -1495,7 +1497,7 @@ int main(int argc, char *argv[]) {
 			if (action_required & ACTION_COMPUTE_PHASECORRECTIONS) {
 			  phase_cals[POL_XY]
 			    [vis_data.header_data[cycidx]->ant_label[l]][i] =
-			    vis_data.vis_quantities[cycidx][visidx][k]->phase[m][0];
+			    vis_data.vis_quantities[cycidx][visidx][k]->phase[m][1];
 			}
 		      }
 		    }
@@ -1537,8 +1539,8 @@ int main(int argc, char *argv[]) {
 		for (i = 1; i < nncal; i++) {
 		  // Generate 3 options for this phase.
 		  p1 = phase_cals[pnum][alabel][i];
-		  p2 = phase_cals[pnum][alabel][i] + 180;
-		  p3 = phase_cals[pnum][alabel][i] - 180;
+		  p2 = phase_cals[pnum][alabel][i] + 360;
+		  p3 = phase_cals[pnum][alabel][i] - 360;
 		  // And then measure the difference between these options and the
 		  // last phase value.
 		  pd1 = fabsf(p1 - phase_cals[pnum][alabel][i - 1]);
@@ -1546,11 +1548,11 @@ int main(int argc, char *argv[]) {
 		  pd3 = fabsf(p3 - phase_cals[pnum][alabel][i - 1]);
 		  // Set this phase now to the value with the smallest difference.
 		  if (pd2 < pd1) {
-		    phase_cals[i][pnum][alabel] = p2;
+		    phase_cals[pnum][alabel][i] = p2;
 		    pd1 = pd2;
 		  }
 		  if (pd3 < pd1) {
-		    phase_cals[i][pnum][alabel] = p3;
+		    phase_cals[pnum][alabel][i] = p3;
 		  }
 		}
 		// Now set the correction value.
