@@ -19,6 +19,7 @@ go to `atca-training/build`.
 
 You should download the RPFITS file that we will use for this tutorial from
 our website:
+[2021-10-09_0514.C999](https://www.narrabri.atnf.csiro.au/people/Jamie.Stevens/atca-training-tutorials/4_challenging_calibration/2021-10-09_0514.C999).
 
 Put it into the `atca-training/tutorials/4_challenging_calibration` directory.
 
