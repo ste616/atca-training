@@ -69,14 +69,53 @@ of minutes. You should be able to use the tools to work out everything else abou
 observation and the data.
 
 Doing the initial delay, amplitude and phase calibrations can be tricky at 16cm, since
-RFI can get in the way. Using any time range for NVIS calibration, and any reference
+RFI can get in the way. Using any time range you think best for NVIS calibration, and any reference
 antenna, get the data to look very similar to the following images.
 
-![NVIS AA at successful completion](nvis_t4_goal1_aa.png)
+![NVIS AA at successful completion of goal 1](nvis_t4_goal1_aa.png)
 
-![NVIS CC at successful completion](nvis_t4_goal1_cc.png)
+![NVIS CC at successful completion of goal 1](nvis_t4_goal1_cc.png)
 
-![NSPD IF1 at successful completion](nspd_t4_goal1_if1.png)
+![NSPD IF1 at successful completion of goal 1](nspd_t4_goal1_if1.png)
 
-![NSPD IF2 at successful completion](nspd_t4_goal1_if2.png)
+![NSPD IF2 at successful completion of goal 1](nspd_t4_goal1_if2.png)
 
+Specifically, you should ensure that:
+* phases (except for RFI) should remain between +/- 100 degrees across the entire
+band
+* the system temperatures, as computed by the server, should all be between 18 and 20 K
+for each antenna, polarisation and IF
+
+### Challenge 2
+
+For the second challenge, we will revisit the same dataset that we looked at for
+the second and third tutorials. Quit the `rpfitsfile_server` you started above and
+restart it (from the same directory) with the command:
+```bash
+../../build/rpfitsfile_server -n ../2_dcal_and_delavg/2021-04-28_0445.C999
+```
+
+When you see the `Waiting for connections...` output, you can restart NSPD and NVIS
+as you did above.
+
+#### Goal
+
+In our previous tutorials we examined how calibration worked primarily with 0823-500,
+which has sufficient flux density to make calibration pretty easy. However, if you
+were stuck with a source with low flux density, like 0945-321, could you do as good
+a job with the calibration?
+
+It is possible to get the calibration to look like the following images, and you must
+achieve this as well, using only data before 04:48 for calibration.
+
+![NVIS AA at successful completion of goal 2](nvis_t4_goal2_aa.png)
+
+![NVIS BB at successful completion of goal 2](nvis_t4_goal2_bb.png)
+
+![NVIS CC at successful completion of goal 2](nvis_t4_goal2_cc.png)
+
+![NVIS DD at successful completion of goal 2](nvis_t4_goal2_dd.png)
+
+![NSPD IF1 at successful completion of goal 2](nspd_t4_goal2_if1.png)
+
+![NSPD IF2 at successful completion of goal 2](nspd_t4_goal2_if2.png)
