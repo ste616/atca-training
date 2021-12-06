@@ -119,3 +119,35 @@ achieve this as well, using only data before 04:48 for calibration.
 ![NSPD IF1 at successful completion of goal 2](nspd_t4_goal2_if1.png)
 
 ![NSPD IF2 at successful completion of goal 2](nspd_t4_goal2_if2.png)
+
+Specifically, you should ensure that:
+* phases, except for RFI and noise, should remain between +/- 100 degrees across
+the entire band, for both 0945-321 and 0823-500
+* the system temperatures, as computed by the server, should all be between 17 and
+26 K for each antenna, polarisation and IF
+* the amplitudes displayed in NVIS for 0823-500 should be consistent with the
+knowledge that its actual flux density in this epoch was 2.835 Jy at 5.5 GHz and
+1.993 Jy at 7.5 GHz
+
+## Some advice
+
+This tutorial is not meant to be tricky, and the data has no major or insurmountable
+issues. Everything can be calibrated using
+judicious use of tvchannel, refant, delavg, tvmedian and an appropriate time
+selection.
+
+What you should get from this tutorial is a better understanding of how to
+evaluate your progress while doing the calibration. It is OK to use multiple
+dcal commands, so long as at each point the situation improves, and between
+each dcal you adjust your parameters (like tvchannel and delavg) to allow you
+to progress to an even better calibration. You should also then be aware of when a
+calibration is not required.
+
+Look carefully at NSPD and NVIS, and what they are showing you about the data.
+Take your time, and try the challenges more than once, using different parameters
+each time.
+
+The real goal of this tutorial is to ensure that you develop your data quality
+recognition skills, so that when you come to observe for real, you can confidently
+calibrate the telescope.
+
