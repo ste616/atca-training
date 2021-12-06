@@ -92,6 +92,14 @@ are affected), and how to use it properly.
 
 [Start tutorial 3](tutorials/3_acal_and_tsys/)
 
+### Tutorial 4
+
+Now you get to play around with some more challenging datasets, and see how
+much you've taken in from the first three tutorials. If you can calibrate
+these data, you'll have no troubles when you use the telescope for real.
+
+[Start tutorial 4](tutorials/4_challenging_calibration/)
+
 
 ## About this package
 This software was written and tested by Jamie Stevens (ste616@gmail.com, or
